@@ -12,7 +12,6 @@
 local async = require("dbdash.util.async")
 local dberr = require("dbdash.db.error")
 local dialect = require("dbdash.db.dialect")
-local map = require("dbdash.util.map")
 local resultset = require("dbdash.db.resultset")
 
 local M = {
@@ -295,27 +294,6 @@ end
 
 local CLASS_TYPE = { I = "integer", R = "number", S = "number", T = "string", X = "bytes", B = "bytes" }
 
----Convert JSON-decoded tables into ordered maps (sorted keys; JSON order is not kept).
-local function to_value(v)
-  if type(v) ~= "table" or v == vim.NIL then
-    return v
-  end
-  if vim.islist(v) and (next(v) ~= nil or getmetatable(v) ~= getmetatable(vim.empty_dict())) then
-    local out = {}
-    for i, x in ipairs(v) do
-      out[i] = to_value(x)
-    end
-    return out
-  end
-  local keys = vim.tbl_keys(v)
-  table.sort(keys)
-  local m = map.new()
-  for _, k in ipairs(keys) do
-    map.set(m, k, to_value(v[k]))
-  end
-  return m
-end
-
 ---Decode one tagged cell into a Lua value of the column's logical type.
 local function cell(tag, raw, ltype)
   if tag == "N" then
@@ -336,8 +314,7 @@ local function cell(tag, raw, ltype)
   if ltype == "boolean" and (tag == "I" or tag == "R") then
     return v ~= 0 and v ~= "0"
   elseif ltype == "json" and tag == "T" then
-    local ok, decoded = pcall(vim.json.decode, v, { luanil = { object = false, array = false } })
-    return ok and to_value(decoded) or v
+    return require("dbdash.db.json").decode(v)
   elseif ltype == "decimal" and (tag == "I" or tag == "R") then
     return type(v) == "number" and require("dbdash.template.runtime").numstr(v) or v
   end
