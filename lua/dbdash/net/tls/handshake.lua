@@ -1,4 +1,4 @@
--- TLS 1.3 client handshake (RFC 8446): X25519 key exchange, AES-128-GCM-SHA256 or
+-- TLS 1.3 client handshake (RFC 8446): X25519 or secp256r1 key exchange, AES-128-GCM-SHA256 or
 -- ChaCha20-Poly1305-SHA256, server authentication by CertificateVerify, Finished.
 --
 -- Modes (design §9.2):
@@ -52,6 +52,7 @@ local SIG_ALGS_CERT = { 0x0403, 0x0503, 0x0603, 0x0804, 0x0805, 0x0806, 0x0401, 
 
 local HRR_RANDOM = util.unhex("cf21ad74e59a6111be1d8c021e65b891c2a211167abb8c5e079e09e2c8a8339c")
 local GROUP_X25519 = 0x001d
+local GROUP_P256 = 0x0017
 
 local function u8(n)
   return string.char(n % 256)
@@ -90,12 +91,16 @@ local function is_dns_name(host)
   return host and not host:match("^[%d%.]+$") and not host:find(":", 1, true)
 end
 
----Build the ClientHello handshake message.
-function M.client_hello(host, public_key, random, session_id)
+---Build the ClientHello handshake message. Key shares for both groups are sent up front
+---(some servers, e.g. PostgreSQL by default, only accept secp256r1), so no
+---HelloRetryRequest is needed.
+---@param shares { x25519: string, p256: string }
+function M.client_hello(host, shares, random, session_id)
+  local key_shares = u16(GROUP_X25519) .. vec16(shares.x25519) .. u16(GROUP_P256) .. vec16(shares.p256)
   local exts = {
     ext(43, u8(2) .. u16(0x0304)), -- supported_versions: TLS 1.3
-    ext(10, vec16(list16({ GROUP_X25519 }))), -- supported_groups
-    ext(51, vec16(u16(GROUP_X25519) .. vec16(public_key))), -- key_share
+    ext(10, vec16(list16({ GROUP_X25519, GROUP_P256 }))), -- supported_groups
+    ext(51, vec16(key_shares)), -- key_share
     ext(13, vec16(list16(SIG_ALGS))), -- signature_algorithms
     ext(50, vec16(list16(SIG_ALGS_CERT))), -- signature_algorithms_cert
   }
@@ -112,12 +117,12 @@ function M.client_hello(host, public_key, random, session_id)
   return u8(HS.client_hello) .. u24(#body) .. body
 end
 
----Parse ServerHello: suite, server key share.
+---Parse ServerHello: suite, group, server key share.
 function M.parse_server_hello(body)
   local p = 3 -- legacy_version
   local random = body:sub(p, p + 31)
   if random == HRR_RANDOM then
-    fail("the server asked for a different key exchange group (HelloRetryRequest); only x25519 is supported")
+    fail("the server asked for a different key exchange group (HelloRetryRequest); only x25519 and secp256r1 are supported")
   end
   p = p + 32
   local sid_len = body:byte(p)
@@ -128,7 +133,7 @@ function M.parse_server_hello(body)
   local ext_len
   ext_len, p = rd16(body, p)
   local stop = p + ext_len
-  local version, share
+  local version, share, group
   while p < stop do
     local typ, len
     typ, p = rd16(body, p)
@@ -138,9 +143,9 @@ function M.parse_server_hello(body)
     if typ == 43 then
       version = rd16(data, 1)
     elseif typ == 51 then
-      local group = rd16(data, 1)
+      group = rd16(data, 1)
       local klen = rd16(data, 3)
-      if group ~= GROUP_X25519 then
+      if group ~= GROUP_X25519 and group ~= GROUP_P256 then
         fail("server chose an unsupported key exchange group 0x%04x", group)
       end
       share = data:sub(5, 4 + klen)
@@ -152,10 +157,10 @@ function M.parse_server_hello(body)
   if not SUITES[suite] then
     fail("server chose an unsupported cipher suite 0x%04x", suite)
   end
-  if not share or #share ~= 32 then
-    fail("missing or invalid x25519 key share")
+  if not share or (group == GROUP_X25519 and #share ~= 32) or (group == GROUP_P256 and #share ~= 65) then
+    fail("missing or invalid key share")
   end
-  return suite, share
+  return suite, share, group
 end
 
 ---Content signed by the server in CertificateVerify.
@@ -214,8 +219,10 @@ end
 ---@return dbdash.tls.Session
 function M.run(sock, opts)
   local priv, pub = x25519.keypair()
+  local p256 = require("dbdash.crypto.ecdsa_p256")
+  local ppriv, ppub = p256.ecdh_keypair()
   local rand = require("dbdash.crypto.random")
-  local ch = M.client_hello(opts.host, pub, rand.bytes(32), rand.bytes(32))
+  local ch = M.client_hello(opts.host, { x25519 = pub, p256 = ppub }, rand.bytes(32), rand.bytes(32))
   sock:raw_write(record.header(TYPE.handshake, #ch) .. ch)
   local transcript = ch
 
@@ -260,15 +267,20 @@ function M.run(sock, opts)
   if t ~= HS.server_hello then
     fail("expected ServerHello, got handshake message %d", t)
   end
-  local suite, server_pub = M.parse_server_hello(body)
+  local suite, server_pub, group = M.parse_server_hello(body)
   transcript = transcript .. raw
   if #hbuf > 0 then
     fail("unexpected data after ServerHello in the same record")
   end
 
-  local shared = x25519.scalarmult(priv, server_pub)
-  if shared == string.rep("\0", 32) then
-    fail("invalid x25519 shared secret")
+  local shared
+  if group == GROUP_P256 then
+    shared = p256.ecdh(ppriv, server_pub)
+  else
+    shared = x25519.scalarmult(priv, server_pub)
+    if shared == string.rep("\0", 32) then
+      fail("invalid x25519 shared secret")
+    end
   end
   local zeros = string.rep("\0", 32)
   local early = hkdf.extract(sha256, zeros, zeros)

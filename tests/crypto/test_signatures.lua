@@ -55,4 +55,12 @@ T["RSA-PSS verify (SHA-256 and SHA-384)"] = function()
   eq(rsa.pss_verify(cert.rsa, sha256, MSG, PSS256:sub(2) .. "\0"), false)
 end
 
+T["P-256 ECDH agrees in both directions"] = function()
+  local a_priv, a_pub = ecdsa.ecdh_keypair()
+  local b_priv, b_pub = ecdsa.ecdh_keypair()
+  eq(#a_pub, 65)
+  eq(ecdsa.ecdh(a_priv, b_pub), ecdsa.ecdh(b_priv, a_pub))
+  eq(pcall(ecdsa.ecdh, a_priv, "\4" .. string.rep("\1", 64)), false)
+end
+
 return T

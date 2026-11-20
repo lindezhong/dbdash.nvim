@@ -19,6 +19,7 @@ local NULL = vim.NIL
 
 -- Capability flags.
 local CLIENT = {
+  SSL = 0x800,
   LONG_PASSWORD = 0x1,
   FOUND_ROWS = 0x2,
   LONG_FLAG = 0x4,
@@ -120,7 +121,7 @@ local function scramble(plugin, password, nonce)
   elseif plugin == "caching_sha2_password" then
     return M.sha2_scramble(password, nonce)
   elseif plugin == "mysql_clear_password" then
-    dberr.raise("auth", "mysql_clear_password needs TLS (not available until M4)")
+    return password .. "\0"
   end
   dberr.raise("auth", "unsupported authentication plugin " .. tostring(plugin))
 end
@@ -238,9 +239,6 @@ function M.parse_url(info)
 end
 
 function M.connect(info)
-  if info.tls ~= "disable" then
-    dberr.raise("config", "TLS for mysql is not available yet (planned for M4)")
-  end
   local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
   local c = setmetatable({ sock = sock, seq = 0 }, Conn)
   local ok, err = pcall(c.handshake, c, info)
@@ -307,12 +305,24 @@ function Conn:handshake(info)
     caps = bit.bor(caps, CLIENT.CONNECT_WITH_DB)
   end
   caps = bit.band(caps, bit.bor(hs.capabilities, CLIENT.CONNECT_WITH_DB))
+  local head = function(c)
+    return le(c % 4294967296, 4)
+      .. le(16777216, 4)
+      .. string.char(255) -- utf8mb4_0900_ai_ci (servers without it fall back to the default)
+      .. string.rep("\0", 23)
+  end
+  if info.tls ~= "disable" then
+    if bit.band(hs.capabilities, CLIENT.SSL) == 0 then
+      dberr.raise("tls", "the server does not support TLS connections")
+    end
+    caps = bit.bor(caps, CLIENT.SSL)
+    self:write_packet(head(caps)) -- SSLRequest
+    require("dbdash.net.tls").from_info(self.sock, info)
+    self.tls = true
+  end
   local plugin = hs.plugin
   local auth = scramble(plugin, password, hs.nonce)
-  local body = le(caps % 4294967296, 4)
-    .. le(16777216, 4)
-    .. string.char(255) -- utf8mb4_0900_ai_ci (servers without it fall back to the default)
-    .. string.rep("\0", 23)
+  local body = head(caps)
     .. info.user .. "\0"
     .. lenenc(#auth) .. auth
     .. (info.database and (info.database .. "\0") or "")
@@ -337,6 +347,9 @@ function Conn:handshake(info)
       local data = p:sub(2)
       if plugin == "caching_sha2_password" and data == "\3" then
         -- fast authentication succeeded; OK follows
+      elseif plugin == "caching_sha2_password" and data == "\4" and self.tls then
+        -- Full authentication over TLS: the password is sent as is.
+        self:write_packet(password .. "\0")
       elseif plugin == "caching_sha2_password" and data == "\4" then
         -- Full authentication. Without TLS the password must be RSA-encrypted with the
         -- server's public key (requested with 0x02).

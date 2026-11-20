@@ -1,12 +1,28 @@
-# Databases for integration tests (make it). Plain-text endpoints; TLS variants come with M4.
+# Databases for integration tests (make it). Every server also accepts TLS:
+#   postgres and mysql negotiate it on the same port; redis has a separate TLS port.
+# PostgreSQL and Redis use the test certificate in tests/fixtures (ec_cert.pem); MySQL uses
+# its auto-generated RSA certificate.
 # Host ports avoid the defaults so a local database is not hit by accident.
 name: dbdash-it
 
 services:
   redis:
     image: redis:7.4-alpine
-    command: ["redis-server", "--requirepass", "dbdash_pw"]
-    ports: ["16379:6379"]
+    command:
+      - redis-server
+      - --requirepass
+      - dbdash_pw
+      - --tls-port
+      - "6380"
+      - --tls-cert-file
+      - /certs/ec_cert.pem
+      - --tls-key-file
+      - /certs/ec.key
+      - --tls-auth-clients
+      - "no"
+    volumes:
+      - ../fixtures:/certs:ro
+    ports: ["16379:6379", "16380:6380"]
 
   postgres:
     image: postgres:16-alpine
@@ -18,8 +34,20 @@ services:
       # the default (SCRAM) user and md5_user below can log in.
       POSTGRES_HOST_AUTH_METHOD: md5
       POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    # The key must belong to the postgres user with mode 0600, so copy it first.
+    command:
+      - sh
+      - -c
+      - >-
+        cp /certs/ec_cert.pem /certs/ec.key /var/lib/postgresql/ &&
+        chown postgres /var/lib/postgresql/ec_cert.pem /var/lib/postgresql/ec.key &&
+        chmod 600 /var/lib/postgresql/ec.key &&
+        exec docker-entrypoint.sh postgres -c ssl=on
+        -c ssl_cert_file=/var/lib/postgresql/ec_cert.pem
+        -c ssl_key_file=/var/lib/postgresql/ec.key
     volumes:
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ../fixtures:/certs:ro
     ports: ["15432:5432"]
 
   mysql:

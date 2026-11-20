@@ -1,5 +1,6 @@
--- ECDSA signature verification on NIST P-256 (FIPS 186-4), for TLS CertificateVerify.
--- Jacobian coordinates over a Montgomery field; u1*G + u2*Q with Shamir's trick.
+-- NIST P-256 (FIPS 186-4): ECDSA verification for TLS CertificateVerify and ECDH for the
+-- secp256r1 key share. Jacobian coordinates over a Montgomery field; u1*G + u2*Q with
+-- Shamir's trick. Not constant-time (accepted risk, see :h dbdash-tls).
 local bn = require("dbdash.crypto.bignum")
 local asn1 = require("dbdash.net.tls.asn1")
 
@@ -138,6 +139,49 @@ function M.verify(key, digest, sig_der)
     x = bn.sub(x, N)
   end
   return bn.cmp(x, r) == 0
+end
+
+---k * point (point in Jacobian Montgomery form, k a plain bignum).
+local function scalar_mul(k, pt)
+  local acc = { F.one, F.one, F.zero }
+  for i = bn.bitlen(k) - 1, 0, -1 do
+    acc = dbl(acc)
+    if bit_of(k, i) == 1 then
+      acc = add(acc, pt)
+    end
+  end
+  return acc
+end
+
+local function affine(pt)
+  local zinv = F:inv(pt[3])
+  local z2 = F:mul(zinv, zinv)
+  return F:from(F:mul(pt[1], z2)), F:from(F:mul(pt[2], F:mul(z2, zinv)))
+end
+
+---New ECDH key pair: 32-byte private scalar, 65-byte uncompressed public point.
+function M.ecdh_keypair()
+  local rand = require("dbdash.crypto.random")
+  local d
+  repeat
+    d = bn.from_bytes(rand.bytes(32))
+  until not bn.is_zero(d) and bn.cmp(d, N) < 0
+  local x, y = affine(scalar_mul(d, { F:to(GX), F:to(GY), F.one }))
+  return bn.to_bytes(d, 32), "\4" .. bn.to_bytes(x, 32) .. bn.to_bytes(y, 32)
+end
+
+---Shared secret: x coordinate of priv * peer (32 bytes). Validates the peer point.
+function M.ecdh(priv, peer)
+  local key, err = M.public_key(peer)
+  if not key then
+    error({ phase = "tls", message = "invalid secp256r1 key share: " .. err }, 0)
+  end
+  local pt = scalar_mul(bn.from_bytes(priv), { F:to(key.x), F:to(key.y), F.one })
+  if bn.is_zero(pt[3]) then
+    error({ phase = "tls", message = "invalid secp256r1 shared secret" }, 0)
+  end
+  local x = affine(pt)
+  return bn.to_bytes(x, 32)
 end
 
 return M

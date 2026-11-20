@@ -305,12 +305,20 @@ function M.parse_url(info)
 end
 
 function M.connect(info)
-  if info.tls ~= "disable" then
-    dberr.raise("config", "TLS for postgres is not available yet (planned for M4)")
-  end
   local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
   local c = setmetatable({ sock = sock, params = {} }, Conn)
-  local ok, err = pcall(c.startup, c, info)
+  local ok, err = pcall(function()
+    if info.tls ~= "disable" then
+      -- SSLRequest, then the TLS handshake on the same connection.
+      sock:write(i32(8) .. i32(80877103))
+      local answer = sock:read_exact(1)
+      if answer ~= "S" then
+        dberr.raise("tls", "the server does not accept TLS connections (ssl is off)")
+      end
+      require("dbdash.net.tls").from_info(sock, info)
+    end
+    c:startup(info)
+  end)
   if not ok then
     sock:close()
     error(err, 0)

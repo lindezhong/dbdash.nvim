@@ -266,6 +266,29 @@ Redis       `redis://[user]:pass@host:6379/0`  the query is one command,
 
 Each refresh opens a connection, runs the query and closes it.
 
+TLS                                                                *dbdash-tls*
+
+`?tls=require` encrypts the connection (TLS 1.3) without checking the
+certificate: it stops passive eavesdropping but not a man in the middle.
+`?tls=pin&fingerprint=sha256:AB:CD:...` also requires the server's leaf
+certificate to have that SHA-256 fingerprint and to prove possession of its
+key (CertificateVerify). On a mismatch the error shows the fingerprint the
+server presented. Get it with:
+>sh
+  openssl s_client -connect host:5432 -starttls postgres </dev/null 2>/dev/null |
+    openssl x509 -noout -fingerprint -sha256
+<
+PostgreSQL and MySQL negotiate TLS on their normal port; for Redis use the
+TLS port (or `rediss://`). Supported: TLS 1.3 with X25519 or secp256r1 key
+exchange, AES-128-GCM or ChaCha20-Poly1305, RSA-PSS and ECDSA P-256 server
+signatures. Not yet: TLS 1.2 (SQL Server before 2022), `verify-full`
+(certificate chains and host names).
+
+Known risk: the cryptography is pure Lua and not constant-time, so timing
+side channels exist in theory. This is accepted for a client that
+periodically reads dashboard data; prefer `pin` over `require` on untrusted
+networks.
+
 Oracle is not supported.
 
 ==============================================================================
