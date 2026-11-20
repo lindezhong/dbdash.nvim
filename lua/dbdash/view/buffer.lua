@@ -1,0 +1,141 @@
+-- Dashboard buffer (design §3.3): scratch buffer named dbdash://<abs path>, content written
+-- with extmark highlights; countdown and errors are extmarks, never buffer text.
+local M = {}
+
+M.ns = vim.api.nvim_create_namespace("dbdash")
+M.ns_status = vim.api.nvim_create_namespace("dbdash_status")
+
+local PREFIX = "dbdash://"
+
+---@param path string absolute config path
+function M.name(path)
+  return PREFIX .. path
+end
+
+---Config path from a buffer name, or nil.
+---@param name string
+---@return string?
+function M.path_of(name)
+  local p = name:sub(1, #PREFIX) == PREFIX and name:sub(#PREFIX + 1) or nil
+  return p ~= "" and p or nil
+end
+
+---Existing buffer with exactly this name.
+local function find(name)
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_get_name(b) == name then
+      return b
+    end
+  end
+end
+
+local KEYS = {
+  { "a", "modify_variable", "Modify an argument" },
+  { "A", "show_variables", "Show arguments" },
+  { "r", "restart", "Refresh now" },
+  { "R", "reset_variables", "Reset arguments to defaults" },
+  { "s", "show_sql", "Show the rendered query" },
+}
+
+---Create (or adopt) the buffer for a dashboard.
+---@param path string
+---@param buf integer? buffer to adopt (session restore, :edit dbdash://...)
+---@return integer buf
+function M.create(path, buf)
+  local name = M.name(path)
+  buf = buf or find(name)
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then
+    buf = vim.api.nvim_create_buf(true, true)
+    vim.api.nvim_buf_set_name(buf, name)
+  end
+  local bo = vim.bo[buf]
+  bo.buftype = "nofile"
+  bo.bufhidden = "hide"
+  bo.swapfile = false
+  bo.buflisted = true
+  bo.modifiable = false
+  bo.modified = false
+  bo.filetype = "dbdash"
+  vim.b[buf].dbdash_path = path
+  for _, k in ipairs(KEYS) do
+    vim.keymap.set("n", k[1], function()
+      require("dbdash.commands")[k[2]]()
+    end, { buffer = buf, nowait = true, silent = true, desc = "dbdash: " .. k[3] })
+  end
+  return buf
+end
+
+---Replace buffer content and highlights.
+---@param buf integer
+---@param lines string[]
+---@param hl { row: integer, col_s: integer, col_e: integer, group: string }[]
+function M.draw(buf, lines, hl)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+  vim.bo[buf].modifiable = true
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].modifiable = false
+  vim.bo[buf].modified = false
+  vim.api.nvim_buf_clear_namespace(buf, M.ns, 0, -1)
+  for _, h in ipairs(hl) do
+    pcall(vim.api.nvim_buf_set_extmark, buf, M.ns, h.row, h.col_s, {
+      end_col = h.col_e,
+      hl_group = h.group,
+      priority = 100,
+    })
+  end
+end
+
+---Countdown and error display.
+---@param buf integer
+---@param status { countdown: string?, error: string?, position: string? }
+function M.set_status(buf, status)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+  vim.api.nvim_buf_clear_namespace(buf, M.ns_status, 0, -1)
+  if status.countdown then
+    vim.api.nvim_buf_set_extmark(buf, M.ns_status, 0, 0, {
+      virt_text = { { status.countdown, "DbDashCountdown" } },
+      virt_text_pos = status.position or "right_align",
+      priority = 200,
+    })
+  end
+  if status.error then
+    local vl = {}
+    for line in (status.error .. "\n"):gmatch("([^\n]*)\n") do
+      vl[#vl + 1] = { { (#vl == 0 and "✗ " or "  ") .. line, "DbDashError" } }
+    end
+    vim.api.nvim_buf_set_extmark(buf, M.ns_status, 0, 0, {
+      virt_lines = vl,
+      virt_lines_above = true,
+      priority = 200,
+    })
+    -- Lines above the first buffer line are only visible with topfill.
+    for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+      vim.api.nvim_win_call(win, function()
+        local view = vim.fn.winsaveview()
+        if view.topline == 1 then
+          view.topfill = #vl
+          vim.fn.winrestview(view)
+        end
+      end)
+    end
+  end
+end
+
+---Text area size of the windows showing `buf` (smallest), or the editor size.
+---@return integer width, integer height
+function M.size(buf)
+  local w, h
+  for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+    local info = vim.fn.getwininfo(win)[1]
+    local ww = info.width - info.textoff
+    w = w and math.min(w, ww) or ww
+    h = h and math.min(h, info.height) or info.height
+  end
+  return w or vim.o.columns, h or (vim.o.lines - 2)
+end
+
+return M
