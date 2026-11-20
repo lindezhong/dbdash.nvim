@@ -131,7 +131,7 @@ function C:expr(n)
       end
       return "rt.method(" .. table.concat(args, ", ") .. ")"
     end
-    return ("rt.call(%s, %s, %s)"):format(self:expr(fn), self:list(n.args), self:kwargs(n.kwargs))
+    return ("rt.call(env, %s, %s, %s)"):format(self:expr(fn), self:list(n.args), self:kwargs(n.kwargs))
   elseif k == "Filter" then
     if not R.filters[n.name] then
       self:fail(n, "No filter named '%s'.", n.name)

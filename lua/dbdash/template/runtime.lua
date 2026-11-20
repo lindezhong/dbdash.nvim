@@ -448,8 +448,8 @@ function R.method(obj, name, ...)
   return fn(obj, ...)
 end
 
----Call a global function value.
-function R.call(fn, args, kwargs)
+---Call a global function value: fn(args, kwargs, env).
+function R.call(env, fn, args, kwargs)
   check(fn)
   if type(fn) ~= "function" then
     raise("type", "'%s' object is not callable", typename(fn))
@@ -457,7 +457,7 @@ function R.call(fn, args, kwargs)
   for i = 1, #args do
     check(args[i])
   end
-  return fn(args, kwargs)
+  return fn(args, kwargs, env)
 end
 
 -- Collections ----------------------------------------------------------------------------

@@ -6,10 +6,12 @@ local errors = require("dbdash.template.errors")
 local R = require("dbdash.template.runtime")
 
 require("dbdash.template.filters").install()
+require("dbdash.template.sql").install()
 
 local M = {}
 
 M.Error = errors.Error
+M.env = require("dbdash.template.sql").env
 M.runtime = R
 
 ---@class dbdash.template.Env
