@@ -239,6 +239,21 @@ T[":edit dbdash://<path> starts the dashboard"] = function()
   eq(child.lua_get("#vim.tbl_keys(require('dbdash.scheduler').dashboards)"), 1)
 end
 
+T["timer refreshes on the interval and restart resets the countdown"] = function()
+  local fast = CFG:gsub("interval: 1h", "interval: 1s")
+  vim.fn.writefile(vim.split(fast, "\n"), dir .. "/fast.yaml")
+  child.lua("require('dbdash').setup({ countdown_interval = 200 })")
+  child.cmd("DbDashStart fast.yaml")
+  wait_loaded()
+  child.lua([[_G.wait_for(function()
+    return #require("dbdash.scheduler").list()[1].history >= 3
+  end)]])
+  local h = child.lua_get("require('dbdash.scheduler').list()[1].history")
+  eq(#h >= 3, true)
+  eq(h[1].rows, 1)
+  eq(child.lua_get("require('dbdash.scheduler').list()[1]:remaining() <= 1"), true)
+end
+
 T["legacy example table.yaml runs"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/table.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("value1") end)]])

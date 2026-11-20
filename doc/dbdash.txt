@@ -1,0 +1,223 @@
+*dbdash.txt*  Database dashboards in Neovim
+
+Author:  dbdash.nvim contributors
+License: see LICENSE
+
+==============================================================================
+CONTENTS                                                       *dbdash-contents*
+
+  1. Introduction ............................ |dbdash-intro|
+  2. Setup ................................... |dbdash-setup|
+  3. Commands ................................ |dbdash-commands|
+  4. Mappings ................................ |dbdash-mappings|
+  5. Config files ............................ |dbdash-config|
+  6. Templates ............................... |dbdash-templates|
+  7. Arguments ............................... |dbdash-arguments|
+  8. Databases ............................... |dbdash-databases|
+  9. Highlights .............................. |dbdash-highlights|
+ 10. Lua API ................................. |dbdash-api|
+
+==============================================================================
+1. INTRODUCTION                                                   *dbdash-intro*
+
+dbdash.nvim runs a query on an interval and shows the result in a buffer as a
+table or a terminal chart. It is written in pure Lua for Neovim 0.12+ and has
+no external dependencies: no Python, no database command-line tools. SQLite
+is used through LuaJIT FFI and the system `libsqlite3`.
+
+Each config file (YAML) describes one dashboard: the database, the query (a
+Jinja-like template) and how to show the result.
+
+==============================================================================
+2. SETUP                                                          *dbdash-setup*
+
+Install with any plugin manager. Calling setup() is optional: >lua
+
+  require("dbdash").setup({
+    mappings = true,               -- global <leader>d* mappings
+    countdown_interval = 10000,    -- ms between countdown updates
+    countdown_position = "right_align",  -- "eol", "overlay"
+  })
+<
+==============================================================================
+3. COMMANDS                                                    *dbdash-commands*
+
+:DbDashStart[!] {config} [{name}={value} ...]                    *:DbDashStart*
+    Start the dashboard for {config} in the current window, or switch to it
+    when it is already running. Arguments after the file set query arguments
+    for this session (|dbdash-arguments|). With [!], every argument is asked
+    for interactively; without it only `required` arguments without a value.
+
+:DbDashRestart                                                 *:DbDashRestart*
+    Run the current dashboard's query now and restart its countdown.
+
+:DbDashStop [{config}]                                            *:DbDashStop*
+    Stop a dashboard (default: the current one) and close its buffer.
+
+:DbDashList                                                       *:DbDashList*
+    List running dashboards.
+
+:DbDashStatus                                                   *:DbDashStatus*
+    Show the current dashboard's config, database, next refresh and the last
+    20 queries (duration, rows, errors, skipped refreshes).
+
+:DbDash                                                               *:DbDash*
+    Open the sidebar listing *.yaml / *.yml files in the current directory.
+
+:DbDashClose                                                     *:DbDashClose*
+    Close the sidebar.
+
+:DbDashShowVariables                                     *:DbDashShowVariables*
+    Show the current dashboard's arguments and values.
+
+:DbDashModifyVariable                                   *:DbDashModifyVariable*
+    Pick an argument and enter a new value.
+
+:DbDashUpdateVariable {name} {value}                    *:DbDashUpdateVariable*
+    Set an argument directly.
+
+:DbDashResetVariables                                   *:DbDashResetVariables*
+    Reset all arguments to their defaults.
+
+:DbDashShowSQL                                                 *:DbDashShowSQL*
+    Show the rendered query in a floating window ("q"/<Esc> close, "y" yank).
+
+:DbDashMksession[!] [{file}]                                 *:DbDashMksession*
+:Mksession[!] [{file}]                                            *:Mksession*
+    Write a session. Dashboard buffers are named `dbdash://<config path>` and
+    are restarted (with default arguments) when the session is loaded. The
+    `mksession` command-line abbreviation points here.
+
+==============================================================================
+4. MAPPINGS                                                    *dbdash-mappings*
+
+Global (disable with `setup({ mappings = false })`):
+
+  <leader>ds   :DbDashStart
+  <leader>dr   :DbDashRestart
+  <leader>dt   :DbDashStop
+  <leader>dl   :DbDashList
+  <leader>dd   :DbDash
+
+Dashboard buffer:
+
+  a   modify an argument          A   show arguments
+  r   refresh now                 R   reset arguments
+  s   show the rendered query
+
+Sidebar:
+
+  <CR>  open or start the dashboard in the window on the right
+  t     stop it                   r   refresh it
+  q     close the sidebar
+
+==============================================================================
+5. CONFIG FILES                                                  *dbdash-config*
+
+>yaml
+  database:
+    url: "postgres://user:pass@host:5432/db?tls=require&timeout=5s"
+    type: postgres          # optional, inferred from the url scheme
+    options: {}             # driver options
+  query:
+    sql: |
+      SELECT ...
+    autoescape: false       # render {{ x }} as SQL literals
+    max_rows: 10000
+    timeout: 30s
+    args_show: false        # show argument values above the chart
+    args:
+      - name: min_age
+        type: number        # string | number | int | boolean | list | map
+        default: 18
+        required: false
+        show: true
+        description: "Minimum age"
+        choices: [18, 30, 50]
+  show:
+    type: table             # table | line | area | bar | histogram |
+                            # boxplot | heatmap | bubble | pie | scatter
+    title: "Users"
+    interval: 60s           # s, m, h or ms
+    show_countdown: true
+    countdown_format: "Next update: {time}s"
+<
+Table options: `column_list: [{column, alias, width}]`, `style.border`,
+`style.header_style`, `style.border_style`, `style.title_style`,
+`style.show_lines`, `style.null_text`.
+
+The YAML parser supports a subset: block and flow collections, quoted and
+plain scalars, block scalars, comments. Anchors, tags and multiple documents
+are rejected with a line and column.
+
+==============================================================================
+6. TEMPLATES                                                  *dbdash-templates*
+
+`query.sql` is a Jinja subset with `trim_blocks` and `lstrip_blocks`:
+if/elif/else, for/else (with `loop`), set, raw, filters and tests, Python
+truthiness and strict undefined variables.
+
+Filters: default (d), length (count), upper, lower, trim, replace, join,
+first, last, int, float, string, abs, round, tojson, safe, and the SQL
+filters sql_escape, sql_quote, sql_in, sql_id, sql_limit.
+Globals: range(), sql_case(conditions, default), sql_concat(...).
+Tests: defined, undefined, none, number, string, mapping, sequence, true,
+false. Methods: items, keys, values, get, upper, lower, strip, startswith,
+endswith.
+
+SQL filters follow the database dialect (MySQL escapes backslashes, MSSQL
+quotes identifiers with [], MongoDB gets JSON strings).
+
+Known difference from Jinja: numbers have one Lua type, so integral floats
+print without ".0" (`{{ 4 / 2 }}` is `2`).
+
+==============================================================================
+7. ARGUMENTS                                                  *dbdash-arguments*
+
+Precedence: command line > edited in the dashboard > interactive input >
+`default`. Values last for the session only. On the command line:
+
+  list   ids=1,2,3            map   filters=region:Asia,level:senior
+  boolean  true/false/1/0/yes/no
+
+Escape commas and colons with a backslash or quote the value.
+
+==============================================================================
+8. DATABASES                                                  *dbdash-databases*
+
+URL: `<scheme>://[user[:password]@]host[:port][/database][?param=value]`
+
+  sqlite:///absolute/path.db   sqlite://relative/to/config.db
+  sqlite:///:memory:
+
+Common parameters: `tls` (disable | require | pin), `fingerprint`
+(sha256:AB:CD:..., required for pin), `connect_timeout` (10s), `timeout`
+(30s), `application_name`.
+
+SQLite options (`database.options`): `lib_path`, `readonly`, `create`
+(create a missing file; off by default).
+
+Oracle is not supported.
+
+==============================================================================
+9. HIGHLIGHTS                                                *dbdash-highlights*
+
+All groups link to standard groups by default:
+
+  DbDashTitle DbDashBorder DbDashHeader DbDashNull DbDashMuted DbDashNumber
+  DbDashAxis DbDashLabel DbDashError DbDashWarn DbDashCountdown
+  DbDashArgName DbDashArgValue
+
+Colors in configs may be hex ("#3498db"), names ("blue", "bold blue"),
+or existing highlight groups ("DiagnosticOk").
+
+==============================================================================
+10. LUA API                                                         *dbdash-api*
+
+require("dbdash").start({config}, {tokens})   start a dashboard
+require("dbdash").stop({config})              stop it
+require("dbdash").query({url}, {query}, {opts}, {callback})
+    run a query through the data layer; callback(err, resultset)
+require("dbdash.db").register({driver})        add a database driver
+
+ vim:tw=78:ts=8:ft=help:norl:
