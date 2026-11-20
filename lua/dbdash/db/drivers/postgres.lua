@@ -244,49 +244,28 @@ local function md5_password(user, password, salt)
 end
 M.md5_password = md5_password
 
----SCRAM-SHA-256 client (RFC 5802 / 7677) as used by PostgreSQL.
----@param send fun(data: string) send a SASL message body
+---SCRAM-SHA-256 exchange as used by PostgreSQL (the user name is sent empty).
+---@param send_initial fun(mech: string, data: string)
+---@param send fun(data: string)
 ---@param recv fun(): integer, string next auth code and payload
----@param user string? user name in the SCRAM exchange (PostgreSQL sends it empty)
 function M.scram(password, send_initial, send, recv, nonce, user)
-  local sha256 = require("dbdash.crypto.sha256")
-  local hmac = require("dbdash.crypto.hmac")
-  local pbkdf2 = require("dbdash.crypto.pbkdf2")
-  local util = require("dbdash.crypto.util")
-  nonce = nonce or vim.base64.encode(require("dbdash.crypto.random").bytes(18))
-  local first_bare = "n=" .. (user or "") .. ",r=" .. nonce
-  send_initial("SCRAM-SHA-256", "n,," .. first_bare)
+  local client = require("dbdash.crypto.scram").new({
+    hash = require("dbdash.crypto.sha256"),
+    user = user,
+    password = password,
+    nonce = nonce,
+  })
+  send_initial("SCRAM-SHA-256", client:first())
   local code, server_first = recv()
   if code ~= 11 then
     dberr.raise("auth", "unexpected SASL message " .. code)
   end
-  local attrs = {}
-  for k, v in server_first:gmatch("(%a)=([^,]*)") do
-    attrs[k] = v
-  end
-  if not attrs.r or attrs.r:sub(1, #nonce) ~= nonce then
-    dberr.raise("auth", "SCRAM server nonce does not extend the client nonce")
-  end
-  local salt = vim.base64.decode(attrs.s)
-  local iterations = tonumber(attrs.i)
-  local salted = pbkdf2.derive(sha256, password, salt, iterations, 32)
-  local client_key = hmac.hmac(sha256, salted, "Client Key")
-  local stored_key = sha256.digest(client_key)
-  local final_no_proof = "c=biws,r=" .. attrs.r
-  local auth_message = first_bare .. "," .. server_first .. "," .. final_no_proof
-  local signature = hmac.hmac(sha256, stored_key, auth_message)
-  local proof = util.xor(client_key, signature)
-  send(final_no_proof .. ",p=" .. vim.base64.encode(proof))
+  send(client:final(server_first))
   local code2, server_final = recv()
   if code2 ~= 12 then
     dberr.raise("auth", "unexpected SASL message " .. code2)
   end
-  local server_key = hmac.hmac(sha256, salted, "Server Key")
-  local expected = vim.base64.encode(hmac.hmac(sha256, server_key, auth_message))
-  local got = server_final:match("v=([^,]+)")
-  if not got or not util.equal(got, expected) then
-    dberr.raise("auth", "SCRAM server signature mismatch (possible impostor server)")
-  end
+  client:verify(server_final)
 end
 
 -- Connection ------------------------------------------------------------------------------

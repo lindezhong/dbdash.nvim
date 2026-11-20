@@ -61,3 +61,32 @@ services:
     volumes:
       - ./mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports: ["13306:3306"]
+
+  mongodb:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: dbdash
+      MONGO_INITDB_ROOT_PASSWORD: dbdash_pw
+    ports: ["17017:27017"]
+
+  cassandra:
+    image: cassandra:5.0
+    environment:
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 128M
+      CASSANDRA_AUTHENTICATOR: PasswordAuthenticator
+    # cassandra/cassandra is the default superuser with PasswordAuthenticator.
+    ports: ["19042:9042"]
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -u cassandra -p cassandra -e 'describe keyspaces' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Dbdash_pw1"
+      MSSQL_PID: Developer
+    ports: ["11433:1433"]
