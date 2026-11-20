@@ -74,8 +74,14 @@ services:
     environment:
       MAX_HEAP_SIZE: 512M
       HEAP_NEWSIZE: 128M
-      CASSANDRA_AUTHENTICATOR: PasswordAuthenticator
-    # cassandra/cassandra is the default superuser with PasswordAuthenticator.
+    # The image has no setting for the authenticator; switch it to PasswordAuthenticator
+    # (default superuser cassandra/cassandra).
+    command:
+      - sh
+      - -c
+      - >-
+        sed -i 's/^authenticator: AllowAllAuthenticator/authenticator: PasswordAuthenticator/'
+        /etc/cassandra/cassandra.yaml && exec docker-entrypoint.sh cassandra -f
     ports: ["19042:9042"]
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -u cassandra -p cassandra -e 'describe keyspaces' || exit 1"]
