@@ -1,6 +1,7 @@
 -- RSA public-key operations: OAEP encryption (MySQL caching_sha2 full authentication)
 -- and signature verification helpers used by TLS (M4).
 local asn1 = require("dbdash.net.tls.asn1")
+local bit = require("bit")
 local bn = require("dbdash.crypto.bignum")
 local util = require("dbdash.crypto.util")
 
@@ -29,15 +30,144 @@ function M.from_spki(der)
   if alg ~= "1.2.840.113549.1.1.1" then
     error({ phase = "auth", message = "not an RSA public key (algorithm " .. alg .. ")" }, 0)
   end
-  return M.from_pkcs1(asn1.bits(spki.children[2]))
+  ---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
+---long as the hash, as TLS 1.3 requires.
+---@param key dbdash.rsa.PublicKey
+---@param hash table hash module
+---@param msg string the signed message (hashed here)
+---@param sig string
+---@return boolean
+function M.pss_verify(key, hash, msg, sig)
+  if #sig ~= key.size then
+    return false
+  end
+  local s = bn.from_bytes(sig)
+  if bn.cmp(s, key.n) >= 0 then
+    return false
+  end
+  local mod_bits = bn.bitlen(key.n)
+  local em_bits = mod_bits - 1
+  local em_len = math.ceil(em_bits / 8)
+  local em = bn.to_bytes(bn.modexp(s, key.e, key.n), key.size):sub(-em_len)
+  local h_len = hash.size
+  if em_len < 2 * h_len + 2 or em:byte(-1) ~= 0xbc then
+    return false
+  end
+  local masked_db = em:sub(1, em_len - h_len - 1)
+  local h = em:sub(em_len - h_len, em_len - 1)
+  local top_bits = 8 * em_len - em_bits
+  local top_mask = 256 - 2 ^ (8 - top_bits)
+  if top_bits > 0 and bit.band(masked_db:byte(1), top_mask) ~= 0 then
+    return false
+  end
+  local db = util.xor(masked_db, M.mgf1(hash, h, #masked_db))
+  if top_bits > 0 then
+    db = string.char(bit.band(db:byte(1), 255 - top_mask)) .. db:sub(2)
+  end
+  local ps_len = em_len - 2 * h_len - 2
+  if db:sub(1, ps_len) ~= string.rep("\0", ps_len) or db:byte(ps_len + 1) ~= 1 then
+    return false
+  end
+  local salt = db:sub(ps_len + 2)
+  local h2 = hash.digest(string.rep("\0", 8) .. hash.digest(msg) .. salt)
+  return util.equal(h, h2)
+end
+
+return M.from_pkcs1(asn1.bits(spki.children[2]))
 end
 
 ---From PEM text ("PUBLIC KEY" or "RSA PUBLIC KEY").
 function M.from_pem(pem)
   if pem:find("BEGIN RSA PUBLIC KEY", 1, true) then
-    return M.from_pkcs1(asn1.pem(pem, "RSA PUBLIC KEY"))
+    ---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
+---long as the hash, as TLS 1.3 requires.
+---@param key dbdash.rsa.PublicKey
+---@param hash table hash module
+---@param msg string the signed message (hashed here)
+---@param sig string
+---@return boolean
+function M.pss_verify(key, hash, msg, sig)
+  if #sig ~= key.size then
+    return false
   end
-  return M.from_spki(asn1.pem(pem, "PUBLIC KEY"))
+  local s = bn.from_bytes(sig)
+  if bn.cmp(s, key.n) >= 0 then
+    return false
+  end
+  local mod_bits = bn.bitlen(key.n)
+  local em_bits = mod_bits - 1
+  local em_len = math.ceil(em_bits / 8)
+  local em = bn.to_bytes(bn.modexp(s, key.e, key.n), key.size):sub(-em_len)
+  local h_len = hash.size
+  if em_len < 2 * h_len + 2 or em:byte(-1) ~= 0xbc then
+    return false
+  end
+  local masked_db = em:sub(1, em_len - h_len - 1)
+  local h = em:sub(em_len - h_len, em_len - 1)
+  local top_bits = 8 * em_len - em_bits
+  local top_mask = 256 - 2 ^ (8 - top_bits)
+  if top_bits > 0 and bit.band(masked_db:byte(1), top_mask) ~= 0 then
+    return false
+  end
+  local db = util.xor(masked_db, M.mgf1(hash, h, #masked_db))
+  if top_bits > 0 then
+    db = string.char(bit.band(db:byte(1), 255 - top_mask)) .. db:sub(2)
+  end
+  local ps_len = em_len - 2 * h_len - 2
+  if db:sub(1, ps_len) ~= string.rep("\0", ps_len) or db:byte(ps_len + 1) ~= 1 then
+    return false
+  end
+  local salt = db:sub(ps_len + 2)
+  local h2 = hash.digest(string.rep("\0", 8) .. hash.digest(msg) .. salt)
+  return util.equal(h, h2)
+end
+
+return M.from_pkcs1(asn1.pem(pem, "RSA PUBLIC KEY"))
+  end
+  ---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
+---long as the hash, as TLS 1.3 requires.
+---@param key dbdash.rsa.PublicKey
+---@param hash table hash module
+---@param msg string the signed message (hashed here)
+---@param sig string
+---@return boolean
+function M.pss_verify(key, hash, msg, sig)
+  if #sig ~= key.size then
+    return false
+  end
+  local s = bn.from_bytes(sig)
+  if bn.cmp(s, key.n) >= 0 then
+    return false
+  end
+  local mod_bits = bn.bitlen(key.n)
+  local em_bits = mod_bits - 1
+  local em_len = math.ceil(em_bits / 8)
+  local em = bn.to_bytes(bn.modexp(s, key.e, key.n), key.size):sub(-em_len)
+  local h_len = hash.size
+  if em_len < 2 * h_len + 2 or em:byte(-1) ~= 0xbc then
+    return false
+  end
+  local masked_db = em:sub(1, em_len - h_len - 1)
+  local h = em:sub(em_len - h_len, em_len - 1)
+  local top_bits = 8 * em_len - em_bits
+  local top_mask = 256 - 2 ^ (8 - top_bits)
+  if top_bits > 0 and bit.band(masked_db:byte(1), top_mask) ~= 0 then
+    return false
+  end
+  local db = util.xor(masked_db, M.mgf1(hash, h, #masked_db))
+  if top_bits > 0 then
+    db = string.char(bit.band(db:byte(1), 255 - top_mask)) .. db:sub(2)
+  end
+  local ps_len = em_len - 2 * h_len - 2
+  if db:sub(1, ps_len) ~= string.rep("\0", ps_len) or db:byte(ps_len + 1) ~= 1 then
+    return false
+  end
+  local salt = db:sub(ps_len + 2)
+  local h2 = hash.digest(string.rep("\0", 8) .. hash.digest(msg) .. salt)
+  return util.equal(h, h2)
+end
+
+return M.from_spki(asn1.pem(pem, "PUBLIC KEY"))
 end
 
 ---Raw RSA public operation m^e mod n on a `size`-byte block.
@@ -73,7 +203,93 @@ function M.oaep_encrypt(key, msg, hash, seed)
   seed = seed or require("dbdash.crypto.random").bytes(h)
   local masked_db = util.xor(db, M.mgf1(hash, seed, k - h - 1))
   local masked_seed = util.xor(seed, M.mgf1(hash, masked_db, h))
-  return M.public(key, "\0" .. masked_seed .. masked_db)
+  ---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
+---long as the hash, as TLS 1.3 requires.
+---@param key dbdash.rsa.PublicKey
+---@param hash table hash module
+---@param msg string the signed message (hashed here)
+---@param sig string
+---@return boolean
+function M.pss_verify(key, hash, msg, sig)
+  if #sig ~= key.size then
+    return false
+  end
+  local s = bn.from_bytes(sig)
+  if bn.cmp(s, key.n) >= 0 then
+    return false
+  end
+  local mod_bits = bn.bitlen(key.n)
+  local em_bits = mod_bits - 1
+  local em_len = math.ceil(em_bits / 8)
+  local em = bn.to_bytes(bn.modexp(s, key.e, key.n), key.size):sub(-em_len)
+  local h_len = hash.size
+  if em_len < 2 * h_len + 2 or em:byte(-1) ~= 0xbc then
+    return false
+  end
+  local masked_db = em:sub(1, em_len - h_len - 1)
+  local h = em:sub(em_len - h_len, em_len - 1)
+  local top_bits = 8 * em_len - em_bits
+  local top_mask = 256 - 2 ^ (8 - top_bits)
+  if top_bits > 0 and bit.band(masked_db:byte(1), top_mask) ~= 0 then
+    return false
+  end
+  local db = util.xor(masked_db, M.mgf1(hash, h, #masked_db))
+  if top_bits > 0 then
+    db = string.char(bit.band(db:byte(1), 255 - top_mask)) .. db:sub(2)
+  end
+  local ps_len = em_len - 2 * h_len - 2
+  if db:sub(1, ps_len) ~= string.rep("\0", ps_len) or db:byte(ps_len + 1) ~= 1 then
+    return false
+  end
+  local salt = db:sub(ps_len + 2)
+  local h2 = hash.digest(string.rep("\0", 8) .. hash.digest(msg) .. salt)
+  return util.equal(h, h2)
+end
+
+return M.public(key, "\0" .. masked_seed .. masked_db)
+end
+
+---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
+---long as the hash, as TLS 1.3 requires.
+---@param key dbdash.rsa.PublicKey
+---@param hash table hash module
+---@param msg string the signed message (hashed here)
+---@param sig string
+---@return boolean
+function M.pss_verify(key, hash, msg, sig)
+  if #sig ~= key.size then
+    return false
+  end
+  local s = bn.from_bytes(sig)
+  if bn.cmp(s, key.n) >= 0 then
+    return false
+  end
+  local mod_bits = bn.bitlen(key.n)
+  local em_bits = mod_bits - 1
+  local em_len = math.ceil(em_bits / 8)
+  local em = bn.to_bytes(bn.modexp(s, key.e, key.n), key.size):sub(-em_len)
+  local h_len = hash.size
+  if em_len < 2 * h_len + 2 or em:byte(-1) ~= 0xbc then
+    return false
+  end
+  local masked_db = em:sub(1, em_len - h_len - 1)
+  local h = em:sub(em_len - h_len, em_len - 1)
+  local top_bits = 8 * em_len - em_bits
+  local top_mask = 256 - 2 ^ (8 - top_bits)
+  if top_bits > 0 and bit.band(masked_db:byte(1), top_mask) ~= 0 then
+    return false
+  end
+  local db = util.xor(masked_db, M.mgf1(hash, h, #masked_db))
+  if top_bits > 0 then
+    db = string.char(bit.band(db:byte(1), 255 - top_mask)) .. db:sub(2)
+  end
+  local ps_len = em_len - 2 * h_len - 2
+  if db:sub(1, ps_len) ~= string.rep("\0", ps_len) or db:byte(ps_len + 1) ~= 1 then
+    return false
+  end
+  local salt = db:sub(ps_len + 2)
+  local h2 = hash.digest(string.rep("\0", 8) .. hash.digest(msg) .. salt)
+  return util.equal(h, h2)
 end
 
 return M

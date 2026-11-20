@@ -67,6 +67,26 @@ local function be64(w)
   return table.concat(out)
 end
 
+local function define(init, size, name)
+  local H = md.define({
+    block = 128,
+    init = init,
+    compress = compress,
+    digest = function(st)
+      local out = {}
+      for i = 1, 8 do
+        out[i] = be64(st[i])
+      end
+      return table.concat(out):sub(1, size)
+    end,
+    length = function(bits)
+      return string.rep("\0", 8) .. md.be64(bits)
+    end,
+  })
+  H.name, H.size = name, size
+  return H
+end
+
 local M = md.define({
   block = 128,
   init = function()
@@ -89,5 +109,13 @@ local M = md.define({
 })
 M.name = "sha512"
 M.size = 64
+
+---SHA-384: SHA-512 with other initial values, truncated to 48 bytes.
+M.sha384 = define(function()
+  return {
+    0xcbbb9d5dc1059ed8ULL, 0x629a292a367cd507ULL, 0x9159015a3070dd17ULL, 0x152fecd8f70e5939ULL,
+    0x67332667ffc00b31ULL, 0x8eb44a8768581511ULL, 0xdb0c2e0d64f98fa7ULL, 0x47b5481dbefa4fa4ULL,
+  }
+end, 48, "sha384")
 
 return M

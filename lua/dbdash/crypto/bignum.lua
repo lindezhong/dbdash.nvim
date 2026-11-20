@@ -209,6 +209,86 @@ function M.modexp(base, exp, n)
   return mont_mul(ctx, acc, { 1 })
 end
 
+---a + b.
+function M.add(a, b)
+  local r, carry = {}, 0
+  for i = 1, math.max(#a, #b) do
+    local v = (a[i] or 0) + (b[i] or 0) + carry
+    if v >= BASE then
+      r[i], carry = v - BASE, 1
+    else
+      r[i], carry = v, 0
+    end
+  end
+  if carry > 0 then
+    r[#r + 1] = carry
+  end
+  return r
+end
+
+function M.is_zero(a)
+  return #a == 1 and a[1] == 0
+end
+
+---Arithmetic modulo an odd prime in Montgomery form (used for elliptic curves).
+---@class dbdash.bignum.Field
+local Field = {}
+Field.__index = Field
+
+function M.field(p)
+  local f = setmetatable({ ctx = context(p), p = p }, Field)
+  f.one = f:to({ 1 })
+  f.zero = { 0 }
+  return f
+end
+
+function Field:to(a)
+  if M.cmp(a, self.p) >= 0 then
+    a = mod_slow(a, self.p)
+  end
+  return mont_mul(self.ctx, a, self.ctx.r2)
+end
+
+function Field:from(a)
+  return mont_mul(self.ctx, a, { 1 })
+end
+
+function Field:mul(a, b)
+  return mont_mul(self.ctx, a, b)
+end
+
+function Field:add(a, b)
+  local r = M.add(a, b)
+  if M.cmp(r, self.p) >= 0 then
+    r = M.sub(r, self.p)
+  end
+  return r
+end
+
+function Field:sub(a, b)
+  if M.cmp(a, b) >= 0 then
+    return M.sub(a, b)
+  end
+  return M.sub(M.add(a, self.p), b)
+end
+
+---a^e (a in Montgomery form, e a plain bignum).
+function Field:pow(a, e)
+  local acc = self.one
+  for bit_i = M.bitlen(e) - 1, 0, -1 do
+    acc = mont_mul(self.ctx, acc, acc)
+    if floor(e[floor(bit_i / BITS) + 1] / 2 ^ (bit_i % BITS)) % 2 == 1 then
+      acc = mont_mul(self.ctx, acc, a)
+    end
+  end
+  return acc
+end
+
+---Inverse by Fermat's little theorem (p prime).
+function Field:inv(a)
+  return self:pow(a, M.sub(self.p, { 2 }))
+end
+
 ---Hex string helpers for tests and debugging.
 function M.from_hex(h)
   if #h % 2 == 1 then
