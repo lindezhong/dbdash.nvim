@@ -48,4 +48,60 @@ function M.golden(name, out)
   end
 end
 
+---True when integration tests should run (make it).
+function M.it()
+  return vim.env.DBDASH_IT == "1"
+end
+
+---Skip the current case unless integration tests are enabled.
+function M.require_it()
+  if not M.it() then
+    MiniTest.skip("integration test (run with make it)")
+  end
+end
+
+---Run a query through the DriverManager and wait for the result.
+---@return { err: dbdash.db.DbError?, rs: dbdash.db.ResultSet? }
+function M.query(url, q, opts)
+  local res
+  require("dbdash.db").query(url, q, opts or {}, function(err, rs)
+    res = { err = err, rs = rs }
+  end)
+  vim.wait(20000, function()
+    return res ~= nil
+  end, 5)
+  assert(res, "query did not complete: " .. q)
+  return res
+end
+
+---Like query() but fails the test on error.
+function M.ok(url, q, opts)
+  local r = M.query(url, q, opts)
+  if r.err then
+    error(tostring(r.err), 2)
+  end
+  return r.rs
+end
+
+---Fake socket reading from a fixed byte string (protocol unit tests).
+function M.fake_socket(bytes)
+  local s = { buf = bytes, written = {} }
+  function s:read_exact(n)
+    assert(#self.buf >= n, "fake socket: out of data")
+    local r = self.buf:sub(1, n)
+    self.buf = self.buf:sub(n + 1)
+    return r
+  end
+  function s:read_until(d)
+    local i = assert(self.buf:find(d, 1, true), "fake socket: delimiter not found")
+    local r = self.buf:sub(1, i + #d - 1)
+    self.buf = self.buf:sub(i + #d)
+    return r
+  end
+  function s:write(data)
+    self.written[#self.written + 1] = data
+  end
+  return s
+end
+
 return M
