@@ -172,7 +172,7 @@ end
 T["manager: url and scheme errors"] = function()
   eq(run("oracle://h/x", "q").err.message:find("Oracle") ~= nil, true)
   eq(run("nosuch://h", "q").err.message:find("no driver") ~= nil, true)
-  eq(run("cassandra://h", "q").err.message:find("not implemented yet") ~= nil, true)
+  eq(run("mongodb+srv://cluster.example.com/db", "{}").err.message:find("mongodb+srv URLs are not supported yet", 1, true) ~= nil, true)
   eq(run("garbage", "q").err.phase, "config")
 end
 
