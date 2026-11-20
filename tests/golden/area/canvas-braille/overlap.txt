@@ -1,0 +1,77 @@
+│    ┌────────────────────────────────────────────────────────┐
+  ^ 4-178 DbDashBorder
+│150 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ ■ visits
+  ^ 0-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 109-121 DbDashSeries1
+  ^ 175-178 DbDashBorder
+  ^ 179-182 DbDashSeries1
+  ^ 182-189 DbDashLabel
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⣀⠀⠀⠀⠀⠀⠀⢀⣴⣿⣿⣿⣿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ ■ signups
+  ^ 4-7 DbDashBorder
+  ^ 76-85 DbDashSeries1
+  ^ 103-127 DbDashSeries1
+  ^ 175-178 DbDashBorder
+  ^ 179-182 DbDashSeries2
+  ^ 182-190 DbDashLabel
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣾⣿⣿⣷⣄⠀⠀⠀⣠⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 73-91 DbDashSeries1
+  ^ 100-130 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⣿⣿⣿⣿⣿⣿⣧⢠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 70-133 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 67-136 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│100 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 0-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 67-142 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 64-145 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣄⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 61-151 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡀⠀⠀⠀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 61-157 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│ 50 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣤⠀⠀⠀⠀⠀│
+  ^ 1-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 58-160 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 58-166 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦⡀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 55-172 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣄│
+  ^ 4-7 DbDashBorder
+  ^ 52-175 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│    │⣄⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿│
+  ^ 4-7 DbDashBorder
+  ^ 7-13 DbDashSeries1
+  ^ 46-175 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│  0 │⣿⣿⣿⣿⣶⣶⣦⣤⣤⣤⣤⣤⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿│
+  ^ 2-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 7-175 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│    └────────────────────────────────────────────────────────┘
+  ^ 4-178 DbDashBorder
+│     00:00       06:00   09:00  12:00  15:00  18:00  21:00
+  ^ 0-58 DbDashAxis

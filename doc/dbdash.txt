@@ -82,6 +82,13 @@ Install with any plugin manager. Calling setup() is optional: >lua
 :DbDashShowSQL                                                 *:DbDashShowSQL*
     Show the rendered query in a floating window ("q"/<Esc> close, "y" yank).
 
+:DbDashStyle {type} {style}                                     *:DbDashStyle*
+:DbDashStyle canvas {name}
+:DbDashStyle reset
+    Re-render the current dashboard's cached data with another style without
+    querying again, e.g. `:DbDashStyle line quadrant`, `:DbDashStyle bar
+    vertical`, `:DbDashStyle canvas block`. Lasts until the dashboard stops.
+
 :DbDashMksession[!] [{file}]                                 *:DbDashMksession*
 :Mksession[!] [{file}]                                            *:Mksession*
     Write a session. Dashboard buffers are named `dbdash://<config path>` and
@@ -145,6 +152,54 @@ Sidebar:
 Table options: `column_list: [{column, alias, width}]`, `style.border`,
 `style.header_style`, `style.border_style`, `style.title_style`,
 `style.show_lines`, `style.null_text`.
+
+Chart fields:                                                    *dbdash-charts*
+
+  line       x_column, y_columns [{column, label, color}] (or y_column),
+             line_style.{fill_area, show_points}, legend.{show, position},
+             axes.{x_axis,y_axis}.{title, min_value, max_value, format}
+  area       x_column, y_columns, style.stacked
+  bar        x_column, y_column, style.{color, show_values}, colors
+  histogram  value_column, bins, style.color
+  boxplot    category_column, value_column, style.{show_outliers, show_means}
+  heatmap    x_column, y_column, value_column, style.show_values
+  scatter    x_column, y_column, color_column, colors
+  bubble     x_column, y_column, size_column, color_column, label_column
+  pie        label_column, value_column,
+             style.{show_percentages, show_values, show_labels}, colors
+
+`colors` is a list (by series index) or a mapping (by category name).
+`width` caps the chart width (default: the window), `height` sets the plot
+rows (default 15). `axes.y_axis.format` takes a Python format such as
+"{:,.0f}" or "{:.1%}".
+
+Styles                                                           *dbdash-styles*
+
+  type       renderer (first is the default)    canvas
+  line       canvas, asciichart                 braille, quadrant, block,
+  scatter    canvas                             halfblock, ascii
+  area       canvas
+  bubble     canvas
+  bar        horizontal, vertical
+  histogram  horizontal, vertical
+  boxplot    boxdraw
+  heatmap    halfblock, block
+  pie        bar
+  table      box
+
+Pick per config with `show.renderer` / `show.canvas`, or set defaults:  >lua
+
+  require("dbdash").setup({
+    styles = { line = { canvas = "quadrant" }, bar = { renderer = "vertical" } },
+    ticks = "nice",           -- or "linear"
+    register = {              -- your own implementations
+      ["chart/bar/mine"] = require("my.bar_style"),
+      ["canvas/sextant"] = require("my.sextant_canvas"),
+    },
+  })
+<
+A chart style is `{ render = function(resultset, show, ctx) -> { lines, hl } }`;
+see lua/dbdash/render/ for the canvas, ticks, frame and palette interfaces.
 
 The YAML parser supports a subset: block and flow collections, quoted and
 plain scalars, block scalars, comments. Anchors, tags and multiple documents

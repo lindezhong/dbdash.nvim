@@ -1,0 +1,98 @@
+│                          Hourly visits
+  ^ 26-39 DbDashTitle
+│    ┌────────────────────────────────────────────────────────┐
+  ^ 4-178 DbDashBorder
+│150 │                                  ▗▞▀▄                  │ ■ visits
+  ^ 0-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 41-53 DbDashSeries1
+  ^ 71-74 DbDashBorder
+  ^ 75-78 DbDashSeries1
+  ^ 78-85 DbDashLabel
+│    │                       ▗▄▄      ▗▞▘   ▀▄                │ ■ Signups
+  ^ 4-7 DbDashBorder
+  ^ 30-39 DbDashSeries1
+  ^ 45-54 DbDashSeries1
+  ^ 57-63 DbDashSeries1
+  ^ 79-82 DbDashBorder
+  ^ 83-86 DbDashSeries2
+  ^ 86-94 DbDashLabel
+│    │                     ▗▞▘  ▀▄   ▞▘       ▚▖              │
+  ^ 4-7 DbDashBorder
+  ^ 28-37 DbDashSeries1
+  ^ 39-45 DbDashSeries1
+  ^ 48-54 DbDashSeries1
+  ^ 61-67 DbDashSeries1
+  ^ 81-84 DbDashBorder
+│    │                     ▞      ▚▄▀          ▝▖             │
+  ^ 4-7 DbDashBorder
+  ^ 28-31 DbDashSeries1
+  ^ 37-46 DbDashSeries1
+  ^ 56-62 DbDashSeries1
+  ^ 75-78 DbDashBorder
+│100 │                    ▐                     ▝▖            │
+  ^ 0-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 27-30 DbDashSeries1
+  ^ 51-57 DbDashSeries1
+  ^ 69-72 DbDashBorder
+│    │                   ▗▘                      ▝▚           │
+  ^ 4-7 DbDashBorder
+  ^ 26-32 DbDashSeries1
+  ^ 54-60 DbDashSeries1
+  ^ 71-74 DbDashBorder
+│    │                   ▞                         ▀▄         │
+  ^ 4-7 DbDashBorder
+  ^ 26-29 DbDashSeries1
+  ^ 54-60 DbDashSeries1
+  ^ 69-72 DbDashBorder
+│    │                  ▞▘                           ▀▄       │
+  ^ 4-7 DbDashBorder
+  ^ 25-31 DbDashSeries1
+  ^ 58-64 DbDashSeries1
+  ^ 71-74 DbDashBorder
+│    │                 ▗▘                             ▝▚▖     │
+  ^ 4-7 DbDashBorder
+  ^ 24-30 DbDashSeries1
+  ^ 59-68 DbDashSeries1
+  ^ 73-76 DbDashBorder
+│ 50 │                 ▞                ▄▄▄▄▖           ▝▄    │
+  ^ 1-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 24-27 DbDashSeries1
+  ^ 43-58 DbDashSeries2
+  ^ 69-75 DbDashSeries1
+  ^ 79-82 DbDashBorder
+│    │                ▗▘   ▄▀▀▀▀▀▚▄▄▄▀▀▀    ▝▀▀▄▄         ▀▄  │
+  ^ 4-7 DbDashBorder
+  ^ 23-29 DbDashSeries1
+  ^ 32-71 DbDashSeries2
+  ^ 75-90 DbDashSeries2
+  ^ 99-105 DbDashSeries1
+  ^ 107-110 DbDashBorder
+│    │               ▞▘ ▗▞▀                      ▀▀▚▄▄▖     ▀▄│
+  ^ 4-7 DbDashBorder
+  ^ 22-28 DbDashSeries1
+  ^ 29-38 DbDashSeries2
+  ^ 60-78 DbDashSeries2
+  ^ 83-89 DbDashSeries1
+  ^ 89-92 DbDashBorder
+│    │▄▄▖          ▄▞ ▄▞▘                             ▝▀▀▚▄▄▖ │
+  ^ 4-7 DbDashBorder
+  ^ 7-16 DbDashSeries1
+  ^ 26-32 DbDashSeries1
+  ^ 33-42 DbDashSeries2
+  ^ 71-92 DbDashSeries2
+  ^ 93-96 DbDashBorder
+│  0 │▀▄▟█████▄▄▟██▞▀▀                                      ▝▀│
+  ^ 2-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 7-13 DbDashSeries2
+  ^ 13-46 DbDashSeries1
+  ^ 46-55 DbDashSeries2
+  ^ 93-99 DbDashSeries2
+  ^ 99-102 DbDashBorder
+│    └────────────────────────────────────────────────────────┘
+  ^ 4-178 DbDashBorder
+│     00:00       06:00   09:00  12:00  15:00  18:00  21:00
+  ^ 0-58 DbDashAxis

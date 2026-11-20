@@ -1,0 +1,62 @@
+│   ┌───────────────────────────────────────────────────────────────────┐
+  ^ 3-210 DbDashBorder
+│40 │                                                                   │
+  ^ 0-2 DbDashAxis
+  ^ 3-6 DbDashBorder
+  ^ 73-76 DbDashBorder
+│   │                                                                   │
+  ^ 3-6 DbDashBorder
+  ^ 73-76 DbDashBorder
+│   │                                                                   │
+  ^ 3-6 DbDashBorder
+  ^ 73-76 DbDashBorder
+│30 │                                                                  ▗│
+  ^ 0-2 DbDashAxis
+  ^ 3-6 DbDashBorder
+  ^ 72-75 DbDashSeries1
+  ^ 75-78 DbDashBorder
+│   │                                                                   │
+  ^ 3-6 DbDashBorder
+  ^ 73-76 DbDashBorder
+│   │                                                                   │
+  ^ 3-6 DbDashBorder
+  ^ 73-76 DbDashBorder
+│   │                                              ▖                    │
+  ^ 3-6 DbDashBorder
+  ^ 52-55 DbDashSeries1
+  ^ 75-78 DbDashBorder
+│20 │                                                                   │
+  ^ 0-2 DbDashAxis
+  ^ 3-6 DbDashBorder
+  ^ 73-76 DbDashBorder
+│   │                               ▝                                   │
+  ^ 3-6 DbDashBorder
+  ^ 37-40 DbDashSeries1
+  ^ 75-78 DbDashBorder
+│   │                                                                   │
+  ^ 3-6 DbDashBorder
+  ^ 73-76 DbDashBorder
+│10 │               ▝                                                   │
+  ^ 0-2 DbDashAxis
+  ^ 3-6 DbDashBorder
+  ^ 21-24 DbDashSeries1
+  ^ 75-78 DbDashBorder
+│   │    ▖                                                              │
+  ^ 3-6 DbDashBorder
+  ^ 10-13 DbDashSeries1
+  ^ 75-78 DbDashBorder
+│   │                                                                   │
+  ^ 3-6 DbDashBorder
+  ^ 73-76 DbDashBorder
+│   │▘                                                                  │
+  ^ 3-6 DbDashBorder
+  ^ 6-9 DbDashSeries1
+  ^ 75-78 DbDashBorder
+│ 0 │                                                                   │
+  ^ 1-2 DbDashAxis
+  ^ 3-6 DbDashBorder
+  ^ 73-76 DbDashBorder
+│   └───────────────────────────────────────────────────────────────────┘
+  ^ 3-210 DbDashBorder
+│                20                     40                      60
+  ^ 0-65 DbDashAxis

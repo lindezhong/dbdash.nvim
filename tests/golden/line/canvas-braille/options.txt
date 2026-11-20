@@ -1,0 +1,65 @@
+│                               Hourly visits
+  ^ 31-44 DbDashTitle
+│count
+  ^ 0-5 DbDashLabel
+│    ┌──────────────────────────────────────────────────────────────────┐
+  ^ 4-208 DbDashBorder
+│200 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 0-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 205-208 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 205-208 DbDashBorder
+│150 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 0-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 133-139 DbDashSeries1
+  ^ 205-208 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣤⣀⣀⠀⠀⠀⠀⠀⠀⣠⣴⣾⣿⣿⣿⣿⣶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 88-103 DbDashSeries1
+  ^ 121-151 DbDashSeries1
+  ^ 205-208 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⣾⣿⣿⣿⣿⣿⣷⣦⣀⣤⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 82-157 DbDashSeries1
+  ^ 205-208 DbDashBorder
+│100 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 0-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 76-166 DbDashSeries1
+  ^ 205-208 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 73-175 DbDashSeries1
+  ^ 205-208 DbDashBorder
+│ 50 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣄⡀⠀⠀⠀⠀⠀⠀│
+  ^ 1-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 70-187 DbDashSeries1
+  ^ 205-208 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣦⣀⠀⠀⠀│
+  ^ 4-7 DbDashBorder
+  ^ 64-196 DbDashSeries1
+  ^ 205-208 DbDashBorder
+│    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦⣄│
+  ^ 4-7 DbDashBorder
+  ^ 58-205 DbDashSeries1
+  ^ 205-208 DbDashBorder
+│  0 │⣷⣶⣶⣶⣦⣤⣤⣤⣤⣤⣤⣀⣤⣤⣤⣶⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿│
+  ^ 2-3 DbDashAxis
+  ^ 4-7 DbDashBorder
+  ^ 7-205 DbDashSeries1
+  ^ 205-208 DbDashBorder
+│    └──────────────────────────────────────────────────────────────────┘
+  ^ 4-208 DbDashBorder
+│     00:00 03:00    06:00   09:00    12:00   15:00    18:00   21:00
+  ^ 0-67 DbDashAxis
+│                                    hour
+  ^ 36-40 DbDashLabel
+│    ■ visits  ■ Signups
+  ^ 4-7 DbDashSeries1
+  ^ 7-14 DbDashLabel
+  ^ 16-19 DbDashSeries2
+  ^ 19-27 DbDashLabel

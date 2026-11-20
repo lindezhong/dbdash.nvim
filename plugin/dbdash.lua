@@ -71,6 +71,15 @@ end, { desc = "Reset dashboard arguments to their defaults" })
 command("DbDashShowSQL", function()
   cmds().show_sql()
 end, { desc = "Show the rendered query" })
+command("DbDashStyle", function(o)
+  cmds().style(o.fargs)
+end, {
+  nargs = "*",
+  complete = function(a, l)
+    return cmds().complete_style(a, l)
+  end,
+  desc = "Switch the chart style: DbDashStyle <type> <style> | canvas <name> | reset",
+})
 for _, name in ipairs({ "DbDashMksession", "Mksession" }) do
   command(name, function(o)
     cmds().mksession(o.bang, o.args)

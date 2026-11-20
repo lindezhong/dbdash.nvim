@@ -1,0 +1,30 @@
+│                                           Headcount
+  ^ 43-52 DbDashTitle
+│                       ┌───────────────────────────────────────────────┐
+  ^ 23-170 DbDashBorder
+│                    IT │■■■■■■■■■■■■■■■ 42                             │
+  ^ 20-22 DbDashAxis
+  ^ 23-26 DbDashBorder
+  ^ 26-71 DbDashC_blue
+  ^ 72-74 DbDashNumber
+  ^ 103-106 DbDashBorder
+│                    HR │■■■ 7                                          │
+  ^ 20-22 DbDashAxis
+  ^ 23-26 DbDashBorder
+  ^ 26-35 DbDashC_blue
+  ^ 36-37 DbDashNumber
+  ^ 79-82 DbDashBorder
+│               Finance │■■■■■ 15                                       │
+  ^ 15-22 DbDashAxis
+  ^ 23-26 DbDashBorder
+  ^ 26-41 DbDashC_blue
+  ^ 42-44 DbDashNumber
+  ^ 83-86 DbDashBorder
+│Research & Development │■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ 120│
+  ^ 0-22 DbDashAxis
+  ^ 23-26 DbDashBorder
+  ^ 26-155 DbDashC_blue
+  ^ 156-159 DbDashNumber
+  ^ 159-162 DbDashBorder
+│                       └───────────────────────────────────────────────┘
+  ^ 23-170 DbDashBorder

@@ -32,4 +32,55 @@ function M.hourly_visits()
   }, rows)
 end
 
+-- Exam scores by class (boxplot, histogram).
+function M.scores()
+  local data = {
+    A = { 55, 61, 64, 68, 70, 72, 73, 75, 78, 80, 82, 85, 99 },
+    B = { 40, 48, 52, 58, 60, 63, 66, 69, 71, 74, 77 },
+    C = { 70, 72, 75, 77, 79, 81, 83, 86, 88, 90, 92, 95, 20 },
+  }
+  local rows = {}
+  for _, class in ipairs({ "A", "B", "C" }) do
+    for _, v in ipairs(data[class]) do
+      rows[#rows + 1] = { class, v }
+    end
+  end
+  return resultset.new({ { name = "class", type = "string" }, { name = "score", type = "integer" } }, rows)
+end
+
+-- Activity per weekday and hour (heatmap).
+function M.activity()
+  local rows = {}
+  local days = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
+  for d, day in ipairs(days) do
+    for h = 0, 23, 2 do
+      local v = math.floor(50 + 40 * math.sin((h - 6) / 24 * 2 * math.pi) + (d <= 5 and 30 or -10))
+      rows[#rows + 1] = { day, h, math.max(v, 0) }
+    end
+  end
+  return resultset.new({
+    { name = "day", type = "string" },
+    { name = "hour", type = "integer" },
+    { name = "activity", type = "integer" },
+  }, rows)
+end
+
+-- Companies with revenue, margin, size and segment (scatter, bubble).
+function M.companies()
+  return resultset.new({
+    { name = "company", type = "string" },
+    { name = "revenue", type = "number" },
+    { name = "margin", type = "number" },
+    { name = "size", type = "number" },
+    { name = "segment", type = "string" },
+  }, {
+    { "Acme", 12.5, 8.2, 30, "Small" },
+    { "Globex", 48.0, 21.5, 210, "Large" },
+    { "Initech", 22.1, 12.0, 55, "Mid" },
+    { "Umbrella", 65.3, 30.1, 400, "Large" },
+    { "Hooli", 35.7, 18.4, 120, "Mid" },
+    { "Vandelay", 8.9, 4.5, 12, "Small" },
+  })
+end
+
 return M

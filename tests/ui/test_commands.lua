@@ -254,6 +254,32 @@ T["timer refreshes on the interval and restart resets the countdown"] = function
   eq(child.lua_get("require('dbdash.scheduler').list()[1]:remaining() <= 1"), true)
 end
 
+T[":DbDashStyle re-renders cached data with another style"] = function()
+  child.cmd("DbDashStart " .. ROOT .. "/example/line.yaml")
+  child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("┌") end)]])
+  local function text()
+    return table.concat(lines(), "\n")
+  end
+  -- UTF-8 prefixes: braille U+2800-28FF, block elements U+2580-259F, arcs U+256D-2570.
+  local BRAILLE, BLOCKS, ARCS = "\226[\160-\163]", "\226\150[\128-\159]", "\226\149[\173-\176]"
+  eq(text():find(BRAILLE) ~= nil, true) -- braille by default
+  local runs = child.lua_get("#require('dbdash.scheduler').list()[1].history")
+  child.cmd("DbDashStyle line quadrant")
+  eq(text():find(BRAILLE), nil)
+  eq(text():find(BLOCKS) ~= nil, true)
+  child.cmd("DbDashStyle canvas ascii")
+  eq(text():find("%*") ~= nil, true)
+  child.cmd("DbDashStyle line asciichart")
+  eq(text():find(ARCS) ~= nil, true)
+  child.cmd("DbDashStyle line fancy")
+  eq(child.lua_get("_G.notes[#_G.notes].msg"):find("unknown style 'fancy' for line") ~= nil, true)
+  child.cmd("DbDashStyle reset")
+  eq(text():find(BRAILLE) ~= nil, true)
+  -- no new queries were run
+  eq(child.lua_get("#require('dbdash.scheduler').list()[1].history"), runs)
+  eq(child.fn.getcompletion("DbDashStyle line q", "cmdline"), { "quadrant" })
+end
+
 T["legacy example table.yaml runs"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/table.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("value1") end)]])

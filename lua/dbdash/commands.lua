@@ -230,6 +230,77 @@ function M.mksession(bang, file)
   vim.cmd("mksession" .. (bang and "!" or "") .. (file ~= "" and (" " .. vim.fn.fnameescape(file)) or ""))
 end
 
+---:DbDashStyle <type> <style> | canvas <name> | reset: re-render cached data (§11.4).
+---Overrides last until the dashboard stops.
+function M.style(fargs)
+  local d = current()
+  if not d then
+    return
+  end
+  local registry = require("dbdash.render.registry")
+  local a, b = fargs[1], fargs[2]
+  if not a then
+    local renderer, canvas = registry.resolve(d:show_config(), require("dbdash").options.styles)
+    vim.api.nvim_echo({ { ("%s: renderer=%s canvas=%s"):format(d:show_config().type, renderer, canvas) } }, false, {})
+    return
+  end
+  if a == "reset" then
+    d.style = {}
+  elseif a == "canvas" then
+    if not b or not registry.get("canvas/" .. b) then
+      return err("unknown canvas '" .. tostring(b) .. "' (available: " .. table.concat(registry.names("canvas/"), ", ") .. ")")
+    end
+    d.style.canvas = b
+  else
+    if not registry.DEFAULTS[a] and not registry.names("chart/" .. a .. "/")[1] then
+      return err("unknown chart type '" .. a .. "'")
+    end
+    if a ~= d.cfg.show.type then
+      d.style.type = a
+    else
+      d.style.type = nil
+    end
+    if b then
+      if registry.get("chart/" .. a .. "/" .. b) then
+        d.style.renderer = b
+      elseif registry.get("canvas/" .. b) then
+        d.style.renderer = "canvas"
+        d.style.canvas = b
+      else
+        return err(("unknown style '%s' for %s (available: %s)"):format(
+          b,
+          a,
+          table.concat(vim.list_extend(registry.names("chart/" .. a .. "/"), registry.names("canvas/")), ", ")
+        ))
+      end
+    else
+      d.style.renderer = nil
+    end
+  end
+  d:redraw()
+end
+
+function M.complete_style(arglead, cmdline)
+  local registry = require("dbdash.render.registry")
+  local words = vim.split(cmdline:gsub("^%s*%S+%s*", ""), "%s+", { trimempty = true })
+  local out
+  if #words == 0 or (#words == 1 and arglead ~= "") then
+    out = vim.tbl_keys(registry.DEFAULTS)
+    vim.list_extend(out, { "canvas", "reset" })
+  elseif words[1] == "canvas" then
+    out = registry.names("canvas/")
+  else
+    out = registry.names("chart/" .. words[1] .. "/")
+    if (registry.DEFAULTS[words[1]] or {}).canvas then
+      vim.list_extend(out, registry.names("canvas/"))
+    end
+  end
+  table.sort(out)
+  return vim.tbl_filter(function(x)
+    return vim.startswith(x, arglead)
+  end, out)
+end
+
 -- Completion ------------------------------------------------------------------------------
 
 local spec_cache = {}

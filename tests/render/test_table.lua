@@ -65,10 +65,10 @@ T["values are formatted by type"] = function()
   eq(tbl.format_value({ 1, 2 }, "array", "NULL"), "[1,2]")
 end
 
-T["unimplemented chart types fall back to a table with a warning"] = function()
+T["unknown chart types are reported in place of the chart"] = function()
   local o = render.render(fx.departments(), { type = "radar" }, { width = 80 })
-  eq(o.lines[1]:find("not available yet") ~= nil, true)
-  eq(o.hl[1].group, "DbDashWarn")
+  eq(o.lines[1]:find("unknown style 'chart/radar/canvas'", 1, true) ~= nil, true)
+  eq(o.hl[1].group, "DbDashError")
 end
 
 T["highlight specs"] = function()

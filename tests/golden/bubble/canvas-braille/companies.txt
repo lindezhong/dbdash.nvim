@@ -1,0 +1,81 @@
+│   ┌───────────────────────────────────────────────────────────┐
+  ^ 3-186 DbDashBorder
+│40 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ ■ Small
+  ^ 0-2 DbDashAxis
+  ^ 3-6 DbDashBorder
+  ^ 183-186 DbDashBorder
+  ^ 187-190 DbDashSeries1
+  ^ 190-196 DbDashLabel
+│   │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ ■ Large
+  ^ 3-6 DbDashBorder
+  ^ 183-186 DbDashBorder
+  ^ 187-190 DbDashSeries2
+  ^ 190-196 DbDashLabel
+│   │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡠⠔⠒│ ■ Mid
+  ^ 3-6 DbDashBorder
+  ^ 174-183 DbDashSeries2
+  ^ 183-186 DbDashBorder
+  ^ 187-190 DbDashSeries3
+  ^ 190-194 DbDashLabel
+│30 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠁⠀⢀│
+  ^ 0-2 DbDashAxis
+  ^ 3-6 DbDashBorder
+  ^ 171-177 DbDashSeries2
+  ^ 180-183 DbDashSeries2
+  ^ 183-186 DbDashBorder
+│   │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢆⠀⠀│
+  ^ 3-6 DbDashBorder
+  ^ 171-177 DbDashSeries2
+  ^ 183-186 DbDashBorder
+│   │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠑│
+  ^ 3-6 DbDashBorder
+  ^ 123-132 DbDashSeries2
+  ^ 177-183 DbDashSeries2
+  ^ 183-186 DbDashBorder
+│   │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠃⢀⠀⢱⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 3-6 DbDashBorder
+  ^ 120-129 DbDashSeries2
+  ^ 132-135 DbDashSeries2
+  ^ 183-186 DbDashBorder
+│20 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡠⠒⠒⢆⠀⠀⠀⠀⠀⠀⠀⠀⠘⣄⠀Globex⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 0-2 DbDashAxis
+  ^ 3-6 DbDashBorder
+  ^ 84-96 DbDashSeries3
+  ^ 120-126 DbDashSeries2
+  ^ 129-135 DbDashSeries2
+  ^ 171-174 DbDashBorder
+│   │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠱⣀Hooli⠀⠀⠀⠀⠀⠀⠀⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 3-6 DbDashBorder
+  ^ 84-95 DbDashSeries3
+  ^ 116-122 DbDashSeries2
+  ^ 173-176 DbDashBorder
+│   │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 3-6 DbDashBorder
+  ^ 45-51 DbDashSeries3
+  ^ 183-186 DbDashBorder
+│10 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣑Initech⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 0-2 DbDashAxis
+  ^ 3-6 DbDashBorder
+  ^ 42-55 DbDashSeries3
+  ^ 169-172 DbDashBorder
+│   │⠀⠀⠀⣔Acme⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 3-6 DbDashBorder
+  ^ 15-22 DbDashSeries1
+  ^ 175-178 DbDashBorder
+│   │⡀⠀⠀⠑⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 3-6 DbDashBorder
+  ^ 6-9 DbDashSeries1
+  ^ 15-21 DbDashSeries1
+  ^ 183-186 DbDashBorder
+│   │⠛Vandelay⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 3-6 DbDashBorder
+  ^ 6-17 DbDashSeries1
+  ^ 167-170 DbDashBorder
+│ 0 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
+  ^ 1-2 DbDashAxis
+  ^ 3-6 DbDashBorder
+  ^ 183-186 DbDashBorder
+│   └───────────────────────────────────────────────────────────┘
+  ^ 3-186 DbDashBorder
+│              20                   40                   60
+  ^ 0-58 DbDashAxis
