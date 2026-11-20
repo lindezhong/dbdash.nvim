@@ -1,0 +1,49 @@
+│                           Departments
+  ^ 27-38 DbDashTitle
+│┏━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━┓
+  ^ 0-198 DbDashBorder
+│┃ id ┃ department             ┃ headcount ┃     budget ┃ manager ┃
+  ^ 0-3 DbDashBorder
+  ^ 4-6 DbDashHeader
+  ^ 6-10 DbDashBorder
+  ^ 11-33 DbDashHeader
+  ^ 33-37 DbDashBorder
+  ^ 38-47 DbDashHeader
+  ^ 47-51 DbDashBorder
+  ^ 52-62 DbDashHeader
+  ^ 62-66 DbDashBorder
+  ^ 67-74 DbDashHeader
+  ^ 74-78 DbDashBorder
+│┡━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━┩
+  ^ 0-198 DbDashBorder
+││  1 │ IT                     │        42 │ 1250000.50 │ Alice   │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 33-37 DbDashBorder
+  ^ 47-51 DbDashBorder
+  ^ 62-66 DbDashBorder
+  ^ 74-78 DbDashBorder
+││  2 │ HR                     │         7 │  310000.00 │ NULL    │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 33-37 DbDashBorder
+  ^ 47-51 DbDashBorder
+  ^ 62-66 DbDashBorder
+  ^ 67-74 DbDashNull
+  ^ 74-78 DbDashBorder
+││  3 │ Finance                │        15 │  880000.25 │ 王小明  │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 33-37 DbDashBorder
+  ^ 47-51 DbDashBorder
+  ^ 62-66 DbDashBorder
+  ^ 77-81 DbDashBorder
+││  4 │ Research & Development │       120 │ 4200000.00 │ Bob     │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 33-37 DbDashBorder
+  ^ 47-51 DbDashBorder
+  ^ 62-66 DbDashBorder
+  ^ 74-78 DbDashBorder
+│└────┴────────────────────────┴───────────┴────────────┴─────────┘
+  ^ 0-198 DbDashBorder

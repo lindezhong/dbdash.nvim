@@ -1,0 +1,12 @@
+│┏━━━┓
+  ^ 0-15 DbDashBorder
+│┃ a ┃
+  ^ 0-3 DbDashBorder
+  ^ 4-5 DbDashHeader
+  ^ 5-9 DbDashBorder
+│┡━━━┩
+  ^ 0-15 DbDashBorder
+│└───┘
+  ^ 0-15 DbDashBorder
+│(no rows)
+  ^ 0-9 DbDashMuted

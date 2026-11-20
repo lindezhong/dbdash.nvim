@@ -1,0 +1,13 @@
+│id  department              headcount      budget  manager
+  ^ 0-2 DbDashHeader
+  ^ 4-26 DbDashHeader
+  ^ 28-37 DbDashHeader
+  ^ 39-49 DbDashHeader
+  ^ 51-58 DbDashHeader
+│──  ──────────────────────  ─────────  ──────────  ───────
+  ^ 0-158 DbDashBorder
+│ 1  IT                             42  1250000.50  Alice  
+│ 2  HR                              7   310000.00  NULL   
+  ^ 51-58 DbDashNull
+│ 3  Finance                        15   880000.25  王小明 
+│ 4  Research & Development        120  4200000.00  Bob    
