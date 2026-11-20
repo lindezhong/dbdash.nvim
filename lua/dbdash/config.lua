@@ -61,29 +61,7 @@ local function nn(v)
 end
 
 ---Parse a duration such as 30, "30s", "5m", "1h", "500ms" into milliseconds.
----@param v any
----@return integer? ms, string? err
-function M.parse_duration(v)
-  v = nn(v)
-  if v == nil then
-    return nil
-  end
-  if type(v) == "number" then
-    if v < 0 then
-      return nil, "duration must not be negative"
-    end
-    return math.floor(v * 1000)
-  end
-  if type(v) ~= "string" then
-    return nil, "duration must be a number or a string like 30s"
-  end
-  local n, unit = vim.trim(v):lower():match("^(%d+%.?%d*)%s*(%a*)$")
-  local mult = ({ [""] = 1000, ms = 1, s = 1000, m = 60000, h = 3600000 })[unit or ""]
-  if not n or not mult then
-    return nil, ("invalid duration %q (use s, m, h or ms)"):format(v)
-  end
-  return math.floor(tonumber(n) * mult)
-end
+M.parse_duration = require("dbdash.util.duration").parse
 
 ---Infer the database type from a URL scheme.
 ---@param url string
