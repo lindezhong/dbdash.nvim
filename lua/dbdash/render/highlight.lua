@@ -30,6 +30,15 @@ M.BASE = {
   DbDashCountdown = { link = "Comment" },
   DbDashArgName = { link = "Identifier" },
   DbDashArgValue = { link = "String" },
+  -- Series colors, taken from common syntax groups so they follow the colorscheme.
+  DbDashSeries1 = { link = "Function" },
+  DbDashSeries2 = { link = "String" },
+  DbDashSeries3 = { link = "Constant" },
+  DbDashSeries4 = { link = "Statement" },
+  DbDashSeries5 = { link = "Type" },
+  DbDashSeries6 = { link = "Special" },
+  DbDashSeries7 = { link = "Identifier" },
+  DbDashSeries8 = { link = "PreProc" },
 }
 
 local defined = {} ---@type table<string, table> group -> attributes, for re-creation
