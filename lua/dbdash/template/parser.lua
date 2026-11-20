@@ -21,7 +21,6 @@ local UNSUPPORTED = {
   ["do"] = true,
   endset = true,
 }
-local NOT_YET = { macro = true, import = true, from = true }
 
 local CMP = { ["=="] = true, ["!="] = true, ["<"] = true, ["<="] = true, [">"] = true, [">="] = true }
 
@@ -147,10 +146,14 @@ function P:statement()
     return self:parse_for(tok)
   elseif n == "set" then
     return self:parse_set(tok)
+  elseif n == "macro" then
+    return self:parse_macro(tok)
+  elseif n == "import" then
+    return self:parse_import(tok)
+  elseif n == "from" then
+    return self:parse_from(tok)
   elseif UNSUPPORTED[n] then
     self:fail(tok, "'%s' is not supported in dbdash templates", n)
-  elseif NOT_YET[n] then
-    self:fail(tok, "'%s' is not supported yet", n)
   end
   self:fail(tok, "Encountered unknown tag '%s'.", n)
 end
@@ -236,6 +239,98 @@ function P:parse_set(tok)
   local e = self:expression()
   self:expect_block_end()
   return { k = "Set", targets = targets, expr = e, line = tok.line }
+end
+
+---{% macro name(a, b=default) %}...{% endmacro %}
+function P:parse_macro(tok)
+  local nt = self:next()
+  if nt.t ~= "name" then
+    self:fail(nt, "expected macro name")
+  end
+  self:expect_op("(")
+  local params, seen_default = {}, false
+  while not self:is_op(")") do
+    local pt = self:next()
+    if pt.t ~= "name" then
+      self:fail(pt, "expected parameter name, got '%s'", describe(pt))
+    end
+    local default
+    if self:skip_op("=") then
+      default = self:expression()
+      seen_default = true
+    elseif seen_default then
+      self:fail(pt, "non-default argument follows default argument")
+    end
+    params[#params + 1] = { name = pt.v, default = default }
+    if not self:skip_op(",") then
+      break
+    end
+  end
+  self:expect_op(")")
+  self:expect_block_end()
+  local body = self:subparse({ endmacro = true }, "'endmacro'")
+  self:next()
+  self:expect_block_end()
+  return { k = "Macro", name = nt.v, params = params, body = body, line = tok.line }
+end
+
+local function skip_context_clause(self)
+  if (self:is_name("with") or self:is_name("without")) and self:is_name("context", 1) then
+    local t = self:peek()
+    if t.v == "with" then
+      self:fail(t, "importing 'with context' is not supported")
+    end
+    self:next()
+    self:next()
+  end
+end
+
+---{% import 'file' as name %}
+function P:parse_import(tok)
+  local target = self:expression()
+  if not self:is_name("as") then
+    self:fail(self:peek(), "expected 'as' after the import target")
+  end
+  self:next()
+  local alias = self:next()
+  if alias.t ~= "name" then
+    self:fail(alias, "expected a name after 'as'")
+  end
+  skip_context_clause(self)
+  self:expect_block_end()
+  return { k = "Import", target = target, alias = alias.v, line = tok.line }
+end
+
+---{% from 'file' import a, b as c %}
+function P:parse_from(tok)
+  local target = self:expression()
+  if not self:is_name("import") then
+    self:fail(self:peek(), "expected 'import'")
+  end
+  self:next()
+  local names = {}
+  repeat
+    if self:is_name("with") or self:is_name("without") then
+      break
+    end
+    local nt = self:next()
+    if nt.t ~= "name" then
+      self:fail(nt, "expected a name to import")
+    end
+    local alias = nt.v
+    if self:is_name("as") then
+      self:next()
+      local at = self:next()
+      if at.t ~= "name" then
+        self:fail(at, "expected a name after 'as'")
+      end
+      alias = at.v
+    end
+    names[#names + 1] = { name = nt.v, alias = alias }
+  until not self:skip_op(",")
+  skip_context_clause(self)
+  self:expect_block_end()
+  return { k = "FromImport", target = target, names = names, line = tok.line }
 end
 
 -- Expressions ------------------------------------------------------------------------------

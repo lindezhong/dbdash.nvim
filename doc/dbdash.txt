@@ -209,8 +209,18 @@ are rejected with a line and column.
 6. TEMPLATES                                                  *dbdash-templates*
 
 `query.sql` is a Jinja subset with `trim_blocks` and `lstrip_blocks`:
-if/elif/else, for/else (with `loop`), set, raw, filters and tests, Python
-truthiness and strict undefined variables.
+if/elif/else, for/else (with `loop`), set, raw, macro (defaults, keyword
+arguments), import / from-import, filters and tests, Python truthiness and
+strict undefined variables.
+
+Imports are relative to the config file's directory; imported templates do
+not see the caller's variables and only export their macros: >jinja
+  {% from 'macros/filters.sql' import in_list %}
+  SELECT * FROM users WHERE {{ in_list('dept', departments) }}
+<
+Not supported: extends, block, include, call/caller, filter blocks, with,
+block set, namespace(), break/continue, recursive loops, loop.cycle, slices,
+arbitrary method calls, custom tests, *args/**kwargs.
 
 Filters: default (d), length (count), upper, lower, trim, replace, join,
 first, last, int, float, string, abs, round, tojson, safe, and the SQL

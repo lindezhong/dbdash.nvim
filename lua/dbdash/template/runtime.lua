@@ -56,6 +56,9 @@ end
 
 local Loop = {}
 Loop.__index = Loop
+
+-- Macro objects (defined with the other value types so typename/str can see them).
+local Macro = {}
 function R.loop(i, n)
   return setmetatable({
     index = i,
@@ -85,6 +88,8 @@ function R.typename(v)
     return "Markup"
   elseif getmetatable(v) == Loop then
     return "LoopContext"
+  elseif getmetatable(v) == Macro then
+    return "Macro"
   elseif map.is_map(v) then
     return "dict"
   elseif t == "table" then
@@ -243,6 +248,8 @@ function R.str(v)
     return v.s
   elseif getmetatable(v) == Loop then
     return "<LoopContext>"
+  elseif getmetatable(v) == Macro then
+    return ("<Macro '%s'>"):format(v.name)
   elseif t == "table" then
     return R.repr(v)
   end
@@ -448,16 +455,126 @@ function R.method(obj, name, ...)
   return fn(obj, ...)
 end
 
+local METHOD_SET = {}
+for _, m in ipairs(R.METHOD_NAMES) do
+  METHOD_SET[m] = true
+end
+
+---obj.name(args): a macro exported by an imported template, or a whitelisted method.
+function R.call_attr(env, obj, name, args, kwargs)
+  check(obj)
+  if map.is_map(obj) and getmetatable(obj[name]) == Macro then
+    return R.call(env, obj[name], args, kwargs)
+  end
+  if not METHOD_SET[name] then
+    raise("type", "calling '.%s()' is not supported (allowed methods: %s)", name, table.concat(R.METHOD_NAMES, ", "))
+  end
+  if next(kwargs) then
+    raise("type", "keyword arguments are not supported for methods")
+  end
+  for i = 1, #args do
+    check(args[i])
+  end
+  return R.method(obj, name, unpack(args))
+end
+
 ---Call a global function value: fn(args, kwargs, env).
 function R.call(env, fn, args, kwargs)
   check(fn)
-  if type(fn) ~= "function" then
+  if type(fn) ~= "function" and getmetatable(fn) ~= Macro then
     raise("type", "'%s' object is not callable", typename(fn))
   end
   for i = 1, #args do
     check(args[i])
   end
   return fn(args, kwargs, env)
+end
+
+-- Macros and imports ------------------------------------------------------------------------
+
+Macro.__index = Macro
+Macro.__call = function(self, args, kwargs, env)
+  local s = self.fn(args, kwargs, env)
+  if env.autoescape then
+    return R.safe(s) -- like Jinja's Markup: not escaped again
+  end
+  return s
+end
+
+---Wrap a compiled macro body as a callable value.
+function R.macro(name, fn)
+  return setmetatable({ name = name, fn = fn }, Macro)
+end
+
+function R.is_macro(v)
+  return getmetatable(v) == Macro
+end
+
+---Reject surplus positional or unknown keyword arguments.
+function R.check_args(name, args, kwargs, params)
+  if #args > #params then
+    raise("type", "macro '%s' takes not more than %d argument(s)", name, #params)
+  end
+  for k in pairs(kwargs) do
+    local known = false
+    for _, p in ipairs(params) do
+      known = known or p == k
+    end
+    if not known then
+      raise("type", "macro '%s' takes no keyword argument '%s'", name, k)
+    end
+  end
+end
+
+local module_names = setmetatable({}, { __mode = "k" })
+
+---Run another template without the caller's context and return its macros as a mapping.
+function R.import(env, target)
+  check(target)
+  if type(target) ~= "string" then
+    raise("type", "import target must be a string, not %s", typename(target))
+  end
+  if not env.load_template then
+    raise("value", "{%% import %%} needs a template loader (base directory)")
+  end
+  env._modules = env._modules or {}
+  if env._modules[target] then
+    return env._modules[target]
+  end
+  env._importing = env._importing or {}
+  if env._importing[target] then
+    raise("value", "circular import of '%s'", target)
+  end
+  env._importing[target] = true
+  local tpl, path = env.load_template(target)
+  local L = { l = nil }
+  local ok, out, exports = pcall(tpl.fn, {}, env, L)
+  env._importing[target] = nil
+  if not ok then
+    if errors.is(out) then
+      out.line = out.line or L.l
+      out.source = out.source or path or target
+    end
+    error(out, 0)
+  end
+  local mod = map.new()
+  for _, e in ipairs(exports) do
+    if e[2] ~= R.MISSING then
+      map.set(mod, e[1], e[2])
+    end
+  end
+  module_names[mod] = target
+  env._modules[target] = mod
+  return mod
+end
+
+---A name from an imported module; missing names stay undefined until used (like Jinja).
+function R.import_name(mod, name)
+  local v = mod[name]
+  if v == nil then
+    return R.undef(("the template '%s' does not export the requested name '%s'"):format(module_names[mod] or "?", name))
+  end
+  return v
 end
 
 -- Collections ----------------------------------------------------------------------------

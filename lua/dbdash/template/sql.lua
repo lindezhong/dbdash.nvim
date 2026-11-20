@@ -168,14 +168,16 @@ end
 ---Build a render env for a dialect.
 ---@param dialect dbdash.db.Dialect
 ---@param autoescape boolean?
+---@param base_dir string? directory for {% import %} (the config file's directory)
 ---@return dbdash.template.Env
-function M.env(dialect, autoescape)
+function M.env(dialect, autoescape, base_dir)
   return {
     dialect = dialect,
     autoescape = autoescape == true,
     escape = function(v)
       return call(dialect.literal, plain(v))
     end,
+    load_template = base_dir and require("dbdash.template.loader").files(base_dir) or nil,
   }
 end
 

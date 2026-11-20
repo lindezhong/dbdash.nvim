@@ -10,7 +10,11 @@ for _, c in ipairs(cases) do
   T[c.name] = function()
     -- The YAML parser keeps mapping order, which Jinja output depends on.
     local ctx = assert(yaml.parse(c.ctx))
-    local out, err = template.render(c.template, ctx)
+    local opts = nil
+    if c.files then
+      opts = { env = { load_template = require("dbdash.template.loader").dict(c.files) } }
+    end
+    local out, err = template.render(c.template, ctx, opts)
     if c.error then
       eq({ err and err.kind, err and err.line, out }, { c.error.type, c.error.line, nil })
     else

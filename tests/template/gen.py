@@ -184,6 +184,27 @@ CASES = [
 ]
 
 
+# Templates using {% macro %} / {% import %}: (name, template, files, lua_expected).
+MACRO_CASES = [
+    ("macro basic", "{% macro col(name, alias='') %}{{ name }}{{ ' AS ' ~ alias if alias }}{% endmacro %}SELECT {{ col('a') }}, {{ col('b', 'bee') }}, {{ col(name='c', alias='cee') }}", {}, None),
+    ("macro with loop and caller context", "{% macro inlist(field, values) %}{{ field }} IN ({% for v in values %}'{{ v }}'{{ ', ' if not loop.last }}{% endfor %}){% endmacro %}WHERE {{ inlist('dept', names) }}", {}, None),
+    ("macro defaults use expressions", "{% macro lim(n=10 * 2) %}LIMIT {{ n }}{% endmacro %}{{ lim() }} {{ lim(5) }}", {}, None),
+    ("macro sees template variables", "{% macro show() %}x={{ x }}{% endmacro %}{{ show() }}", {}, None),
+    ("macro recursion-free nesting", "{% macro a() %}A{% endmacro %}{% macro b() %}[{{ a() }}]{% endmacro %}{{ b() }}", {}, None),
+    ("macro whitespace", "{% macro m() %}\n  inner\n{% endmacro %}\nstart{{ m() }}end", {}, None),
+    ("endmacro with name", "{% macro m() %}ok{% endmacro m %}{{ m() }}", {}, None),
+    ("import as", "{% import 'helpers.sql' as h %}SELECT {{ h.quote('x') }} FROM {{ h.table }}", {"helpers.sql": "{% macro quote(v) %}'{{ v }}'{% endmacro %}{% macro table() %}t{% endmacro %}"}, None),
+    ("from import with alias", "{% from 'helpers.sql' import quote, upper_col as uc %}{{ quote('a') }} {{ uc('b') }}", {"helpers.sql": "{% macro quote(v) %}'{{ v }}'{% endmacro %}{% macro upper_col(c) %}UPPER({{ c }}){% endmacro %}"}, None),
+    ("imported template has no caller context", "{% import 'h.sql' as h %}{{ h.m() }}", {"h.sql": "{% macro m() %}{{ x is defined }}{% endmacro %}"}, None),
+    ("imported top-level output is discarded", "{% import 'h.sql' as h %}[{{ h.m() }}]", {"h.sql": "IGNORED TEXT {% macro m() %}m{% endmacro %}"}, None),
+    ("nested imports", "{% from 'a.sql' import outer %}{{ outer() }}", {"a.sql": "{% import 'b.sql' as b %}{% macro outer() %}<{{ b.inner() }}>{% endmacro %}", "b.sql": "{% macro inner() %}in{% endmacro %}"}, None),
+    ("macro too many arguments", "{% macro m(a) %}{{ a }}{% endmacro %}{{ m(1, 2) }}", {}, None),
+    ("macro unknown keyword", "{% macro m(a) %}{{ a }}{% endmacro %}{{ m(b=1) }}", {}, None),
+    ("macro missing argument", "{% macro m(a) %}{{ a }}{% endmacro %}{{ m() }}", {}, None),
+    ("import missing name", "{% from 'h.sql' import nope %}", {"h.sql": "{% macro m() %}{% endmacro %}"}, None),
+]
+
+
 def error_line(e):
     if isinstance(e, jinja2.TemplateSyntaxError):
         return e.lineno
@@ -213,6 +234,22 @@ def main():
         try:
             case["expected"] = env.from_string(tpl).render(**ctx)
         except Exception as e:  # noqa: BLE001 - every failure kind is recorded
+            case["error"] = {"type": error_type(e), "line": error_line(e), "message": str(e)}
+        if lua_expected is not None:
+            case["lua_expected"] = lua_expected
+        out.append(case)
+    for name, tpl, files, lua_expected in MACRO_CASES:
+        menv = jinja2.Environment(
+            trim_blocks=True,
+            lstrip_blocks=True,
+            undefined=jinja2.StrictUndefined,
+            autoescape=False,
+            loader=jinja2.DictLoader(files),
+        )
+        case = {"name": name, "template": tpl, "ctx": json.dumps(CTX, ensure_ascii=False), "files": files}
+        try:
+            case["expected"] = menv.from_string(tpl).render(**CTX)
+        except Exception as e:  # noqa: BLE001
             case["error"] = {"type": error_type(e), "line": error_line(e), "message": str(e)}
         if lua_expected is not None:
             case["lua_expected"] = lua_expected

@@ -830,5 +830,146 @@
    "line": 1,
    "message": "Encountered unknown tag 'else'."
   }
+ },
+ {
+  "name": "macro basic",
+  "template": "{% macro col(name, alias='') %}{{ name }}{{ ' AS ' ~ alias if alias }}{% endmacro %}SELECT {{ col('a') }}, {{ col('b', 'bee') }}, {{ col(name='c', alias='cee') }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {},
+  "expected": "SELECT a, b AS bee, c AS cee"
+ },
+ {
+  "name": "macro with loop and caller context",
+  "template": "{% macro inlist(field, values) %}{{ field }} IN ({% for v in values %}'{{ v }}'{{ ', ' if not loop.last }}{% endfor %}){% endmacro %}WHERE {{ inlist('dept', names) }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {},
+  "expected": "WHERE dept IN ('IT', 'HR', 'Finance')"
+ },
+ {
+  "name": "macro defaults use expressions",
+  "template": "{% macro lim(n=10 * 2) %}LIMIT {{ n }}{% endmacro %}{{ lim() }} {{ lim(5) }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {},
+  "expected": "LIMIT 20 LIMIT 5"
+ },
+ {
+  "name": "macro sees template variables",
+  "template": "{% macro show() %}x={{ x }}{% endmacro %}{{ show() }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {},
+  "expected": "x=5"
+ },
+ {
+  "name": "macro recursion-free nesting",
+  "template": "{% macro a() %}A{% endmacro %}{% macro b() %}[{{ a() }}]{% endmacro %}{{ b() }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {},
+  "expected": "[A]"
+ },
+ {
+  "name": "macro whitespace",
+  "template": "{% macro m() %}\n  inner\n{% endmacro %}\nstart{{ m() }}end",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {},
+  "expected": "start  inner\nend"
+ },
+ {
+  "name": "endmacro with name",
+  "template": "{% macro m() %}ok{% endmacro m %}{{ m() }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {},
+  "error": {
+   "type": "syntax",
+   "line": 1,
+   "message": "expected token 'end of statement block', got 'm'"
+  }
+ },
+ {
+  "name": "import as",
+  "template": "{% import 'helpers.sql' as h %}SELECT {{ h.quote('x') }} FROM {{ h.table }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {
+   "helpers.sql": "{% macro quote(v) %}'{{ v }}'{% endmacro %}{% macro table() %}t{% endmacro %}"
+  },
+  "expected": "SELECT 'x' FROM <Macro 'table'>"
+ },
+ {
+  "name": "from import with alias",
+  "template": "{% from 'helpers.sql' import quote, upper_col as uc %}{{ quote('a') }} {{ uc('b') }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {
+   "helpers.sql": "{% macro quote(v) %}'{{ v }}'{% endmacro %}{% macro upper_col(c) %}UPPER({{ c }}){% endmacro %}"
+  },
+  "expected": "'a' UPPER(b)"
+ },
+ {
+  "name": "imported template has no caller context",
+  "template": "{% import 'h.sql' as h %}{{ h.m() }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {
+   "h.sql": "{% macro m() %}{{ x is defined }}{% endmacro %}"
+  },
+  "expected": "False"
+ },
+ {
+  "name": "imported top-level output is discarded",
+  "template": "{% import 'h.sql' as h %}[{{ h.m() }}]",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {
+   "h.sql": "IGNORED TEXT {% macro m() %}m{% endmacro %}"
+  },
+  "expected": "[m]"
+ },
+ {
+  "name": "nested imports",
+  "template": "{% from 'a.sql' import outer %}{{ outer() }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {
+   "a.sql": "{% import 'b.sql' as b %}{% macro outer() %}<{{ b.inner() }}>{% endmacro %}",
+   "b.sql": "{% macro inner() %}in{% endmacro %}"
+  },
+  "expected": "<in>"
+ },
+ {
+  "name": "macro too many arguments",
+  "template": "{% macro m(a) %}{{ a }}{% endmacro %}{{ m(1, 2) }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {},
+  "error": {
+   "type": "type",
+   "line": 1,
+   "message": "macro 'm' takes not more than 1 argument(s)"
+  }
+ },
+ {
+  "name": "macro unknown keyword",
+  "template": "{% macro m(a) %}{{ a }}{% endmacro %}{{ m(b=1) }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {},
+  "error": {
+   "type": "type",
+   "line": 1,
+   "message": "macro 'm' takes no keyword argument 'b'"
+  }
+ },
+ {
+  "name": "macro missing argument",
+  "template": "{% macro m(a) %}{{ a }}{% endmacro %}{{ m() }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {},
+  "error": {
+   "type": "undefined",
+   "line": 1,
+   "message": "parameter 'a' was not provided"
+  }
+ },
+ {
+  "name": "import missing name",
+  "template": "{% from 'h.sql' import nope %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "files": {
+   "h.sql": "{% macro m() %}{% endmacro %}"
+  },
+  "expected": ""
  }
 ]

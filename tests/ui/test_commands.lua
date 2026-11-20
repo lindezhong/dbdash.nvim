@@ -280,6 +280,16 @@ T[":DbDashStyle re-renders cached data with another style"] = function()
   eq(child.fn.getcompletion("DbDashStyle line q", "cmdline"), { "quadrant" })
 end
 
+T["query templates import macros from files next to the config"] = function()
+  vim.fn.writefile({ "{% macro ids(xs) %}{{ xs|sql_in }}{% endmacro %}" }, dir .. "/macros.sql")
+  local cfg = CFG:gsub("SELECT {{ n }} AS n", "{%% from 'macros.sql' import ids %%}SELECT {{ n }} AS n, {{ ids([7, 8])|sql_quote }} AS m")
+  vim.fn.writefile(vim.split(cfg, "\n"), dir .. "/imports.yaml")
+  child.cmd("DbDashStart imports.yaml")
+  wait_loaded()
+  eq(find_line("%(7, 8%)") ~= nil, true)
+  eq(child.lua_get("#_G.notes"), 0)
+end
+
 T["legacy example table.yaml runs"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/table.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("value1") end)]])

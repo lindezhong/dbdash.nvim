@@ -213,7 +213,7 @@ function Dashboard:render_sql()
   end
   local vars = args.resolve(self.cfg.query.args, self.state)
   local sql, err = template.render(self.cfg.query.sql, vars, {
-    env = template.env(driver.dialect, self.cfg.query.autoescape),
+    env = template.env(driver.dialect, self.cfg.query.autoescape, self.cfg.dir),
     source = vim.fn.fnamemodify(self.path, ":~:."),
     line_offset = self.cfg.query.sql_line - 1,
   })

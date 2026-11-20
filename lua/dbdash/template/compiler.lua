@@ -23,11 +23,6 @@ local BINOPS = {
   ["~"] = "concat",
 }
 
-local METHODS = {}
-for _, m in ipairs(R.METHOD_NAMES) do
-  METHODS[m] = true
-end
-
 local C = {}
 C.__index = C
 
@@ -114,22 +109,8 @@ function C:expr(n)
   elseif k == "Call" then
     local fn = n.fn
     if fn.k == "Getattr" then
-      if not METHODS[fn.name] then
-        self:fail(
-          n,
-          "calling '.%s()' is not supported (allowed methods: %s)",
-          fn.name,
-          table.concat(R.METHOD_NAMES, ", ")
-        )
-      end
-      if #n.kwargs > 0 then
-        self:fail(n, "keyword arguments are not supported for methods")
-      end
-      local args = { self:expr(fn.obj), ("%q"):format(fn.name) }
-      for _, a in ipairs(n.args) do
-        args[#args + 1] = self:expr(a)
-      end
-      return "rt.method(" .. table.concat(args, ", ") .. ")"
+      -- obj.name(...): a macro of an imported module, or a whitelisted method.
+      return ("rt.call_attr(env, %s, %q, %s, %s)"):format(self:expr(fn.obj), fn.name, self:list(n.args), self:kwargs(n.kwargs))
     end
     return ("rt.call(env, %s, %s, %s)"):format(self:expr(fn), self:list(n.args), self:kwargs(n.kwargs))
   elseif k == "Filter" then
@@ -212,6 +193,16 @@ local function collect_sets(body, out, seen)
       end
     elseif st.k == "For" and st.else_ then
       collect_sets(st.else_, out, seen)
+    elseif st.k == "Macro" or st.k == "Import" or st.k == "FromImport" then
+      local names = st.k == "Macro" and { st.name } or st.k == "Import" and { st.alias } or vim.tbl_map(function(n)
+        return n.alias
+      end, st.names)
+      for _, name in ipairs(names) do
+        if not seen[name] then
+          seen[name] = true
+          out[#out + 1] = name
+        end
+      end
     end
   end
   return out
@@ -306,6 +297,54 @@ function C:stmt(st)
     else
       self:emit(("%s = rt.unpack(%s, %d)"):format(table.concat(lhs, ", "), self:expr(st.expr), #lhs))
     end
+  elseif k == "Macro" then
+    self:line(st)
+    local b = self.scopes[#self.scopes][st.name]
+    local args, kwargs = self:tmp(), self:tmp()
+    self:emit(("%s = rt.macro(%q, function(%s, %s, env)"):format(b.lua, st.name, args, kwargs))
+    self.depth = self.depth + 1
+    self:emit("local o = {}")
+    -- Bind parameters: positional, then keyword, then defaults.
+    local bindings = {}
+    local names = {}
+    for i, p in ipairs(st.params) do
+      local lua = self:tmp()
+      bindings[p.name] = { lua = lua, sure = true }
+      names[i] = ("%q"):format(p.name)
+      self:emit(("local %s = %s[%d]"):format(lua, args, i))
+      self:emit(("if %s == nil then %s = %s[%q] end"):format(lua, lua, kwargs, p.name))
+      if p.default then
+        self:emit(("if %s == nil then %s = %s end"):format(lua, lua, self:expr(p.default)))
+      else
+        self:emit(("if %s == nil then %s = rt.undef(%q) end"):format(
+          lua,
+          lua,
+          ("'%s' is undefined (missing argument of macro %s)"):format(p.name, st.name)
+        ))
+      end
+    end
+    self:emit(("rt.check_args(%q, %s, %s, {%s})"):format(st.name, args, kwargs, table.concat(names, ", ")))
+    self:open_scope(st.body, bindings)
+    self:body(st.body)
+    self:close_scope()
+    self:emit("return table.concat(o)")
+    self.depth = self.depth - 1
+    self:emit("end)")
+    if #self.scopes == 1 then
+      self.exports[#self.exports + 1] = { st.name, b.lua }
+    end
+  elseif k == "Import" then
+    self:line(st)
+    local b = self.scopes[#self.scopes][st.alias]
+    self:emit(("%s = rt.import(env, %s)"):format(b.lua, self:expr(st.target)))
+  elseif k == "FromImport" then
+    self:line(st)
+    local mod = self:tmp()
+    self:emit(("local %s = rt.import(env, %s)"):format(mod, self:expr(st.target)))
+    for _, n in ipairs(st.names) do
+      local b = self.scopes[#self.scopes][n.alias]
+      self:emit(("%s = rt.import_name(%s, %q)"):format(b.lua, mod, n.name))
+    end
   else
     error("unknown statement node " .. tostring(k))
   end
@@ -336,7 +375,7 @@ end
 ---@param body table[]
 ---@return string
 function M.compile(body)
-  local c = setmetatable({ buf = {}, depth = 0, n = 0, scopes = {} }, C)
+  local c = setmetatable({ buf = {}, depth = 0, n = 0, scopes = {}, exports = {} }, C)
   c:emit("local rt = ...")
   c:emit("return function(ctx, env, L)")
   c.depth = 1
@@ -344,7 +383,12 @@ function M.compile(body)
   c:open_scope(body)
   c:body(body)
   c:close_scope()
-  c:emit("return table.concat(o)")
+  -- The second return value lists top-level macros, used by {% import %}.
+  local ex = {}
+  for _, e in ipairs(c.exports) do
+    ex[#ex + 1] = ("{ %q, %s }"):format(e[1], e[2])
+  end
+  c:emit("return table.concat(o), { " .. table.concat(ex, ", ") .. " }")
   c.depth = 0
   c:emit("end")
   return table.concat(c.buf, "\n")

@@ -3,19 +3,23 @@ local M = {}
 
 ---@param file string? path to a single test file, empty for the whole suite
 function M.run(file)
-  local opts = {
-    execute = { reporter = MiniTest.gen_reporter.stdout({ group_depth = 2 }) },
-  }
-  if file and file ~= "" then
-    opts.collect = { find_files = function() return { file } end }
-  else
-    opts.collect = {
-      find_files = function()
-        return vim.fn.globpath("tests", "**/test_*.lua", false, true)
-      end,
-    }
+  local files = (file and file ~= "") and { file } or vim.fn.globpath("tests", "**/test_*.lua", false, true)
+  -- A test file that does not compile would make mini.test wait forever: fail fast instead.
+  for _, f in ipairs(files) do
+    local ok, err = loadfile(f)
+    if not ok then
+      io.stderr:write("cannot load " .. f .. ": " .. tostring(err) .. "\n")
+      vim.cmd("cquit 1")
+    end
   end
-  MiniTest.run(opts)
+  MiniTest.run({
+    collect = {
+      find_files = function()
+        return files
+      end,
+    },
+    execute = { reporter = MiniTest.gen_reporter.stdout({ group_depth = 2 }) },
+  })
 end
 
 return M
