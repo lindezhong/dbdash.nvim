@@ -2,7 +2,7 @@
 NVIM ?= nvim
 FILE ?=
 
-.PHONY: deps test it fmt
+.PHONY: deps test it it-up it-down fmt
 
 deps: deps/mini.nvim
 
@@ -14,8 +14,16 @@ test: deps
 		-c "lua require('tests.runner').run('$(FILE)')"
 
 # Integration tests against real databases (see tests/docker/compose.yaml).
-it: deps
+COMPOSE ?= docker compose -f tests/docker/compose.yaml
+
+it: deps it-up
 	DBDASH_IT=1 $(MAKE) test
+
+it-up:
+	$(COMPOSE) up -d --wait
+
+it-down:
+	$(COMPOSE) down -v
 
 fmt:
 	stylua lua tests plugin

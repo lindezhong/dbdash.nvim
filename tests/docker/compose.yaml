@@ -1,0 +1,35 @@
+# Databases for integration tests (make it). Plain-text endpoints; TLS variants come with M4.
+# Host ports avoid the defaults so a local database is not hit by accident.
+name: dbdash-it
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--requirepass", "dbdash_pw"]
+    ports: ["16379:6379"]
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dbdash
+      POSTGRES_PASSWORD: dbdash_pw
+      POSTGRES_DB: dbdash_test
+      # "md5" in pg_hba also accepts SCRAM for SCRAM-stored passwords, so both
+      # the default (SCRAM) user and md5_user below can log in.
+      POSTGRES_HOST_AUTH_METHOD: md5
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    volumes:
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports: ["15432:5432"]
+
+  mysql:
+    image: mysql:8.4
+    command: ["--mysql-native-password=ON"]
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pw
+      MYSQL_DATABASE: dbdash_test
+      MYSQL_USER: dbdash
+      MYSQL_PASSWORD: dbdash_pw
+    volumes:
+      - ./mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports: ["13306:3306"]
