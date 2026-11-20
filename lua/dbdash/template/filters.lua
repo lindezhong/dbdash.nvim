@@ -1,0 +1,466 @@
+-- Built-in filters, tests and globals (design §6.3), with Jinja/Python semantics.
+-- SQL filters are registered separately (dbdash.template.sql).
+local map = require("dbdash.util.map")
+local R = require("dbdash.template.runtime")
+local errors = require("dbdash.template.errors")
+
+local M = {}
+
+local raise = errors.raise
+local NONE = R.NONE
+
+---Bind positional and keyword arguments to a Python-like signature.
+---@param fname string
+---@param args any[]
+---@param kwargs table<string, any>
+---@param params { [1]: string, [2]: any }[] name and default (nil = required)
+---@return any ...
+local function bind(fname, args, kwargs, params)
+  local out = {}
+  if #args > #params then
+    raise("type", "%s() takes at most %d arguments (%d given)", fname, #params, #args)
+  end
+  for i, p in ipairs(params) do
+    local v = args[i]
+    local kv = kwargs[p[1]]
+    if v ~= nil and kv ~= nil then
+      raise("type", "%s() got multiple values for argument '%s'", fname, p[1])
+    end
+    if v == nil then
+      v = kv
+    end
+    if v == nil then
+      v = p[2]
+    end
+    out[i] = R.check(v)
+  end
+  for k in pairs(kwargs) do
+    local known = false
+    for _, p in ipairs(params) do
+      known = known or p[1] == k
+    end
+    if not known then
+      raise("type", "%s() got an unexpected keyword argument '%s'", fname, k)
+    end
+  end
+  return unpack(out, 1, #params)
+end
+M.bind = bind
+
+local function length(v)
+  if type(v) == "string" then
+    return #R.chars(v)
+  elseif R.is_safe(v) then
+    return #R.chars(v.s)
+  elseif map.is_map(v) then
+    return #map.keys(v)
+  elseif R.is_list(v) then
+    return #v
+  end
+  raise("type", "object of type '%s' has no len()", R.typename(v))
+end
+
+local function seq_of(v)
+  if type(v) == "string" then
+    return R.chars(v)
+  end
+  return R.iter(v)
+end
+
+---Python int() of a string, or nil when invalid.
+local function parse_int(s, base)
+  s = vim.trim(s):gsub("_", "")
+  if base == 16 then
+    s = s:gsub("^([-+]?)0[xX]", "%1")
+  elseif base == 8 then
+    s = s:gsub("^([-+]?)0[oO]", "%1")
+  elseif base == 2 then
+    s = s:gsub("^([-+]?)0[bB]", "%1")
+  end
+  local sign, digits = s:match("^([-+]?)(%w+)$")
+  if not digits then
+    return nil
+  end
+  local n = tonumber(digits, base)
+  if not n then
+    return nil
+  end
+  return sign == "-" and -n or n
+end
+
+---Python float() of a string, or nil when invalid.
+local function parse_float(s)
+  s = vim.trim(s):gsub("_", "")
+  local l = s:lower():gsub("^[-+]", "")
+  if l == "inf" or l == "infinity" then
+    return s:sub(1, 1) == "-" and -math.huge or math.huge
+  elseif l == "nan" then
+    return 0 / 0
+  end
+  if not s:match("^[-+]?%d*%.?%d*[eE]?[-+]?%d*$") then
+    return nil
+  end
+  return tonumber(s)
+end
+
+local function trunc(x)
+  return x >= 0 and math.floor(x) or math.ceil(x)
+end
+
+local function as_number(v, fname)
+  if type(v) == "number" then
+    return v
+  elseif type(v) == "boolean" then
+    return v and 1 or 0
+  end
+  raise("type", "%s: expected a number, got '%s'", fname, R.typename(v))
+end
+
+-- Python's round(): round half to even.
+local function round_half_even(x, ndigits)
+  local m = 10 ^ ndigits
+  local y = x * m
+  local f = math.floor(y)
+  local diff = y - f
+  local r
+  if diff > 0.5 then
+    r = f + 1
+  elseif diff < 0.5 then
+    r = f
+  else
+    r = (f % 2 == 0) and f or f + 1
+  end
+  return r / m
+end
+
+-- JSON as produced by Jinja's tojson: sorted keys, ", " / ": " separators, ASCII-only,
+-- and <, >, &, ' escaped for HTML safety.
+local JSON_ESC = {
+  ['"'] = '\\"',
+  ["\\"] = "\\\\",
+  ["\n"] = "\\n",
+  ["\r"] = "\\r",
+  ["\t"] = "\\t",
+  ["\b"] = "\\b",
+  ["\f"] = "\\f",
+  ["<"] = "\\u003c",
+  [">"] = "\\u003e",
+  ["&"] = "\\u0026",
+  ["'"] = "\\u0027",
+}
+
+local function json_string(s)
+  local out = {}
+  for ch in s:gmatch("[%z\1-\127\192-\247][\128-\191]*") do
+    local b = ch:byte()
+    if JSON_ESC[ch] then
+      out[#out + 1] = JSON_ESC[ch]
+    elseif #ch == 1 and b < 0x20 then
+      out[#out + 1] = ("\\u%04x"):format(b)
+    elseif #ch == 1 then
+      out[#out + 1] = ch
+    else
+      local cp = vim.fn.char2nr(ch)
+      if cp >= 0x10000 then
+        cp = cp - 0x10000
+        out[#out + 1] = ("\\u%04x\\u%04x"):format(0xD800 + math.floor(cp / 0x400), 0xDC00 + cp % 0x400)
+      else
+        out[#out + 1] = ("\\u%04x"):format(cp)
+      end
+    end
+  end
+  return '"' .. table.concat(out) .. '"'
+end
+
+local function to_json(v)
+  R.check(v)
+  local t = type(v)
+  if v == NONE or v == nil then
+    return "null"
+  elseif t == "boolean" then
+    return tostring(v)
+  elseif t == "number" then
+    if v ~= v then
+      return "NaN"
+    elseif v == math.huge then
+      return "Infinity"
+    elseif v == -math.huge then
+      return "-Infinity"
+    end
+    return R.numstr(v)
+  elseif t == "string" then
+    return json_string(v)
+  elseif R.is_safe(v) then
+    return json_string(v.s)
+  elseif map.is_map(v) then
+    local keys = {}
+    for k in pairs(v) do
+      keys[#keys + 1] = { s = type(k) == "string" and k or R.str(k), k = k }
+    end
+    table.sort(keys, function(a, b)
+      return a.s < b.s
+    end)
+    local parts = {}
+    for i, k in ipairs(keys) do
+      parts[i] = json_string(k.s) .. ": " .. to_json(v[k.k])
+    end
+    return "{" .. table.concat(parts, ", ") .. "}"
+  elseif R.is_list(v) then
+    local parts = {}
+    for i = 1, #v do
+      parts[i] = to_json(v[i])
+    end
+    return "[" .. table.concat(parts, ", ") .. "]"
+  end
+  raise("type", "Object of type %s is not JSON serializable", R.typename(v))
+end
+M.to_json = to_json
+
+local F = {}
+
+F.default = function(_, v, args, kw)
+  local dflt, boolean = bind("default", args, kw, { { "default_value", "" }, { "boolean", false } })
+  if R.is_undef(v) or (boolean and not R.truthy(v)) then
+    return dflt
+  end
+  return v
+end
+F.d = F.default
+
+F.length = function(_, v, args, kw)
+  bind("length", args, kw, {})
+  return length(v)
+end
+F.count = F.length
+
+F.upper = function(_, v, args, kw)
+  bind("upper", args, kw, {})
+  return R.upper(R.str(v))
+end
+
+F.lower = function(_, v, args, kw)
+  bind("lower", args, kw, {})
+  return vim.fn.tolower(R.str(v))
+end
+
+F.trim = function(_, v, args, kw)
+  local chars = bind("trim", args, kw, { { "chars", NONE } })
+  return R.strip_chars(R.str(v), chars ~= NONE and R.str(chars) or nil, true, true)
+end
+
+F.replace = function(_, v, args, kw)
+  local old, new, count = bind("replace", args, kw, { { "old" }, { "new" }, { "count", NONE } })
+  local s = R.str(v)
+  old, new = R.str(old), R.str(new)
+  local limit = count ~= NONE and as_number(count, "replace") or math.huge
+  local out, pos, n = {}, 1, 0
+  if old == "" then
+    -- Python inserts `new` between every character (and at both ends).
+    local cs = R.chars(s)
+    for i = 0, #cs do
+      if n < limit then
+        out[#out + 1] = new
+        n = n + 1
+      end
+      out[#out + 1] = cs[i + 1]
+    end
+    return table.concat(out)
+  end
+  while n < limit do
+    local a, b = s:find(old, pos, true)
+    if not a then
+      break
+    end
+    out[#out + 1] = s:sub(pos, a - 1) .. new
+    pos = b + 1
+    n = n + 1
+  end
+  out[#out + 1] = s:sub(pos)
+  return table.concat(out)
+end
+
+F.join = function(_, v, args, kw)
+  local sep, attribute = bind("join", args, kw, { { "d", "" }, { "attribute", NONE } })
+  local parts = {}
+  for i, item in ipairs(seq_of(v)) do
+    if attribute ~= NONE then
+      item = R.check(R.getitem(item, attribute))
+    end
+    parts[i] = R.str(item)
+  end
+  return table.concat(parts, R.str(sep))
+end
+
+F.first = function(_, v, args, kw)
+  bind("first", args, kw, {})
+  local seq = seq_of(v)
+  if #seq == 0 then
+    return R.undef("No first item, sequence was empty.")
+  end
+  return seq[1]
+end
+
+F.last = function(_, v, args, kw)
+  bind("last", args, kw, {})
+  local seq = seq_of(v)
+  if #seq == 0 then
+    return R.undef("No last item, sequence was empty.")
+  end
+  return seq[#seq]
+end
+
+F.int = function(_, v, args, kw)
+  local dflt, base = bind("int", args, kw, { { "default", 0 }, { "base", 10 } })
+  if type(v) == "string" or R.is_safe(v) then
+    local s = R.str(v)
+    local n = parse_int(s, base)
+    if n then
+      return n
+    end
+    local f = parse_float(s)
+    if f and f == f and f ~= math.huge and f ~= -math.huge then
+      return trunc(f)
+    end
+    return dflt
+  elseif type(v) == "number" then
+    if v ~= v or v == math.huge or v == -math.huge then
+      return dflt
+    end
+    return trunc(v)
+  elseif type(v) == "boolean" then
+    return v and 1 or 0
+  end
+  return dflt
+end
+
+F.float = function(_, v, args, kw)
+  local dflt = bind("float", args, kw, { { "default", 0.0 } })
+  if type(v) == "number" then
+    return v
+  elseif type(v) == "boolean" then
+    return v and 1 or 0
+  elseif type(v) == "string" or R.is_safe(v) then
+    local f = parse_float(R.str(v))
+    if f then
+      return f
+    end
+  end
+  return dflt
+end
+
+F.string = function(_, v, args, kw)
+  bind("string", args, kw, {})
+  return R.str(v)
+end
+
+F.abs = function(_, v, args, kw)
+  bind("abs", args, kw, {})
+  return math.abs(as_number(v, "abs"))
+end
+
+F.round = function(_, v, args, kw)
+  local precision, method = bind("round", args, kw, { { "precision", 0 }, { "method", "common" } })
+  local x = as_number(v, "round")
+  if method == "common" then
+    return round_half_even(x, precision)
+  elseif method == "ceil" or method == "floor" then
+    local m = 10 ^ precision
+    return math[method](x * m) / m
+  end
+  raise("value", "method must be 'common', 'ceil' or 'floor'")
+end
+
+F.tojson = function(_, v, args, kw)
+  local indent = bind("tojson", args, kw, { { "indent", NONE } })
+  if indent ~= NONE then
+    raise("value", "tojson(indent=...) is not supported")
+  end
+  return R.safe(to_json(v))
+end
+
+F.safe = function(_, v, args, kw)
+  bind("safe", args, kw, {})
+  if R.is_safe(v) then
+    return v
+  end
+  return R.safe(R.str(v))
+end
+
+local T = {}
+
+T.defined = function(_, v)
+  return not R.is_undef(v)
+end
+T.undefined = function(_, v)
+  return R.is_undef(v)
+end
+T.none = function(_, v)
+  return R.check(v) == NONE
+end
+T.number = function(_, v)
+  local t = type(R.check(v))
+  return t == "number" or t == "boolean"
+end
+T.string = function(_, v)
+  return type(R.check(v)) == "string" or R.is_safe(v)
+end
+T.mapping = function(_, v)
+  return map.is_map(R.check(v))
+end
+T.sequence = function(_, v)
+  R.check(v)
+  return type(v) == "string" or R.is_safe(v) or map.is_map(v) or R.is_list(v)
+end
+T["true"] = function(_, v)
+  return R.check(v) == true
+end
+T["false"] = function(_, v)
+  return R.check(v) == false
+end
+
+local G = {}
+
+G.range = function(args, kwargs)
+  if next(kwargs) then
+    raise("type", "range() takes no keyword arguments")
+  end
+  local start, stop, step
+  if #args == 1 then
+    start, stop, step = 0, args[1], 1
+  elseif #args == 2 or #args == 3 then
+    start, stop, step = args[1], args[2], args[3] or 1
+  else
+    raise("type", "range expected 1 to 3 arguments, got %d", #args)
+  end
+  for _, x in ipairs({ start, stop, step }) do
+    if type(x) ~= "number" or x ~= math.floor(x) then
+      raise("type", "'%s' object cannot be interpreted as an integer", R.typename(x))
+    end
+  end
+  if step == 0 then
+    raise("value", "range() arg 3 must not be zero")
+  end
+  local out = {}
+  if (stop - start) / step > 100000 then
+    raise("value", "range() is limited to 100000 items")
+  end
+  for i = start, stop - (step > 0 and 1 or -1), step do
+    out[#out + 1] = i
+  end
+  return out
+end
+
+---Register everything into the runtime.
+function M.install()
+  for k, v in pairs(F) do
+    R.filters[k] = v
+  end
+  for k, v in pairs(T) do
+    R.tests[k] = v
+  end
+  for k, v in pairs(G) do
+    R.globals[k] = v
+  end
+end
+
+return M

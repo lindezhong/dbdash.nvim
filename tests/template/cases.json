@@ -1,0 +1,834 @@
+[
+ {
+  "name": "text only",
+  "template": "SELECT 1",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "SELECT 1"
+ },
+ {
+  "name": "variable",
+  "template": "a {{ x }} b",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "a 5 b"
+ },
+ {
+  "name": "trailing newline dropped",
+  "template": "x\n",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "x"
+ },
+ {
+  "name": "only one trailing newline dropped",
+  "template": "x\n\n",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "x\n"
+ },
+ {
+  "name": "trim_blocks",
+  "template": "{% if true %}\nyes\n{% endif %}\nend",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "yes\nend"
+ },
+ {
+  "name": "lstrip_blocks",
+  "template": "  {% if true %}\n  x\n  {% endif %}\ny",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "  x\ny"
+ },
+ {
+  "name": "lstrip not for variables",
+  "template": "  {{ x }}\n",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "  5"
+ },
+ {
+  "name": "lstrip only at line start",
+  "template": "a {% if true %}b{% endif %} c",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "a b c"
+ },
+ {
+  "name": "minus strips both sides",
+  "template": "a  \n {%- if true -%} \n b \n {%- endif -%}  c",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "abc"
+ },
+ {
+  "name": "minus on variable",
+  "template": "a   {{- x -}}   b",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "a5b"
+ },
+ {
+  "name": "plus disables lstrip",
+  "template": "  {%+ if true %}x{% endif %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "  x"
+ },
+ {
+  "name": "comment inline",
+  "template": "a {# note #} b",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "a  b"
+ },
+ {
+  "name": "comment trims newline",
+  "template": "{# note #}\nx",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "x"
+ },
+ {
+  "name": "comment lstrip",
+  "template": "  {# note #}\nx",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "x"
+ },
+ {
+  "name": "multiline comment",
+  "template": "a{# line1\nline2 #}b",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "ab"
+ },
+ {
+  "name": "raw block",
+  "template": "{% raw %}{{ x }}{% if %}{% endraw %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "{{ x }}{% if %}"
+ },
+ {
+  "name": "raw with trim",
+  "template": "{% raw %}\n{{ x }}\n{% endraw %}\nz",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "\n{{ x }}\nz"
+ },
+ {
+  "name": "delimiters inside strings",
+  "template": "{{ '}}' ~ \"%}\" }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "}}%}"
+ },
+ {
+  "name": "dict literal braces",
+  "template": "{{ {'a': {'b': 1}}['a']['b'] }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "1"
+ },
+ {
+  "name": "int literal",
+  "template": "{{ 42 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "42"
+ },
+ {
+  "name": "float literal",
+  "template": "{{ 1.5 }} {{ 0.1 }} {{ 1e-05 }} {{ 1_000 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "1.5 0.1 1e-05 1000"
+ },
+ {
+  "name": "integral float literal",
+  "template": "{{ 2.0 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "2.0",
+  "lua_expected": "2"
+ },
+ {
+  "name": "string escapes",
+  "template": "{{ 'a\\tb' }}|{{ \"it's\" }}|{{ 'x\\'y' }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "a\tb|it's|x'y"
+ },
+ {
+  "name": "adjacent strings",
+  "template": "{{ 'a' 'b' \"c\" }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "abc"
+ },
+ {
+  "name": "constants",
+  "template": "{{ true }} {{ True }} {{ false }} {{ none }} {{ None }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True True False None None"
+ },
+ {
+  "name": "list literal repr",
+  "template": "{{ [1, 'a', none, true, [2]] }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "[1, 'a', None, True, [2]]"
+ },
+ {
+  "name": "dict literal repr",
+  "template": "{{ {'k': 'v', 'n': 1} }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "{'k': 'v', 'n': 1}"
+ },
+ {
+  "name": "string repr quotes",
+  "template": "{{ [\"it's\", 'say \"hi\"', 'a\\nb'] }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "[\"it's\", 'say \"hi\"', 'a\\nb']"
+ },
+ {
+  "name": "tuple literal",
+  "template": "{% for a, b in [(1, 2), (3, 4)] %}{{ a }}{{ b }};{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "12;34;"
+ },
+ {
+  "name": "precedence",
+  "template": "{{ 1 + 2 * 3 }} {{ (1 + 2) * 3 }} {{ 2 * 3 % 4 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "7 9 2"
+ },
+ {
+  "name": "power left assoc",
+  "template": "{{ 2 ** 3 ** 2 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "64"
+ },
+ {
+  "name": "floor div and mod",
+  "template": "{{ 7 // 2 }} {{ -7 // 2 }} {{ 7 % 3 }} {{ -7 % 3 }} {{ 7 % -3 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "3 -4 1 2 -2"
+ },
+ {
+  "name": "true division",
+  "template": "{{ 1 / 4 }} {{ 7 / 2 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "0.25 3.5"
+ },
+ {
+  "name": "true division integral",
+  "template": "{{ 4 / 2 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "2.0",
+  "lua_expected": "2"
+ },
+ {
+  "name": "unary",
+  "template": "{{ -x }} {{ +x }} {{ - -x }} {{ -1|abs }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "-5 5 5 1"
+ },
+ {
+  "name": "string plus",
+  "template": "{{ 'a' + 'b' }} {{ s + '!' }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "ab Hello!"
+ },
+ {
+  "name": "list plus",
+  "template": "{{ [1] + [2, 3] }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "[1, 2, 3]"
+ },
+ {
+  "name": "string times",
+  "template": "{{ 'ab' * 3 }} {{ [0] * 2 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "ababab [0, 0]"
+ },
+ {
+  "name": "tilde concat",
+  "template": "{{ 'a' ~ 1 ~ none ~ true ~ 1.5 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "a1NoneTrue1.5"
+ },
+ {
+  "name": "float math",
+  "template": "{{ pi * 2 }} {{ 0.1 + 0.2 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "6.28318 0.30000000000000004"
+ },
+ {
+  "name": "comparisons",
+  "template": "{{ 1 < 2 }} {{ 2 <= 1 }} {{ 'a' == 'a' }} {{ 'a' != 'b' }} {{ 'b' > 'a' }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True False True True True"
+ },
+ {
+  "name": "chained comparison",
+  "template": "{{ 1 < x < 10 }} {{ 1 < x > 10 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True False"
+ },
+ {
+  "name": "deep equality",
+  "template": "{{ [1, [2]] == [1, [2]] }} {{ {'a': 1} == {'a': 1} }} {{ 1 == 1.0 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True True True"
+ },
+ {
+  "name": "in operator",
+  "template": "{{ 1 in items }} {{ 9 in items }} {{ 'ell' in s }} {{ 'a' in d }} {{ 'z' not in d }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True False True True True"
+ },
+ {
+  "name": "and or return operands",
+  "template": "{{ 0 or 'x' }}|{{ '' and 1 }}|{{ 1 and 2 }}|{{ none or [] }}|{{ zero or blank }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "x||2|[]|"
+ },
+ {
+  "name": "not",
+  "template": "{{ not 0 }} {{ not 'a' }} {{ not empty_list }} {{ not not flag }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True False True True"
+ },
+ {
+  "name": "not in precedence",
+  "template": "{{ not 1 in [2] }} {{ not x == 5 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True False"
+ },
+ {
+  "name": "conditional expression",
+  "template": "{{ 'y' if flag else 'n' }} {{ 'y' if off else 'n' }} {{ 1 if 0 else 2 if 1 else 3 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "y n 2"
+ },
+ {
+  "name": "python truthiness",
+  "template": "{% for v in [0, '', [], {}, none, false, 0.0, 'a', [0], {'k': 0}, -1] %}{{ 'T' if v else 'F' }}{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "FFFFFFFTTTT"
+ },
+ {
+  "name": "if on context values",
+  "template": "{% if zero %}a{% elif blank %}b{% elif empty_map %}c{% elif nothing %}d{% else %}e{% endif %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "e"
+ },
+ {
+  "name": "attribute and item",
+  "template": "{{ d.a }} {{ d['b'] }} {{ d.nested.k }} {{ d['nested']['k'] }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "1 2 v v"
+ },
+ {
+  "name": "list index",
+  "template": "{{ items[0] }} {{ items[-1] }} {{ users[1].name }} {{ users[0]['age'] }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "3 2 bob 30"
+ },
+ {
+  "name": "string index",
+  "template": "{{ s[0] }}{{ s[-1] }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "Ho"
+ },
+ {
+  "name": "numeric attribute",
+  "template": "{{ items.0 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "3"
+ },
+ {
+  "name": "unicode string index",
+  "template": "{{ '中文字'[1] }} {{ '中文字'|length }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "文 3"
+ },
+ {
+  "name": "dict items keys values",
+  "template": "{% for k, v in d.items() %}{{ k }}={{ v }};{% endfor %}|{% for k in d.keys() %}{{ k }}{% endfor %}|{% for v in d.values() %}{{ v }}{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "b=2;a=1;nested={'k': 'v'};|banested|21{'k': 'v'}"
+ },
+ {
+  "name": "dict get",
+  "template": "{{ d.get('a') }} {{ d.get('zz') }} {{ d.get('zz', 'dflt') }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "1 None dflt"
+ },
+ {
+  "name": "string methods",
+  "template": "{{ s.upper() }} {{ s.lower() }} [{{ '  pad  '.strip() }}] {{ s.startswith('He') }} {{ s.endswith('x') }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "HELLO hello [pad] True False"
+ },
+ {
+  "name": "is defined",
+  "template": "{{ x is defined }} {{ zz is defined }} {{ zz is not defined }} {{ zz is undefined }} {{ d.zz is defined }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True False True True False"
+ },
+ {
+  "name": "is none",
+  "template": "{{ nothing is none }} {{ 0 is none }} {{ nothing is not none }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True False False"
+ },
+ {
+  "name": "type tests",
+  "template": "{{ 1 is number }} {{ 1.5 is number }} {{ true is number }} {{ '1' is number }} {{ s is string }} {{ 1 is string }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True True True False True False"
+ },
+ {
+  "name": "collection tests",
+  "template": "{{ d is mapping }} {{ items is mapping }} {{ items is sequence }} {{ s is sequence }} {{ d is sequence }} {{ 1 is sequence }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True False True True True False"
+ },
+ {
+  "name": "true false tests",
+  "template": "{{ true is true }} {{ 1 is true }} {{ false is false }} {{ 0 is false }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True False True False"
+ },
+ {
+  "name": "default",
+  "template": "{{ zz|default('dflt') }} {{ nothing|default('dflt') }} {{ blank|default('dflt', true) }} {{ x|d(0) }} {{ zz|default }}|",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "dflt None dflt 5 |"
+ },
+ {
+  "name": "default on missing attribute",
+  "template": "{{ d.zz|default('none here') }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "none here"
+ },
+ {
+  "name": "length count",
+  "template": "{{ s|length }} {{ items|count }} {{ d|length }} {{ empty_list|length }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "5 3 3 0"
+ },
+ {
+  "name": "upper lower trim",
+  "template": "{{ 'aBc'|upper }} {{ 'aBc'|lower }} [{{ '  t  '|trim }}] [{{ 'xxaxx'|trim('x') }}]",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "ABC abc [t] [a]"
+ },
+ {
+  "name": "replace",
+  "template": "{{ 'a-b-c'|replace('-', '+') }} {{ 'a-b-c'|replace('-', '', 1) }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "a+b+c ab-c"
+ },
+ {
+  "name": "join",
+  "template": "{{ names|join(', ') }} {{ items|join }} {{ users|join('/', attribute='name') }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "IT, HR, Finance 312 ann/bob"
+ },
+ {
+  "name": "first last",
+  "template": "{{ items|first }} {{ items|last }} {{ s|first }} {{ s|last }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "3 2 H o"
+ },
+ {
+  "name": "int filter",
+  "template": "{{ '3'|int }} {{ '3.7'|int }} {{ 'x'|int }} {{ 'x'|int(5) }} {{ 'ff'|int(base=16) }} {{ 3.9|int }} {{ -3.9|int }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "3 3 0 5 255 3 -3"
+ },
+ {
+  "name": "float filter",
+  "template": "{{ '1.5'|float }} {{ 'x'|float(2.5) }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "1.5 2.5"
+ },
+ {
+  "name": "float filter integral",
+  "template": "{{ '3'|float }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "3.0",
+  "lua_expected": "3"
+ },
+ {
+  "name": "string filter",
+  "template": "{{ 1|string ~ 'x' }} {{ none|string }} {{ [1]|string }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "1x None [1]"
+ },
+ {
+  "name": "abs",
+  "template": "{{ -3|abs }} {{ (-2.5)|abs }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "3 2.5"
+ },
+ {
+  "name": "round",
+  "template": "{{ 2.567|round(2) }} {{ 2.561|round(2, 'floor') }} {{ 2.561|round(1, 'ceil') }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "2.57 2.56 2.6"
+ },
+ {
+  "name": "round integral",
+  "template": "{{ 2.5|round }} {{ 3.5|round }} {{ 2.1|round(method='ceil') }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "2.0 4.0 3.0",
+  "lua_expected": "2 4 3"
+ },
+ {
+  "name": "tojson",
+  "template": "{{ d|tojson }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "{\"a\": 1, \"b\": 2, \"nested\": {\"k\": \"v\"}}"
+ },
+ {
+  "name": "tojson escapes",
+  "template": "{{ {'k': \"<a & b> it's é\", 'l': [1, none, true]}|tojson }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "{\"k\": \"\\u003ca \\u0026 b\\u003e it\\u0027s \\u00e9\", \"l\": [1, null, true]}"
+ },
+ {
+  "name": "tojson scalars",
+  "template": "{{ 'x'|tojson }} {{ 1|tojson }} {{ none|tojson }} {{ empty_map|tojson }} {{ empty_list|tojson }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "\"x\" 1 null {} []"
+ },
+ {
+  "name": "safe",
+  "template": "{{ 'a < b'|safe }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "a < b"
+ },
+ {
+  "name": "filter chain and args",
+  "template": "{{ '  a,b  '|trim|replace(',', ';')|upper }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "A;B"
+ },
+ {
+  "name": "filter binds tighter than unary",
+  "template": "{{ -1|abs }} {{ - 1|abs }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "1 1"
+ },
+ {
+  "name": "filter on parenthesized",
+  "template": "{{ (1 - 3)|abs }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "2"
+ },
+ {
+  "name": "loop variables",
+  "template": "{% for i in items %}{{ loop.index }}/{{ loop.index0 }}/{{ loop.revindex }}/{{ loop.revindex0 }}/{{ loop.first }}/{{ loop.last }}/{{ loop.length }};{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "1/0/3/2/True/False/3;2/1/2/1/False/False/3;3/2/1/0/False/True/3;"
+ },
+ {
+  "name": "for else",
+  "template": "{% for i in empty_list %}x{% else %}empty{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "empty"
+ },
+ {
+  "name": "for over dict iterates keys",
+  "template": "{% for k in d %}{{ k }},{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "b,a,nested,"
+ },
+ {
+  "name": "for over string",
+  "template": "{% for c in 'abc' %}{{ c }}-{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "a-b-c-"
+ },
+ {
+  "name": "nested loops",
+  "template": "{% for u in users %}{% for k, v in u.items() %}{{ k }}:{{ v }} {% endfor %}{{ loop.index }}|{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "name:ann age:30 1|name:bob age:25 2|"
+ },
+ {
+  "name": "range",
+  "template": "{% for i in range(3) %}{{ i }}{% endfor %} {% for i in range(1, 7, 2) %}{{ i }}{% endfor %} {% for i in range(3, 0, -1) %}{{ i }}{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "012 135 321"
+ },
+ {
+  "name": "loop with sql shape",
+  "template": "SELECT *\nFROM t\nWHERE 1=1\n{% for n in names %}\n  {% if not loop.first %}OR{% else %}AND ({% endif %} dept = '{{ n }}'\n{% endfor %}\n)\n",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "SELECT *\nFROM t\nWHERE 1=1\nAND ( dept = 'IT'\nOR dept = 'HR'\nOR dept = 'Finance'\n)"
+ },
+ {
+  "name": "set",
+  "template": "{% set y = x * 2 %}{{ y }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "10"
+ },
+ {
+  "name": "set in if is visible after",
+  "template": "{% if true %}{% set y = 1 %}{% endif %}{{ y }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "1"
+ },
+ {
+  "name": "unexecuted set falls back to context",
+  "template": "{% if false %}{% set x = 1 %}{% endif %}{{ x }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "5"
+ },
+ {
+  "name": "set in loop does not leak",
+  "template": "{% set c = 0 %}{% for i in items %}{% set c = c + i %}{% endfor %}{{ c }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "0"
+ },
+ {
+  "name": "loop sees outer set",
+  "template": "{% set p = '>' %}{% for i in items %}{{ p }}{{ i }}{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": ">3>1>2"
+ },
+ {
+  "name": "set shadows context",
+  "template": "{% set x = 'local' %}{{ x }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "local"
+ },
+ {
+  "name": "set multiple targets",
+  "template": "{% set a, b = [1, 2] %}{{ a }}{{ b }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "12"
+ },
+ {
+  "name": "legacy table example",
+  "template": "SELECT \n  datetime('now') as current_time,\n  \"{{key1}}\" as k1,\n  \"{{key2}}\" as k2\n",
+  "ctx": "{\"key1\": \"value1\", \"key2\": \"value2\"}",
+  "expected": "SELECT \n  datetime('now') as current_time,\n  \"value1\" as k1,\n  \"value2\" as k2"
+ },
+ {
+  "name": "conditional where",
+  "template": "SELECT * FROM users\nWHERE age >= {{ min_age }}\n{% if departments %}\n  AND department IN ({% for d in departments %}'{{ d }}'{{ ', ' if not loop.last }}{% endfor %})\n{% endif %}\nORDER BY age",
+  "ctx": "{\"min_age\": 18, \"departments\": [\"IT\", \"HR\"]}",
+  "expected": "SELECT * FROM users\nWHERE age >= 18\n  AND department IN ('IT', 'HR')\nORDER BY age"
+ },
+ {
+  "name": "map argument",
+  "template": "{% for k, v in filters.items() %}AND {{ k }} = '{{ v }}'\n{% endfor %}",
+  "ctx": "{\"filters\": {\"region\": \"Asia\", \"level\": \"senior\"}}",
+  "expected": "AND region = 'Asia'\nAND level = 'senior'\n"
+ },
+ {
+  "name": "spaces after block tag survive trim",
+  "template": "{% if true %}  \nx{% endif %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "  \nx"
+ },
+ {
+  "name": "minus at line start",
+  "template": "a\n  {%- if true %}\nb\n{% endif %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "ab\n"
+ },
+ {
+  "name": "nested blocks with lstrip",
+  "template": "{% for i in items %}\n  {% if i > 1 %}\n    v{{ i }}\n  {% endif %}\n{% endfor %}\n",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "    v3\n    v2\n"
+ },
+ {
+  "name": "tests combined with logic",
+  "template": "{{ x is defined and x > 1 }} {{ nothing is not none or 'fallback' }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True fallback"
+ },
+ {
+  "name": "string comparison",
+  "template": "{{ 'abc' < 'abd' }} {{ '10' < '9' }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "True True"
+ },
+ {
+  "name": "big float literal",
+  "template": "{{ 1e20 }} {{ 1.5e300 }} {{ 123456.789 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "1e+20 1.5e+300 123456.789"
+ },
+ {
+  "name": "small floats",
+  "template": "{{ 0.0001 }} {{ 0.00001234 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "0.0001 1.234e-05"
+ },
+ {
+  "name": "percent literal in string",
+  "template": "{{ '%.2f' }} {{ 'a % b' }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "%.2f a % b"
+ },
+ {
+  "name": "subscript with expression",
+  "template": "{{ users[x - 4].name }} {{ d['ne' ~ 'sted'].k }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "bob v"
+ },
+ {
+  "name": "default with boolean kwarg",
+  "template": "{{ zero|default('z', boolean=true) }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "z"
+ },
+ {
+  "name": "join on mapping keys",
+  "template": "{{ d|join('|') }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "b|a|nested"
+ },
+ {
+  "name": "unicode upper",
+  "template": "{{ 'straße é'|upper }} {{ 'straße'.upper() }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "expected": "STRASSE É STRASSE"
+ },
+ {
+  "name": "undefined variable",
+  "template": "a\n\n{{ missing }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "undefined",
+   "line": 3,
+   "message": "'missing' is undefined"
+  }
+ },
+ {
+  "name": "undefined attribute",
+  "template": "{{ d.missing }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "undefined",
+   "line": 1,
+   "message": "'dict object' has no attribute 'missing'"
+  }
+ },
+ {
+  "name": "undefined in condition",
+  "template": "x\n{% if missing %}y{% endif %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "undefined",
+   "line": 2,
+   "message": "'missing' is undefined"
+  }
+ },
+ {
+  "name": "undefined in arithmetic",
+  "template": "{{ missing + 1 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "undefined",
+   "line": 1,
+   "message": "'missing' is undefined"
+  }
+ },
+ {
+  "name": "undefined iteration",
+  "template": "{% for i in missing %}{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "undefined",
+   "line": 1,
+   "message": "'missing' is undefined"
+  }
+ },
+ {
+  "name": "type error plus",
+  "template": "{{ 1 + 'a' }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "type",
+   "line": 1,
+   "message": "unsupported operand type(s) for +: 'int' and 'str'"
+  }
+ },
+ {
+  "name": "type error compare",
+  "template": "{{ 'a' < 1 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "type",
+   "line": 1,
+   "message": "'<' not supported between instances of 'str' and 'int'"
+  }
+ },
+ {
+  "name": "division by zero",
+  "template": "{{ 1 / 0 }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "value",
+   "line": 1,
+   "message": "division by zero"
+  }
+ },
+ {
+  "name": "syntax unclosed if",
+  "template": "{% if true %}\nx",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "syntax",
+   "line": 2,
+   "message": "Unexpected end of template. Jinja was looking for the following tags: 'elif' or 'else' or 'endif'. The innermost block that needs to be closed is 'if'."
+  }
+ },
+ {
+  "name": "syntax unknown tag",
+  "template": "a\n{% frobnicate %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "syntax",
+   "line": 2,
+   "message": "Encountered unknown tag 'frobnicate'."
+  }
+ },
+ {
+  "name": "syntax unknown filter",
+  "template": "{{ x|nope }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "syntax",
+   "line": 1,
+   "message": "No filter named 'nope'."
+  }
+ },
+ {
+  "name": "syntax bad expression",
+  "template": "{{ 1 + }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "syntax",
+   "line": 1,
+   "message": "unexpected 'end of print statement'"
+  }
+ },
+ {
+  "name": "syntax unclosed variable",
+  "template": "{{ x ",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "syntax",
+   "line": 1,
+   "message": "unexpected end of template, expected 'end of print statement'."
+  }
+ },
+ {
+  "name": "syntax stray endfor",
+  "template": "{% endfor %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "syntax",
+   "line": 1,
+   "message": "Encountered unknown tag 'endfor'."
+  }
+ },
+ {
+  "name": "syntax else without if",
+  "template": "{% else %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159}",
+  "error": {
+   "type": "syntax",
+   "line": 1,
+   "message": "Encountered unknown tag 'else'."
+  }
+ }
+]
