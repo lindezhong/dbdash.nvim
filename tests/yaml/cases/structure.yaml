@@ -1,0 +1,36 @@
+top:
+  nested:
+    deep: 1
+  list:
+    - a
+    - b
+  list_same_indent:
+  - x
+  - y
+  after: z
+args:
+  - name: min_age
+    type: number
+    default: 18
+    choices: [18, 30, 50]
+  - name: depts
+    default: ["IT", "HR", 'Fin, Ops']
+  -
+  - - nested
+    - seq
+  - key: |
+      block in seq
+    other: 1
+flow:
+  map: {a: 1, b: [x, y], c: {d: e}, "q k": "v, w"}
+  empty_map: {}
+  empty_list: []
+  multi: [1, 2,
+    3, 4]  # comment
+  multi_map: {
+    k: v,   # comment
+    k2: [a]
+  }
+null_value:
+dup: 1
+dup: 2

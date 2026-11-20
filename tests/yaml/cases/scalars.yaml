@@ -1,0 +1,15 @@
+# Scalar resolution, following PyYAML (YAML 1.1)
+nulls: [~, null, Null, NULL]
+empty:
+bools: [true, True, TRUE, false, yes, No, on, OFF]
+ints: [0, 42, -7, +3, 1_000, 0x1F, 0b101, 017, 0o17]
+not_ints: [08, 1e3, 1:30, 12abc]
+floats: [1.5, -0.25, 1., .5, 1.5e+3, 2.0E-2]
+strings: [hello world, "quoted # not comment", 'it''s', "tab\tnew\nline", "中\x41"]
+plain_with_colon: http://example.com:8080/path
+plain_hash: a#b   # real comment
+trailing_spaces: value    
+"quoted key": 1
+'single key': 2
+key with spaces: 3
+url: "postgres://user:p%40ss@host:5432/db?tls=require"

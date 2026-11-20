@@ -1,0 +1,29 @@
+literal: |
+  line one
+    indented
+  # not a comment
+
+  last
+folded: >
+  folded
+  text here
+
+  new para
+    more indented
+  back
+strip: |-
+  no trailing newline
+keep: |+
+  keep trailing
+
+clip_after_blank: |
+  text
+
+
+explicit: |2
+    two extra spaces
+folded_strip: >-
+  a
+  b
+empty_block: |
+next: after

@@ -1,0 +1,74 @@
+{
+ "top": {
+  "nested": {
+   "deep": 1
+  },
+  "list": [
+   "a",
+   "b"
+  ],
+  "list_same_indent": [
+   "x",
+   "y"
+  ],
+  "after": "z"
+ },
+ "args": [
+  {
+   "name": "min_age",
+   "type": "number",
+   "default": 18,
+   "choices": [
+    18,
+    30,
+    50
+   ]
+  },
+  {
+   "name": "depts",
+   "default": [
+    "IT",
+    "HR",
+    "Fin, Ops"
+   ]
+  },
+  null,
+  [
+   "nested",
+   "seq"
+  ],
+  {
+   "key": "block in seq\n",
+   "other": 1
+  }
+ ],
+ "flow": {
+  "map": {
+   "a": 1,
+   "b": [
+    "x",
+    "y"
+   ],
+   "c": {
+    "d": "e"
+   },
+   "q k": "v, w"
+  },
+  "empty_map": {},
+  "empty_list": [],
+  "multi": [
+   1,
+   2,
+   3,
+   4
+  ],
+  "multi_map": {
+   "k": "v",
+   "k2": [
+    "a"
+   ]
+  }
+ },
+ "null_value": null,
+ "dup": 2
+}

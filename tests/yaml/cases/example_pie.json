@@ -1,0 +1,31 @@
+{
+ "database": {
+  "type": "sqlite",
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "sql": "WITH departments AS (\n  SELECT 'Research' as department, abs(random() % 500) + 200 as budget\n  UNION ALL SELECT 'Marketing', abs(random() % 400) + 150\n  UNION ALL SELECT 'Sales', abs(random() % 600) + 300\n  UNION ALL SELECT 'Engineering', abs(random() % 800) + 400\n  UNION ALL SELECT 'HR', abs(random() % 200) + 100\n  UNION ALL SELECT 'Operations', abs(random() % 300) + 150\n)\nSELECT \n  department,\n  budget,\n  ROUND(budget * 100.0 / (SELECT SUM(budget) FROM departments), 1) as percentage\nFROM departments\nORDER BY budget DESC\n"
+ },
+ "show": {
+  "type": "pie",
+  "title": "部门预算分配",
+  "interval": "40s",
+  "label_column": "department",
+  "value_column": "budget",
+  "style": {
+   "show_percentages": true,
+   "show_values": true,
+   "show_labels": true
+  },
+  "colors": [
+   "#FF6B6B",
+   "#4ECDC4",
+   "#45B7D1",
+   "#96CEB4",
+   "#FFEAA7",
+   "#DDA0DD"
+  ],
+  "show_countdown": true,
+  "countdown_format": "刷新倒计时: {time}s"
+ }
+}

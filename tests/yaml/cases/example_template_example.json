@@ -1,0 +1,106 @@
+{
+ "database": {
+  "type": "sqlite",
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "args_show": true,
+  "args": [
+   {
+    "name": "user_status",
+    "show": false,
+    "type": "string",
+    "default": "active",
+    "description": "用户状态过滤条件"
+   },
+   {
+    "name": "min_age",
+    "show": false,
+    "type": "number",
+    "default": 18,
+    "description": "最小年龄"
+   },
+   {
+    "name": "max_age",
+    "show": false,
+    "type": "number",
+    "default": 65,
+    "description": "最大年龄"
+   },
+   {
+    "name": "include_deleted",
+    "show": false,
+    "type": "boolean",
+    "default": false,
+    "description": "是否包含已删除用户"
+   },
+   {
+    "name": "departments",
+    "show": false,
+    "type": "list",
+    "default": [
+     "IT",
+     "HR",
+     "Finance"
+    ],
+    "description": "部门列表"
+   },
+   {
+    "name": "user_ids",
+    "show": false,
+    "type": "list",
+    "default": [
+     1,
+     2,
+     3
+    ],
+    "description": "用户ID列表"
+   },
+   {
+    "name": "filters",
+    "type": "map",
+    "default": {
+     "region": "Asia",
+     "level": "senior"
+    },
+    "description": "额外过滤条件"
+   },
+   {
+    "name": "search_keyword",
+    "type": "string",
+    "description": "搜索关键词（可选）"
+   }
+  ],
+  "sql": "WITH sample_users AS (\n  SELECT 1 as id, 'Alice' as name, 25 as age, 'IT' as department, \n         '{{ user_status }}' as status, datetime('now', '-30 days') as created_at\n  UNION ALL\n  SELECT 2, 'Bob', 32, 'HR', 'active', datetime('now', '-25 days')\n  UNION ALL  \n  SELECT 3, 'Charlie', 28, 'Finance', 'inactive', datetime('now', '-20 days')\n  UNION ALL\n  SELECT 4, 'Diana', 35, 'IT', 'active', datetime('now', '-15 days')\n  UNION ALL\n  SELECT 5, 'Eve', 29, 'HR', 'active', datetime('now', '-10 days')\n  UNION ALL\n  SELECT 6, 'Frank', 42, 'Finance', 'inactive', datetime('now', '-5 days')\n  UNION ALL\n  SELECT 7, 'Grace', 26, 'IT', 'active', datetime('now', '-2 days')\n)\nSELECT \n  u.id,\n  u.name,\n  u.age,\n  u.department,\n  u.status,\n  u.created_at,\n  '{{ search_keyword | default(\"\") }}' as search_term\nFROM sample_users u\nWHERE 1=1\n  {%- if user_status %}\n  AND u.status = {{ user_status | sql_quote }}\n  {%- endif %}\n  \n  {%- if min_age is defined %}\n  AND u.age >= {{ min_age }}\n  {%- endif %}\n  \n  {%- if max_age is defined %}\n  AND u.age <= {{ max_age }}\n  {%- endif %}\n  \n  {%- if departments and departments|length > 0 %}\n  AND u.department IN {{ departments | sql_in }}\n  {%- endif %}\n  \n  {%- if user_ids and user_ids|length > 0 %}\n  AND u.id IN {{ user_ids | sql_in }}\n  {%- endif %}\n  \n  {%- if filters %}\n    {%- for key, value in filters.items() %}\n      {%- if key == 'region' %}\n  -- 模拟区域过滤 (示例)\n  AND '{{ value }}' = 'Asia'\n      {%- elif key == 'level' %}\n  -- 模拟级别过滤 (示例)  \n  AND '{{ value }}' IN ('senior', 'junior')\n      {%- endif %}\n    {%- endfor %}\n  {%- endif %}\n  \n  {%- if search_keyword %}\n  AND (u.name LIKE {{ ('%' + search_keyword + '%') | sql_quote }}\n       OR u.department LIKE {{ ('%' + search_keyword + '%') | sql_quote }})\n  {%- endif %}\n\nORDER BY u.created_at DESC\nLIMIT {{ 100 if not filters.get('limit') else filters.limit }}\n"
+ },
+ "show": {
+  "interval": "30s",
+  "type": "table",
+  "column_list": [
+   {
+    "column": "id",
+    "alias": "用户ID"
+   },
+   {
+    "column": "name",
+    "alias": "姓名"
+   },
+   {
+    "column": "age",
+    "alias": "年龄"
+   },
+   {
+    "column": "department",
+    "alias": "部门"
+   },
+   {
+    "column": "status",
+    "alias": "状态"
+   },
+   {
+    "column": "created_at",
+    "alias": "创建时间"
+   }
+  ]
+ }
+}

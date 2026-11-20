@@ -1,0 +1,58 @@
+{
+ "nulls": [
+  null,
+  null,
+  null,
+  null
+ ],
+ "empty": null,
+ "bools": [
+  true,
+  true,
+  true,
+  false,
+  true,
+  false,
+  true,
+  false
+ ],
+ "ints": [
+  0,
+  42,
+  -7,
+  3,
+  1000,
+  31,
+  5,
+  15,
+  "0o17"
+ ],
+ "not_ints": [
+  "08",
+  "1e3",
+  90,
+  "12abc"
+ ],
+ "floats": [
+  1.5,
+  -0.25,
+  1.0,
+  0.5,
+  1500.0,
+  0.02
+ ],
+ "strings": [
+  "hello world",
+  "quoted # not comment",
+  "it's",
+  "tab\tnew\nline",
+  "中A"
+ ],
+ "plain_with_colon": "http://example.com:8080/path",
+ "plain_hash": "a#b",
+ "trailing_spaces": "value",
+ "quoted key": 1,
+ "single key": 2,
+ "key with spaces": 3,
+ "url": "postgres://user:p%40ss@host:5432/db?tls=require"
+}

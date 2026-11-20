@@ -1,0 +1,11 @@
+{
+ "literal": "line one\n  indented\n# not a comment\n\nlast\n",
+ "folded": "folded text here\nnew para\n  more indented\nback\n",
+ "strip": "no trailing newline",
+ "keep": "keep trailing\n\n",
+ "clip_after_blank": "text\n",
+ "explicit": "  two extra spaces\n",
+ "folded_strip": "a b",
+ "empty_block": "",
+ "next": "after"
+}

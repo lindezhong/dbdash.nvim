@@ -1,0 +1,29 @@
+{
+ "database": {
+  "type": "sqlite",
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "sql": "WITH categories AS (\n  SELECT 'Electronics' as category, abs(random() % 1000) + 500 as sales\n  UNION ALL SELECT 'Clothing', abs(random() % 800) + 300\n  UNION ALL SELECT 'Books', abs(random() % 400) + 100  \n  UNION ALL SELECT 'Home', abs(random() % 600) + 200\n  UNION ALL SELECT 'Sports', abs(random() % 500) + 150\n  UNION ALL SELECT 'Food', abs(random() % 700) + 250\n)\nSELECT \n  category,                     -- 产品类别\n  sales,                        -- 销售额\n  sales * 1.2 as target         -- 目标销售额（实际的120%）\nFROM categories\nORDER BY sales DESC\n"
+ },
+ "show": {
+  "type": "bar",
+  "title": "产品类别销售对比",
+  "interval": "45s",
+  "x_column": "category",
+  "y_column": "sales",
+  "style": {
+   "bar_width": 0.8,
+   "color": "blue",
+   "show_values": true
+  },
+  "colors": {
+   "primary": "#3498db",
+   "secondary": "#2ecc71",
+   "background": "#ffffff",
+   "text": "#2c3e50"
+  },
+  "show_countdown": true,
+  "countdown_format": "数据更新倒计时: {time}s"
+ }
+}
