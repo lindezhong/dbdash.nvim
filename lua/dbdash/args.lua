@@ -1,7 +1,8 @@
 -- Query arguments (design §7): typed parsing of "key=value" input and precedence merging.
 --
 -- Precedence (high to low): command line > edited in the dashboard > interactive input >
--- YAML default. Values only live for the session.
+-- YAML default. Values only live for the session. Declared arguments without a value are
+-- `none` in templates.
 --
 -- Text forms: list "a,b,c"; map "k:v,k2:v2"; boolean true/false/1/0/yes/no/on/off.
 -- Commas and colons inside values are escaped with a backslash or quoted ('a,b' / "a:b").
@@ -246,8 +247,8 @@ function M.value(spec, state)
   return spec.default
 end
 
----Template variables for the current state (arguments without a value are left out so
----templates fail with a clear "'x' is undefined").
+---Template variables for the current state. Like the legacy plugin, every declared
+---argument is defined; one without any value is `none`.
 ---@param specs dbdash.ArgSpec[]
 ---@param state dbdash.ArgState
 ---@return table<string, any>
@@ -255,9 +256,7 @@ function M.resolve(specs, state)
   local vars = {}
   for _, spec in ipairs(specs) do
     local v = M.value(spec, state)
-    if v ~= nil then
-      vars[spec.name] = v
-    end
+    vars[spec.name] = v == nil and vim.NIL or v
   end
   return vars
 end

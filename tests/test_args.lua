@@ -77,7 +77,7 @@ T["precedence: cli > modified > interactive > default"] = function()
   args.set_modified(st, "limit", 2)
   eq(args.resolve(specs, st).limit, 2)
   local vars = args.resolve(specs, st)
-  eq({ vars.min_age, vars.active, vars.filters, vars.label }, { 21, true, nil, nil })
+  eq({ vars.min_age, vars.active, vars.filters, vars.label }, { 21, true, vim.NIL, vim.NIL })
   eq(#args.missing_required(specs, st), 1)
   st.interactive.label = "x"
   eq(#args.missing_required(specs, st), 0)
