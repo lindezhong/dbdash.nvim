@@ -96,6 +96,9 @@ function M.render(buf)
     "",
   }
   local mapping = {}
+  if #files == 0 then
+    lines[#lines + 1] = "(no config files matching " .. table.concat(opts().pattern, ", ") .. ")"
+  end
   for _, f in ipairs(files) do
     local path = vim.fs.joinpath(dir, f)
     lines[#lines + 1] = (sched.get(path) and "▾ " or "▸ ") .. f
@@ -217,14 +220,10 @@ local function apply_keys(buf)
   vim.b[buf].dbdash_keys = mapped
 end
 
----Open the sidebar (sidebar.position), or jump to it when already open.
+---Open the sidebar (sidebar.position), or jump to it when already open. Without config
+---files it says so in the list; it does not open the directory itself, which file
+---explorers may take over (and close Neovim with their last-window rules).
 function M.open()
-  local dir = M.dir()
-  if #M.config_files(dir) == 0 then
-    vim.notify("No config files found in " .. dir, vim.log.levels.WARN)
-    vim.cmd.edit(vim.fn.fnameescape(dir))
-    return
-  end
   local buf = sidebar_buf() or create_buf()
   apply_keys(buf)
   local win = sidebar_win(buf)

@@ -302,12 +302,18 @@ T["popup border and maximum size come from setup()"] = function()
   eq({ cfg.width <= 80, cfg.height }, { true, 3 })
 end
 
-T["sidebar without configs opens the directory"] = function()
+T["sidebar without configs says so and keeps the windows"] = function()
   local empty = vim.fn.tempname()
   vim.fn.mkdir(empty, "p")
   child.cmd("cd " .. empty)
+  child.cmd("edit notes.txt")
   child.cmd("DbDash")
-  eq(child.lua_get("_G.notes[#_G.notes].msg"):find("No config files found in") ~= nil, true)
+  eq(lines()[7], "(no config files matching *.yaml, *.yml)")
+  eq(child.lua_get("{ vim.bo.filetype, #vim.api.nvim_tabpage_list_wins(0) }"), { "dbdash-sidebar", 2 })
+  child.type_keys("<CR>") -- nothing to open
+  eq(child.lua_get("{ vim.bo.filetype, #vim.api.nvim_tabpage_list_wins(0) }"), { "dbdash-sidebar", 2 })
+  child.type_keys("q")
+  eq(child.fn.expand("%:t"), "notes.txt")
 end
 
 T["sessions restore running dashboards"] = function()
