@@ -31,7 +31,10 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 {
   "<owner>/dbdash.nvim",
   cmd = { "DbDash", "DbDashStart" },
-  opts = {}, -- optional, see :help dbdash-setup
+  opts = { -- optional, see :help dbdash-setup
+    sidebar = { width = "30%" },     -- columns or a percentage of the editor
+    dashboard = { open = "vsplit" }, -- where :DbDashStart shows a dashboard
+  },
 }
 ```
 
@@ -90,8 +93,11 @@ an in-memory SQLite database.
 
 In a dashboard: `r` refresh, `a` modify an argument, `A` show arguments, `R` reset
 arguments, `s` show the query. Global mappings: `<leader>ds` start, `<leader>dr` refresh,
-`<leader>dt` stop, `<leader>dl` list, `<leader>dd` sidebar (`setup({ mappings = false })`
-turns them off).
+`<leader>dt` stop, `<leader>dl` list, `<leader>dd` sidebar.
+
+Every key, the sidebar (width, position, directory, file globs), where dashboards open,
+the popup border and size, and the default interval, timeouts and row limit can be set
+in `setup()`; see `:help dbdash-setup`.
 
 ## Configuration
 

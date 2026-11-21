@@ -113,7 +113,8 @@ Global keys already mapped by you are not overwritten. `styles`, `ticks` and
     20 queries (duration, rows, errors, skipped refreshes).
 
 :DbDash                                                              *:DbDash*
-    Open the sidebar listing *.yaml / *.yml files in the current directory.
+    Open the sidebar listing *.yaml / *.yml files in the current directory
+    (see `sidebar` in |dbdash-setup| for the directory, globs and width).
 
 :DbDashClose                                                    *:DbDashClose*
     Close the sidebar.
@@ -149,7 +150,10 @@ Global keys already mapped by you are not overwritten. `styles`, `ticks` and
 ==============================================================================
 4. MAPPINGS                                                  *dbdash-mappings*
 
-Global (disable with `setup({ mappings = false })`):
+Defaults; all keys can be changed or removed with `mappings`,
+`dashboard.keys` and `sidebar.keys` (|dbdash-setup|).
+
+Global:
 
   <leader>ds   :DbDashStart
   <leader>dr   :DbDashRestart
@@ -157,15 +161,16 @@ Global (disable with `setup({ mappings = false })`):
   <leader>dl   :DbDashList
   <leader>dd   :DbDash
 
-Dashboard buffer:
+Dashboard buffer (`dashboard.keys`: modify, show_args, refresh, reset,
+show_sql):
 
   a   modify an argument          A   show arguments
   r   refresh now                 R   reset arguments
   s   show the rendered query
 
-Sidebar:
+Sidebar (`sidebar.keys`: select, stop, refresh, close):
 
-  <CR>  open or start the dashboard in the window on the right
+  <CR>  open or start the dashboard in the window beside the sidebar
   t     stop it                   r   refresh it
   q     close the sidebar
 
