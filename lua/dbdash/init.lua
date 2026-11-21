@@ -8,8 +8,7 @@ local M = {}
 ---@field position "left"|"right" (default "left")
 ---@field dir string|fun(): string|nil directory to list (default: the current directory)
 ---@field pattern string[] file globs to list (default { "*.yaml", "*.yml" })
----@field exclude string[] file globs to skip (default { "*.schema.yaml", "*.schema.yml" })
----@field recursive boolean also list subdirectories (default false)
+---@field exclude string[] file and directory name globs to skip (default { "*.schema.yaml", "*.schema.yml" })
 ---@field keys table<"select"|"stop"|"refresh"|"close", string|false>
 
 ---@class dbdash.DashboardOptions
@@ -54,7 +53,6 @@ local defaults = {
     dir = nil,
     pattern = { "*.yaml", "*.yml" },
     exclude = { "*.schema.yaml", "*.schema.yml" },
-    recursive = false,
     keys = { select = "<CR>", stop = "t", refresh = "r", close = "q" },
   },
   dashboard = {
@@ -176,7 +174,6 @@ local SPEC = {
     dir = optional(of_type("string", "function")),
     pattern = string_list,
     exclude = string_list,
-    recursive = of_type("boolean"),
     keys = keys({ "select", "stop", "refresh", "close" }),
   },
   dashboard = {

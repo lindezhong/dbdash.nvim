@@ -5,7 +5,7 @@ local function opts()
   return require("dbdash").options.sidebar
 end
 
-local HEADER_LINES = 6
+local HEADER_LINES = 5
 local NAME = "dbdash-sidebar"
 
 local function sidebar_buf()
@@ -57,59 +57,110 @@ local function matcher(globs)
   end
 end
 
----Config files in `dir` matching sidebar.pattern and not sidebar.exclude (globs on the
----file name), as paths relative to `dir`, sorted. With sidebar.recursive, hidden
----directories are skipped.
+---One directory level: config files (matching sidebar.pattern, not sidebar.exclude) and
+---subdirectories (not hidden, not matching sidebar.exclude), each sorted by name.
 ---@param dir string
----@return string[]
-function M.config_files(dir)
+---@return { files: string[], dirs: string[] }
+function M.entries(dir)
   local o = opts()
   local include, exclude = matcher(o.pattern), matcher(o.exclude)
-  local out = {}
-  local iter = vim.fs.dir(dir, {
-    depth = o.recursive and 20 or 1,
-    skip = function(name)
-      return vim.fs.basename(name):sub(1, 1) ~= "."
-    end,
-  })
-  for rel, kind in iter do
-    local base = vim.fs.basename(rel)
-    if (kind == "file" or kind == "link") and include(base) and not exclude(base) then
-      out[#out + 1] = rel
+  local files, dirs = {}, {}
+  for name, kind in vim.fs.dir(dir) do
+    if kind == "link" then
+      kind = (vim.uv.fs_stat(vim.fs.joinpath(dir, name)) or {}).type
+    end
+    if kind == "directory" then
+      if name:sub(1, 1) ~= "." and not exclude(name) then
+        dirs[#dirs + 1] = name
+      end
+    elseif kind == "file" and include(name) and not exclude(name) then
+      files[#files + 1] = name
     end
   end
-  table.sort(out)
-  return out
+  table.sort(files)
+  table.sort(dirs)
+  return { files = files, dirs = dirs }
 end
 
----Fill the sidebar buffer; the line -> file mapping is stored in b:dbdash_sidebar_files.
+-- Expanded directories per sidebar root: expanded[root][abs dir] = true. Kept while
+-- Neovim runs, so closing and reopening the sidebar keeps the tree as it was.
+local expanded = {}
+
+local function is_expanded(root, dir)
+  return expanded[root] ~= nil and expanded[root][dir] == true
+end
+
+---Expand or collapse a directory of the tree rooted at `root`.
+function M.toggle(root, dir)
+  expanded[root] = expanded[root] or {}
+  expanded[root][dir] = not expanded[root][dir] or nil
+end
+
+M.HEADER = {
+  "DbDash Sidebar",
+  "", -- Directory: ...
+  "",
+  "● = Running  ○ = Not running",
+  "",
+}
+
+---Fill the sidebar buffer with the tree; b:dbdash_sidebar_nodes maps line numbers to
+---{ path, dir } nodes.
 function M.render(buf)
+  require("dbdash.render.highlight").setup()
   local sched = require("dbdash.scheduler")
-  local dir = M.dir()
-  local files = M.config_files(dir)
-  local lines = {
-    "DbDash Sidebar",
-    "Directory: " .. vim.fn.fnamemodify(dir, ":~"),
-    "",
-    "▸ = Not running",
-    "▾ = Running",
-    "",
+  local root = M.dir()
+  local lines = vim.deepcopy(M.HEADER)
+  lines[2] = "Directory: " .. vim.fn.fnamemodify(root, ":~")
+  local hl = {
+    { row = 3, col_s = 0, col_e = #"●", group = "DbDashSidebarRunning" },
+    { row = 3, col_s = #"● = Running  ", col_e = #"● = Running  ○", group = "DbDashSidebarIdle" },
   }
-  local mapping = {}
-  if #files == 0 then
-    lines[#lines + 1] = "(no config files matching " .. table.concat(opts().pattern, ", ") .. ")"
+  local nodes = {}
+
+  local function walk(dir, depth)
+    local e = M.entries(dir)
+    local indent = string.rep("  ", depth)
+    for _, f in ipairs(e.files) do
+      local path = vim.fs.joinpath(dir, f)
+      local running = sched.get(path) ~= nil
+      local mark = running and "●" or "○"
+      lines[#lines + 1] = indent .. mark .. " " .. f
+      hl[#hl + 1] = {
+        row = #lines - 1,
+        col_s = #indent,
+        col_e = #indent + #mark,
+        group = running and "DbDashSidebarRunning" or "DbDashSidebarIdle",
+      }
+      nodes[tostring(#lines)] = { path = path }
+    end
+    for _, d in ipairs(e.dirs) do
+      local path = vim.fs.joinpath(dir, d)
+      local open = is_expanded(root, path)
+      lines[#lines + 1] = indent .. (open and "▾" or "▸") .. " " .. d .. "/"
+      hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #lines[#lines], group = "DbDashSidebarDir" }
+      nodes[tostring(#lines)] = { path = path, dir = true }
+      if open then
+        walk(path, depth + 1)
+      end
+    end
+    return #e.files + #e.dirs
   end
-  for _, f in ipairs(files) do
-    local path = vim.fs.joinpath(dir, f)
-    lines[#lines + 1] = (sched.get(path) and "▾ " or "▸ ") .. f
-    mapping[tostring(#lines)] = path
+
+  if walk(root, 0) == 0 then
+    lines[#lines + 1] = "(no config files matching " .. table.concat(opts().pattern, ", ") .. ")"
   end
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modifiable = false
   vim.bo[buf].modified = false
-  vim.b[buf].dbdash_sidebar_files = mapping
-  return #files, dir
+  local ns = require("dbdash.view.buffer").ns
+  vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+  for _, h in ipairs(hl) do
+    vim.api.nvim_buf_set_extmark(buf, ns, h.row, h.col_s, { end_col = h.col_e, hl_group = h.group })
+  end
+  vim.b[buf].dbdash_sidebar_nodes = nodes
+  return root
 end
 
 ---Re-render the sidebar if it exists (after dashboards start or stop).
@@ -120,9 +171,16 @@ function M.refresh()
   end
 end
 
-local function selected(buf)
+---The node under the cursor: { path, dir }.
+local function node_at_cursor(buf)
   local lnum = vim.api.nvim_win_get_cursor(0)[1]
-  return (vim.b[buf].dbdash_sidebar_files or {})[tostring(lnum)]
+  return (vim.b[buf].dbdash_sidebar_nodes or {})[tostring(lnum)]
+end
+
+---The config file under the cursor (nil on directories and other lines).
+local function selected(buf)
+  local n = node_at_cursor(buf)
+  return n and not n.dir and n.path or nil
 end
 
 ---Sidebar width in columns.
@@ -149,7 +207,15 @@ local function target_win(side_win)
 end
 
 local function on_enter(buf)
-  local path = selected(buf)
+  local n = node_at_cursor(buf)
+  if n and n.dir then
+    M.toggle(M.dir(), n.path)
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    M.render(buf)
+    vim.api.nvim_win_set_cursor(0, cursor) -- the directory line does not move
+    return
+  end
+  local path = n and n.path
   if not path then
     return
   end

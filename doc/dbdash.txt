@@ -47,8 +47,8 @@ defaults: >lua
       dir = nil,           -- directory to list: nil = current directory,
                            -- a path, or a function returning one
       pattern = { "*.yaml", "*.yml" },               -- files to list
-      exclude = { "*.schema.yaml", "*.schema.yml" }, -- files to skip
-      recursive = false,   -- also list subdirectories
+      exclude = { "*.schema.yaml", "*.schema.yml" }, -- files and
+                           -- directories to skip, e.g. "node_modules"
       keys = { select = "<CR>", stop = "t", refresh = "r", close = "q" },
     },
     dashboard = {
@@ -113,8 +113,12 @@ Global keys already mapped by you are not overwritten. `styles`, `ticks` and
     20 queries (duration, rows, errors, skipped refreshes).
 
 :DbDash                                                              *:DbDash*
-    Open the sidebar listing *.yaml / *.yml files in the current directory
-    (see `sidebar` in |dbdash-setup| for the directory, globs and width).
+    Open the sidebar: the *.yaml / *.yml files of the current directory and
+    its subdirectories as a tree (see `sidebar` in |dbdash-setup| for the
+    directory, globs and width). Files show `●` when their dashboard runs and
+    `○` otherwise; directories show `▸` (collapsed) or `▾` (expanded) and
+    stay expanded when the sidebar is reopened. Hidden directories are not
+    listed.
 
 :DbDashClose                                                    *:DbDashClose*
     Close the sidebar.
@@ -172,7 +176,8 @@ show_sql):
 
 Sidebar (`sidebar.keys`: select, stop, refresh, close):
 
-  <CR>  open or start the dashboard in the window beside the sidebar
+  <CR>  on a file: open or start its dashboard beside the sidebar;
+        on a directory: expand or collapse it
   t     stop it                   r   refresh it
   q     close the sidebar
 
@@ -649,6 +654,10 @@ All groups link to standard groups by default:
   DbDashTitle DbDashBorder DbDashHeader DbDashNull DbDashMuted DbDashNumber
   DbDashAxis DbDashLabel DbDashError DbDashWarn DbDashCountdown
   DbDashArgName DbDashArgValue
+
+Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
+`Directory`), `DbDashSidebarRunning` (● of running dashboards, links to
+`DiagnosticOk`), `DbDashSidebarIdle` (○, links to `Normal`).
 
 Colors in configs may be hex ("#3498db"), names ("blue", "bold blue"),
 or existing highlight groups ("DiagnosticOk").

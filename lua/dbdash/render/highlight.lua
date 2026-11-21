@@ -30,6 +30,10 @@ M.BASE = {
   DbDashCountdown = { link = "Comment" },
   DbDashArgName = { link = "Identifier" },
   DbDashArgValue = { link = "String" },
+  -- Sidebar: directories (name and arrow), running and idle dashboards.
+  DbDashSidebarDir = { link = "Directory" },
+  DbDashSidebarRunning = { link = "DiagnosticOk" },
+  DbDashSidebarIdle = { link = "Normal" },
   -- Series colors, taken from common syntax groups so they follow the colorscheme.
   DbDashSeries1 = { link = "Function" },
   DbDashSeries2 = { link = "String" },

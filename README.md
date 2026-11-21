@@ -72,7 +72,7 @@ show:
 ```
 
 Then `:DbDashStart signups.yaml hours=48`, or `:DbDash` for a sidebar listing the configs
-in the current directory.
+in the current directory, with subdirectories you can expand.
 
 To try it without a database server, open any file in [`example/`](example): they all use
 an in-memory SQLite database.

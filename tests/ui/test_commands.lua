@@ -192,11 +192,10 @@ T["sidebar lists configs and starts/stops them"] = function()
     "DbDash Sidebar",
     "Directory: " .. child.lua_get("vim.fn.fnamemodify(vim.fn.getcwd(), ':~')"),
     "",
-    "▸ = Not running",
-    "▾ = Running",
+    "● = Running  ○ = Not running",
     "",
-    "▸ board.yaml",
-    "▸ broken.yaml",
+    "○ board.yaml",
+    "○ broken.yaml",
   })
   eq(child.lua_get("{ vim.bo.filetype, vim.api.nvim_win_get_width(0), vim.wo.winfixwidth, vim.wo.number }"), { "dbdash-sidebar", 30, true, false })
   child.type_keys("r")
@@ -206,14 +205,43 @@ T["sidebar lists configs and starts/stops them"] = function()
   eq(child.lua_get("vim.bo.filetype"), "dbdash")
   eq(child.lua_get("#vim.api.nvim_tabpage_list_wins(0)"), 2)
   child.cmd("wincmd h")
-  eq(lines()[7], "▾ board.yaml")
+  eq(lines()[6], "● board.yaml")
   child.type_keys("t")
-  eq(lines()[7], "▸ board.yaml")
+  eq(lines()[6], "○ board.yaml")
   eq(child.lua_get("#vim.tbl_keys(require('dbdash.scheduler').dashboards)"), 0)
   child.cmd("DbDash") -- already open: jump to it
   eq(child.lua_get("#vim.api.nvim_tabpage_list_wins(0)"), 2)
   child.type_keys("q")
   eq(child.lua_get("vim.bo.filetype ~= 'dbdash-sidebar'"), true)
+end
+
+T["sidebar directories expand, collapse and open nested dashboards"] = function()
+  vim.fn.mkdir(dir .. "/team/daily", "p")
+  vim.fn.writefile(vim.split(CFG, "\n"), dir .. "/team/daily/nested.yaml")
+  child.cmd("DbDash")
+  eq(lines()[8], "▸ team/")
+  child.api.nvim_win_set_cursor(0, { 8, 0 })
+  child.type_keys("<CR>")
+  eq({ lines()[8], lines()[9], child.api.nvim_win_get_cursor(0)[1] }, { "▾ team/", "  ▸ daily/", 8 })
+  child.api.nvim_win_set_cursor(0, { 9, 0 })
+  child.type_keys("<CR>")
+  eq(lines()[10], "    ○ nested.yaml")
+  child.type_keys("t") -- stop/refresh do nothing on directories
+  eq(child.lua_get("#require('dbdash.scheduler').list()"), 0)
+  child.api.nvim_win_set_cursor(0, { 10, 0 })
+  child.type_keys("<CR>")
+  wait_loaded()
+  eq(child.fn.expand("%:t"), "nested.yaml")
+  child.cmd("wincmd h")
+  eq(lines()[10], "    ● nested.yaml")
+  -- closing and reopening keeps the tree expanded
+  child.type_keys("q")
+  child.cmd("DbDash")
+  eq(lines()[10], "    ● nested.yaml")
+  -- collapse the top directory
+  child.api.nvim_win_set_cursor(0, { 8, 0 })
+  child.type_keys("<CR>")
+  eq({ #lines(), lines()[8] }, { 8, "▸ team/" })
 end
 
 T["sidebar width, position and keys come from setup()"] = function()
@@ -308,7 +336,7 @@ T["sidebar without configs says so and keeps the windows"] = function()
   child.cmd("cd " .. empty)
   child.cmd("edit notes.txt")
   child.cmd("DbDash")
-  eq(lines()[7], "(no config files matching *.yaml, *.yml)")
+  eq(lines()[6], "(no config files matching *.yaml, *.yml)")
   eq(child.lua_get("{ vim.bo.filetype, #vim.api.nvim_tabpage_list_wins(0) }"), { "dbdash-sidebar", 2 })
   child.type_keys("<CR>") -- nothing to open
   eq(child.lua_get("{ vim.bo.filetype, #vim.api.nvim_tabpage_list_wins(0) }"), { "dbdash-sidebar", 2 })
