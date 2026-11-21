@@ -3,7 +3,10 @@
 # Editors with yaml-language-server pick it up from a modeline at the top of a config:
 #   # yaml-language-server: $schema=./dbdash.schema.yaml
 #
-# The sidebar (:DbDash) does not list *.schema.yaml files.
+# The sidebar (:DbDash) does not list *.schema.yaml files (default sidebar.exclude).
+#
+# Defaults below marked "setup" can be changed for all configs with
+# require("dbdash").setup({ defaults = { ... } }); see :help dbdash-setup.
 $schema: "http://json-schema.org/draft-07/schema#"
 $id: "dbdash.schema.yaml"
 title: dbdash.nvim dashboard
@@ -74,7 +77,7 @@ definitions:
           Connection URL: <scheme>://[user[:password]@]host[:port][/database][?param=value&...]
           User names and passwords are percent-decoded (write @ as %40, : as %3A).
 
-          SQLite      sqlite:///absolute/path.db
+          SQLite      sqlite:///absolute/path.db                (or sqlite3://)
                       sqlite://relative/to/this/config.db
                       sqlite:///:memory:
           PostgreSQL  postgres://user:pass@host:5432/db        (or postgresql://)
@@ -88,6 +91,7 @@ definitions:
                       defaults to tls=verify-full; ?dns=host:port picks the name server)
                       ?authMechanism=SCRAM-SHA-256|SCRAM-SHA-1
           Cassandra   cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_QUORUM
+                      (or cql://)
           SQL Server  mssql://user:pass@host:1433/db            (or sqlserver://)
                       with TLS: TLS negotiated inside TDS; &encrypt=strict for TDS 8
 
@@ -98,7 +102,8 @@ definitions:
                                                             the system store; relative to
                                                             this config file)
             tls_host=name                                  (name to verify instead of host)
-            connect_timeout=10s   timeout=30s   application_name=dbdash.nvim
+            connect_timeout=10s   timeout=30s              (defaults: setup)
+            application_name=dbdash.nvim
         examples:
           - "sqlite:///:memory:"
           - "sqlite://data/app.db"
@@ -182,9 +187,10 @@ definitions:
         type: integer
         minimum: 1
         default: 10000
+        description: Rows read at most (default 10000, setup defaults.max_rows).
       timeout:
         $ref: "#/definitions/duration"
-        description: Query timeout (default 30s, or the URL's timeout).
+        description: Query timeout (default the URL's timeout, else 30s from setup defaults.timeout).
 
   panel:
     type: object
@@ -222,9 +228,14 @@ definitions:
       title: { type: string }
       interval:
         $ref: "#/definitions/duration"
-        description: Refresh interval of this chart (default 30s or the top-level interval).
+        description: >-
+          Refresh interval of this chart (default the top-level interval, else 30s from
+          setup defaults.interval). At least 1s.
       show_countdown: { type: boolean, default: false }
-      countdown_format: { type: string, default: "Next update: {time}s" }
+      countdown_format:
+        type: string
+        default: "Next update: {time}s"
+        description: "{time} is replaced by the seconds left (default: setup defaults.countdown_format)."
       renderer:
         type: string
         description: |-
@@ -240,7 +251,7 @@ definitions:
         type: string
         description: "Series colors: theme (default, follows the colorscheme) or tableau."
       width: { type: integer, minimum: 20, description: Maximum chart width (default the window). }
-      height: { type: integer, minimum: 3, description: Plot rows (default 15). }
+      height: { type: integer, minimum: 3, description: "Plot rows (default: setup defaults.height, else 15)." }
       span: { type: integer, minimum: 1, default: 1, description: Grid columns this panel spans. }
       style:
         type: object

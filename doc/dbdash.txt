@@ -94,10 +94,12 @@ Global keys already mapped by you are not overwritten. `styles`, `ticks` and
 3. COMMANDS                                                  *dbdash-commands*
 
 :DbDashStart[!] {config} [{name}={value} ...]                   *:DbDashStart*
-    Start the dashboard for {config} in the current window, or switch to it
-    when it is already running. Arguments after the file set query arguments
-    for this session (|dbdash-arguments|). With [!], every argument is asked
-    for interactively; without it only `required` arguments without a value.
+    Start the dashboard for {config}, or switch to it when it is already
+    running. It opens in the current window, or in a split or tab with
+    `dashboard.open` (|dbdash-setup|); a dashboard already visible is jumped
+    to. Arguments after the file set query arguments for this session
+    (|dbdash-arguments|). With [!], every argument is asked for
+    interactively; without it only `required` arguments without a value.
 
 :DbDashRestart                                                *:DbDashRestart*
     Run the current dashboard's query now and restart its countdown.
@@ -110,15 +112,17 @@ Global keys already mapped by you are not overwritten. `styles`, `ticks` and
 
 :DbDashStatus                                                  *:DbDashStatus*
     Show the current dashboard's config, database, next refresh and the last
-    20 queries (duration, rows, errors, skipped refreshes).
+    queries (duration, rows, errors, skipped refreshes; `defaults.history`
+    of them, 20 by default).
 
 :DbDash                                                              *:DbDash*
     Open the sidebar: the *.yaml / *.yml files of the current directory and
     its subdirectories as a tree (see `sidebar` in |dbdash-setup| for the
     directory, globs and width). Files show `●` when their dashboard runs and
     `○` otherwise; directories show `▸` (collapsed) or `▾` (expanded) and
-    stay expanded when the sidebar is reopened. Hidden directories are not
-    listed.
+    stay expanded when the sidebar is reopened. Hidden directories and names
+    matching `sidebar.exclude` (by default `*.schema.yaml`) are not listed;
+    without config files the list says so.
 
 :DbDashClose                                                    *:DbDashClose*
     Close the sidebar.
@@ -150,8 +154,8 @@ Global keys already mapped by you are not overwritten. `styles`, `ticks` and
     Write a session. Dashboard buffers are named `dbdash://<config path>` and
     are restarted (with default arguments) when the session is loaded. The
     `mksession` command-line abbreviation points here. Any other :mksession
-    restores dashboards the same way; to also keep changed arguments, see
-    |dbdash-session-state|.
+    restores dashboards the same way, also when 'sessionoptions' lacks
+    "blank". To also keep changed arguments, see |dbdash-session-state|.
 
 ==============================================================================
 4. MAPPINGS                                                  *dbdash-mappings*
@@ -217,10 +221,12 @@ Top-level fields: `database`, `query`, `show` (one chart) or `panels`,
 `interval` (default refresh interval; `show.interval` wins). Durations are
 numbers of seconds or strings with a unit: "500ms", "30s", "5m", "1h".
 `query.max_rows` caps the rows read; `query.timeout` defaults to the URL's
-`timeout` or 30s. Fields the plugin does not use are ignored (the legacy
-configs have many matplotlib-only ones); invalid values of known fields are
-reported with their line and column. The full list of fields is in
-`example/dbdash.schema.yaml` (|dbdash-examples|).
+`timeout`. Values a config leaves out (interval 30s, max_rows 10000, timeout
+30s, countdown_format, chart height) come from `defaults` in |dbdash-setup|.
+Fields the plugin does not use are ignored (the legacy configs have many
+matplotlib-only ones); invalid values of known fields are reported with their
+line and column. The full list of fields is in `example/dbdash.schema.yaml`
+(|dbdash-examples|).
 
 Table options: `column_list: [{column, alias, width}]`, `style.border`,
 `style.header_style`, `style.border_style`, `style.title_style`,
@@ -239,7 +245,8 @@ field and the URL format of each database. Editors using yaml-language-server
 validate and complete a config that starts with: >yaml
   # yaml-language-server: $schema=/path/to/example/dbdash.schema.yaml
 <
-The sidebar does not list `*.schema.yaml` files.
+The sidebar does not list `*.schema.yaml` files (the default
+`sidebar.exclude`).
 
 Multiple panels                                                *dbdash-panels*
 
@@ -278,10 +285,10 @@ Chart fields:                                                  *dbdash-charts*
   pie        label_column, value_column,
              style.{show_percentages, show_values, show_labels}, colors
 
-`colors` is a list (by series index) or a mapping (by category name).
-`width` caps the chart width (default: the window), `height` sets the plot
-rows (default 15). `axes.y_axis.format` takes a Python format such as
-"{:,.0f}" or "{:.1%}".
+`colors` is a list (by series index) or a mapping (by category name). `width`
+caps the chart width (default: the window), `height` sets the plot rows
+(default: `defaults.height`, else 15). `axes.y_axis.format` takes a Python
+format such as "{:,.0f}" or "{:.1%}".
 
 Styles                                                         *dbdash-styles*
 
@@ -550,11 +557,15 @@ URL: `<scheme>://[user[:password]@]host[:port][/database][?param=value]`
   sqlite:///absolute/path.db   sqlite://relative/to/config.db
   sqlite:///:memory:
 
+Schemes also accepted: `sqlite3`, `postgresql`, `mariadb`, `rediss` (Redis
+with TLS), `mongodb+srv`, `cql`, `sqlserver`. `database.type` is inferred from
+the scheme.
+
 Common parameters: `tls` (disable | require | pin | verify-ca |
 verify-full), `fingerprint` (sha256:AB:CD:..., required for pin), `ca`
 (CA bundle for verify-*, relative to the config file), `tls_host` (name to
-verify instead of the URL host), `connect_timeout` (10s), `timeout` (30s),
-`application_name`.
+verify instead of the URL host), `connect_timeout` and `timeout` (default
+10s and 30s, see `defaults` in |dbdash-setup|), `application_name`.
 
 SQLite options (`database.options`): `lib_path`, `readonly`, `create`
 (create a missing file; off by default).
@@ -607,8 +618,9 @@ TLS                                                               *dbdash-tls*
 
 Modes:
 
-  require      encrypt (TLS 1.3) without checking the certificate: stops
-               passive eavesdropping but not a man in the middle.
+  require      encrypt (TLS 1.3, or 1.2 when the server has no 1.3) without
+               checking the certificate: stops passive eavesdropping but not
+               a man in the middle.
   pin          `&fingerprint=sha256:AB:CD:...`: the leaf certificate must
                have that SHA-256 fingerprint. On a mismatch the error shows
                the fingerprint the server presented.
@@ -654,6 +666,7 @@ All groups link to standard groups by default:
   DbDashTitle DbDashBorder DbDashHeader DbDashNull DbDashMuted DbDashNumber
   DbDashAxis DbDashLabel DbDashError DbDashWarn DbDashCountdown
   DbDashArgName DbDashArgValue
+  DbDashSeries1 ... DbDashSeries8   chart series colors (palette "theme")
 
 Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
 `Directory`), `DbDashSidebarRunning` (● of running dashboards, links to
