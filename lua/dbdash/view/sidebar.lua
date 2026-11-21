@@ -20,11 +20,12 @@ local function sidebar_win(buf)
   end
 end
 
----Config files (*.yaml, *.yml) in `dir`, sorted, not recursive.
+---Config files (*.yaml, *.yml) in `dir`, sorted, not recursive. Schemas (*.schema.yaml)
+---are not dashboards and are skipped.
 function M.config_files(dir)
   local out = {}
   for name, kind in vim.fs.dir(dir) do
-    if (kind == "file" or kind == "link") and (name:match("%.ya?ml$")) then
+    if (kind == "file" or kind == "link") and name:match("%.ya?ml$") and not name:match("%.schema%.ya?ml$") then
       out[#out + 1] = name
     end
   end
