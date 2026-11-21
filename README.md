@@ -1,21 +1,60 @@
 # dbdash.nvim
 
-Database dashboards inside Neovim: periodically run a query and render the result as a
-table or a terminal chart (line, area, bar, histogram, boxplot, heatmap, scatter, bubble,
-pie). Pure Lua for Neovim 0.12+, with no external dependencies: no Python, no database
-CLIs. Wire protocols, TLS 1.3 and the cryptography are implemented in Lua; SQLite goes
-through LuaJIT FFI and the system `libsqlite3`.
+Database dashboards inside Neovim: run a query on an interval and show the result as a
+table or a terminal chart. Pure Lua for Neovim 0.12+, with no external dependencies: no
+Python, no database command-line tools. Wire protocols, TLS 1.2/1.3 and the cryptography
+are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite3`.
 
-Databases: SQLite, PostgreSQL, MySQL, Redis, MongoDB, Cassandra, SQL Server.
+- **Databases**: SQLite, PostgreSQL, MySQL/MariaDB, Redis, MongoDB (including
+  `mongodb+srv://`), Cassandra, SQL Server.
+- **Charts**: table, line, area, bar, histogram, boxplot, heatmap, scatter, bubble, pie,
+  each with alternative styles (braille / block canvases, vertical bars, round pie, ...).
+- **Several panels** per dashboard in a grid, each refreshing on its own interval.
+- **Query templates**: a Jinja2 subset with SQL-safe quoting filters, autoescape, macros
+  and imports.
+- **Arguments**: typed variables set from the command line, prompts or in the dashboard.
+- **TLS**: `require`, certificate pinning, `verify-ca` / `verify-full` against the system
+  CA store or a CA bundle.
+
+## Requirements
+
+- Neovim 0.12 or newer (LuaJIT build, which is the default).
+- SQLite dashboards need the system SQLite library (`libsqlite3.so.0` on Linux,
+  `libsqlite3.dylib` on macOS, `sqlite3.dll` / `winsqlite3.dll` on Windows), or
+  `database.options.lib_path`. Other databases need nothing extra.
+
+## Installation
+
+With [lazy.nvim](https://github.com/folke/lazy.nvim):
+
+```lua
+{
+  "<owner>/dbdash.nvim",
+  cmd = { "DbDash", "DbDashStart" },
+  opts = {}, -- optional, see :help dbdash-setup
+}
+```
+
+With the built-in package manager:
+
+```lua
+vim.pack.add({ "https://github.com/<owner>/dbdash.nvim" })
+```
+
+`setup()` is optional. Run `:helptags ALL` if your plugin manager does not build help tags.
+
+## Quick start
+
+Save a config, e.g. `signups.yaml`:
 
 ```yaml
 database:
-  url: "postgres://user:pass@db.internal:5432/app?tls=pin&fingerprint=sha256:AB:CD:..."
+  url: "postgres://user:pass@db.internal:5432/app?tls=verify-full"
 query:
   sql: |
     SELECT date_trunc('hour', created_at) AS hour, count(*) AS signups
     FROM users
-    WHERE created_at > now() - interval '{{ hours }} hours'
+    WHERE created_at > now() - make_interval(hours => {{ hours }})
     GROUP BY 1 ORDER BY 1
   args:
     - name: hours
@@ -29,12 +68,108 @@ show:
   interval: 60s
 ```
 
-`:DbDashStart signups.yaml hours=48`, or `:DbDash` for a sidebar of the configs in the
-current directory. See `:help dbdash`.
+Then `:DbDashStart signups.yaml hours=48`, or `:DbDash` for a sidebar listing the configs
+in the current directory.
 
-[`example/`](example) has a runnable SQLite config for every chart type and feature, and
-[`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a JSON Schema of the config
-format, including the connection URL of each database.
+To try it without a database server, open any file in [`example/`](example): they all use
+an in-memory SQLite database.
+
+## Usage
+
+| Command | Description |
+| --- | --- |
+| `:DbDashStart[!] {config} [name=value ...]` | Start a dashboard (`!` asks for every argument) |
+| `:DbDashRestart` | Refresh now |
+| `:DbDashStop [{config}]` | Stop a dashboard |
+| `:DbDashList` / `:DbDashStatus` | Running dashboards / status and query history |
+| `:DbDash` / `:DbDashClose` | Open / close the sidebar |
+| `:DbDashShowVariables`, `:DbDashModifyVariable`, `:DbDashUpdateVariable {name} {value}`, `:DbDashResetVariables` | Show and change arguments |
+| `:DbDashShowSQL` | Show the rendered query |
+| `:DbDashStyle {type} {style}` | Re-render with another style, e.g. `:DbDashStyle line asciichart` |
+| `:DbDashMksession[!] [{file}]` | Write a session that restores dashboards |
+
+In a dashboard: `r` refresh, `a` modify an argument, `A` show arguments, `R` reset
+arguments, `s` show the query. Global mappings: `<leader>ds` start, `<leader>dr` refresh,
+`<leader>dt` stop, `<leader>dl` list, `<leader>dd` sidebar (`setup({ mappings = false })`
+turns them off).
+
+## Configuration
+
+A config file describes one dashboard: `database`, `query` and `show`, or `panels` and
+`layout` for several charts. [`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a
+JSON Schema of the whole format; editors with yaml-language-server validate and complete a
+config that starts with:
+
+```yaml
+# yaml-language-server: $schema=/path/to/dbdash.nvim/example/dbdash.schema.yaml
+```
+
+Examples, all runnable as they are:
+
+| File | Shows |
+| --- | --- |
+| [`table.yaml`](example/table.yaml) | table columns, aliases, widths, styles |
+| [`line.yaml`](example/line.yaml), [`area.yaml`](example/area.yaml), [`bar.yaml`](example/bar.yaml), [`histogram.yaml`](example/histogram.yaml), [`boxplot.yaml`](example/boxplot.yaml), [`heatmap.yaml`](example/heatmap.yaml), [`scatter.yaml`](example/scatter.yaml), [`bubble.yaml`](example/bubble.yaml), [`pie.yaml`](example/pie.yaml) | one chart type each |
+| [`styles.yaml`](example/styles.yaml) | the alternative styles and canvases |
+| [`multi_panel.yaml`](example/multi_panel.yaml) | several panels, grid layout, per-panel intervals |
+| [`template_example.yaml`](example/template_example.yaml) | every argument type and the template syntax |
+| [`macros.yaml`](example/macros.yaml) | macros, imports, autoescape |
+| [`sqlite_file.yaml`](example/sqlite_file.yaml) | a SQLite file database |
+
+### Connection URLs
+
+```text
+sqlite:///absolute/path.db    sqlite://relative/to/config.db    sqlite:///:memory:
+postgres://user:pass@host:5432/db
+mysql://user:pass@host:3306/db
+redis://[user]:pass@host:6379/0                      (rediss:// for TLS)
+mongodb://user:pass@host:27017/db?authSource=admin
+mongodb://user:pass@h1:27017,h2:27017/db?readPreference=secondaryPreferred
+mongodb+srv://user:pass@cluster0.example.net/db
+cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_QUORUM
+mssql://user:pass@host:1433/db
+```
+
+Common parameters: `tls=disable|require|pin|verify-ca|verify-full`,
+`fingerprint=sha256:...` (for `pin`), `ca=bundle.pem`, `tls_host=name`,
+`connect_timeout=10s`, `timeout=30s`. Passwords are percent-decoded. The query language
+follows the database: SQL, CQL, one Redis command, or a JSON document for MongoDB.
+Details: `:help dbdash-databases` and `:help dbdash-tls`.
+
+### Templates
+
+```sql
+SELECT * FROM orders
+WHERE status = {{ status | sql_quote }}
+  AND region IN {{ regions | sql_in }}
+{% if since %}
+  AND created_at >= {{ since | sql_quote }}
+{% endif %}
+ORDER BY {{ sort | sql_id }}
+LIMIT {{ limit | sql_limit }}
+```
+
+The SQL filters quote for the dashboard's database (MySQL backslashes, SQL Server
+`N'...'` and `[ident]`, JSON for MongoDB, ...). See `:help dbdash-templates`.
+
+## Coming from vim-dashboard
+
+Existing configs mostly work. Differences:
+
+- Arguments use `name:`; the old `key:` is rejected with a hint.
+- Fields only meaningful for matplotlib are ignored.
+- `sql_id` quotes with the database's identifier quotes instead of always backticks,
+  `sql_in` of an empty list gives `(NULL)`, and booleans become SQL literals rather than
+  `True` / `False`.
+
+## Limitations
+
+- Each refresh opens a new connection; there is no connection pool.
+- No certificate revocation checks (CRL / OCSP); TLS 1.0/1.1, renegotiation and session
+  resumption are not supported.
+- The cryptography is pure Lua and not constant-time.
+- SQL Server `encrypt=strict` (TDS 8) is not covered by the integration tests.
+- Oracle is not supported.
 
 ## Development
 
@@ -43,10 +178,12 @@ make test                  # unit, golden and UI tests (clones mini.nvim into de
 make test FILE=tests/yaml/test_parse.lua
 UPDATE_GOLDEN=1 make test  # regenerate render reference outputs
 make it                    # also run integration tests against tests/docker/compose.yaml
-make it-down
+make it-down               # stop the integration databases
+DBDASH_NET=1 make test     # include a TLS handshake with a public server (system CAs)
+make fmt                   # format with stylua
 python3 tests/examples_schema.py   # validate example/*.yaml against the schema
 ```
 
 Test expectations for the template engine and YAML parser come from real Jinja2 and
-PyYAML (`tests/template/gen.py`, `tests/yaml/gen.py`); they are only needed to
-regenerate cases. The schema test needs Python `jsonschema` and is skipped without it.
+PyYAML (`tests/template/gen.py`, `tests/yaml/gen.py`); they are only needed to regenerate
+cases. The schema test needs Python `jsonschema` and is skipped without it.
