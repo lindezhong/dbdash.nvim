@@ -152,7 +152,7 @@ function M.query(raw_url, query, opts, callback)
   end
   local driver, info = prep.driver, prep.info
   local q_timeout = opts.timeout or info.timeout
-  local exec_opts = { max_rows = opts.max_rows or 10000, timeout = q_timeout }
+  local exec_opts = { max_rows = opts.max_rows or require("dbdash").options.defaults.max_rows, timeout = q_timeout }
 
   timer = vim.uv.new_timer()
   timer:start(info.connect_timeout + q_timeout, 0, function()

@@ -39,11 +39,16 @@ M.CHART_TYPES = {
 
 M.ARG_TYPES = { string = true, number = true, int = true, boolean = true, list = true, map = true }
 
-local DEFAULTS = {
-  interval = 30 * 1000,
-  max_rows = 10000,
-  countdown_format = "Next update: {time}s",
-}
+-- Values a config does not set come from setup({ defaults = ... }).
+local DEFAULTS = setmetatable({}, {
+  __index = function(_, k)
+    local dbdash = require("dbdash")
+    if k == "interval" then
+      return dbdash.default_ms("interval")
+    end
+    return dbdash.options.defaults[k]
+  end,
+})
 
 ---@class dbdash.ArgSpec
 ---@field name string

@@ -279,6 +279,17 @@ T["dashboard.open: vsplit, split, tab; a visible dashboard is jumped to"] = func
   eq({ child.fn.tabpagenr(), #child.api.nvim_list_tabpages() }, { 2, 2 })
 end
 
+T["defaults.history caps the status history"] = function()
+  child.lua([[require("dbdash").setup({ defaults = { history = 2 } })]])
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  for _ = 1, 4 do
+    child.cmd("DbDashRestart")
+    child.lua([[_G.wait_for(function() return not require("dbdash.scheduler").list()[1].panels[1].running end)]])
+  end
+  eq(child.lua_get("#require('dbdash.scheduler').list()[1].panels[1].history"), 2)
+end
+
 T["sidebar without configs opens the directory"] = function()
   local empty = vim.fn.tempname()
   vim.fn.mkdir(empty, "p")

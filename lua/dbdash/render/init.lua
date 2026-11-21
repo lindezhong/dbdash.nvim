@@ -76,7 +76,7 @@ function M.render(rs, show, opts)
     if w then
       ctx.width = math.min(ctx.width, w)
     end
-    local h = tonumber(show.height ~= vim.NIL and show.height or nil)
+    local h = tonumber(show.height ~= vim.NIL and show.height or nil) or require("dbdash").options.defaults.height
     if h then
       ctx.plot_height = h
     end

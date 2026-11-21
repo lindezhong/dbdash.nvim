@@ -55,7 +55,6 @@ Dashboard.__index = Dashboard
 ---@type table<string, dbdash.Dashboard>
 M.dashboards = {}
 
-M.HISTORY_MAX = 20
 
 local function opts()
   return require("dbdash").options
@@ -127,7 +126,7 @@ end
 function Panel:push_history(entry)
   entry.at = os.time()
   table.insert(self.history, 1, entry)
-  while #self.history > M.HISTORY_MAX do
+  while #self.history > opts().defaults.history do
     table.remove(self.history)
   end
 end
