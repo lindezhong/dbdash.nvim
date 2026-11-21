@@ -347,11 +347,13 @@ Get a server's fingerprint with:
 <
 PostgreSQL, MySQL and SQL Server negotiate TLS on their normal port; Redis,
 MongoDB and Cassandra start TLS right away (use the server's TLS port;
-`rediss://` and MongoDB's `tls=true` imply `require`). Supported: TLS 1.3 (X25519 or secp256r1; AES-128-GCM
-or ChaCha20-Poly1305) and TLS 1.2 (ECDHE or RSA key exchange; AES-GCM,
-ChaCha20-Poly1305 or AES-CBC with HMAC, encrypt-then-MAC and extended
-master secret when the server supports them). TLS 1.0/1.1, renegotiation
-and session resumption are not supported.
+`rediss://` and MongoDB's `tls=true` imply `require`).
+
+Supported: TLS 1.3 (X25519 or secp256r1; AES-128-GCM or ChaCha20-Poly1305)
+and TLS 1.2 (ECDHE or RSA key exchange; AES-GCM, ChaCha20-Poly1305 or
+AES-CBC with HMAC; encrypt-then-MAC and extended master secret when the
+server supports them). TLS 1.0/1.1, renegotiation and session resumption
+are not supported.
 
 Known risk: the cryptography is pure Lua and not constant-time, so timing
 side channels exist in theory. This is accepted for a client that
