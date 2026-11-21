@@ -104,4 +104,48 @@ function M.fake_socket(bytes)
   return s
 end
 
+local function u16(n)
+  return string.char(math.floor(n / 256), n % 256)
+end
+---Build a response for a query with SRV / TXT answers (names compressed to the question).
+function M.dns_respond(query, records)
+  local id = query:sub(1, 2)
+  local qname_end = query:find("\0", 13, true)
+  local question = query:sub(13, qname_end + 4)
+  local qtype = query:byte(qname_end + 1) * 256 + query:byte(qname_end + 2)
+  local answers = {}
+  for _, r in ipairs(records) do
+    if r.type == qtype then
+      local rdata
+      if r.type == 33 then
+        local target = ""
+        for label in r.target:gmatch("[^.]+") do
+          target = target .. string.char(#label) .. label
+        end
+        rdata = u16(r.priority) .. u16(r.weight) .. u16(r.port) .. target .. "\0"
+      else
+        rdata = ""
+        for _, part in ipairs(r.parts) do
+          rdata = rdata .. string.char(#part) .. part
+        end
+      end
+      answers[#answers + 1] = "\192\12" .. u16(r.type) .. u16(1) .. "\0\0\0\60" .. u16(#rdata) .. rdata
+    end
+  end
+  return id .. u16(0x8180) .. u16(1) .. u16(#answers) .. u16(0) .. u16(0) .. question .. table.concat(answers)
+end
+
+---Fake UDP DNS server answering every query with `records`. Returns server, port.
+function M.fake_dns(records)
+  local udp = vim.uv.new_udp()
+  udp:bind("127.0.0.1", 0)
+  udp:recv_start(function(_, data, addr)
+    if data then
+      udp:send(M.dns_respond(data, records), addr.ip, addr.port)
+    end
+  end)
+  return udp, udp:getsockname().port
+end
+
+
 return M

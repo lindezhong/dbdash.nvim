@@ -61,9 +61,67 @@ T["documents to a result set, with flattening"] = function()
   eq(rs:column_names(), { "_id", "customer.name", "customer.tier.level", "amount", "extra" })
 end
 
+T["SRV targets must stay in the host's domain"] = function()
+  eq(mongo.srv_target_ok("cluster0.abc.mongodb.net", "shard-00.abc.mongodb.net"), true)
+  eq(mongo.srv_target_ok("cluster0.abc.mongodb.net", "evil.example.com"), false)
+  eq(mongo.srv_target_ok("cluster0.abc.mongodb.net", "abc.mongodb.net"), false)
+  eq(mongo.srv_target_ok("rs.localhost", "db1.rs.localhost."), true)
+  eq(mongo.srv_target_ok("rs.localhost", "rs.localhost"), false)
+  eq(mongo.srv_target_ok("rs.localhost", "other.localhost"), false)
+end
+
+T["host selection follows the primary and readPreference"] = function()
+  local real = mongo.open
+  local opened = {}
+  local hellos = {
+    ["a:1"] = { isWritablePrimary = false, primary = "c:3" },
+    ["b:2"] = { isWritablePrimary = false, secondary = true },
+    ["c:3"] = { isWritablePrimary = true },
+  }
+  mongo.open = function(_, host, port)
+    local key = host .. ":" .. port
+    opened[#opened + 1] = key
+    local hello = hellos[key]
+    if not hello then
+      error({ phase = "connect", message = "refused " .. key }, 0)
+    end
+    return { key = key, close = function() end }, hello
+  end
+  local function connect(urlstr)
+    local url = require("dbdash.db.url")
+    return mongo.connect(mongo.parse_url(url.parse(urlstr)))
+  end
+  local ok, c = pcall(connect, "mongodb://dead:9,a:1,b:2/db")
+  eq({ ok, ok and c.key, opened }, { true, "c:3", { "dead:9", "a:1", "c:3" } })
+  opened = {}
+  c = connect("mongodb://b:2,a:1/db?readPreference=secondaryPreferred")
+  eq(c.key, "b:2")
+  hellos["c:3"] = nil -- primary down
+  opened = {}
+  c = connect("mongodb://b:2/db?readPreference=primaryPreferred")
+  eq(c.key, "b:2")
+  local r = { pcall(connect, "mongodb://b:2/db") }
+  eq(r[1], false)
+  mongo.open = real
+end
+
 -- Integration (make it) ---------------------------------------------------------------------
 
 local URL = "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/dbdash_test?authSource=admin"
+
+---Initiate the single-node replica set once (the compose server starts uninitiated).
+local function ensure_rs()
+  local direct = "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin&readPreference=nearest"
+  local r = h.query(direct, [[{"operation": "command", "command": {"replSetInitiate": {"_id": "rs0", "members": [{"_id": 0, "host": "localhost:17017"}]}}}]])
+  if r.err and not tostring(r.err.code):find("AlreadyInitialized") then
+    error(tostring(r.err))
+  end
+  -- Wait until the member is primary.
+  vim.wait(30000, function()
+    local s = h.query(direct, [[{"operation": "command", "command": {"hello": 1}}]])
+    return s.rs and s.rs:get(1, "isWritablePrimary") == true
+  end, 500)
+end
 
 local function q(t)
   return vim.json.encode(t)
@@ -71,6 +129,7 @@ end
 
 T["it: aggregate, find, count, distinct"] = function()
   h.require_it()
+  ensure_rs()
   -- Seed with an aggregate $merge-free approach: $documents + $out.
   h.ok(URL, [[{"operation": "aggregate", "database": "dbdash_test", "pipeline": [
     {"$documents": [
@@ -119,6 +178,25 @@ T["it: errors"] = function()
   eq(r.err.message:find('"collection"') ~= nil, true)
   r = h.query(URL, "not json")
   eq(r.err.message:find("invalid JSON") ~= nil, true)
+end
+
+T["it: mongodb+srv through a local DNS server and seed lists"] = function()
+  h.require_it()
+  ensure_rs()
+  local udp, port = h.fake_dns({
+    { type = 33, priority = 0, weight = 0, port = 1, target = "dead.rs.localhost" },
+    { type = 33, priority = 1, weight = 0, port = 17017, target = "db1.rs.localhost" },
+    { type = 16, parts = { "authSource=admin&replicaSet=rs0" } },
+  })
+  local srv = "mongodb+srv://dbdash:dbdash_pw@rs.localhost/dbdash_test?tls=disable&dns=127.0.0.1:" .. port
+  local r = h.query(srv, [[{"operation": "command", "command": {"ping": 1}}]])
+  eq(r.err, nil)
+  -- verify-full is the default for +srv: plain-text servers fail the TLS handshake
+  r = h.query("mongodb+srv://dbdash:dbdash_pw@rs.localhost/x?dns=127.0.0.1:" .. port .. "&connect_timeout=2s&timeout=2s", [[{"collection": "a"}]])
+  eq(r.err ~= nil, true)
+  udp:close()
+  -- seed list with a dead first host
+  eq(h.ok("mongodb://dbdash:dbdash_pw@127.0.0.1:1,localhost:17017/dbdash_test?authSource=admin", [[{"operation": "command", "command": {"ping": 1}}]]).row_count, 1)
 end
 
 return T

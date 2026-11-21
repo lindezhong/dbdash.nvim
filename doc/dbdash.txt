@@ -305,10 +305,19 @@ MongoDB     `mongodb://user:pass@host:27017/db?authSource=admin`  SCRAM-SHA-256
                "sort": {"created_at": -1}, "limit": 100, "flatten": 1}
 <           operation: find | aggregate (`pipeline`; omit `collection` for
             database-level stages such as $documents) | count | distinct
-            (`field`). Use Extended JSON for special values ({"$oid": ...},
+            (`field`) | command (`"command": {...}`, the reply as one row). Use Extended JSON for special values ({"$oid": ...},
             {"$date": "2026-01-01T00:00:00Z"}, {"$numberLong": "1"}) and
             `| tojson` in templates. Columns are the union of top-level keys;
             `flatten` expands nested documents to a.b columns.
+            Seed lists (`mongodb://h1:27017,h2:27017/db`) are tried in order;
+            the driver follows hello's `primary` to the writable member, or
+            with `readPreference=secondary|secondaryPreferred|nearest|
+            primaryPreferred` uses the first reachable member.
+            `mongodb+srv://cluster.example.net/db` resolves the
+            `_mongodb._tcp` SRV records (targets must be in the same domain)
+            and the TXT options `authSource`, `replicaSet`, and defaults to
+            `tls=verify-full`. Name servers come from /etc/resolv.conf (or
+            DnsQuery on Windows); `dns=host:port` picks one.
 Cassandra   `cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_ONE`
             CQL with paging; PasswordAuthenticator.
 SQL Server  `mssql://user:pass@host:1433/db`  SQL authentication. With

@@ -114,38 +114,167 @@ function M.bin(s)
   return map.from_pairs({ { "$binary", s } })
 end
 
+---Is an SRV target acceptable for the queried host (Initial DNS Seedlist Discovery)?
+---Targets must share the host's parent domain; for one- or two-label hosts, they must end
+---in ".<host>".
+function M.srv_target_ok(host, target)
+  host, target = host:lower():gsub("%.$", ""), target:lower():gsub("%.$", "")
+  local labels = select(2, host:gsub("%.", ".")) + 1
+  local suffix = labels >= 3 and host:gsub("^[^.]+", "") or ("." .. host)
+  return #target > #suffix and target:sub(-#suffix) == suffix
+end
+
+local TXT_OPTIONS = { authSource = true, replicaSet = true, loadBalanced = true }
+
 function M.parse_url(info)
-  if info.scheme == "mongodb+srv" then
-    dberr.raise("config", "mongodb+srv URLs are not supported yet; use mongodb://host:port")
+  info.srv = info.scheme == "mongodb+srv"
+  if info.srv then
+    if #info.hosts ~= 1 or info.port then
+      dberr.raise("config", "mongodb+srv URLs take exactly one host name and no port")
+    end
+    if info.params.tls == nil and info.params.ssl == nil then
+      info.tls = "verify-full" -- as the mongodb+srv specification requires TLS
+    end
   end
-  info.host = info.host or "localhost"
-  info.port = info.port or 27017
+  for _, h in ipairs(info.hosts) do
+    h.host = h.host or "localhost"
+    h.port = h.port or 27017
+  end
+  info.host, info.port = info.hosts[1].host, info.hosts[1].port
   info.database = info.database or "test"
   local t = info.params.tls or info.params.ssl
   if (t == "true" or t == "1") and info.tls == "disable" then
     info.tls = "require"
   end
+  info.read_preference = info.params.readPreference or "primary"
+  local rp = { primary = true, primaryPreferred = true, secondary = true, secondaryPreferred = true, nearest = true }
+  if not rp[info.read_preference] then
+    dberr.raise("config", "unknown readPreference " .. info.read_preference)
+  end
   return info
 end
 
-function M.connect(info)
-  local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
+---Resolve a mongodb+srv host: SRV targets (validated) and TXT options.
+local function resolve_srv(info)
+  local dns = require("dbdash.net.dns")
+  local opts = { server = info.params.dns }
+  local name = info.host
+  local recs = dns.srv("_mongodb._tcp." .. name, opts)
+  if #recs == 0 then
+    dberr.raise("connect", "no SRV records for _mongodb._tcp." .. name)
+  end
+  local hosts = {}
+  for _, r in ipairs(recs) do
+    local target = r.target:gsub("%.$", "")
+    if not M.srv_target_ok(name, target) then
+      dberr.raise("connect", ("SRV target %s is not in the domain of %s"):format(target, name))
+    end
+    hosts[#hosts + 1] = { host = target, port = r.port }
+  end
+  local ok, txts = pcall(dns.txt, name, opts)
+  if ok and #txts > 1 then
+    dberr.raise("connect", "more than one TXT record for " .. name)
+  elseif ok and #txts == 1 then
+    for k, v in txts[1]:gmatch("([^&=]+)=([^&]*)") do
+      if not TXT_OPTIONS[k] then
+        dberr.raise("connect", ("TXT option %s is not allowed for mongodb+srv"):format(k))
+      end
+      if info.params[k] == nil then
+        info.params[k] = v
+      end
+    end
+  end
+  return hosts
+end
+
+---Connect to one host (TLS as configured) and send hello.
+local function open(info, host, port)
+  local sock = socket.connect(host, port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
   local c = setmetatable({ sock = sock, db = info.database }, Conn)
-  local ok, err = pcall(function()
+  local ok, res = pcall(function()
     if info.tls ~= "disable" then
-      require("dbdash.net.tls").from_info(sock, info)
+      local per_host = setmetatable({ host = host }, { __index = info })
+      require("dbdash.net.tls").from_info(sock, per_host)
     end
-    local hello = c:command(doc({ { "hello", 1 }, { "$db", "admin" } }), "connect")
-    c.max_wire = hello.maxWireVersion
-    if info.user and info.user ~= "" then
-      c:auth(info)
-    end
+    return c:command(doc({ { "hello", 1 }, { "$db", "admin" } }), "connect")
   end)
   if not ok then
     sock:close()
-    error(err, 0)
+    error(res, 0)
   end
-  return c
+  c.max_wire = res.maxWireVersion
+  return c, res
+end
+
+M.open = open -- replaceable in tests
+
+local function writable(hello)
+  return hello.isWritablePrimary == true or hello.ismaster == true
+end
+
+---Try the hosts in order: use a writable primary (following hello.primary when a member
+---names another one), or with a non-primary readPreference the first reachable member.
+function M.connect(info)
+  local hosts = info.hosts
+  if info.srv then
+    hosts = resolve_srv(info)
+  end
+  local any = info.read_preference ~= "primary"
+  local fallback, last_err
+  local function finish(c)
+    local ok, err = pcall(function()
+      if info.user and info.user ~= "" then
+        c:auth(info)
+      end
+    end)
+    if not ok then
+      c:close()
+      error(err, 0)
+    end
+    return c
+  end
+  for _, h in ipairs(hosts) do
+    local ok, c, hello = pcall(M.open, info, h.host, h.port)
+    if not ok then
+      last_err = c
+    elseif writable(hello) then
+      if fallback then
+        fallback:close()
+      end
+      return finish(c)
+    elseif info.read_preference == "secondary" or info.read_preference == "secondaryPreferred" or info.read_preference == "nearest" then
+      return finish(c)
+    else
+      local primary = type(hello.primary) == "string" and hello.primary or nil
+      if any and not fallback then
+        fallback = c
+      else
+        c:close()
+      end
+      if primary then
+        local ph, pp = primary:match("^(.-):(%d+)$")
+        local pok, pc, phello = pcall(M.open, info, ph or primary, tonumber(pp) or 27017)
+        if pok and writable(phello) then
+          if fallback then
+            fallback:close()
+          end
+          return finish(pc)
+        elseif pok then
+          pc:close()
+        else
+          last_err = pc
+        end
+      end
+      last_err = last_err or ("%s:%d is not a primary"):format(h.host, h.port)
+    end
+  end
+  if fallback then
+    return finish(fallback)
+  end
+  if type(last_err) == "table" then
+    error(last_err, 0)
+  end
+  dberr.raise("connect", "no usable MongoDB server: " .. tostring(last_err))
 end
 
 -- Results ---------------------------------------------------------------------------------
@@ -303,7 +432,7 @@ function Conn:execute(query, opts)
   local op = opt(q, "operation") or "find"
   if op == "aggregate" and coll == nil then
     coll = 1 -- database-level aggregation ($documents, $currentOp, ...)
-  elseif type(coll) ~= "string" then
+  elseif op ~= "command" and type(coll) ~= "string" then
     dberr.raise("query", 'the query needs "collection": "<name>"')
   end
   local db = opt(q, "database") or self.db
@@ -357,7 +486,27 @@ function Conn:execute(query, opts)
     end
     return M.to_resultset(docs, 0, max, false)
   end
-  dberr.raise("query", ("unknown operation %q (use find, aggregate, count or distinct)"):format(op))
+  if op == "command" then
+    -- Any database command; the reply becomes one row (without "ok").
+    local cmd = opt(q, "command")
+    if not map.is_map(cmd) then
+      dberr.raise("query", 'operation "command" needs "command": { ... }')
+    end
+    local full = map.new()
+    for k, v in map.pairs(cmd) do
+      map.set(full, k, v)
+    end
+    map.set(full, "$db", db)
+    local reply = self:command(full)
+    local row = map.new()
+    for k, v in map.pairs(reply) do
+      if k ~= "ok" and k:sub(1, 1) ~= "$" then
+        map.set(row, k, v)
+      end
+    end
+    return M.to_resultset({ row }, levels, max, false)
+  end
+  dberr.raise("query", ("unknown operation %q (use find, aggregate, count, distinct or command)"):format(op))
 end
 
 function Conn:close()

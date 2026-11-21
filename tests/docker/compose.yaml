@@ -63,12 +63,21 @@ services:
       - ./mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports: ["13306:3306"]
 
+  # A single-node replica set (initiated by the tests) listening on 17017 inside and
+  # outside the container, so the member address localhost:17017 works from the host.
   mongodb:
     image: mongo:7.0
     environment:
       MONGO_INITDB_ROOT_USERNAME: dbdash
       MONGO_INITDB_ROOT_PASSWORD: dbdash_pw
-    ports: ["17017:27017"]
+    command:
+      - bash
+      - -c
+      - >-
+        head -c 756 /dev/urandom | base64 > /tmp/keyfile && chmod 400 /tmp/keyfile &&
+        chown 999:999 /tmp/keyfile &&
+        exec docker-entrypoint.sh mongod --replSet rs0 --keyFile /tmp/keyfile --port 17017 --bind_ip_all
+    ports: ["17017:17017"]
 
   cassandra:
     image: cassandra:5.0

@@ -13,6 +13,7 @@ local M = {}
 ---@field password string?
 ---@field host string?
 ---@field port integer?
+---@field hosts { host: string?, port: integer? }[] all hosts of a seed list
 ---@field database string? path for sqlite, database name otherwise
 ---@field params table<string, string> all query parameters, decoded
 ---@field tls "disable"|"require"|"pin"|"verify-ca"|"verify-full"
@@ -83,25 +84,31 @@ function M.parse(raw)
       u.user = M.decode(user or userinfo)
       u.password = pass and M.decode(pass) or nil
     end
-    local host, port
-    if hostport:sub(1, 1) == "[" then
-      host, port = hostport:match("^%[([^%]]+)%]:?(%d*)$")
-      if not host then
-        fail("invalid IPv6 host in %q", raw)
+    -- Seed lists ("h1:27017,h2:27018") give several hosts; u.host/u.port are the first.
+    u.hosts = {}
+    for part in (hostport .. ","):gmatch("([^,]*),") do
+      local host, port
+      if part:sub(1, 1) == "[" then
+        host, port = part:match("^%[([^%]]+)%]:?(%d*)$")
+        if not host then
+          fail("invalid IPv6 host in %q", raw)
+        end
+      else
+        host, port = part:match("^([^:]*):?(%d*)$")
+        if not host then
+          fail("invalid host:port %q", part)
+        end
       end
-    else
-      host, port = hostport:match("^([^:]*):?(%d*)$")
-      if not host then
-        fail("invalid host:port %q", hostport)
+      local entry = { host = host ~= "" and M.decode(host) or nil }
+      if port ~= "" then
+        entry.port = tonumber(port)
+        if entry.port < 1 or entry.port > 65535 then
+          fail("port out of range: %s", port)
+        end
       end
+      u.hosts[#u.hosts + 1] = entry
     end
-    u.host = host ~= "" and M.decode(host) or nil
-    if port ~= "" then
-      u.port = tonumber(port)
-      if u.port < 1 or u.port > 65535 then
-        fail("port out of range: %s", port)
-      end
-    end
+    u.host, u.port = u.hosts[1].host, u.hosts[1].port
     local db = path:gsub("^/", "")
     u.database = db ~= "" and M.decode(db) or nil
   end
