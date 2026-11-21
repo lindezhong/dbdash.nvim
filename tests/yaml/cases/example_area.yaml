@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=./dbdash.schema.yaml
+#
+# Area chart: users per device type over a year, stacked.
+# Set style.stacked to false to draw overlapping areas.
+
+database:
+  url: "sqlite:///:memory:"
+
+query:
+  sql: |
+    WITH RECURSIVE months AS (
+      SELECT 1 AS month, 'Jan' AS month_name
+      UNION ALL
+      SELECT month + 1,
+             CASE month + 1
+               WHEN 2 THEN 'Feb' WHEN 3 THEN 'Mar' WHEN 4 THEN 'Apr'
+               WHEN 5 THEN 'May' WHEN 6 THEN 'Jun' WHEN 7 THEN 'Jul'
+               WHEN 8 THEN 'Aug' WHEN 9 THEN 'Sep' WHEN 10 THEN 'Oct'
+               WHEN 11 THEN 'Nov' WHEN 12 THEN 'Dec'
+             END
+      FROM months WHERE month < 12
+    )
+    SELECT
+      month_name,
+      abs(random() % 50) + 20 AS desktop_users,
+      abs(random() % 80) + 30 AS mobile_users,
+      abs(random() % 30) + 10 AS tablet_users
+    FROM months
+
+show:
+  type: area
+  title: "Users by device type"
+  interval: 35s
+
+  x_column: month_name
+  y_columns:
+    - column: desktop_users
+      label: "Desktop"
+      color: "#3498db"
+    - column: mobile_users
+      label: "Mobile"
+      color: "#e74c3c"
+    - column: tablet_users
+      label: "Tablet"
+      color: "#2ecc71"
+
+  style:
+    stacked: true
+
+  show_countdown: true
+  countdown_format: "Next update: {time}s"

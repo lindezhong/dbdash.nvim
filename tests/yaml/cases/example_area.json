@@ -1,0 +1,36 @@
+{
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "sql": "WITH RECURSIVE months AS (\n  SELECT 1 AS month, 'Jan' AS month_name\n  UNION ALL\n  SELECT month + 1,\n         CASE month + 1\n           WHEN 2 THEN 'Feb' WHEN 3 THEN 'Mar' WHEN 4 THEN 'Apr'\n           WHEN 5 THEN 'May' WHEN 6 THEN 'Jun' WHEN 7 THEN 'Jul'\n           WHEN 8 THEN 'Aug' WHEN 9 THEN 'Sep' WHEN 10 THEN 'Oct'\n           WHEN 11 THEN 'Nov' WHEN 12 THEN 'Dec'\n         END\n  FROM months WHERE month < 12\n)\nSELECT\n  month_name,\n  abs(random() % 50) + 20 AS desktop_users,\n  abs(random() % 80) + 30 AS mobile_users,\n  abs(random() % 30) + 10 AS tablet_users\nFROM months\n"
+ },
+ "show": {
+  "type": "area",
+  "title": "Users by device type",
+  "interval": "35s",
+  "x_column": "month_name",
+  "y_columns": [
+   {
+    "column": "desktop_users",
+    "label": "Desktop",
+    "color": "#3498db"
+   },
+   {
+    "column": "mobile_users",
+    "label": "Mobile",
+    "color": "#e74c3c"
+   },
+   {
+    "column": "tablet_users",
+    "label": "Tablet",
+    "color": "#2ecc71"
+   }
+  ],
+  "style": {
+   "stacked": true
+  },
+  "show_countdown": true,
+  "countdown_format": "Next update: {time}s"
+ }
+}

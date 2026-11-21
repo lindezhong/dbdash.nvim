@@ -1,0 +1,63 @@
+{
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "sql": "SELECT\n  datetime('now', 'localtime') AS current_time,\n  abs(random() % 100) AS random_number,\n  abs(random() % 1000) AS sales_amount,\n  CASE abs(random() % 3)\n    WHEN 0 THEN 'Active'\n    WHEN 1 THEN 'Pending'\n    ELSE 'Inactive'\n  END AS status,\n  'User' || (abs(random() % 10) + 1) AS username,\n  {{ key1 | sql_quote }} AS k1,\n  {{ key2 | sql_quote }} AS k2\n",
+  "args": [
+   {
+    "name": "key1",
+    "default": "value1"
+   },
+   {
+    "name": "key2",
+    "default": "value2"
+   }
+  ]
+ },
+ "show": {
+  "type": "table",
+  "title": "System status",
+  "interval": "30s",
+  "column_list": [
+   {
+    "column": "current_time",
+    "alias": "Time",
+    "width": 20
+   },
+   {
+    "column": "random_number",
+    "alias": "Random",
+    "width": 10
+   },
+   {
+    "column": "sales_amount",
+    "alias": "Sales",
+    "width": 12
+   },
+   {
+    "column": "status",
+    "alias": "Status",
+    "width": 10
+   },
+   {
+    "column": "username",
+    "alias": "User",
+    "width": 12
+   },
+   {
+    "column": "k1"
+   },
+   {
+    "column": "k2"
+   }
+  ],
+  "style": {
+   "border": true,
+   "header_style": "bold blue",
+   "show_lines": false
+  },
+  "show_countdown": true,
+  "countdown_format": "Next update: {time}s"
+ }
+}

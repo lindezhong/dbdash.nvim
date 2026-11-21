@@ -102,18 +102,6 @@ T["top-level interval is honored like the old plugin"] = function()
   eq(cfg.show.interval, 120000)
 end
 
-T["legacy examples load, except table.yaml which uses key:"] = function()
-  for _, f in ipairs(vim.fn.globpath("tests/yaml/cases", "example_*.yaml", false, true)) do
-    local cfg, err = config.load(f)
-    if f:find("example_table") then
-      eq(err.message:find("name:", 1, true) ~= nil, true)
-    else
-      eq({ f, err and err.message }, { f, nil })
-      eq(cfg.database.type, "sqlite")
-    end
-  end
-end
-
 T["single-chart configs become one panel"] = function()
   local cfg = assert(load(MINIMAL .. "args:\n  - name: top\n"))
   eq({ cfg.multi, #cfg.panels, cfg.panels[1].query == cfg.query }, { false, 1, true })

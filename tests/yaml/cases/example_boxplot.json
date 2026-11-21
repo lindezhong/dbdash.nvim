@@ -1,0 +1,21 @@
+{
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "sql": "WITH RECURSIVE data_points AS (\n  SELECT 1 AS id,\n         CASE abs(random() % 3) WHEN 0 THEN 'Group A' WHEN 1 THEN 'Group B' ELSE 'Group C' END AS category,\n         abs(random() % 100) + 20 AS value\n  UNION ALL\n  SELECT id + 1,\n         CASE abs(random() % 3) WHEN 0 THEN 'Group A' WHEN 1 THEN 'Group B' ELSE 'Group C' END,\n         abs(random() % 100) + 20\n  FROM data_points\n  WHERE id < 30\n)\nSELECT category, value FROM data_points\n"
+ },
+ "show": {
+  "type": "boxplot",
+  "title": "Distribution per group",
+  "interval": "55s",
+  "category_column": "category",
+  "value_column": "value",
+  "style": {
+   "show_outliers": true,
+   "show_means": true
+  },
+  "show_countdown": true,
+  "countdown_format": "Next update: {time}s"
+ }
+}

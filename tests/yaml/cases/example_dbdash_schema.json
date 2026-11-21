@@ -1,0 +1,642 @@
+{
+ "$schema": "http://json-schema.org/draft-07/schema#",
+ "$id": "dbdash.schema.yaml",
+ "title": "dbdash.nvim dashboard",
+ "description": "One dashboard: either a single chart (database / query / show) or several panels (panels / layout). See :help dbdash-config.",
+ "type": "object",
+ "oneOf": [
+  {
+   "title": "single chart",
+   "required": [
+    "database",
+    "query"
+   ],
+   "not": {
+    "required": [
+     "panels"
+    ]
+   }
+  },
+  {
+   "title": "several panels",
+   "required": [
+    "panels"
+   ],
+   "not": {
+    "anyOf": [
+     {
+      "required": [
+       "query"
+      ]
+     },
+     {
+      "required": [
+       "show"
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "properties": {
+  "database": {
+   "$ref": "#/definitions/database"
+  },
+  "query": {
+   "$ref": "#/definitions/query"
+  },
+  "show": {
+   "$ref": "#/definitions/show"
+  },
+  "interval": {
+   "$ref": "#/definitions/duration",
+   "description": "Default refresh interval. With panels it is also a global timer: when it elapses every panel refreshes and the panels' own timers restart."
+  },
+  "args": {
+   "type": "array",
+   "description": "Arguments shared by all panels, merged by name with each panel's query.args (the same name must be declared identically).",
+   "items": {
+    "$ref": "#/definitions/arg"
+   }
+  },
+  "args_show": {
+   "type": "boolean",
+   "description": "Show the argument values above the charts."
+  },
+  "layout": {
+   "type": "object",
+   "description": "Grid layout for panels.",
+   "additionalProperties": false,
+   "properties": {
+    "columns": {
+     "type": "integer",
+     "minimum": 1,
+     "default": 1,
+     "description": "Panels per row."
+    },
+    "gap": {
+     "type": "integer",
+     "minimum": 0,
+     "default": 2,
+     "description": "Spaces between panels."
+    }
+   }
+  },
+  "panels": {
+   "type": "array",
+   "minItems": 1,
+   "description": "Charts placed left to right, wrapping into rows (see show.span).",
+   "items": {
+    "$ref": "#/definitions/panel"
+   }
+  }
+ },
+ "additionalProperties": false,
+ "definitions": {
+  "duration": {
+   "description": "Seconds as a number, or a string with a unit: \"500ms\", \"30s\", \"5m\", \"1h\".",
+   "oneOf": [
+    {
+     "type": "number",
+     "minimum": 0
+    },
+    {
+     "type": "string",
+     "pattern": "^\\s*\\d+(\\.\\d+)?\\s*(ms|s|m|h)?\\s*$"
+    }
+   ]
+  },
+  "database": {
+   "type": "object",
+   "required": [
+    "url"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "type": {
+     "description": "Database type; inferred from the URL scheme when omitted.",
+     "enum": [
+      "sqlite",
+      "postgres",
+      "postgresql",
+      "mysql",
+      "mariadb",
+      "redis",
+      "mongodb",
+      "cassandra",
+      "mssql",
+      "sqlserver"
+     ]
+    },
+    "url": {
+     "type": "string",
+     "description": "Connection URL: <scheme>://[user[:password]@]host[:port][/database][?param=value&...]\nUser names and passwords are percent-decoded (write @ as %40, : as %3A).\n\nSQLite      sqlite:///absolute/path.db\n            sqlite://relative/to/this/config.db\n            sqlite:///:memory:\nPostgreSQL  postgres://user:pass@host:5432/db        (or postgresql://)\n            auth: cleartext, md5, SCRAM-SHA-256; ?options=-c%20search_path%3Dapp\nMySQL       mysql://user:pass@host:3306/db           (or mariadb://)\n            auth: mysql_native_password, caching_sha2_password\nRedis       redis://[user]:pass@host:6379/0          (rediss:// = TLS)\nMongoDB     mongodb://user:pass@host:27017/db?authSource=admin\n            mongodb://user:pass@h1:27017,h2:27017/db?readPreference=secondaryPreferred\n            mongodb+srv://user:pass@cluster0.example.net/db   (SRV + TXT lookup,\n            defaults to tls=verify-full; ?dns=host:port picks the name server)\n            ?authMechanism=SCRAM-SHA-256|SCRAM-SHA-1\nCassandra   cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_QUORUM\nSQL Server  mssql://user:pass@host:1433/db            (or sqlserver://)\n            with TLS: TLS negotiated inside TDS; &encrypt=strict for TDS 8\n\nCommon parameters:\n  tls=disable|require|pin|verify-ca|verify-full   (default disable)\n  fingerprint=sha256:AB:CD:...                    (required for tls=pin)\n  ca=path/to/ca.pem                              (verify-*: trusted CAs instead of\n                                                  the system store; relative to\n                                                  this config file)\n  tls_host=name                                  (name to verify instead of host)\n  connect_timeout=10s   timeout=30s   application_name=dbdash.nvim",
+     "examples": [
+      "sqlite:///:memory:",
+      "sqlite://data/app.db",
+      "postgres://app:secret@db.internal:5432/app?tls=verify-full",
+      "mysql://report:secret@127.0.0.1:3306/shop?tls=require",
+      "redis://:secret@cache:6379/0",
+      "mongodb+srv://reader:secret@cluster0.example.net/shop",
+      "cassandra://cassandra:cassandra@127.0.0.1:9042/metrics",
+      "mssql://sa:Secret1@sqlhost:1433/master?tls=pin&fingerprint=sha256:AB:..."
+     ]
+    },
+    "options": {
+     "type": "object",
+     "description": "Driver options.",
+     "properties": {
+      "lib_path": {
+       "type": "string",
+       "description": "SQLite: path of the libsqlite3 library to load."
+      },
+      "readonly": {
+       "type": "boolean",
+       "description": "SQLite: open the file read-only."
+      },
+      "create": {
+       "type": "boolean",
+       "description": "SQLite: create the file when it does not exist (default false)."
+      }
+     }
+    }
+   }
+  },
+  "arg": {
+   "type": "object",
+   "required": [
+    "name"
+   ],
+   "additionalProperties": false,
+   "not": {
+    "required": [
+     "key"
+    ],
+    "description": "Legacy 'key:' is not supported; use 'name:'."
+   },
+   "properties": {
+    "name": {
+     "type": "string",
+     "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+     "description": "Variable name in the query template."
+    },
+    "type": {
+     "enum": [
+      "string",
+      "number",
+      "int",
+      "boolean",
+      "list",
+      "map"
+     ],
+     "default": "string",
+     "description": "How command-line / prompt input is parsed: list \"a,b,c\", map \"k:v,k2:v2\", boolean true/false/1/0/yes/no. Escape , and : with a backslash or quotes."
+    },
+    "default": {
+     "description": "Value when nothing else sets it (an argument without a value is none)."
+    },
+    "required": {
+     "type": "boolean",
+     "default": false,
+     "description": "Ask for a value at start when it has none."
+    },
+    "show": {
+     "type": "boolean",
+     "default": true,
+     "description": "Include the argument in the args_show line."
+    },
+    "description": {
+     "type": "string"
+    },
+    "choices": {
+     "type": "array",
+     "description": "Candidates for completion and prompts."
+    }
+   }
+  },
+  "query": {
+   "type": "object",
+   "required": [
+    "sql"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "sql": {
+     "type": "string",
+     "description": "Query template (Jinja subset, see :help dbdash-templates). Its language depends on\nthe database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\": {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)"
+    },
+    "args": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/arg"
+     }
+    },
+    "args_show": {
+     "type": "boolean",
+     "default": false,
+     "description": "Show the argument values above the chart."
+    },
+    "autoescape": {
+     "type": "boolean",
+     "default": false,
+     "description": "Render {{ x }} as SQL literals of the database's dialect (| safe opts out)."
+    },
+    "max_rows": {
+     "type": "integer",
+     "minimum": 1,
+     "default": 10000
+    },
+    "timeout": {
+     "$ref": "#/definitions/duration",
+     "description": "Query timeout (default 30s, or the URL's timeout)."
+    }
+   }
+  },
+  "panel": {
+   "type": "object",
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "database": {
+     "$ref": "#/definitions/database",
+     "description": "Overrides the top-level database for this panel."
+    },
+    "query": {
+     "$ref": "#/definitions/query"
+    },
+    "show": {
+     "$ref": "#/definitions/show"
+    }
+   }
+  },
+  "series": {
+   "oneOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "object",
+     "required": [
+      "column"
+     ],
+     "properties": {
+      "column": {
+       "type": "string"
+      },
+      "label": {
+       "type": "string"
+      },
+      "color": {
+       "$ref": "#/definitions/color"
+      }
+     }
+    }
+   ]
+  },
+  "color": {
+   "type": "string",
+   "description": "Hex (\"#3498db\"), a color name (\"blue\", \"bright_blue\"), a style (\"bold blue on black\"), or an existing highlight group (\"DiagnosticOk\")."
+  },
+  "show": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "enum": [
+      "table",
+      "line",
+      "area",
+      "bar",
+      "histogram",
+      "boxplot",
+      "heatmap",
+      "bubble",
+      "pie",
+      "scatter"
+     ],
+     "default": "table"
+    },
+    "title": {
+     "type": "string"
+    },
+    "interval": {
+     "$ref": "#/definitions/duration",
+     "description": "Refresh interval of this chart (default 30s or the top-level interval)."
+    },
+    "show_countdown": {
+     "type": "boolean",
+     "default": false
+    },
+    "countdown_format": {
+     "type": "string",
+     "default": "Next update: {time}s"
+    },
+    "renderer": {
+     "type": "string",
+     "description": "Style for the chart type (the first one is the default):\n  table: box          line: canvas, asciichart     scatter/area/bubble: canvas\n  bar: horizontal, vertical    histogram: horizontal, vertical\n  boxplot: boxdraw    heatmap: halfblock, block    pie: bar, circle\nCustom styles registered with setup({ register = ... }) are accepted too."
+    },
+    "canvas": {
+     "type": "string",
+     "description": "Pixel canvas for canvas styles: braille (default), quadrant, block, halfblock, ascii."
+    },
+    "palette": {
+     "type": "string",
+     "description": "Series colors: theme (default, follows the colorscheme) or tableau."
+    },
+    "width": {
+     "type": "integer",
+     "minimum": 20,
+     "description": "Maximum chart width (default the window)."
+    },
+    "height": {
+     "type": "integer",
+     "minimum": 3,
+     "description": "Plot rows (default 15)."
+    },
+    "span": {
+     "type": "integer",
+     "minimum": 1,
+     "default": 1,
+     "description": "Grid columns this panel spans."
+    },
+    "style": {
+     "type": "object",
+     "description": "Chart options:\n  table      border, header_style, border_style, title_style, show_lines, null_text\n  area       stacked\n  bar        color, show_values\n  histogram  color, show_values\n  boxplot    show_outliers, show_means\n  heatmap    show_values (block renderer)\n  pie        show_labels, show_values, show_percentages"
+    },
+    "colors": {
+     "description": "Series / slice colors, by position (list) or by category name (mapping).",
+     "oneOf": [
+      {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/color"
+       }
+      },
+      {
+       "type": "object",
+       "additionalProperties": {
+        "$ref": "#/definitions/color"
+       }
+      }
+     ]
+    },
+    "legend": {
+     "oneOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "show": {
+         "type": "boolean"
+        },
+        "position": {
+         "type": "string",
+         "description": "right (default) or bottom."
+        }
+       }
+      }
+     ]
+    },
+    "axes": {
+     "type": "object",
+     "properties": {
+      "x_axis": {
+       "$ref": "#/definitions/axis"
+      },
+      "y_axis": {
+       "$ref": "#/definitions/axis"
+      }
+     }
+    },
+    "x_label": {
+     "type": "string"
+    },
+    "y_label": {
+     "type": "string"
+    },
+    "x_column": {
+     "type": "string"
+    },
+    "y_column": {
+     "type": "string"
+    },
+    "y_columns": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/series"
+     }
+    },
+    "line_style": {
+     "type": "object",
+     "properties": {
+      "fill_area": {
+       "type": "boolean"
+      },
+      "show_points": {
+       "type": "boolean"
+      }
+     }
+    },
+    "value_column": {
+     "type": "string"
+    },
+    "category_column": {
+     "type": "string"
+    },
+    "label_column": {
+     "type": "string"
+    },
+    "size_column": {
+     "type": "string"
+    },
+    "color_column": {
+     "type": "string"
+    },
+    "bins": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "column_list": {
+     "type": "array",
+     "description": "Table columns to show, in order (all columns when omitted).",
+     "items": {
+      "oneOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "object",
+        "required": [
+         "column"
+        ],
+        "properties": {
+         "column": {
+          "type": "string"
+         },
+         "alias": {
+          "type": "string"
+         },
+         "width": {
+          "type": "integer",
+          "minimum": 1
+         }
+        }
+       }
+      ]
+     }
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "type": {
+        "enum": [
+         "line",
+         "area"
+        ]
+       }
+      },
+      "required": [
+       "type"
+      ]
+     },
+     "then": {
+      "required": [
+       "x_column"
+      ],
+      "anyOf": [
+       {
+        "required": [
+         "y_column"
+        ]
+       },
+       {
+        "required": [
+         "y_columns"
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "type": {
+        "const": "bar"
+       }
+      },
+      "required": [
+       "type"
+      ]
+     },
+     "then": {
+      "required": [
+       "x_column",
+       "y_column"
+      ]
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "type": {
+        "enum": [
+         "scatter",
+         "bubble"
+        ]
+       }
+      },
+      "required": [
+       "type"
+      ]
+     },
+     "then": {
+      "required": [
+       "x_column",
+       "y_column"
+      ]
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "type": {
+        "enum": [
+         "histogram",
+         "boxplot"
+        ]
+       }
+      },
+      "required": [
+       "type"
+      ]
+     },
+     "then": {
+      "required": [
+       "value_column"
+      ]
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "type": {
+        "const": "heatmap"
+       }
+      },
+      "required": [
+       "type"
+      ]
+     },
+     "then": {
+      "required": [
+       "x_column",
+       "y_column",
+       "value_column"
+      ]
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "type": {
+        "const": "pie"
+       }
+      },
+      "required": [
+       "type"
+      ]
+     },
+     "then": {
+      "required": [
+       "label_column",
+       "value_column"
+      ]
+     }
+    }
+   ]
+  },
+  "axis": {
+   "type": "object",
+   "properties": {
+    "title": {
+     "type": "string"
+    },
+    "min_value": {
+     "type": "number"
+    },
+    "max_value": {
+     "type": "number"
+    },
+    "format": {
+     "type": "string",
+     "description": "Python format, e.g. \"{:,.0f}\" or \"{:.1%}\"."
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,117 @@
+{
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "args_show": true,
+  "args": [
+   {
+    "name": "user_status",
+    "type": "string",
+    "default": "active",
+    "choices": [
+     "active",
+     "inactive"
+    ],
+    "description": "Status filter"
+   },
+   {
+    "name": "min_age",
+    "type": "number",
+    "default": 18,
+    "description": "Minimum age"
+   },
+   {
+    "name": "max_age",
+    "type": "int",
+    "default": 65,
+    "show": false,
+    "description": "Maximum age"
+   },
+   {
+    "name": "include_inactive",
+    "type": "boolean",
+    "default": false,
+    "description": "Also list inactive users"
+   },
+   {
+    "name": "departments",
+    "type": "list",
+    "default": [
+     "IT",
+     "HR",
+     "Finance"
+    ],
+    "description": "Departments"
+   },
+   {
+    "name": "user_ids",
+    "type": "list",
+    "default": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "show": false,
+    "description": "User ids"
+   },
+   {
+    "name": "filters",
+    "type": "map",
+    "default": {
+     "region": "Asia",
+     "level": "senior"
+    },
+    "description": "Extra filters"
+   },
+   {
+    "name": "search_keyword",
+    "type": "string",
+    "description": "Search in names and departments"
+   },
+   {
+    "name": "limit",
+    "type": "int",
+    "default": 100,
+    "required": true,
+    "description": "Row limit"
+   }
+  ],
+  "sql": "WITH sample_users AS (\n  SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'IT' AS department, 'active' AS status,\n         datetime('now', '-30 days') AS created_at\n  UNION ALL SELECT 2, 'Bob', 32, 'HR', 'active', datetime('now', '-25 days')\n  UNION ALL SELECT 3, 'Charlie', 28, 'Finance', 'inactive', datetime('now', '-20 days')\n  UNION ALL SELECT 4, 'Diana', 35, 'IT', 'active', datetime('now', '-15 days')\n  UNION ALL SELECT 5, 'Eve', 29, 'HR', 'active', datetime('now', '-10 days')\n  UNION ALL SELECT 6, 'Frank', 42, 'Finance', 'inactive', datetime('now', '-5 days')\n  UNION ALL SELECT 7, 'Grace', 26, 'IT', 'active', datetime('now', '-2 days')\n)\nSELECT id, name, age, department, status, created_at,\n       {{ (search_keyword or '') | sql_quote }} AS search_term\nFROM sample_users\nWHERE 1 = 1\n{% if not include_inactive %}\n  AND status = {{ user_status | sql_quote }}\n{% endif %}\n  AND age BETWEEN {{ min_age }} AND {{ max_age }}\n{% if departments %}\n  AND department IN {{ departments | sql_in }}\n{% endif %}\n{% if user_ids %}\n  AND id IN {{ user_ids | sql_in }}\n{% endif %}\n{% for key, value in filters.items() %}\n  -- filter {{ loop.index }}: {{ key }} = {{ value }} (illustration only)\n{% endfor %}\n{% if search_keyword is not none and search_keyword | trim %}\n  AND (name LIKE {{ ('%' ~ search_keyword ~ '%') | sql_quote }}\n       OR department LIKE {{ ('%' ~ search_keyword ~ '%') | sql_quote }})\n{% endif %}\nORDER BY created_at DESC\nLIMIT {{ limit | sql_limit }}\n"
+ },
+ "show": {
+  "type": "table",
+  "title": "Users",
+  "interval": "30s",
+  "column_list": [
+   {
+    "column": "id",
+    "alias": "ID"
+   },
+   {
+    "column": "name",
+    "alias": "Name"
+   },
+   {
+    "column": "age",
+    "alias": "Age"
+   },
+   {
+    "column": "department",
+    "alias": "Department"
+   },
+   {
+    "column": "status",
+    "alias": "Status"
+   },
+   {
+    "column": "created_at",
+    "alias": "Created"
+   }
+  ]
+ }
+}

@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=./dbdash.schema.yaml
+#
+# Macros, imports and autoescape.
+# - {% macro %} defines reusable fragments (defaults and keyword arguments work).
+# - {% import %} / {% from ... import %} load macros from files next to this config.
+# - query.autoescape renders {{ value }} as a SQL literal of the database's dialect
+#   (strings quoted and escaped, lists as (a, b), none as NULL); | safe opts out.
+
+database:
+  url: "sqlite:///:memory:"
+
+query:
+  autoescape: true
+  args:
+    - name: label
+      default: "it's ok"             # quoted and escaped by autoescape
+    - name: teams
+      type: list
+      default: ["red", "blue"]
+  sql: |
+    {% from 'macros/sql_helpers.sql' import in_list, bucket %}
+    {% import 'macros/sql_helpers.sql' as h %}
+    {% macro pct(part, total) -%}
+      round(100.0 * {{ part | safe }} / {{ total | safe }}, 1)
+    {%- endmacro %}
+    WITH RECURSIVE players(id, team, score) AS (
+      SELECT 1, 'red', abs(random() % 100)
+      UNION ALL
+      SELECT id + 1, CASE id % 3 WHEN 0 THEN 'red' WHEN 1 THEN 'blue' ELSE 'green' END,
+             abs(random() % 100)
+      FROM players WHERE id < 60
+    )
+    SELECT team,
+           {{ bucket('score', size=25) }} AS score_bucket,
+           count(*) AS players,
+           {{ pct('count(*)', '(SELECT count(*) FROM players)') }} AS pct,
+           {{ label }} AS label
+    FROM players
+    WHERE {{ in_list('team', teams) }}
+      AND {{ h.between('score', 0, 100) }}
+    GROUP BY team, score_bucket
+    ORDER BY team, score_bucket
+
+show:
+  type: table
+  title: "Players per team and score bucket"
+  interval: 30s

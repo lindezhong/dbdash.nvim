@@ -153,6 +153,20 @@ Table options: `column_list: [{column, alias, width}]`, `style.border`,
 `style.header_style`, `style.border_style`, `style.title_style`,
 `style.show_lines`, `style.null_text`.
 
+Examples and schema                                            *dbdash-examples*
+
+The `example/` directory of the plugin has a runnable config (SQLite, no setup)
+for every chart type, the alternative styles (`styles.yaml`), several panels
+(`multi_panel.yaml`), arguments and templates (`template_example.yaml`), macros
+and autoescape (`macros.yaml`) and a SQLite file (`sqlite_file.yaml`).
+
+`example/dbdash.schema.yaml` is a JSON Schema for config files. It lists every
+field and the URL format of each database. Editors using yaml-language-server
+validate and complete a config that starts with: >yaml
+  # yaml-language-server: $schema=/path/to/dbdash.nvim/example/dbdash.schema.yaml
+<
+The sidebar does not list `*.schema.yaml` files.
+
 Multiple panels                                                  *dbdash-panels*
 
 One config can hold several charts in a grid: >yaml

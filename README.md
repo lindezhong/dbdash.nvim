@@ -32,6 +32,10 @@ show:
 `:DbDashStart signups.yaml hours=48`, or `:DbDash` for a sidebar of the configs in the
 current directory. See `:help dbdash`.
 
+[`example/`](example) has a runnable SQLite config for every chart type and feature, and
+[`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a JSON Schema of the config
+format, including the connection URL of each database.
+
 ## Development
 
 ```sh
@@ -40,8 +44,9 @@ make test FILE=tests/yaml/test_parse.lua
 UPDATE_GOLDEN=1 make test  # regenerate render reference outputs
 make it                    # also run integration tests against tests/docker/compose.yaml
 make it-down
+python3 tests/examples_schema.py   # validate example/*.yaml against the schema
 ```
 
 Test expectations for the template engine and YAML parser come from real Jinja2 and
 PyYAML (`tests/template/gen.py`, `tests/yaml/gen.py`); they are only needed to
-regenerate cases.
+regenerate cases. The schema test needs Python `jsonschema` and is skipped without it.

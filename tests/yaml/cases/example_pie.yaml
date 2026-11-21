@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=./dbdash.schema.yaml
+#
+# Pie chart: budget share per department.
+# The default style is one proportional bar with a legend; `renderer: circle` draws a
+# round pie (see styles.yaml).
+
+database:
+  url: "sqlite:///:memory:"
+
+query:
+  sql: |
+    WITH departments AS (
+      SELECT 'Research' AS department, abs(random() % 500) + 200 AS budget
+      UNION ALL SELECT 'Marketing', abs(random() % 400) + 150
+      UNION ALL SELECT 'Sales', abs(random() % 600) + 300
+      UNION ALL SELECT 'Engineering', abs(random() % 800) + 400
+      UNION ALL SELECT 'HR', abs(random() % 200) + 100
+      UNION ALL SELECT 'Operations', abs(random() % 300) + 150
+    )
+    SELECT department, budget
+    FROM departments
+    ORDER BY budget DESC
+
+show:
+  type: pie
+  title: "Budget by department"
+  interval: 40s
+
+  label_column: department
+  value_column: budget
+
+  style:
+    show_labels: true
+    show_values: true
+    show_percentages: true
+
+  colors:                            # by position
+    - "#FF6B6B"
+    - "#4ECDC4"
+    - "#45B7D1"
+    - "#96CEB4"
+    - "#FFEAA7"
+    - "#DDA0DD"
+
+  show_countdown: true
+  countdown_format: "Next update: {time}s"

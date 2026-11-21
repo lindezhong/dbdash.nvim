@@ -1,17 +1,17 @@
-# 面积图样例配置
-# 功能说明：展示多个指标随时间变化的累积趋势，适合显示堆叠数据
-# 适用场景：累积趋势分析、多指标对比、资源使用监控等
+# yaml-language-server: $schema=./dbdash.schema.yaml
+#
+# Area chart: users per device type over a year, stacked.
+# Set style.stacked to false to draw overlapping areas.
 
 database:
-  type: sqlite
   url: "sqlite:///:memory:"
 
 query:
   sql: |
     WITH RECURSIVE months AS (
-      SELECT 1 as month, 'Jan' as month_name
+      SELECT 1 AS month, 'Jan' AS month_name
       UNION ALL
-      SELECT month + 1, 
+      SELECT month + 1,
              CASE month + 1
                WHEN 2 THEN 'Feb' WHEN 3 THEN 'Mar' WHEN 4 THEN 'Apr'
                WHEN 5 THEN 'May' WHEN 6 THEN 'Jun' WHEN 7 THEN 'Jul'
@@ -20,32 +20,32 @@ query:
              END
       FROM months WHERE month < 12
     )
-    SELECT 
+    SELECT
       month_name,
-      abs(random() % 50) + 20 as desktop_users,
-      abs(random() % 80) + 30 as mobile_users,
-      abs(random() % 30) + 10 as tablet_users
+      abs(random() % 50) + 20 AS desktop_users,
+      abs(random() % 80) + 30 AS mobile_users,
+      abs(random() % 30) + 10 AS tablet_users
     FROM months
 
 show:
   type: area
-  title: "用户设备类型趋势分析"
+  title: "Users by device type"
   interval: 35s
 
   x_column: month_name
   y_columns:
     - column: desktop_users
-      label: "桌面端用户"
+      label: "Desktop"
       color: "#3498db"
     - column: mobile_users
-      label: "移动端用户"
+      label: "Mobile"
       color: "#e74c3c"
     - column: tablet_users
-      label: "平板端用户"
+      label: "Tablet"
       color: "#2ecc71"
-  
+
   style:
     stacked: true
 
   show_countdown: true
-  countdown_format: "更新中: {time}s"
+  countdown_format: "Next update: {time}s"

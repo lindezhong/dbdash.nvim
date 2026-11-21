@@ -1,0 +1,21 @@
+{
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "sql": "WITH RECURSIVE hours AS (\n  SELECT 0 AS hour\n  UNION ALL\n  SELECT hour + 1 FROM hours WHERE hour < 23\n),\ndays AS (\n  SELECT 'Monday' AS day, 1 AS day_order\n  UNION SELECT 'Tuesday', 2\n  UNION SELECT 'Wednesday', 3\n  UNION SELECT 'Thursday', 4\n  UNION SELECT 'Friday', 5\n  UNION SELECT 'Saturday', 6\n  UNION SELECT 'Sunday', 7\n)\nSELECT\n  day,\n  hour,\n  abs(random() % 100) +\n    CASE\n      WHEN hour BETWEEN 9 AND 17 THEN 50\n      WHEN hour BETWEEN 18 AND 22 THEN 30\n      ELSE 10\n    END AS activity_level\nFROM days CROSS JOIN hours\nORDER BY day_order, hour\n"
+ },
+ "show": {
+  "type": "heatmap",
+  "title": "Weekly activity",
+  "interval": "60s",
+  "x_column": "hour",
+  "y_column": "day",
+  "value_column": "activity_level",
+  "style": {
+   "show_values": true
+  },
+  "show_countdown": true,
+  "countdown_format": "Next update: {time}s"
+ }
+}

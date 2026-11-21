@@ -1,45 +1,39 @@
-# 直方图样例配置
-# 功能说明：展示数据分布情况，显示各个数值区间的频次分布
-# 适用场景：数据分布分析、质量控制、统计分析等
+# yaml-language-server: $schema=./dbdash.schema.yaml
+#
+# Histogram: distribution of 50 exam scores in 10 bins.
+# Horizontal bars with 1/8-cell precision; try `renderer: vertical`.
 
 database:
-  type: sqlite
   url: "sqlite:///:memory:"
 
 query:
   sql: |
     WITH RECURSIVE numbers AS (
-      SELECT 1 as id, abs(random() % 100) as score
+      SELECT 1 AS id, abs(random() % 100) AS score
       UNION ALL
-      SELECT id + 1, abs(random() % 100)
-      FROM numbers 
-      WHERE id < 50
+      SELECT id + 1, abs(random() % 100) FROM numbers WHERE id < 50
     )
-    SELECT 
+    SELECT
       score,
-      CASE 
+      CASE
         WHEN score >= 90 THEN 'A'
         WHEN score >= 80 THEN 'B'
         WHEN score >= 70 THEN 'C'
         WHEN score >= 60 THEN 'D'
         ELSE 'F'
-      END as grade
+      END AS grade
     FROM numbers
 
 show:
   type: histogram
-  title: "学生成绩分布直方图"
+  title: "Score distribution"
   interval: 45s
 
-  # 数据列配置
   value_column: score
-  
-  # 直方图配置
-  bins: 10
-  
-  # 样式配置
+  bins: 10                           # default: Sturges' rule
+
   style:
     color: "#3498db"
 
   show_countdown: true
-  countdown_format: "刷新: {time}s"
+  countdown_format: "Next update: {time}s"

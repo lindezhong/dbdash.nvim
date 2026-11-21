@@ -47,6 +47,7 @@ local function setup_child(keep_dir)
     vim.fn.mkdir(dir, "p")
     vim.fn.writefile(vim.split(CFG, "\n"), dir .. "/board.yaml")
     vim.fn.writefile({ "database:", "  url: sqlite:///:memory:", "query:", "  sql: SELEC oops" }, dir .. "/broken.yaml")
+    vim.fn.writefile({ "type: object" }, dir .. "/board.schema.yaml") -- not a dashboard: hidden
   end
   child.cmd("cd " .. dir)
 end
@@ -371,10 +372,10 @@ T["multi-panel: commands act on the panel under the cursor"] = function()
   eq(status:find("Error:", 1, true) ~= nil, true)
 end
 
-T["legacy example table.yaml runs"] = function()
+T["example table.yaml runs"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/table.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("value1") end)]])
-  eq(find_line("当前时间") ~= nil, true)
+  eq(find_line("Time") ~= nil, true)
   eq(find_line("value1") ~= nil, true)
   eq(child.lua_get("#_G.notes"), 0)
 end

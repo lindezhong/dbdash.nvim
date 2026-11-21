@@ -1,20 +1,21 @@
-# 热力图样例配置
-# 功能说明：展示二维数据的密度分布，通过颜色深浅表示数值大小
-# 适用场景：相关性分析、时间热点分析、地理数据可视化等
+# yaml-language-server: $schema=./dbdash.schema.yaml
+#
+# Heat map: activity per weekday and hour.
+# The default halfblock style packs two rows per line; `renderer: block` uses one line per
+# row and can print the values (style.show_values).
 
 database:
-  type: sqlite
   url: "sqlite:///:memory:"
 
 query:
   sql: |
     WITH RECURSIVE hours AS (
-      SELECT 0 as hour
+      SELECT 0 AS hour
       UNION ALL
       SELECT hour + 1 FROM hours WHERE hour < 23
     ),
     days AS (
-      SELECT 'Monday' as day, 1 as day_order
+      SELECT 'Monday' AS day, 1 AS day_order
       UNION SELECT 'Tuesday', 2
       UNION SELECT 'Wednesday', 3
       UNION SELECT 'Thursday', 4
@@ -22,31 +23,29 @@ query:
       UNION SELECT 'Saturday', 6
       UNION SELECT 'Sunday', 7
     )
-    SELECT 
+    SELECT
       day,
       hour,
-      abs(random() % 100) + 
-      CASE 
-        WHEN hour BETWEEN 9 AND 17 THEN 50
-        WHEN hour BETWEEN 18 AND 22 THEN 30
-        ELSE 10
-      END as activity_level
+      abs(random() % 100) +
+        CASE
+          WHEN hour BETWEEN 9 AND 17 THEN 50
+          WHEN hour BETWEEN 18 AND 22 THEN 30
+          ELSE 10
+        END AS activity_level
     FROM days CROSS JOIN hours
     ORDER BY day_order, hour
 
 show:
   type: heatmap
-  title: "一周活动热力图"
+  title: "Weekly activity"
   interval: 60s
 
-  # 数据列配置
   x_column: hour
   y_column: day
   value_column: activity_level
-  
-  # 热力图样式配置
+
   style:
-    show_values: true
-      
+    show_values: true                # used by the block renderer
+
   show_countdown: true
-  countdown_format: "热力图更新: {time}s"
+  countdown_format: "Next update: {time}s"

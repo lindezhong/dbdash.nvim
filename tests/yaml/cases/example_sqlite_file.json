@@ -1,0 +1,20 @@
+{
+ "database": {
+  "url": "sqlite:///tmp/dbdash-example.db",
+  "options": {
+   "create": true
+  }
+ },
+ "query": {
+  "sql": "CREATE TABLE IF NOT EXISTS samples (at TEXT, value INTEGER);\nINSERT INTO samples VALUES (strftime('%H:%M:%S', 'now'), abs(random() % 100));\nSELECT at, value FROM samples ORDER BY rowid DESC LIMIT 30\n"
+ },
+ "show": {
+  "type": "line",
+  "title": "Logged samples (newest first)",
+  "interval": "5s",
+  "x_column": "at",
+  "y_column": "value",
+  "show_countdown": true,
+  "countdown_format": "{time}s"
+ }
+}

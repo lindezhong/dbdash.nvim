@@ -1,0 +1,20 @@
+{
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "sql": "WITH RECURSIVE numbers AS (\n  SELECT 1 AS id, abs(random() % 100) AS score\n  UNION ALL\n  SELECT id + 1, abs(random() % 100) FROM numbers WHERE id < 50\n)\nSELECT\n  score,\n  CASE\n    WHEN score >= 90 THEN 'A'\n    WHEN score >= 80 THEN 'B'\n    WHEN score >= 70 THEN 'C'\n    WHEN score >= 60 THEN 'D'\n    ELSE 'F'\n  END AS grade\nFROM numbers\n"
+ },
+ "show": {
+  "type": "histogram",
+  "title": "Score distribution",
+  "interval": "45s",
+  "value_column": "score",
+  "bins": 10,
+  "style": {
+   "color": "#3498db"
+  },
+  "show_countdown": true,
+  "countdown_format": "Next update: {time}s"
+ }
+}

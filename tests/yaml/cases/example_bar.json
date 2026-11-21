@@ -1,0 +1,21 @@
+{
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "sql": "WITH categories AS (\n  SELECT 'Electronics' AS category, abs(random() % 1000) + 500 AS sales\n  UNION ALL SELECT 'Clothing', abs(random() % 800) + 300\n  UNION ALL SELECT 'Books', abs(random() % 400) + 100\n  UNION ALL SELECT 'Home', abs(random() % 600) + 200\n  UNION ALL SELECT 'Sports', abs(random() % 500) + 150\n  UNION ALL SELECT 'Food', abs(random() % 700) + 250\n)\nSELECT category, sales, sales * 1.2 AS target\nFROM categories\nORDER BY sales DESC\n"
+ },
+ "show": {
+  "type": "bar",
+  "title": "Sales by category",
+  "interval": "45s",
+  "x_column": "category",
+  "y_column": "sales",
+  "style": {
+   "color": "blue",
+   "show_values": true
+  },
+  "show_countdown": true,
+  "countdown_format": "Next update: {time}s"
+ }
+}
