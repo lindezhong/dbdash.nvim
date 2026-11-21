@@ -1,7 +1,7 @@
 *dbdash.txt*  Database dashboards in Neovim
 
 Author:  dbdash.nvim contributors
-License: see LICENSE
+License: MIT (see LICENSE)
 
 ==============================================================================
 CONTENTS                                                     *dbdash-contents*
