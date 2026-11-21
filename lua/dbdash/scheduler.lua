@@ -148,6 +148,38 @@ function Panel:track(rs)
   end
 end
 
+---Notify once when a value rises to a threshold step with notify = true (it notifies
+---again after falling back and crossing it again).
+function Panel:check_thresholds(rs)
+  local T = require("dbdash.render.thresholds")
+  local ok, levels = pcall(T.levels, rs, self.cfg.show)
+  if not ok then
+    return
+  end
+  self.levels = self.levels or {}
+  for key, cur in pairs(levels) do
+    local prev = self.levels[key] or 0
+    if cur.level > prev and cur.step and cur.step.notify then
+      local t = self.cfg.show.title
+      local title = (t and t ~= "") and t
+        or (self.d.cfg.multi and self:title() or vim.fn.fnamemodify(self.d.path, ":t"))
+      local what = cur.column and (cur.column .. " = ") or ""
+      local value = require("dbdash.render.table").format_value(cur.value, nil, "NULL")
+      vim.notify(
+        ("dbdash: %s: %s%s %s %s"):format(
+          title,
+          what,
+          value,
+          cur.below and "≤" or "≥",
+          require("dbdash.template.runtime").numstr(cur.step.value)
+        ),
+        vim.log.levels.WARN
+      )
+    end
+    self.levels[key] = cur.level
+  end
+end
+
 ---Seconds until the panel's next refresh.
 function Panel:remaining()
   return math.max(0, math.ceil((self.next_at - now()) / 1000))
@@ -255,6 +287,7 @@ function Panel:refresh(o)
     self:push_history({ elapsed_ms = rs.elapsed_ms, rows = rs.row_count })
     self.rs = rs
     self:track(rs)
+    self:check_thresholds(rs)
     self.error = nil
     self.d:redraw()
   end)

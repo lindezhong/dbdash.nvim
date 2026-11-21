@@ -292,6 +292,21 @@ function Ctx:show(s, top_interval, prefix)
   out.style = self:expect(prefix .. "show.style", s.style, "map", true) or map.new()
   out.renderer = self:expect(prefix .. "show.renderer", s.renderer, "string", true)
   out.canvas = self:expect(prefix .. "show.canvas", s.canvas, "string", true)
+  local T = require("dbdash.render.thresholds")
+  if nn(s.thresholds) ~= nil then
+    local terr = T.check(s.thresholds)
+    if terr then
+      self:fail(prefix .. "show.thresholds", "%s", terr)
+    end
+  end
+  for i, spec in ipairs(nn(s.column_list) or {}) do
+    if type(spec) == "table" and nn(spec.thresholds) ~= nil then
+      local terr = T.check(spec.thresholds)
+      if terr then
+        self:fail(("%sshow.column_list[%d].thresholds"):format(prefix, i - 1), "%s", terr)
+      end
+    end
+  end
   out.span = self:expect(prefix .. "show.span", s.span, "integer", true) or 1
   if out.span < 1 then
     self:fail(prefix .. "show.span", "span must be at least 1")

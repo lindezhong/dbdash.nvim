@@ -67,6 +67,11 @@ local function select_columns(rs, show)
           width = type(spec) == "table" and tonumber(nn(spec.width)) or nil,
           align = (ltype and NUMERIC[ltype]) and "right" or "left",
           ltype = ltype,
+          thresholds = type(spec) == "table" and nn(spec.thresholds) and require("dbdash.render.thresholds").steps(
+            spec.thresholds,
+            nn(spec.thresholds_below) == true
+          ) or nil,
+          below = type(spec) == "table" and nn(spec.thresholds_below) == true,
         }
       end
     end
@@ -159,8 +164,15 @@ function M.render(rs, show, ctx)
   for r, row in ipairs(rs.rows) do
     cells[r] = {}
     for c, col in ipairs(cols) do
-      local text, is_null = M.format_value(col.index and row[col.index] or nil, col.ltype, null_text)
-      cells[r][c] = { text = text, null = is_null }
+      local v = col.index and row[col.index] or nil
+      local text, is_null = M.format_value(v, col.ltype, null_text)
+      local group
+      if col.thresholds and not is_null then
+        local T = require("dbdash.render.thresholds")
+        local _, step = T.level(v, col.thresholds, col.below)
+        group = T.group(step)
+      end
+      cells[r][c] = { text = text, null = is_null, group = group }
       data_w[c] = math.max(data_w[c], W.width(text))
       if not col.width then
         widths[c] = math.max(widths[c], W.width(text))
@@ -245,7 +257,7 @@ function M.render(rs, show, ctx)
     local texts, groups = {}, {}
     for c, cell in ipairs(row) do
       texts[c] = cell.text
-      groups[c] = cell.null and "DbDashNull" or nil
+      groups[c] = cell.null and "DbDashNull" or cell.group
     end
     add(row_line(texts, groups, "│"))
   end

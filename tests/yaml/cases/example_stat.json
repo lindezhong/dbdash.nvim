@@ -11,6 +11,17 @@
   "value_column": "users",
   "format": "{:,}",
   "unit": "users",
-  "interval": "5s"
+  "interval": "5s",
+  "thresholds": [
+   {
+    "value": 1000,
+    "color": "yellow"
+   },
+   {
+    "value": 1190,
+    "color": "red",
+    "notify": true
+   }
+  ]
  }
 }

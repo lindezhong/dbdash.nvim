@@ -503,6 +503,15 @@
      "default": true,
      "description": "stat: show the last 20 values."
     },
+    "thresholds": {
+     "$ref": "#/definitions/thresholds",
+     "description": "stat: color the value by thresholds; notify: true notifies when the value rises to a step."
+    },
+    "thresholds_below": {
+     "type": "boolean",
+     "default": false,
+     "description": "Thresholds apply at or below their value (lower is worse)."
+    },
     "column_list": {
      "type": "array",
      "description": "Table columns to show, in order (all columns when omitted).",
@@ -526,6 +535,14 @@
          "width": {
           "type": "integer",
           "minimum": 1
+         },
+         "thresholds": {
+          "$ref": "#/definitions/thresholds",
+          "description": "Color the cells of this column by value (notify works as for stat)."
+         },
+         "thresholds_below": {
+          "type": "boolean",
+          "default": false
          }
         }
        }
@@ -663,6 +680,30 @@
      }
     }
    ]
+  },
+  "thresholds": {
+   "type": "array",
+   "description": "Steps from least to most severe; a value at or above a step's value (at or below with thresholds_below) reaches it and the most severe step reached wins.",
+   "items": {
+    "type": "object",
+    "required": [
+     "value"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "value": {
+      "type": "number"
+     },
+     "color": {
+      "$ref": "#/definitions/color"
+     },
+     "notify": {
+      "type": "boolean",
+      "default": false,
+      "description": "vim.notify once when the value rises to this step."
+     }
+    }
+   }
   },
   "axis": {
    "type": "object",

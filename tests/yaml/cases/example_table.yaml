@@ -41,6 +41,10 @@ show:
     - column: random_number
       alias: "Random"
       width: 10
+      # Color cells by value: >= 50 yellow, >= 90 red (thresholds_below: true reverses).
+      thresholds:
+        - { value: 50, color: yellow }
+        - { value: 90, color: red }
     - column: sales_amount
       alias: "Sales"
       width: 12

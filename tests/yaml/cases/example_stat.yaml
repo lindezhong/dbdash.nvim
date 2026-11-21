@@ -7,6 +7,8 @@
 # The value is the first row of value_column (default: the first numeric column).
 # format takes a Python format ("{:,}", "{:.1f}", "{:.1%}"); unit is shown after it.
 # delta: false / sparkline: false hide the second line's parts.
+# thresholds color the value; a step with notify: true also notifies (once) when the
+# value rises to it.
 
 database:
   url: "sqlite:///:memory:"
@@ -22,3 +24,6 @@ show:
   format: "{:,}"
   unit: users
   interval: 5s
+  thresholds:
+    - { value: 1000, color: yellow }
+    - { value: 1190, color: red, notify: true }

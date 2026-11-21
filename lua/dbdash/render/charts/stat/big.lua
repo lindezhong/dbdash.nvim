@@ -75,6 +75,12 @@ function M.render(rs, show, ctx)
   end
   local text, unit = C.text(v, show)
   local group = ctx.value_group or "DbDashStatValue"
+  if show.thresholds and show.thresholds ~= vim.NIL then
+    local T = require("dbdash.render.thresholds")
+    local below = show.thresholds_below == true
+    local _, step = T.level(v, T.steps(show.thresholds, below), below)
+    group = T.group(step) or group
+  end
 
   local rows = big(text)
   local fits = rows and W.width(rows[1]) + (unit and (W.width(unit) + 1) or 0) <= ctx.width

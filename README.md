@@ -14,6 +14,7 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
   Dashboards that are not on screen pause and catch up when shown again.
 - **Query templates**: a Jinja2 subset with SQL-safe quoting filters, autoescape, macros
   and imports.
+- **Thresholds**: color values (stat cards, table cells) and notify when a value crosses a level.
 - **Arguments**: typed variables set from the command line, prompts or in the dashboard.
 - **Sidebar**: browse config files and subdirectories as a tree, start and stop dashboards.
 - **Sessions**: dashboards come back with `:mksession`; changed arguments can be kept too.

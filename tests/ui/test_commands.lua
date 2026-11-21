@@ -618,6 +618,40 @@ T["stat dashboards keep recent values for the change and the sparkline"] = funct
   eq(text:find("[▁▂▃▄▅▆▇█][▁▂▃▄▅▆▇█]") ~= nil, true) -- sparkline
 end
 
+T["thresholds notify once when a value rises to a notify step"] = function()
+  vim.fn.writefile({
+    "database: { url: 'sqlite:///:memory:' }",
+    "query:",
+    "  sql: SELECT {{ v }} AS errors",
+    "  args: [{ name: v, type: int, default: 5 }]",
+    "show:",
+    "  type: stat",
+    "  thresholds: [{ value: 10, color: yellow }, { value: 50, color: red, notify: true }]",
+  }, dir .. "/alert.yaml")
+  child.cmd("DbDashStart alert.yaml")
+  child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].rs ~= nil end)]])
+  local function set(v)
+    child.cmd("DbDashUpdateVariable v " .. v)
+    child.lua(([[_G.wait_for(function()
+      local p = require("dbdash.scheduler").list()[1].panels[1]
+      return not p.running and p.rs.rows[1][1] == %d
+    end)]]):format(v))
+  end
+  local function warnings()
+    return child.lua_get([[vim.tbl_map(function(n) return n.msg end,
+      vim.tbl_filter(function(n) return n.level == vim.log.levels.WARN end, _G.notes))]])
+  end
+  set(20) -- yellow: no notify on that step
+  eq(warnings(), {})
+  set(60)
+  eq(warnings(), { "dbdash: alert.yaml: 60 ≥ 50" })
+  set(70) -- still on the red step: no new notification
+  eq(#warnings(), 1)
+  set(20)
+  set(80) -- crossed again
+  eq(warnings(), { "dbdash: alert.yaml: 60 ≥ 50", "dbdash: alert.yaml: 80 ≥ 50" })
+end
+
 T[":DbDashStyle re-renders cached data with another style"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/line.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("┌") end)]])

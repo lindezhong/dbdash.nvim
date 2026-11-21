@@ -269,9 +269,9 @@ matplotlib-only ones); invalid values of known fields are reported with their
 line and column. The full list of fields is in `example/dbdash.schema.yaml`
 (|dbdash-examples|).
 
-Table options: `column_list: [{column, alias, width}]`, `style.border`,
-`style.header_style`, `style.border_style`, `style.title_style`,
-`style.show_lines`, `style.null_text`.
+Table options: `column_list: [{column, alias, width, thresholds}]`,
+`style.border`, `style.header_style`, `style.border_style`,
+`style.title_style`, `style.show_lines`, `style.null_text`.
 
 Examples and schema                                          *dbdash-examples*
 
@@ -326,7 +326,21 @@ Chart fields:                                                  *dbdash-charts*
   pie        label_column, value_column,
              style.{show_percentages, show_values, show_labels}, colors
   stat       value_column (default: the first numeric column; first row),
-             format (Python format), unit, delta, sparkline
+             format (Python format), unit, delta, sparkline, thresholds
+
+Thresholds                                                 *dbdash-thresholds*
+
+`show.thresholds` (stat) and `thresholds` on a `column_list` entry (table)
+color values by steps; the most severe step reached wins: >yaml
+  thresholds:
+    - { value: 100, color: yellow }            # >= 100
+    - { value: 500, color: red, notify: true } # >= 500, and notify
+  thresholds_below: false   # true: steps apply at or below (lower is worse)
+<With `notify: true`, the refresh where a value rises to that step notifies
+once (vim.notify WARN, e.g. "Errors: 650 ≥ 500"); it notifies again after
+falling back and crossing it again. For a table column the most severe cell
+counts. Colors take the same specs as `colors` (|dbdash-highlights|). Query
+failures are not thresholds: they show in the dashboard and notify once.
 
 A stat chart shows one value in large digits (one line when the window is
 too narrow), its change since the previous refresh (↑ 4.7%, ↓ 3.0%) and a

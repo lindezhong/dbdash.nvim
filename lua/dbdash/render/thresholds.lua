@@ -1,0 +1,122 @@
+-- Thresholds on values: show.thresholds for stat charts, column_list[].thresholds for
+-- tables. A list of { value, color, notify? } steps; a value at or above a step's value
+-- (at or below with thresholds_below) reaches it, and the most severe step reached wins.
+local M = {}
+
+local NULL = vim.NIL
+
+local function nn(v)
+  if v == NULL then
+    return nil
+  end
+  return v
+end
+
+---Steps ordered from least to most severe.
+---@param list table[]?
+---@param below boolean?
+---@return { value: number, color: string?, notify: boolean }[]
+function M.steps(list, below)
+  local out = {}
+  for _, s in ipairs(nn(list) or {}) do
+    local v = tonumber(nn(s.value))
+    if v then
+      out[#out + 1] = { value = v, color = nn(s.color), notify = nn(s.notify) == true }
+    end
+  end
+  table.sort(out, function(a, b)
+    if below then
+      return a.value > b.value
+    end
+    return a.value < b.value
+  end)
+  return out
+end
+
+---Numeric value of a cell, or nil.
+function M.number(v)
+  if type(v) == "number" then
+    return v
+  elseif type(v) == "cdata" then
+    return tonumber(v)
+  elseif type(v) == "string" then
+    return tonumber(v)
+  end
+end
+
+---Severity level reached by `v` (0 = none) and its step.
+---@param v any
+---@param steps table[] from M.steps
+---@param below boolean?
+---@return integer level, table? step
+function M.level(v, steps, below)
+  local n = M.number(v)
+  if not n then
+    return 0
+  end
+  local level, step = 0, nil
+  for i, s in ipairs(steps) do
+    if (below and n <= s.value) or (not below and n >= s.value) then
+      level, step = i, s
+    end
+  end
+  return level, step
+end
+
+---Highlight group for a step (its color spec), or nil.
+function M.group(step)
+  if step and step.color then
+    return require("dbdash.render.highlight").color(step.color)
+  end
+end
+
+---Validate a thresholds list from a config; returns an error message or nil.
+function M.check(list)
+  if not vim.islist(list) then
+    return "thresholds must be a list of { value, color, notify }"
+  end
+  for i, s in ipairs(list) do
+    if type(s) ~= "table" or tonumber(nn(s.value)) == nil then
+      return ("thresholds[%d]: value must be a number"):format(i - 1)
+    end
+    if nn(s.color) ~= nil and type(s.color) ~= "string" then
+      return ("thresholds[%d]: color must be a string"):format(i - 1)
+    end
+    if nn(s.notify) ~= nil and type(s.notify) ~= "boolean" then
+      return ("thresholds[%d]: notify must be true or false"):format(i - 1)
+    end
+  end
+end
+
+---Levels for a panel's result, keyed by source: "value" for stat charts, the column name
+---for table columns with thresholds. Each entry: { level, step, value, below, column }.
+---@return table<string, table>
+function M.levels(rs, show)
+  local out = {}
+  if show.type == "stat" and nn(show.thresholds) then
+    local below = nn(show.thresholds_below) == true
+    local steps = M.steps(show.thresholds, below)
+    local v = require("dbdash.render.charts.stat.common").value(rs, show)
+    local level, step = M.level(v, steps, below)
+    out.value = { level = level, step = step, value = v, below = below }
+  elseif show.type == "table" then
+    for _, spec in ipairs(nn(show.column_list) or {}) do
+      if type(spec) == "table" and nn(spec.thresholds) and nn(spec.column) then
+        local below = nn(spec.thresholds_below) == true
+        local steps = M.steps(spec.thresholds, below)
+        local idx = rs:col_index(spec.column)
+        local best = { level = 0, below = below, column = spec.column }
+        for _, row in ipairs(idx and rs.rows or {}) do
+          local level, step = M.level(row[idx], steps, below)
+          if level > best.level then
+            best = { level = level, step = step, value = row[idx], below = below, column = spec.column }
+          end
+        end
+        out[spec.column] = best
+      end
+    end
+  end
+  return out
+end
+
+return M

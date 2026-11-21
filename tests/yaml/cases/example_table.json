@@ -28,7 +28,17 @@
    {
     "column": "random_number",
     "alias": "Random",
-    "width": 10
+    "width": 10,
+    "thresholds": [
+     {
+      "value": 50,
+      "color": "yellow"
+     },
+     {
+      "value": 90,
+      "color": "red"
+     }
+    ]
    },
    {
     "column": "sales_amount",
