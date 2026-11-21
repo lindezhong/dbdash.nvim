@@ -598,6 +598,10 @@ function M.start(path, o)
         style = {},
       }, Panel)
     end
+    local restored = require("dbdash")._take_pending(path)
+    if restored then
+      require("dbdash")._apply_args(d, restored)
+    end
     d.buf = buffer.create(path, o.buf)
     M.dashboards[path] = d
     vim.api.nvim_create_autocmd("BufWipeout", {

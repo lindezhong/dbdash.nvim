@@ -145,7 +145,9 @@ Global keys already mapped by you are not overwritten. `styles`, `ticks` and
 :Mksession[!] [{file}]                                            *:Mksession*
     Write a session. Dashboard buffers are named `dbdash://<config path>` and
     are restarted (with default arguments) when the session is loaded. The
-    `mksession` command-line abbreviation points here.
+    `mksession` command-line abbreviation points here. Any other :mksession
+    restores dashboards the same way; to also keep changed arguments, see
+    |dbdash-session-state|.
 
 ==============================================================================
 4. MAPPINGS                                                  *dbdash-mappings*
@@ -659,5 +661,25 @@ require("dbdash").stop({config})              stop it
 require("dbdash").query({url}, {query}, {opts}, {callback})
     run a query through the data layer; callback(err, resultset)
 require("dbdash.db").register({driver})        add a database driver
+
+                                                        *dbdash-session-state*
+require("dbdash").mksession({file})
+    Write the argument values of running dashboards that differ from their
+    defaults (command line, edited or entered) to {file} as JSON, like
+    :mksession writes the windows. Returns true, or false and an error.
+require("dbdash").load_session({file})
+    Load values written by mksession(), like :source of a session: running
+    dashboards refresh with them, the others get them when they start (call
+    it after sourcing the session). A missing {file} is not an error;
+    unknown arguments and invalid values are skipped.
+
+Sessions restore dashboards with default arguments; when to save and load
+the changed ones is up to your session setup, e.g. next to the session
+file: >lua
+  -- after :mksession {file}
+  require("dbdash").mksession(file .. ".dbdash")
+  -- after :source {file}
+  require("dbdash").load_session(file .. ".dbdash")
+<
 
  vim:tw=78:ts=8:ft=help:norl:

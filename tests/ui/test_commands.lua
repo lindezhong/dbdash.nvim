@@ -348,6 +348,34 @@ T["sessions without 'blank' in sessionoptions keep dashboard windows"] = functio
   end, vim.api.nvim_list_wins())]]), { "dbdash", "dbdash" })
 end
 
+T["mksession(file) and load_session(file) keep changed arguments"] = function()
+  child.cmd("DbDashStart board.yaml n=9")
+  wait_loaded()
+  child.cmd("DbDashUpdateVariable ids 3,4")
+  local file = dir .. "/Session.vim.dbdash"
+  eq(child.lua_get("{ require('dbdash').mksession(...) }", { file }), { true })
+  local path = child.lua_get("require('dbdash.scheduler').list()[1].path")
+  eq(vim.json.decode(table.concat(vim.fn.readfile(file), "\n")),
+    { version = 1, dashboards = { [path] = { n = "9", ids = "3,4" } } }) -- label is its default
+  -- load into a running dashboard
+  child.cmd("DbDashResetVariables")
+  eq(child.lua_get("{ require('dbdash').load_session(...) }", { file }), { true })
+  child.lua([[_G.wait_for(function() return vim.api.nvim_buf_get_lines(0, 0, 1, false)[1]:find("n=9") end)]])
+  eq(lines()[1], "n=9  label=hello  ids=3,4")
+  -- load before the dashboard runs (as when a session is sourced): applied when it
+  -- starts; unknown arguments and invalid values are skipped
+  child.cmd("DbDashStop")
+  vim.fn.writefile({ vim.json.encode({ version = 1, dashboards = { [path] = { n = "nine", ids = "5", gone = "x" } } }) }, file)
+  child.lua("require('dbdash').load_session(...)", { file })
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  eq(lines()[1], "n=1  label=hello  ids=5")
+  -- missing file: nothing to do; broken file: an error, not an exception
+  eq(child.lua_get("{ require('dbdash').load_session(...) }", { dir .. "/none" }), { true })
+  vim.fn.writefile({ "{" }, file)
+  eq(child.lua_get("require('dbdash').load_session(...)", { file }), false)
+end
+
 T[":edit dbdash://<path> starts the dashboard"] = function()
   child.cmd("edit dbdash://" .. dir .. "/board.yaml")
   wait_loaded()
