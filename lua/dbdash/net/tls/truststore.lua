@@ -17,6 +17,8 @@ M.SYSTEM_FILES = {
 ---@field by_subject table<string, dbdash.x509.Cert[]>
 ---@field by_der table<string, boolean>
 ---@field source string
+---@field intermediates dbdash.x509.Cert[]? extra intermediate CAs that may complete a chain
+---  (Windows "CA" store); never trust anchors
 
 local cache = {}
 
@@ -83,24 +85,48 @@ local function windows_store()
   pcall(ffi.cdef, [[
     typedef struct { unsigned long dwCertEncodingType; unsigned char *pbCertEncoded;
                      unsigned long cbCertEncoded; void *pCertInfo; void *hCertStore; } DBDASH_CERT_CONTEXT;
-    void *CertOpenSystemStoreA(void *hProv, const char *szSubsystemProtocol);
+    void *CertOpenStore(const char *lpszStoreProvider, unsigned long dwEncodingType, void *hCryptProv,
+                        unsigned long dwFlags, const void *pvPara);
     const DBDASH_CERT_CONTEXT *CertEnumCertificatesInStore(void *hCertStore, const DBDASH_CERT_CONTEXT *pPrev);
     int CertCloseStore(void *hCertStore, unsigned long dwFlags);
   ]])
   local crypt32 = ffi.load("crypt32")
-  local ders = {}
-  for _, name in ipairs({ "ROOT", "CA" }) do
-    local h = crypt32.CertOpenSystemStoreA(nil, name)
-    if h ~= nil then
-      local ctx = crypt32.CertEnumCertificatesInStore(h, nil)
-      while ctx ~= nil do
-        ders[#ders + 1] = ffi.string(ctx.pbCertEncoded, ctx.cbCertEncoded)
-        ctx = crypt32.CertEnumCertificatesInStore(h, ctx)
+  local PROV_SYSTEM_A = ffi.cast("const char *", 9) -- CERT_STORE_PROV_SYSTEM_A
+  local READONLY = 0x8000
+  local CURRENT_USER, LOCAL_MACHINE = 0x10000, 0x20000
+  local function enum(name, location, into, seen)
+    local h = crypt32.CertOpenStore(PROV_SYSTEM_A, 0, nil, location + READONLY, name)
+    if h == nil then
+      return
+    end
+    local ctx = crypt32.CertEnumCertificatesInStore(h, nil)
+    while ctx ~= nil do
+      local der = ffi.string(ctx.pbCertEncoded, ctx.cbCertEncoded)
+      if not seen[der] then
+        seen[der] = true
+        into[#into + 1] = der
       end
-      crypt32.CertCloseStore(h, 0)
+      ctx = crypt32.CertEnumCertificatesInStore(h, ctx)
+    end
+    crypt32.CertCloseStore(h, 0)
+  end
+  -- Trust anchors: trusted roots, and the third-party roots Windows keeps up to date
+  -- (AuthRoot). Intermediate CAs ("CA") only complete chains; they are not anchors.
+  local roots, inters, seen = {}, {}, {}
+  enum("ROOT", CURRENT_USER, roots, seen)
+  enum("ROOT", LOCAL_MACHINE, roots, seen)
+  enum("AuthRoot", LOCAL_MACHINE, roots, seen)
+  enum("CA", CURRENT_USER, inters, seen)
+  enum("CA", LOCAL_MACHINE, inters, seen)
+  local store = M.from_ders(roots, "Windows certificate store")
+  store.intermediates = {}
+  for _, der in ipairs(inters) do
+    local ok, cert = pcall(x509.parse, der)
+    if ok then
+      store.intermediates[#store.intermediates + 1] = cert
     end
   end
-  return M.from_ders(ders, "Windows certificate store")
+  return store
 end
 
 local system_store

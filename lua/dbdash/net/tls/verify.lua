@@ -113,7 +113,8 @@ function M.chain(leaf, intermediates, store, now)
     return false, ("certificate %s is not valid for server authentication"):format(describe(leaf))
   end
   local inter_index = {}
-  for _, c in ipairs(intermediates) do
+  local all = vim.list_extend(vim.list_extend({}, intermediates), store.intermediates or {})
+  for _, c in ipairs(all) do
     inter_index[c.subject_der] = inter_index[c.subject_der] or {}
     table.insert(inter_index[c.subject_der], c)
   end

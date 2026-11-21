@@ -19,6 +19,12 @@ function M.ca_store()
   local ok, store = pcall(require("dbdash.net.tls.truststore").system)
   if ok then
     vim.health.ok(("system CA store: %d certificates from %s"):format(#store.certs, store.source))
+    if jit.os == "Windows" then
+      vim.health.info(
+        "Windows installs many root certificates only when a program first needs them; if "
+          .. "verify-ca fails with an unknown CA, pass ?ca=/path/to/ca.pem in the URL"
+      )
+    end
   else
     local msg = type(store) == "table" and store.message or tostring(store)
     vim.health.warn(msg, {

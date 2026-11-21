@@ -752,11 +752,15 @@ Modes:
                (left-most `*.` wildcards) and IP addresses; certificates
                without subjectAltName fall back to the common name.
 
-pin, verify-ca and verify-full also require the server to prove possession
-of its key (CertificateVerify). Chains may use RSA (PKCS#1 v1.5, PSS) and
-ECDSA P-256/P-384 signatures; SHA-1 signatures are rejected; revocation
-(CRL/OCSP) is not checked. The system store is read from the usual bundle
-files on Linux/macOS/BSD and from the certificate store on Windows.
+pin, verify-ca and verify-full also require the server to prove possession of
+its key (CertificateVerify). Chains may use RSA (PKCS#1 v1.5, PSS) and ECDSA
+P-256/P-384 signatures; SHA-1 signatures are rejected; revocation (CRL/OCSP)
+is not checked. The system store is read from the usual bundle files on
+Linux/macOS/BSD. On Windows the trusted roots are the "Trusted Root" and
+"Third-Party Root" certificate stores; certificates of the "Intermediate"
+store only complete chains. Windows installs many roots only when some program
+first needs them, so if verify-ca fails there with an unknown CA, pass the CA
+with `ca=` (`:checkhealth dbdash.postgres` shows how many roots were found).
 
 Get a server's fingerprint with:
 >sh

@@ -48,7 +48,7 @@ T["x509 fields"] = function()
   eq(leaf.issuer_der, inter.subject_der)
   eq({ inter.ca, inter.key_usage.key_cert_sign }, { true, true })
   eq(root.issuer_der, root.subject_der)
-  eq(leaf.not_before, os.time({ year = 2026, month = 1, day = 1, hour = 0 }) - (os.time() - os.time(os.date("!*t"))))
+  eq(leaf.not_before, 1767225600) -- 2026-01-01T00:00:00Z, whatever the local time zone
   eq(cert("leaf_pss.pem").sig_alg, { kind = "rsa_pss", hash = "sha256", oid = "1.2.840.113549.1.1.10" })
   eq(cert("leaf_critical.pem").unknown_critical, { "1.3.6.1.4.1.99999.1" })
 end
@@ -97,6 +97,20 @@ T["host names"] = function()
   eq(verify.ip_bytes("::1"), string.rep("\0", 15) .. "\1")
 end
 
+T["intermediates of the system store complete chains but are not trust anchors"] = function()
+  local leaf, inter, root = cert("leaf.pem"), cert("inter.pem"), cert("root.pem")
+  -- root as anchor, the intermediate only known to the store (Windows "CA" store)
+  local store = truststore.from_ders({ root.der }, "test")
+  store.intermediates = { inter }
+  eq(verify.chain(leaf, {}, store), true)
+  -- an intermediate alone does not make a chain trusted
+  local only_inter = truststore.from_ders({}, "test")
+  only_inter.intermediates = { inter }
+  local ok, why = verify.chain(leaf, {}, only_inter)
+  eq(ok, false)
+  eq(type(why), "string")
+end
+
 T["system trust store loads"] = function()
   local ok, store = pcall(truststore.system)
   if not ok then
@@ -105,7 +119,8 @@ T["system trust store loads"] = function()
   local t0 = vim.uv.hrtime()
   truststore.system()
   MiniTest.add_note(("system store: %d certificates from %s (cached reload %.1f ms)"):format(#store.certs, store.source, (vim.uv.hrtime() - t0) / 1e6))
-  eq(#store.certs > 50, true)
+  -- Windows downloads most roots on demand, so its local store can be small.
+  eq(#store.certs > 0, true)
 end
 
 return T
