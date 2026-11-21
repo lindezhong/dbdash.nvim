@@ -1,6 +1,6 @@
 {
  "database": {
-  "url": "sqlite:///tmp/dbdash-example.db",
+  "url": "sqlite://dbdash-example.db",
   "options": {
    "create": true
   }

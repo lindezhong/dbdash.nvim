@@ -1,7 +1,8 @@
 # yaml-language-server: $schema=./dbdash.schema.yaml
 #
-# A SQLite file database. Relative paths are resolved against this config's directory;
-# sqlite:///absolute/path.db works too. database.options:
+# A SQLite file database. Relative paths are resolved against this config's directory
+# (here: example/dbdash-example.db, ignored by git); sqlite:///absolute/path.db and, on
+# Windows, sqlite:///C:/path/app.db work too. database.options:
 #   create: true     create the file when it does not exist (off by default, so a typo
 #                    does not silently create an empty database)
 #   readonly: true   open read-only
@@ -10,7 +11,7 @@
 # Each refresh logs a row, so the chart grows over time.
 
 database:
-  url: "sqlite:///tmp/dbdash-example.db"
+  url: "sqlite://dbdash-example.db"
   options:
     create: true
 
