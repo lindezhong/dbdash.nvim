@@ -5,6 +5,7 @@ local async = require("dbdash.util.async")
 local eq = MiniTest.expect.equality
 
 local FIX = vim.fn.getcwd() .. "/tests/fixtures/"
+local PKI = FIX .. "pki/"
 local servers = {}
 
 local T = MiniTest.new_set({
@@ -95,11 +96,73 @@ T["pin mode rejects another certificate"] = function()
   eq(r.err.message:find("certificate fingerprint mismatch: the server presented " .. fingerprint("ec_cert.pem"), 1, true) ~= nil, true)
 end
 
-T["servers without TLS 1.3 are reported"] = function()
+-- TLS 1.2: every suite we offer, with encrypt-then-MAC and extended master secret on and off.
+local TLS12 = {
+  { "ECDHE-ECDSA-AES128-GCM-SHA256", "ec" },
+  { "ECDHE-ECDSA-AES256-GCM-SHA384", "ec" },
+  { "ECDHE-ECDSA-CHACHA20-POLY1305", "ec" },
+  { "ECDHE-ECDSA-AES128-SHA256", "ec" },
+  { "ECDHE-ECDSA-AES256-SHA384", "ec" },
+  { "ECDHE-ECDSA-AES128-SHA", "ec" },
+  { "ECDHE-ECDSA-AES256-SHA", "ec", "-no_etm" },
+  { "ECDHE-RSA-AES128-GCM-SHA256", "rsa" },
+  { "ECDHE-RSA-AES256-GCM-SHA384", "rsa" },
+  { "ECDHE-RSA-CHACHA20-POLY1305", "rsa" },
+  { "ECDHE-RSA-AES128-SHA256", "rsa", "-no_etm" },
+  { "ECDHE-RSA-AES256-SHA384", "rsa" },
+  { "ECDHE-RSA-AES128-SHA", "rsa" },
+  { "ECDHE-RSA-AES256-SHA", "rsa", "-no_ems" },
+  { "AES128-GCM-SHA256", "rsa" },
+  { "AES256-GCM-SHA384", "rsa" },
+  { "AES128-SHA256", "rsa" },
+  { "AES128-SHA", "rsa", "-no_etm" },
+  { "AES256-SHA", "rsa" },
+}
+
+for _, case in ipairs(TLS12) do
+  T["TLS 1.2 " .. case[1] .. (case[3] and (" " .. case[3]) or "")] = function()
+    local args = vim.deepcopy(case[2] == "ec" and EC or RSA)
+    args[#args] = "-tls1_2"
+    vim.list_extend(args, { "-cipher", case[1] .. ":@SECLEVEL=0" })
+    if case[3] then
+      args[#args + 1] = case[3]
+    end
+    local port = server(args)
+    local line = string.rep("abcdefghij", 50)
+    local r = echo(port, { mode = "require" }, line)
+    eq(r.err, nil)
+    eq(r[1], line:reverse() .. "\n")
+    eq(r[2]:match("^TLS_") ~= nil, true)
+  end
+end
+
+T["TLS 1.2 with pin and verify-full"] = function()
+  local url = require("dbdash.db.url")
+  local port = server({ "-cert", FIX .. "rsa_cert.pem", "-key", FIX .. "rsa2048.pem", "-tls1_2", "-cipher", "ECDHE-RSA-AES128-GCM-SHA256" })
+  local r = echo(port, { mode = "pin", fingerprint = url.parse_fingerprint(fingerprint("rsa_cert.pem")) }, "pin")
+  eq({ r.err, r[1] }, { nil, "nip\n" })
+  port = server({ "-cert", PKI .. "leaf.pem", "-key", PKI .. "leaf.key", "-cert_chain", PKI .. "inter.pem", "-tls1_2" })
+  r = echo(port, { mode = "verify-full", ca = PKI .. "root.pem", host = "localhost" }, "full", "localhost")
+  eq({ r.err, r[1] }, { nil, "lluf\n" })
+  port = server({ "-cert", PKI .. "leaf_wronghost.pem", "-key", PKI .. "leaf.key", "-cert_chain", PKI .. "inter.pem", "-tls1_2" })
+  r = echo(port, { mode = "verify-full", ca = PKI .. "root.pem", host = "localhost" }, "x", "localhost")
+  eq(r.err.message:find("host name mismatch") ~= nil, true)
+end
+
+T["TLS 1.3 only when requested"] = function()
   local port = server({ "-cert", FIX .. "ec_cert.pem", "-key", FIX .. "ec.key", "-tls1_2" })
-  local r = echo(port, { mode = "require" }, "x")
+  local r = echo(port, { mode = "require", tls12 = false }, "x")
   eq(r.err.phase, "tls")
-  eq(r.err.message:find("protocol_version") ~= nil or r.err.message:find("TLS 1.3") ~= nil, true)
+end
+
+T["downgrade sentinel is rejected"] = function()
+  local hs = require("dbdash.net.tls.handshake")
+  local random = string.rep("\1", 24) .. "DOWNGRD\1"
+  local body = "\3\3" .. random .. "\0" .. "\192\47" .. "\0"
+  local ok, err = pcall(hs.parse_server_hello, body)
+  eq({ ok, err.message:find("downgrade") ~= nil }, { false, true })
+  local plain = "\3\3" .. string.rep("\1", 32) .. "\0" .. "\192\47" .. "\0"
+  eq(hs.parse_server_hello(plain).version, 0x0303)
 end
 
 T["data larger than one record"] = function()
@@ -123,7 +186,6 @@ T["data larger than one record"] = function()
   eq(nines, 4000)
 end
 
-local PKI = FIX .. "pki/"
 local function pki_server(leaf, key, chain)
   local args = { "-cert", PKI .. leaf, "-key", PKI .. key, "-tls1_3" }
   if chain then

@@ -26,6 +26,23 @@ end
 ---Read one record and return its application data ("" for handshake/other records).
 function Filter:unwrap(sock)
   local s = self.session
+  if s.version == 0x0303 then
+    -- TLS 1.2: the record header carries the real content type.
+    local _, hdr, body = record.read(sock)
+    local typ, content = s.read:open(hdr, body)
+    if typ == TYPE.application_data then
+      return content
+    elseif typ == TYPE.alert then
+      record.alert(content)
+    elseif typ == TYPE.handshake then
+      -- HelloRequest: renegotiation is not supported; answer no_renegotiation (warning).
+      if content:byte(1) == 0 then
+        sock:raw_write(s.write:seal(TYPE.alert, "\1\100"))
+      end
+      return ""
+    end
+    record.fail("unexpected record type %d", typ)
+  end
   local typ, hdr, body = record.read(sock)
   if typ == TYPE.change_cipher_spec then
     return ""

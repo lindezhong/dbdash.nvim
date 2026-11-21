@@ -53,7 +53,9 @@ local SIG_ALGS = {
   SIG.rsa_pss_rsae_sha256,
   SIG.rsa_pss_rsae_sha384,
 }
--- What certificates may be signed with (not checked, but servers pick certificates by it).
+-- TLS 1.2 ServerKeyExchange may also use RSA PKCS#1 v1.5 and SHA-512 variants.
+local SIG_ALGS_12 = { 0x0401, 0x0501, 0x0601, 0x0806, 0x0603 }
+-- What certificates may be signed with (servers pick certificates by it).
 local SIG_ALGS_CERT = { 0x0403, 0x0503, 0x0603, 0x0804, 0x0805, 0x0806, 0x0401, 0x0501, 0x0601 }
 
 local HRR_RANDOM = util.unhex("cf21ad74e59a6111be1d8c021e65b891c2a211167abb8c5e079e09e2c8a8339c")
@@ -97,35 +99,67 @@ local function is_dns_name(host)
   return host and not host:match("^[%d%.]+$") and not host:find(":", 1, true)
 end
 
----Build the ClientHello handshake message. Key shares for both groups are sent up front
----(some servers, e.g. PostgreSQL by default, only accept secp256r1), so no
----HelloRetryRequest is needed.
+---Build the ClientHello handshake message: TLS 1.3 with a TLS 1.2 fallback. Key shares
+---for both groups are sent up front (some servers, e.g. PostgreSQL by default, only accept
+---secp256r1), so no HelloRetryRequest is needed.
 ---@param shares { x25519: string, p256: string }
-function M.client_hello(host, shares, random, session_id)
+---@param o { alpn: string[]?, tls12: boolean? }? tls12 = false offers TLS 1.3 only
+function M.client_hello(host, shares, random, session_id, o)
+  o = o or {}
+  local tls12 = o.tls12 ~= false
   local key_shares = u16(GROUP_X25519) .. vec16(shares.x25519) .. u16(GROUP_P256) .. vec16(shares.p256)
+  local sig_algs = vim.list_extend(vim.deepcopy(SIG_ALGS), tls12 and SIG_ALGS_12 or {})
   local exts = {
-    ext(43, u8(2) .. u16(0x0304)), -- supported_versions: TLS 1.3
+    ext(43, tls12 and (u8(4) .. u16(0x0304) .. u16(0x0303)) or (u8(2) .. u16(0x0304))), -- supported_versions
     ext(10, vec16(list16({ GROUP_X25519, GROUP_P256 }))), -- supported_groups
     ext(51, vec16(key_shares)), -- key_share
-    ext(13, vec16(list16(SIG_ALGS))), -- signature_algorithms
+    ext(13, vec16(list16(sig_algs))), -- signature_algorithms
     ext(50, vec16(list16(SIG_ALGS_CERT))), -- signature_algorithms_cert
   }
+  if tls12 then
+    exts[#exts + 1] = ext(11, u8(1) .. u8(0)) -- ec_point_formats: uncompressed
+    exts[#exts + 1] = ext(0xff01, u8(0)) -- renegotiation_info (initial handshake)
+    exts[#exts + 1] = ext(23, "") -- extended_master_secret
+    exts[#exts + 1] = ext(22, "") -- encrypt_then_mac
+  end
+  if o.alpn and #o.alpn > 0 then
+    local names = {}
+    for _, a in ipairs(o.alpn) do
+      names[#names + 1] = u8(#a) .. a
+    end
+    exts[#exts + 1] = ext(16, vec16(table.concat(names)))
+  end
   if is_dns_name(host) then
     local name = u8(0) .. vec16(host)
     table.insert(exts, 1, ext(0, vec16(name))) -- server_name
   end
+  local suites = { 0x1301, 0x1303 }
+  if tls12 then
+    vim.list_extend(suites, require("dbdash.net.tls.handshake12").ORDER)
+  end
   local body = u16(0x0303)
     .. random
     .. u8(#session_id) .. session_id
-    .. vec16(list16({ 0x1301, 0x1303 }))
+    .. vec16(list16(suites))
     .. u8(1) .. u8(0)
     .. vec16(table.concat(exts))
   return u8(HS.client_hello) .. u24(#body) .. body
 end
 
----Parse ServerHello: suite, group, server key share.
+---@class dbdash.tls.ServerHello
+---@field version integer 0x0304 or 0x0303
+---@field random string
+---@field suite integer
+---@field share string? TLS 1.3 key share
+---@field group integer?
+---@field ems boolean TLS 1.2 extended master secret
+---@field etm boolean TLS 1.2 encrypt-then-MAC
+
+---Parse ServerHello.
+---@return dbdash.tls.ServerHello
 function M.parse_server_hello(body)
-  local p = 3 -- legacy_version
+  local legacy = rd16(body, 1)
+  local p = 3
   local random = body:sub(p, p + 31)
   if random == HRR_RANDOM then
     fail("the server asked for a different key exchange group (HelloRetryRequest); only x25519 and secp256r1 are supported")
@@ -136,37 +170,56 @@ function M.parse_server_hello(body)
   local suite
   suite, p = rd16(body, p)
   p = p + 1 -- compression
-  local ext_len
-  ext_len, p = rd16(body, p)
-  local stop = p + ext_len
-  local version, share, group
-  while p < stop do
-    local typ, len
-    typ, p = rd16(body, p)
-    len, p = rd16(body, p)
-    local data = body:sub(p, p + len - 1)
-    p = p + len
-    if typ == 43 then
-      version = rd16(data, 1)
-    elseif typ == 51 then
-      group = rd16(data, 1)
-      local klen = rd16(data, 3)
-      if group ~= GROUP_X25519 and group ~= GROUP_P256 then
-        fail("server chose an unsupported key exchange group 0x%04x", group)
+  local info = { random = random, suite = suite, ems = false, etm = false }
+  if p <= #body then
+    local ext_len
+    ext_len, p = rd16(body, p)
+    local stop = p + ext_len
+    while p < stop do
+      local typ, len
+      typ, p = rd16(body, p)
+      len, p = rd16(body, p)
+      local data = body:sub(p, p + len - 1)
+      p = p + len
+      if typ == 43 then
+        info.version = rd16(data, 1)
+      elseif typ == 51 then
+        info.group = rd16(data, 1)
+        local klen = rd16(data, 3)
+        if info.group ~= GROUP_X25519 and info.group ~= GROUP_P256 then
+          fail("server chose an unsupported key exchange group 0x%04x", info.group)
+        end
+        info.share = data:sub(5, 4 + klen)
+      elseif typ == 23 then
+        info.ems = true
+      elseif typ == 22 then
+        info.etm = true
       end
-      share = data:sub(5, 4 + klen)
     end
   end
-  if version ~= 0x0304 then
-    fail("the server does not support TLS 1.3 (TLS 1.2 is not available yet)")
+  if not info.version then
+    -- No supported_versions: TLS 1.2 or older.
+    if legacy ~= 0x0303 then
+      fail("the server only supports TLS versions older than 1.2 (0x%04x)", legacy)
+    end
+    local tail = random:sub(25)
+    if tail == "DOWNGRD\1" or tail == "DOWNGRD\0" then
+      fail("TLS downgrade detected (the server supports TLS 1.3 but negotiated an older version)")
+    end
+    info.version = 0x0303
+    return info
+  end
+  if info.version ~= 0x0304 then
+    fail("unsupported TLS version 0x%04x", info.version)
   end
   if not SUITES[suite] then
     fail("server chose an unsupported cipher suite 0x%04x", suite)
   end
+  local share, group = info.share, info.group
   if not share or (group == GROUP_X25519 and #share ~= 32) or (group == GROUP_P256 and #share ~= 65) then
     fail("missing or invalid key share")
   end
-  return suite, share, group
+  return info
 end
 
 ---Content signed by the server in CertificateVerify.
@@ -282,7 +335,11 @@ function M.run(sock, opts)
   local p256 = require("dbdash.crypto.ecdsa_p256")
   local ppriv, ppub = p256.ecdh_keypair()
   local rand = require("dbdash.crypto.random")
-  local ch = M.client_hello(opts.host, { x25519 = pub, p256 = ppub }, rand.bytes(32), rand.bytes(32))
+  local client_random = rand.bytes(32)
+  local ch = M.client_hello(opts.host, { x25519 = pub, p256 = ppub }, client_random, rand.bytes(32), {
+    alpn = opts.alpn,
+    tls12 = opts.tls12,
+  })
   sock:raw_write(record.header(TYPE.handshake, #ch) .. ch)
   local transcript = ch
 
@@ -327,8 +384,23 @@ function M.run(sock, opts)
   if t ~= HS.server_hello then
     fail("expected ServerHello, got handshake message %d", t)
   end
-  local suite, server_pub, group = M.parse_server_hello(body)
+  local sh = M.parse_server_hello(body)
   transcript = transcript .. raw
+  if sh.version == 0x0303 then
+    return require("dbdash.net.tls.handshake12").finish(sock, {
+      opts = opts,
+      suite = sh.suite,
+      client_random = client_random,
+      server_random = sh.random,
+      transcript = transcript,
+      leftover = hbuf,
+      ems = sh.ems,
+      etm = sh.etm,
+      x25519 = { priv = priv },
+      p256 = { priv = ppriv, pub = ppub },
+    })
+  end
+  local suite, server_pub, group = sh.suite, sh.share, sh.group
   if #hbuf > 0 then
     fail("unexpected data after ServerHello in the same record")
   end
@@ -425,6 +497,7 @@ function M.run(sock, opts)
   sock:raw_write(table.concat(out))
 
   return {
+    version = 0x0304,
     suite = suite,
     suite_name = SUITES[suite].name,
     read = traffic(suite, s_ap),
