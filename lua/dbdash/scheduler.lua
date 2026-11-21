@@ -208,6 +208,7 @@ function Panel:refresh()
     timeout = q.timeout,
     options = self.cfg.database.options,
     base_dir = self.d.cfg.dir,
+    password_cmd = self.cfg.database.password_cmd,
   }, function(qerr, rs)
     if gen ~= self.d.generation then
       return -- stopped meanwhile

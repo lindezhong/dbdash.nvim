@@ -570,6 +570,32 @@ verify instead of the URL host), `connect_timeout` and `timeout` (default
 SQLite options (`database.options`): `lib_path`, `readonly`, `create`
 (create a missing file; off by default).
 
+Passwords                                                 *dbdash-passwords*
+
+Passwords do not have to be written in config files. A password in the URL
+wins, then `database.password_cmd`, then `passwords.json`:
+
+- `${NAME}` anywhere in `database.url` is replaced by the environment
+  variable NAME (URL characters in the value are percent-encoded; `$${`
+  writes a literal `${`): `postgres://app:${APP_DB_PASSWORD}@db/app`.
+  An unset variable is reported with the line of the URL.
+- `database.password_cmd` runs a command when the URL has no password and
+  uses the first line it prints. A string runs through `sh -c` (`cmd /c` on
+  Windows), a list runs directly: >yaml
+    database:
+      url: "postgres://app@db.internal:5432/app"
+      password_cmd: "pass show db/app"     # or [pass, show, db/app]
+<  The output is cached until Neovim exits or the server rejects it.
+- `stdpath("data")/dbdash/passwords.json` (e.g.
+  ~/.local/share/nvim/dbdash/passwords.json) maps URLs without passwords to
+  passwords, most specific first: `scheme://user@host:port/db`, then
+  `scheme://user@host:port`, then `scheme://user@host` (ports filled in with
+  the database's default): >json
+    { "postgres://app@db.internal:5432/app": "secret",
+      "redis://cache.internal:6379": "redis-secret" }
+<  Keep it readable by you only (chmod 600). Changes are picked up without
+  restarting.
+
 PostgreSQL  `postgres://user:pass@host:5432/db`  cleartext, md5 and
             SCRAM-SHA-256 authentication; `options` URL parameter is sent as
             the startup `options`.

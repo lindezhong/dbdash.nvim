@@ -154,6 +154,10 @@ cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_QUORUM
 mssql://user:pass@host:1433/db
 ```
 
+Passwords do not have to be in config files: use `${ENV_VAR}` in the URL,
+`database.password_cmd` (e.g. `pass show db/app`), or
+`~/.local/share/nvim/dbdash/passwords.json` (`:help dbdash-passwords`).
+
 Common parameters: `tls=disable|require|pin|verify-ca|verify-full`,
 `fingerprint=sha256:...` (for `pin`), `ca=bundle.pem`, `tls_host=name`,
 `connect_timeout=10s`, `timeout=30s` (defaults changeable in `setup({ defaults })`).

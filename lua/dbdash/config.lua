@@ -134,6 +134,23 @@ function Ctx:database(db, prefix)
   prefix = prefix or ""
   db = self:expect(prefix .. "database", db, "map")
   local url = self:expect(prefix .. "database.url", db.url, "string")
+  local _, env_err = require("dbdash.db.credentials").expand_env(url)
+  if env_err then
+    self:fail(prefix .. "database.url", "%s", env_err)
+  end
+  local password_cmd = nn(db.password_cmd)
+  if password_cmd ~= nil then
+    local ok = type(password_cmd) == "string" and password_cmd ~= ""
+    if type(password_cmd) == "table" then
+      ok = #password_cmd > 0
+      for _, a in ipairs(password_cmd) do
+        ok = ok and type(a) == "string"
+      end
+    end
+    if not ok then
+      self:fail(prefix .. "database.password_cmd", "password_cmd must be a command string or a list of strings")
+    end
+  end
   local scheme = M.scheme_of(url)
   local typ = nn(db.type)
   if typ ~= nil then
@@ -154,6 +171,7 @@ function Ctx:database(db, prefix)
   return {
     type = typ,
     url = url,
+    password_cmd = password_cmd,
     options = self:expect(prefix .. "database.options", db.options, "map", true) or map.new(),
   }
 end

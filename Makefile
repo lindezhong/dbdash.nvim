@@ -9,8 +9,12 @@ deps: deps/mini.nvim
 deps/mini.nvim:
 	git clone --depth 1 --filter=blob:none https://github.com/echasnovski/mini.nvim $@
 
+# Tests use their own data/state/cache directories (not the user's passwords.json, shada...).
+TEST_ENV = XDG_DATA_HOME=$(CURDIR)/deps/xdg/data XDG_STATE_HOME=$(CURDIR)/deps/xdg/state \
+	XDG_CACHE_HOME=$(CURDIR)/deps/xdg/cache
+
 test: deps
-	$(NVIM) --headless --noplugin -u tests/minimal_init.lua \
+	$(TEST_ENV) $(NVIM) --headless --noplugin -u tests/minimal_init.lua \
 		-c "lua require('tests.runner').run('$(FILE)')"
 
 # Integration tests against real databases (see tests/docker/compose.yaml).

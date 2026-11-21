@@ -107,6 +107,7 @@ end
 ---@field timeout integer? ms, overrides the url's timeout
 ---@field options table? driver options (database.options)
 ---@field base_dir string?
+---@field password_cmd string|string[]? command printing the password (database.password_cmd)
 
 ---Run a query. `callback(err, rs)` is invoked exactly once, on the main loop.
 ---@param raw_url string
@@ -136,9 +137,13 @@ function M.query(raw_url, query, opts, callback)
   end
 
   local ok, prep = pcall(function()
-    local driver = M.driver_for(raw_url)
+    local expanded, env_err = require("dbdash.db.credentials").expand_env(raw_url)
+    if not expanded then
+      dberr.raise("config", env_err)
+    end
+    local driver = M.driver_for(expanded)
     driver_name = driver.name
-    local info = url.parse(raw_url)
+    local info = url.parse(expanded)
     info.options = opts.options or {}
     info.base_dir = opts.base_dir
     if driver.parse_url then
@@ -167,7 +172,12 @@ function M.query(raw_url, query, opts, callback)
   end)
 
   local started = vim.uv.hrtime()
+  local credentials = require("dbdash.db.credentials")
   async.run(function()
+    credentials.fill(info, opts.password_cmd)
+    if done then
+      return
+    end
     conn = driver.connect(info)
     if done then -- timed out while connecting
       pcall(conn.close, conn)
@@ -181,6 +191,9 @@ function M.query(raw_url, query, opts, callback)
     rs.elapsed_ms = (vim.uv.hrtime() - started) / 1e6
     return rs
   end, function(err, rs)
+    if err and opts.password_cmd and type(err) == "table" and err.phase == "auth" then
+      credentials.forget(opts.password_cmd, info) -- the password may have changed
+    end
     finish(err, rs)
   end)
 end

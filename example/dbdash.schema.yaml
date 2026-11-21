@@ -76,6 +76,9 @@ definitions:
         description: |-
           Connection URL: <scheme>://[user[:password]@]host[:port][/database][?param=value&...]
           User names and passwords are percent-decoded (write @ as %40, : as %3A).
+          ${NAME} is replaced by the environment variable NAME ($${ for a literal ${).
+          Without a password in the URL: password_cmd, then
+          stdpath("data")/dbdash/passwords.json (see :help dbdash-passwords).
 
           SQLite      sqlite:///absolute/path.db                (or sqlite3://)
                       sqlite://relative/to/this/config.db
@@ -113,6 +116,14 @@ definitions:
           - "mongodb+srv://reader:secret@cluster0.example.net/shop"
           - "cassandra://cassandra:cassandra@127.0.0.1:9042/metrics"
           - "mssql://sa:Secret1@sqlhost:1433/master?tls=pin&fingerprint=sha256:AB:..."
+      password_cmd:
+        description: >-
+          Command printing the password (first line), used when the URL has none. A string
+          runs through sh -c (cmd /c on Windows); a list runs directly.
+        oneOf:
+          - { type: string, minLength: 1 }
+          - { type: array, minItems: 1, items: { type: string } }
+        examples: ["pass show db/app"]
       options:
         type: object
         description: Driver options.
