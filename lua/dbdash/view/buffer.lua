@@ -88,13 +88,28 @@ function M.draw(buf, lines, hl)
 end
 
 ---Countdown and error display.
+---Single panel: `countdown` on the first line and `error` as virtual lines above it.
+---Multiple panels: `panels` lists { row, col, text } marks at fixed window columns.
 ---@param buf integer
----@param status { countdown: string?, error: string?, position: string? }
+---@param status { countdown: string?, error: string?, position: string?, panels: { row: integer, col: integer, text: string }[]? }
 function M.set_status(buf, status)
   if not vim.api.nvim_buf_is_valid(buf) then
     return
   end
   vim.api.nvim_buf_clear_namespace(buf, M.ns_status, 0, -1)
+  if status.panels then
+    local last = vim.api.nvim_buf_line_count(buf) - 1
+    for _, m in ipairs(status.panels) do
+      if m.row <= last then
+        vim.api.nvim_buf_set_extmark(buf, M.ns_status, m.row, 0, {
+          virt_text = { { m.text, "DbDashCountdown" } },
+          virt_text_win_col = math.max(0, m.col),
+          priority = 200,
+        })
+      end
+    end
+    return
+  end
   if status.countdown then
     vim.api.nvim_buf_set_extmark(buf, M.ns_status, 0, 0, {
       virt_text = { { status.countdown, "DbDashCountdown" } },

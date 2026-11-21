@@ -153,6 +153,28 @@ Table options: `column_list: [{column, alias, width}]`, `style.border`,
 `style.header_style`, `style.border_style`, `style.title_style`,
 `style.show_lines`, `style.null_text`.
 
+Multiple panels                                                  *dbdash-panels*
+
+One config can hold several charts in a grid: >yaml
+  database: { url: "postgres://..." }   # shared; a panel may set its own
+  interval: 5m      # default panel interval; also refreshes every panel
+  args:             # shared arguments (merged with each panel's query.args)
+    - name: region
+      default: EU
+  layout: { columns: 2, gap: 2 }
+  panels:
+    - query: { sql: "SELECT ..." }
+      show: { type: line, title: Orders, interval: 30s, span: 2 }
+    - query: { sql: "SELECT ..." }
+      show: { type: table, title: Latest }
+<
+Panels flow left to right and wrap; `show.span` widens a panel over several
+columns. Each panel refreshes on its own `show.interval` (default: the
+top-level `interval`); when the top-level interval elapses every panel
+refreshes and their timers restart. Arguments with the same name must be
+declared identically. In the dashboard, `s` and |:DbDashStyle| act on the
+panel under the cursor (or ask which one); `r` refreshes all panels.
+
 Chart fields:                                                    *dbdash-charts*
 
   line       x_column, y_columns [{column, label, color}] (or y_column),

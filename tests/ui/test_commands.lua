@@ -246,9 +246,9 @@ T["timer refreshes on the interval and restart resets the countdown"] = function
   child.cmd("DbDashStart fast.yaml")
   wait_loaded()
   child.lua([[_G.wait_for(function()
-    return #require("dbdash.scheduler").list()[1].history >= 3
+    return #require("dbdash.scheduler").list()[1].panels[1].history >= 3
   end)]])
-  local h = child.lua_get("require('dbdash.scheduler').list()[1].history")
+  local h = child.lua_get("require('dbdash.scheduler').list()[1].panels[1].history")
   eq(#h >= 3, true)
   eq(h[1].rows, 1)
   eq(child.lua_get("require('dbdash.scheduler').list()[1]:remaining() <= 1"), true)
@@ -263,7 +263,7 @@ T[":DbDashStyle re-renders cached data with another style"] = function()
   -- UTF-8 prefixes: braille U+2800-28FF, block elements U+2580-259F, arcs U+256D-2570.
   local BRAILLE, BLOCKS, ARCS = "\226[\160-\163]", "\226\150[\128-\159]", "\226\149[\173-\176]"
   eq(text():find(BRAILLE) ~= nil, true) -- braille by default
-  local runs = child.lua_get("#require('dbdash.scheduler').list()[1].history")
+  local runs = child.lua_get("#require('dbdash.scheduler').list()[1].panels[1].history")
   child.cmd("DbDashStyle line quadrant")
   eq(text():find(BRAILLE), nil)
   eq(text():find(BLOCKS) ~= nil, true)
@@ -276,7 +276,7 @@ T[":DbDashStyle re-renders cached data with another style"] = function()
   child.cmd("DbDashStyle reset")
   eq(text():find(BRAILLE) ~= nil, true)
   -- no new queries were run
-  eq(child.lua_get("#require('dbdash.scheduler').list()[1].history"), runs)
+  eq(child.lua_get("#require('dbdash.scheduler').list()[1].panels[1].history"), runs)
   eq(child.fn.getcompletion("DbDashStyle line q", "cmdline"), { "quadrant" })
 end
 
@@ -288,6 +288,87 @@ T["query templates import macros from files next to the config"] = function()
   wait_loaded()
   eq(find_line("%(7, 8%)") ~= nil, true)
   eq(child.lua_get("#_G.notes"), 0)
+end
+
+local MULTI = [[
+database:
+  url: "sqlite:///:memory:"
+interval: 3s
+layout:
+  columns: 2
+panels:
+  - query:
+      sql: SELECT 'alpha' AS a
+    show:
+      type: table
+      title: Fast
+      interval: 1s
+      show_countdown: true
+  - query:
+      sql: SELECT 'beta' AS b
+    show:
+      type: table
+      title: Slow
+      interval: 1h
+  - query:
+      sql: SELEC broken
+    show:
+      title: Broken
+      span: 2
+]]
+
+local function start_multi()
+  vim.fn.writefile(vim.split(MULTI, "\n"), dir .. "/multi.yaml")
+  child.cmd("DbDashStart multi.yaml")
+  child.lua([[_G.wait_for(function()
+    local t = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
+    return t:find("alpha") and t:find("beta") and t:find("✗")
+  end)]])
+end
+
+T["multi-panel: grid, per-panel errors and countdowns"] = function()
+  start_multi()
+  local first = lines()[1]
+  eq(first:match("^Fast") ~= nil and first:find("Slow") ~= nil, true) -- side by side
+  eq(find_line("^Broken  ✗ .*sqlite query error") ~= nil, true)
+  eq(find_line("alpha") ~= nil and find_line("beta") ~= nil, true)
+  local regions = child.lua_get("vim.b.dbdash_regions")
+  eq(#regions, 3)
+  eq(regions[1].row_s, regions[2].row_s)
+  eq(regions[3].row_s > regions[1].row_e, true)
+  local marks = child.lua_get([[vim.tbl_map(function(m) return { m[2], m[4].virt_text_win_col } end,
+    vim.api.nvim_buf_get_extmarks(0, require("dbdash.view.buffer").ns_status, 0, -1, { details = true }))]])
+  eq(#marks, 1) -- only the panel with show_countdown
+  eq(marks[1][1], regions[1].row_s)
+end
+
+T["multi-panel: own intervals, and the top-level interval refreshes everything"] = function()
+  start_multi()
+  child.lua([[_G.wait_for(function()
+    return #require("dbdash.scheduler").list()[1].panels[2].history >= 2
+  end)]])
+  local n = child.lua_get("vim.tbl_map(function(p) return #p.history end, require('dbdash.scheduler').list()[1].panels)")
+  eq(n[2], 2) -- the 1h panel only refreshed through the 3s global timer
+  eq(n[1] >= 3, true) -- the 1s panel refreshed on its own in between
+end
+
+T["multi-panel: commands act on the panel under the cursor"] = function()
+  start_multi()
+  local regions = child.lua_get("vim.b.dbdash_regions")
+  -- Line inside panel 2; `N|` moves to a screen column (lines hold multi-byte glyphs).
+  child.cmd(("normal! %dG%d|"):format(regions[2].row_s + 2, regions[2].x + 2))
+  child.type_keys("s")
+  eq(lines()[1], "SELECT 'beta' AS b")
+  child.type_keys("q")
+  child.cmd("DbDashStyle table box")
+  local style = child.lua_get("vim.tbl_map(function(p) return p.style.renderer or '' end, require('dbdash.scheduler').list()[1].panels)")
+  eq(style, { "", "box", "" })
+  local status = (function()
+    child.cmd("DbDashStatus")
+    return table.concat(lines(), "\n")
+  end)()
+  eq(status:find("Panel 2: Slow", 1, true) ~= nil, true)
+  eq(status:find("Error:", 1, true) ~= nil, true)
 end
 
 T["legacy example table.yaml runs"] = function()

@@ -114,4 +114,58 @@ T["legacy examples load, except table.yaml which uses key:"] = function()
   end
 end
 
+T["single-chart configs become one panel"] = function()
+  local cfg = assert(load(MINIMAL .. "args:\n  - name: top\n"))
+  eq({ cfg.multi, #cfg.panels, cfg.panels[1].query == cfg.query }, { false, 1, true })
+  eq(vim.tbl_map(function(a)
+    return a.name
+  end, cfg.args), { "top" })
+end
+
+local MULTI = [[
+database:
+  url: "sqlite:///:memory:"
+interval: 5m
+args:
+  - name: region
+    default: Asia
+layout:
+  columns: 2
+panels:
+  - query:
+      sql: SELECT 1
+      args:
+        - name: region
+          default: Asia
+        - name: n
+          type: int
+    show:
+      type: line
+      interval: 30s
+      span: 2
+  - database:
+      url: "redis://localhost"
+    query:
+      sql: GET k
+]]
+
+T["multi-panel configs"] = function()
+  local cfg = assert(load(MULTI))
+  eq({ cfg.multi, #cfg.panels, cfg.layout.columns, cfg.layout.gap, cfg.interval }, { true, 2, 2, 2, 300000 })
+  eq(vim.tbl_map(function(a)
+    return a.name
+  end, cfg.args), { "region", "n" })
+  local p1, p2 = cfg.panels[1], cfg.panels[2]
+  eq({ p1.show.interval, p1.show.own_interval, p1.show.span, p1.database.type }, { 30000, true, 2, "sqlite" })
+  eq({ p2.show.interval, p2.show.own_interval, p2.database.type, p2.query.sql_line }, { 300000, false, "redis", 24 })
+end
+
+T["multi-panel errors point at the panel"] = function()
+  local msg = err_of(MULTI:gsub("        %- name: region\n          default: Asia\n", "        - name: region\n          default: EU\n"))
+  eq(msg:find("argument 'region' is declared differently at args%[1%]%.name") ~= nil, true)
+  eq(err_of("panels:\n  - query:\n      sql: x\n"):find("panels%[1%]%.database: missing database") ~= nil, true)
+  eq(err_of("database:\n  url: sqlite:///:memory:\nquery:\n  sql: x\npanels:\n  - query:\n      sql: y\n"):find("not both") ~= nil, true)
+  eq(err_of(MULTI .. "    show:\n      type: radar\n"):find(":%d+:%d+: unknown chart type 'radar'") ~= nil, true)
+end
+
 return T

@@ -1,13 +1,18 @@
 -- Running dashboards and their refresh cycle (design §12).
 --
--- Refresh: render template -> db.query -> render chart -> write buffer. A refresh that
--- comes due while a query is still running is skipped (and recorded). On error the last
--- good content stays and the error is shown above it.
+-- A dashboard has one or more panels. Each panel refreshes on its own interval: render
+-- template -> db.query -> render chart -> redraw. A refresh that comes due while the
+-- panel's query is still running is skipped (and recorded). On error the panel keeps its
+-- last good content and shows the error.
+--
+-- Multi-panel configs with a top-level `interval` also have a global timer that refreshes
+-- every panel and restarts the panels' own timers.
 local args = require("dbdash.args")
 local buffer = require("dbdash.view.buffer")
 local config = require("dbdash.config")
 local db = require("dbdash.db")
 local template = require("dbdash.template")
+local W = require("dbdash.util.width")
 
 local M = {}
 
@@ -18,20 +23,30 @@ local M = {}
 ---@field error string?
 ---@field skipped boolean?
 
----@class dbdash.Dashboard
----@field path string
----@field cfg dbdash.Config
----@field state dbdash.ArgState
----@field buf integer
+---@class dbdash.Panel
+---@field d dbdash.Dashboard
+---@field index integer
+---@field cfg dbdash.PanelConfig
 ---@field timer uv.uv_timer_t?
----@field ctimer uv.uv_timer_t?
 ---@field running boolean
 ---@field next_at integer loop time (ms) of the next refresh
 ---@field rs dbdash.db.ResultSet? last successful result
 ---@field sql string? last rendered query
 ---@field error table? last error (cleared on success)
 ---@field history dbdash.HistoryEntry[]
----@field style table per-dashboard overrides from :DbDashStyle
+---@field style table overrides from :DbDashStyle
+local Panel = {}
+Panel.__index = Panel
+
+---@class dbdash.Dashboard
+---@field path string
+---@field cfg dbdash.Config
+---@field state dbdash.ArgState
+---@field buf integer
+---@field panels dbdash.Panel[]
+---@field gtimer uv.uv_timer_t? global refresh timer (multi-panel with top-level interval)
+---@field ctimer uv.uv_timer_t? countdown display timer
+---@field regions table[]? buffer regions of the panels (multi-panel)
 ---@field last_size integer[]?
 ---@field generation integer incremented on stop, to drop late query results
 local Dashboard = {}
@@ -46,7 +61,7 @@ local function opts()
   return require("dbdash").options
 end
 
----Report an error once per distinct message (§3.8: only errors produce messages).
+---Report an error (§3.8: only errors produce messages).
 local function notify(err)
   vim.notify("dbdash: " .. M.format_error(err), vim.log.levels.ERROR)
 end
@@ -98,7 +113,18 @@ local function now()
   return vim.uv.now()
 end
 
-function Dashboard:push_history(entry)
+local function close_timer(t)
+  if t then
+    t:stop()
+    if not t:is_closing() then
+      t:close()
+    end
+  end
+end
+
+-- Panels -----------------------------------------------------------------------------------
+
+function Panel:push_history(entry)
   entry.at = os.time()
   table.insert(self.history, 1, entry)
   while #self.history > M.HISTORY_MAX do
@@ -106,13 +132,22 @@ function Dashboard:push_history(entry)
   end
 end
 
----Seconds until the next refresh.
-function Dashboard:remaining()
+---Seconds until the panel's next refresh.
+function Panel:remaining()
   return math.max(0, math.ceil((self.next_at - now()) / 1000))
 end
 
+---Title used in headers, status and pickers.
+function Panel:title()
+  local t = self.cfg.show.title
+  if t and t ~= "" then
+    return t
+  end
+  return ("Panel %d"):format(self.index)
+end
+
 ---The effective show config (config file + :DbDashStyle overrides).
-function Dashboard:show_config()
+function Panel:show_config()
   if next(self.style) == nil then
     return self.cfg.show
   end
@@ -123,10 +158,106 @@ function Dashboard:show_config()
   return show
 end
 
----Lines shown above the chart: argument values when query.args_show is on.
+---Render the query template for the current arguments.
+---@return string? sql, table? err
+function Panel:render_sql()
+  local q, d = self.cfg.query, self.d
+  local ok, driver = pcall(db.driver, self.cfg.database.type)
+  if not ok then
+    return nil, db.Error.wrap(driver)
+  end
+  local vars = args.resolve(d.cfg.args, d.state)
+  return template.render(q.sql, vars, {
+    env = template.env(driver.dialect, q.autoescape, d.cfg.dir),
+    source = vim.fn.fnamemodify(d.path, ":~:."),
+    line_offset = q.sql_line - 1,
+  })
+end
+
+function Panel:fail(err)
+  local changed = not self.error or M.format_error(self.error) ~= M.format_error(err)
+  self.error = err
+  if changed then
+    notify(err)
+  end
+  if self.d.cfg.multi then
+    self.d:redraw() -- the error shows in the panel header
+  else
+    self.d:update_status()
+  end
+end
+
+---Run the panel's query now (unless one is in flight).
+function Panel:refresh()
+  if self.running then
+    self:push_history({ skipped = true })
+    return
+  end
+  local sql, err = self:render_sql()
+  if not sql then
+    self:push_history({ error = M.format_error(err) })
+    self:fail(err)
+    return
+  end
+  self.sql = sql
+  self.running = true
+  self.d:update_status()
+  local gen = self.d.generation
+  local q = self.cfg.query
+  db.query(self.cfg.database.url, sql, {
+    max_rows = q.max_rows,
+    timeout = q.timeout,
+    options = self.cfg.database.options,
+    base_dir = self.d.cfg.dir,
+  }, function(qerr, rs)
+    if gen ~= self.d.generation then
+      return -- stopped meanwhile
+    end
+    self.running = false
+    if qerr then
+      self:push_history({ error = M.format_error(qerr) })
+      self:fail(qerr)
+      return
+    end
+    self:push_history({ elapsed_ms = rs.elapsed_ms, rows = rs.row_count })
+    self.rs = rs
+    self.error = nil
+    self.d:redraw()
+  end)
+end
+
+---(Re)start the panel's own timer. Panels that just follow the top-level interval of a
+---multi-panel dashboard have no timer of their own: the global timer drives them.
+function Panel:start_timer()
+  local interval = self.cfg.show.interval
+  self.next_at = now() + interval
+  local d = self.d
+  if d.cfg.multi and d.gtimer and not self.cfg.show.own_interval then
+    return
+  end
+  self.timer = self.timer or vim.uv.new_timer()
+  self.timer:stop()
+  self.timer:start(interval, interval, function()
+    self.next_at = now() + interval
+    vim.schedule(function()
+      if self.timer then
+        self:refresh()
+      end
+    end)
+  end)
+end
+
+function Panel:stop_timer()
+  close_timer(self.timer)
+  self.timer = nil
+end
+
+-- Dashboards -------------------------------------------------------------------------------
+
+---Lines shown above the panels: argument values when args_show is on.
 function Dashboard:header()
   local lines, hl = {}, {}
-  if not self.cfg.query.args_show then
+  if not self.cfg.args_show then
     return lines, hl
   end
   local parts, spans, pos = {}, {}, 0
@@ -137,7 +268,7 @@ function Dashboard:header()
     parts[#parts + 1] = s
     pos = pos + #s
   end
-  for _, spec in ipairs(self.cfg.query.args) do
+  for _, spec in ipairs(self.cfg.args) do
     if spec.show then
       if #parts > 0 then
         put("  ")
@@ -158,7 +289,53 @@ function Dashboard:header()
   return lines, hl
 end
 
----Re-render the cached result into the buffer (no query).
+local function message(text, group)
+  return { lines = { text }, hl = { { row = 0, col_s = 0, col_e = #text, group = group } } }
+end
+
+---Render one panel's chart (or a placeholder) at the given size.
+local function render_panel(p, show, width, height)
+  if p.rs then
+    local ok, out = pcall(require("dbdash.render").render, p.rs, show, { width = width, height = height })
+    if ok then
+      return out
+    end
+    return message("render error: " .. tostring(out), "DbDashError")
+  elseif not p.error then
+    return message("Loading…", "DbDashMuted")
+  end
+  return { lines = {}, hl = {} }
+end
+
+---Multi-panel cell: a header line (title, state, error) above the chart.
+local function panel_cell(p, width, height)
+  local show = vim.deepcopy(p:show_config())
+  show.title = nil -- shown in the header line instead
+  local title = W.truncate(p:title(), width)
+  local head, spans = title, { { 0, #title, "DbDashTitle" } }
+  if p.error then
+    local room = width - W.width(head) - 3
+    if room > 5 then
+      local e = W.truncate(M.format_error(p.error):gsub("\n", " "), room)
+      spans[#spans + 1] = { #head + 2, #head + 2 + #("✗ " .. e), "DbDashError" }
+      head = head .. "  ✗ " .. e
+    end
+  end
+  local body = render_panel(p, show, width, height)
+  local out = { lines = { head }, hl = {} }
+  for _, s in ipairs(spans) do
+    out.hl[#out.hl + 1] = { row = 0, col_s = s[1], col_e = s[2], group = s[3] }
+  end
+  for i, l in ipairs(body.lines) do
+    out.lines[i + 1] = l
+  end
+  for _, h in ipairs(body.hl) do
+    out.hl[#out.hl + 1] = { row = h.row + 1, col_s = h.col_s, col_e = h.col_e, group = h.group }
+  end
+  return out
+end
+
+---Re-render cached results into the buffer (no query).
 function Dashboard:redraw()
   if not vim.api.nvim_buf_is_valid(self.buf) then
     return
@@ -166,128 +343,114 @@ function Dashboard:redraw()
   local width, height = buffer.size(self.buf)
   self.last_size = { width, height }
   local lines, hl = self:header()
-  if self.rs then
-    local ok, out = pcall(require("dbdash.render").render, self.rs, self:show_config(), {
-      width = width,
-      height = height - #lines,
-    })
-    if not ok then
-      out = { lines = { "render error: " .. tostring(out) }, hl = { { row = 0, col_s = 0, col_e = 12, group = "DbDashError" } } }
+  local offset = #lines
+  local body
+  if not self.cfg.multi then
+    local p = self.panels[1]
+    body = render_panel(p, p:show_config(), width, height - offset)
+    self.regions = nil
+  else
+    local layout = require("dbdash.render.layout")
+    local lay = self.cfg.layout
+    local spans = {}
+    for i, p in ipairs(self.panels) do
+      spans[i] = p.cfg.show.span
     end
-    local offset = #lines
-    vim.list_extend(lines, out.lines)
-    for _, h in ipairs(out.hl) do
-      hl[#hl + 1] = { row = h.row + offset, col_s = h.col_s, col_e = h.col_e, group = h.group }
+    local cells = layout.plan(spans, width, lay.columns, lay.gap)
+    local grid_rows = 0
+    for _, c in ipairs(cells) do
+      grid_rows = math.max(grid_rows, c.row)
     end
-  elseif not self.error then
-    lines[#lines + 1] = "Loading…"
-    hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #lines[#lines], group = "DbDashMuted" }
+    local cell_h = math.max(8, math.floor((height - offset) / grid_rows) - 2)
+    local outs = {}
+    for i, p in ipairs(self.panels) do
+      outs[i] = panel_cell(p, cells[i].width, cell_h)
+    end
+    body = layout.compose(cells, outs)
+    self.regions = {}
+    for i, r in ipairs(body.regions) do
+      self.regions[i] = { row_s = r.row_s + offset, row_e = r.row_e + offset, x = r.x, width = r.width }
+    end
+  end
+  vim.list_extend(lines, body.lines)
+  for _, h in ipairs(body.hl) do
+    hl[#hl + 1] = { row = h.row + offset, col_s = h.col_s, col_e = h.col_e, group = h.group }
   end
   if #lines == 0 then
     lines = { "" }
   end
   buffer.draw(self.buf, lines, hl)
+  vim.b[self.buf].dbdash_regions = self.regions
   self:update_status()
 end
 
 ---Countdown and error extmarks.
 function Dashboard:update_status()
-  local show = self.cfg.show
-  local countdown
-  if show.show_countdown then
-    countdown = self.running and "…" or show.countdown_format:gsub("{time}", tostring(self:remaining()))
-  end
-  buffer.set_status(self.buf, {
-    countdown = countdown,
-    error = self.error and M.format_error(self.error) or nil,
-    position = opts().countdown_position,
-  })
-end
-
----Render the query template for the current arguments.
----@return string? sql, table? err
-function Dashboard:render_sql()
-  local ok, driver = pcall(db.driver, self.cfg.database.type)
-  if not ok then
-    return nil, db.Error.wrap(driver)
-  end
-  local vars = args.resolve(self.cfg.query.args, self.state)
-  local sql, err = template.render(self.cfg.query.sql, vars, {
-    env = template.env(driver.dialect, self.cfg.query.autoescape, self.cfg.dir),
-    source = vim.fn.fnamemodify(self.path, ":~:."),
-    line_offset = self.cfg.query.sql_line - 1,
-  })
-  return sql, err
-end
-
-function Dashboard:fail(err)
-  local changed = not self.error or M.format_error(self.error) ~= M.format_error(err)
-  self.error = err
-  if changed then
-    notify(err)
-  end
-  self:update_status()
-end
-
----Run the query now (unless one is in flight).
-function Dashboard:refresh()
-  if self.running then
-    self:push_history({ skipped = true })
+  if not self.cfg.multi then
+    local p = self.panels[1]
+    local show = p.cfg.show
+    local countdown
+    if show.show_countdown then
+      countdown = p.running and "…" or show.countdown_format:gsub("{time}", tostring(p:remaining()))
+    end
+    buffer.set_status(self.buf, {
+      countdown = countdown,
+      error = p.error and M.format_error(p.error) or nil,
+      position = opts().countdown_position,
+    })
     return
   end
-  local sql, err = self:render_sql()
-  if not sql then
-    self:push_history({ error = M.format_error(err) })
-    self:fail(err)
-    return
+  local marks = {}
+  for i, p in ipairs(self.panels) do
+    local r = self.regions and self.regions[i]
+    local show = p.cfg.show
+    if r and (show.show_countdown or p.running) then
+      local text = p.running and "…" or show.countdown_format:gsub("{time}", tostring(p:remaining()))
+      marks[#marks + 1] = { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text), text = text }
+    end
   end
-  self.sql = sql
-  self.running = true
-  self:update_status()
-  local gen = self.generation
-  local q = self.cfg.query
-  db.query(self.cfg.database.url, sql, {
-    max_rows = q.max_rows,
-    timeout = q.timeout,
-    options = self.cfg.database.options,
-    base_dir = self.cfg.dir,
-  }, function(qerr, rs)
-    if gen ~= self.generation then
-      return -- stopped meanwhile
-    end
-    self.running = false
-    if qerr then
-      self:push_history({ error = M.format_error(qerr) })
-      self:fail(qerr)
-      return
-    end
-    self:push_history({ elapsed_ms = rs.elapsed_ms, rows = rs.row_count })
-    self.rs = rs
-    self.error = nil
-    self:redraw()
-  end)
+  buffer.set_status(self.buf, { panels = marks })
 end
 
----Restart the interval and refresh immediately.
+---Panel whose region contains buffer line `lnum` (1-based) and display column `dcol`
+---(0-based); the only panel when single. Panels side by side share lines, so the column
+---decides between them.
+function Dashboard:panel_at(lnum, dcol)
+  if not self.cfg.multi then
+    return self.panels[1]
+  end
+  for i, r in ipairs(self.regions or {}) do
+    if lnum - 1 >= r.row_s and lnum - 1 <= r.row_e and (dcol or 0) >= r.x and (dcol or 0) < r.x + r.width then
+      return self.panels[i]
+    end
+  end
+end
+
+---Refresh every panel now and restart all timers.
 function Dashboard:restart()
-  local interval = self.cfg.show.interval
-  self.next_at = now() + interval
-  if self.timer then
-    self.timer:stop()
-    self.timer:start(interval, interval, function()
-      self.next_at = now() + interval
+  if self.gtimer then
+    local interval = self.cfg.interval
+    self.gtimer:stop()
+    self.gtimer:start(interval, interval, function()
       vim.schedule(function()
-        if self.timer then
-          self:refresh()
+        if self.gtimer then
+          self:restart()
         end
       end)
     end)
   end
-  self:refresh()
+  for _, p in ipairs(self.panels) do
+    p:start_timer()
+  end
+  for _, p in ipairs(self.panels) do
+    p:refresh()
+  end
 end
 
 function Dashboard:start_timers()
-  self.timer = vim.uv.new_timer()
+  if self.cfg.multi and self.cfg.interval then
+    self.gtimer = vim.uv.new_timer()
+  end
   self.ctimer = vim.uv.new_timer()
   local every = opts().countdown_interval
   self.ctimer:start(every, every, function()
@@ -301,16 +464,36 @@ function Dashboard:start_timers()
 end
 
 function Dashboard:stop_timers()
-  for _, key in ipairs({ "timer", "ctimer" }) do
-    local t = self[key]
-    if t then
-      t:stop()
-      if not t:is_closing() then
-        t:close()
-      end
-      self[key] = nil
+  close_timer(self.gtimer)
+  close_timer(self.ctimer)
+  self.gtimer, self.ctimer = nil, nil
+  for _, p in ipairs(self.panels) do
+    p:stop_timer()
+  end
+end
+
+---State summary across panels: "running query", "error" or "idle".
+function Dashboard:status_word()
+  for _, p in ipairs(self.panels) do
+    if p.running then
+      return "running query"
     end
   end
+  for _, p in ipairs(self.panels) do
+    if p.error then
+      return "error"
+    end
+  end
+  return "idle"
+end
+
+---Seconds until the next refresh of any panel.
+function Dashboard:remaining()
+  local r
+  for _, p in ipairs(self.panels) do
+    r = r and math.min(r, p:remaining()) or p:remaining()
+  end
+  return r or 0
 end
 
 ---@class dbdash.StartOpts
@@ -338,7 +521,7 @@ function M.start(path, o)
   local existing = M.dashboards[path]
   if existing then
     if o.tokens and #o.tokens > 0 then
-      local ok, cli = pcall(args.parse_cli, existing.cfg.query.args, o.tokens)
+      local ok, cli = pcall(args.parse_cli, existing.cfg.args, o.tokens)
       if not ok then
         return notify(cli)
       end
@@ -363,7 +546,7 @@ function M.start(path, o)
   if not cfg then
     return notify(err)
   end
-  local ok, cli = pcall(args.parse_cli, cfg.query.args, o.tokens or {})
+  local ok, cli = pcall(args.parse_cli, cfg.args, o.tokens or {})
   if not ok then
     return notify(cli)
   end
@@ -377,12 +560,20 @@ function M.start(path, o)
       path = path,
       cfg = cfg,
       state = state,
-      running = false,
-      next_at = now(),
-      history = {},
-      style = {},
+      panels = {},
       generation = 0,
     }, Dashboard)
+    for i, pc in ipairs(cfg.panels) do
+      d.panels[i] = setmetatable({
+        d = d,
+        index = i,
+        cfg = pc,
+        running = false,
+        next_at = now(),
+        history = {},
+        style = {},
+      }, Panel)
+    end
     d.buf = buffer.create(path, o.buf)
     M.dashboards[path] = d
     vim.api.nvim_create_autocmd("BufWipeout", {
@@ -403,7 +594,7 @@ function M.start(path, o)
     end
   end
 
-  local to_ask = o.ask_all and cfg.query.args or args.missing_required(cfg.query.args, state)
+  local to_ask = o.ask_all and cfg.args or args.missing_required(cfg.args, state)
   if #to_ask == 0 then
     launch()
     return
@@ -415,7 +606,7 @@ function M.start(path, o)
       end
       return
     end
-    local missing = args.missing_required(cfg.query.args, state)
+    local missing = args.missing_required(cfg.args, state)
     if #missing > 0 then
       return notify({ phase = "args", message = "missing required argument '" .. missing[1].name .. "'" })
     end
@@ -479,5 +670,6 @@ function M.adopt_session_buffers()
 end
 
 M.Dashboard = Dashboard
+M.Panel = Panel
 
 return M

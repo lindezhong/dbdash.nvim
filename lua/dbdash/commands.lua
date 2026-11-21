@@ -56,14 +56,32 @@ function M.stop(path)
   end
 end
 
-local function status_word(d)
-  if d.running then
-    return "running query"
-  elseif d.error then
-    return "error"
+---Call fn(panel): the panel under the cursor in the dashboard window, the only panel, or
+---one picked with vim.ui.select.
+local function with_panel(d, fn)
+  if #d.panels == 1 then
+    return fn(d.panels[1])
   end
-  return "idle"
+  if vim.api.nvim_get_current_buf() == d.buf then
+    local cur = vim.api.nvim_win_get_cursor(0)
+    local line = vim.api.nvim_get_current_line()
+    local p = d:panel_at(cur[1], vim.fn.strdisplaywidth(line:sub(1, cur[2])))
+    if p then
+      return fn(p)
+    end
+  end
+  vim.ui.select(d.panels, {
+    prompt = "Panel",
+    format_item = function(p)
+      return p:title()
+    end,
+  }, function(p)
+    if p then
+      fn(p)
+    end
+  end)
 end
+M.with_panel = with_panel
 
 function M.list()
   local all = sched.list()
@@ -73,7 +91,7 @@ function M.list()
   end
   local chunks = { { "Running dashboards:\n", "Title" } }
   for _, d in ipairs(all) do
-    chunks[#chunks + 1] = { ("  %s - %s, next refresh in %ds\n"):format(short(d.path), status_word(d), d:remaining()) }
+    chunks[#chunks + 1] = { ("  %s - %s, next refresh in %ds\n"):format(short(d.path), d:status_word(), d:remaining()) }
   end
   vim.api.nvim_echo(chunks, false, {})
 end
@@ -86,26 +104,34 @@ function M.status()
   local url = require("dbdash.db.url")
   local lines = {
     "Config:    " .. short(d.path),
-    "Database:  " .. d.cfg.database.type .. "  " .. url.redact(d.cfg.database.url),
-    "Status:    " .. status_word(d),
-    ("Interval:  %ds, next refresh in %ds"):format(d.cfg.show.interval / 1000, d:remaining()),
+    "Status:    " .. d:status_word(),
   }
-  if d.error then
-    lines[#lines + 1] = "Error:     " .. sched.format_error(d.error):gsub("\n", " ")
+  if d.cfg.multi and d.cfg.interval then
+    lines[#lines + 1] = ("Interval:  every panel refreshes every %ds"):format(d.cfg.interval / 1000)
   end
-  lines[#lines + 1] = ""
-  lines[#lines + 1] = "Recent queries:"
-  if #d.history == 0 then
-    lines[#lines + 1] = "  (none yet)"
-  end
-  for _, h in ipairs(d.history) do
-    local when = os.date("%H:%M:%S", h.at)
-    if h.skipped then
-      lines[#lines + 1] = ("  %s  skipped (previous query still running)"):format(when)
-    elseif h.error then
-      lines[#lines + 1] = ("  %s  error: %s"):format(when, h.error:gsub("\n", " "))
-    else
-      lines[#lines + 1] = ("  %s  %6.0f ms  %d rows"):format(when, h.elapsed_ms or 0, h.rows or 0)
+  for _, p in ipairs(d.panels) do
+    lines[#lines + 1] = ""
+    if d.cfg.multi then
+      lines[#lines + 1] = ("Panel %d: %s"):format(p.index, p:title())
+    end
+    lines[#lines + 1] = "Database:  " .. p.cfg.database.type .. "  " .. url.redact(p.cfg.database.url)
+    lines[#lines + 1] = ("Interval:  %ds, next refresh in %ds"):format(p.cfg.show.interval / 1000, p:remaining())
+    if p.error then
+      lines[#lines + 1] = "Error:     " .. sched.format_error(p.error):gsub("\n", " ")
+    end
+    lines[#lines + 1] = "Recent queries:"
+    if #p.history == 0 then
+      lines[#lines + 1] = "  (none yet)"
+    end
+    for _, h in ipairs(p.history) do
+      local when = os.date("%H:%M:%S", h.at)
+      if h.skipped then
+        lines[#lines + 1] = ("  %s  skipped (previous query still running)"):format(when)
+      elseif h.error then
+        lines[#lines + 1] = ("  %s  error: %s"):format(when, h.error:gsub("\n", " "))
+      else
+        lines[#lines + 1] = ("  %s  %6.0f ms  %d rows"):format(when, h.elapsed_ms or 0, h.rows or 0)
+      end
     end
   end
   require("dbdash.view.popup").open(lines, { title = "DbDash status" })
@@ -124,7 +150,7 @@ function M.show_variables()
   if not d then
     return
   end
-  local specs = d.cfg.query.args
+  local specs = d.cfg.args
   if #specs == 0 then
     vim.api.nvim_echo({ { "This dashboard has no arguments" } }, false, {})
     return
@@ -155,7 +181,7 @@ function M.modify_variable()
   if not d then
     return
   end
-  local specs = d.cfg.query.args
+  local specs = d.cfg.args
   if #specs == 0 then
     return err("this dashboard has no arguments")
   end
@@ -186,7 +212,7 @@ function M.update_variable(name, value)
   if not name or not value then
     return err("usage: DbDashUpdateVariable <name> <value>")
   end
-  local spec = args.find(d.cfg.query.args, name)
+  local spec = args.find(d.cfg.args, name)
   if not spec then
     return err("unknown argument '" .. name .. "'")
   end
@@ -211,18 +237,20 @@ function M.show_sql()
   if not d then
     return
   end
-  local sql = d.sql
-  if not sql then
-    local e
-    sql, e = d:render_sql()
+  with_panel(d, function(p)
+    local sql = p.sql
     if not sql then
-      return err(sched.format_error(e))
+      local e
+      sql, e = p:render_sql()
+      if not sql then
+        return err(sched.format_error(e))
+      end
     end
-  end
-  require("dbdash.view.popup").open(vim.split(sql, "\n", { plain = true }), {
-    title = "DbDash query",
-    filetype = d.cfg.database.type == "mongodb" and "json" or "sql",
-  })
+    require("dbdash.view.popup").open(vim.split(sql, "\n", { plain = true }), {
+      title = d.cfg.multi and ("DbDash query: " .. p:title()) or "DbDash query",
+      filetype = p.cfg.database.type == "mongodb" and "json" or "sql",
+    })
+  end)
 end
 
 ---:DbDashMksession[!] [file] / :Mksession: sessions record dbdash:// buffers by name.
@@ -237,47 +265,49 @@ function M.style(fargs)
   if not d then
     return
   end
-  local registry = require("dbdash.render.registry")
-  local a, b = fargs[1], fargs[2]
-  if not a then
-    local renderer, canvas = registry.resolve(d:show_config(), require("dbdash").options.styles)
-    vim.api.nvim_echo({ { ("%s: renderer=%s canvas=%s"):format(d:show_config().type, renderer, canvas) } }, false, {})
-    return
-  end
-  if a == "reset" then
-    d.style = {}
-  elseif a == "canvas" then
-    if not b or not registry.get("canvas/" .. b) then
-      return err("unknown canvas '" .. tostring(b) .. "' (available: " .. table.concat(registry.names("canvas/"), ", ") .. ")")
+  with_panel(d, function(p)
+    local registry = require("dbdash.render.registry")
+    local a, b = fargs[1], fargs[2]
+    if not a then
+      local renderer, canvas = registry.resolve(p:show_config(), require("dbdash").options.styles)
+      vim.api.nvim_echo({ { ("%s: renderer=%s canvas=%s"):format(p:show_config().type, renderer, canvas) } }, false, {})
+      return
     end
-    d.style.canvas = b
-  else
-    if not registry.DEFAULTS[a] and not registry.names("chart/" .. a .. "/")[1] then
-      return err("unknown chart type '" .. a .. "'")
-    end
-    if a ~= d.cfg.show.type then
-      d.style.type = a
-    else
-      d.style.type = nil
-    end
-    if b then
-      if registry.get("chart/" .. a .. "/" .. b) then
-        d.style.renderer = b
-      elseif registry.get("canvas/" .. b) then
-        d.style.renderer = "canvas"
-        d.style.canvas = b
-      else
-        return err(("unknown style '%s' for %s (available: %s)"):format(
-          b,
-          a,
-          table.concat(vim.list_extend(registry.names("chart/" .. a .. "/"), registry.names("canvas/")), ", ")
-        ))
+    if a == "reset" then
+      p.style = {}
+    elseif a == "canvas" then
+      if not b or not registry.get("canvas/" .. b) then
+        return err("unknown canvas '" .. tostring(b) .. "' (available: " .. table.concat(registry.names("canvas/"), ", ") .. ")")
       end
+      p.style.canvas = b
     else
-      d.style.renderer = nil
+      if not registry.DEFAULTS[a] and not registry.names("chart/" .. a .. "/")[1] then
+        return err("unknown chart type '" .. a .. "'")
+      end
+      if a ~= p.cfg.show.type then
+        p.style.type = a
+      else
+        p.style.type = nil
+      end
+      if b then
+        if registry.get("chart/" .. a .. "/" .. b) then
+          p.style.renderer = b
+        elseif registry.get("canvas/" .. b) then
+          p.style.renderer = "canvas"
+          p.style.canvas = b
+        else
+          return err(("unknown style '%s' for %s (available: %s)"):format(
+            b,
+            a,
+            table.concat(vim.list_extend(registry.names("chart/" .. a .. "/"), registry.names("canvas/")), ", ")
+          ))
+        end
+      else
+        p.style.renderer = nil
+      end
     end
-  end
-  d:redraw()
+    d:redraw()
+  end)
 end
 
 function M.complete_style(arglead, cmdline)
@@ -309,7 +339,7 @@ local function specs_for(path)
   path = sched.normalize(path)
   local d = sched.get(path)
   if d then
-    return d.cfg.query.args
+    return d.cfg.args
   end
   local mtime = (vim.uv.fs_stat(path) or {}).mtime
   local c = spec_cache[path]
@@ -317,7 +347,7 @@ local function specs_for(path)
     return c.specs
   end
   local cfg = require("dbdash.config").load(path)
-  local specs = cfg and cfg.query.args or {}
+  local specs = cfg and cfg.args or {}
   spec_cache[path] = { mtime = mtime and mtime.sec, specs = specs }
   return specs
 end
@@ -379,14 +409,14 @@ function M.complete_update(arglead, cmdline)
   local words = vim.split(cmdline:gsub("^%s*%S+%s*", ""), "%s+", { trimempty = true })
   if #words == 0 or (#words == 1 and arglead ~= "") then
     local out = {}
-    for _, s in ipairs(d.cfg.query.args) do
+    for _, s in ipairs(d.cfg.args) do
       if vim.startswith(s.name, arglead) then
         out[#out + 1] = s.name
       end
     end
     return out
   end
-  local spec = args.find(d.cfg.query.args, words[1])
+  local spec = args.find(d.cfg.args, words[1])
   local out = {}
   for _, c in ipairs(spec and spec.choices or {}) do
     local text = args.format_value(c)

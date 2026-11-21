@@ -1,0 +1,9 @@
+│中文 A                B
+  ^ 0-8 DbDashTitle
+  ^ 24-25 DbDashSeries1
+│中文 A line 1         B line 1
+│                      B line 2
+│                      B line 3
+│
+│Wide
+  ^ 0-4 DbDashTitle
