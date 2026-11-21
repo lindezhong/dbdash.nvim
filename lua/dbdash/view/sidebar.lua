@@ -1,5 +1,9 @@
--- Sidebar listing config files in the current directory (design §3.4).
+-- Sidebar listing config files (design §3.4). Configured by setup({ sidebar = ... }).
 local M = {}
+
+local function opts()
+  return require("dbdash").options.sidebar
+end
 
 local HEADER_LINES = 6
 local NAME = "dbdash-sidebar"
@@ -20,13 +24,58 @@ local function sidebar_win(buf)
   end
 end
 
----Config files (*.yaml, *.yml) in `dir`, sorted, not recursive. Schemas (*.schema.yaml)
----are not dashboards and are skipped.
+---The directory the sidebar lists: sidebar.dir (a path or a function returning one,
+---relative paths from the current directory), or the current directory.
+---@return string
+function M.dir()
+  local d = opts().dir
+  if type(d) == "function" then
+    d = d()
+  end
+  if type(d) ~= "string" or d == "" then
+    d = vim.fn.getcwd()
+  end
+  d = vim.fs.normalize(d)
+  if not d:match("^/") and not d:match("^%a:[/\\]") then
+    d = vim.fs.joinpath(vim.fn.getcwd(), d)
+  end
+  return vim.fs.normalize(d)
+end
+
+local function matcher(globs)
+  local pats = {}
+  for i, g in ipairs(globs) do
+    pats[i] = vim.glob.to_lpeg(g)
+  end
+  return function(name)
+    for _, p in ipairs(pats) do
+      if p:match(name) then
+        return true
+      end
+    end
+    return false
+  end
+end
+
+---Config files in `dir` matching sidebar.pattern and not sidebar.exclude (globs on the
+---file name), as paths relative to `dir`, sorted. With sidebar.recursive, hidden
+---directories are skipped.
+---@param dir string
+---@return string[]
 function M.config_files(dir)
+  local o = opts()
+  local include, exclude = matcher(o.pattern), matcher(o.exclude)
   local out = {}
-  for name, kind in vim.fs.dir(dir) do
-    if (kind == "file" or kind == "link") and name:match("%.ya?ml$") and not name:match("%.schema%.ya?ml$") then
-      out[#out + 1] = name
+  local iter = vim.fs.dir(dir, {
+    depth = o.recursive and 20 or 1,
+    skip = function(name)
+      return vim.fs.basename(name):sub(1, 1) ~= "."
+    end,
+  })
+  for rel, kind in iter do
+    local base = vim.fs.basename(rel)
+    if (kind == "file" or kind == "link") and include(base) and not exclude(base) then
+      out[#out + 1] = rel
     end
   end
   table.sort(out)
@@ -36,7 +85,7 @@ end
 ---Fill the sidebar buffer; the line -> file mapping is stored in b:dbdash_sidebar_files.
 function M.render(buf)
   local sched = require("dbdash.scheduler")
-  local dir = vim.fs.normalize(vim.fn.getcwd())
+  local dir = M.dir()
   local files = M.config_files(dir)
   local lines = {
     "DbDash Sidebar",
@@ -73,7 +122,12 @@ local function selected(buf)
   return (vim.b[buf].dbdash_sidebar_files or {})[tostring(lnum)]
 end
 
----A window to the right of the sidebar for dashboards (created if needed).
+---Sidebar width in columns.
+local function width()
+  return require("dbdash.util.size").resolve(opts().width, vim.o.columns)
+end
+
+---A window beside the sidebar for dashboards (created if needed).
 local function target_win(side_win)
   local prev = vim.fn.win_getid(vim.fn.winnr("#"))
   if prev ~= 0 and prev ~= side_win and vim.api.nvim_win_get_config(prev).relative == "" then
@@ -84,10 +138,10 @@ local function target_win(side_win)
       return w
     end
   end
-  vim.cmd("rightbelow vnew")
+  vim.cmd(opts().position == "right" and "leftabove vnew" or "rightbelow vnew")
   local w = vim.api.nvim_get_current_win()
   vim.api.nvim_set_current_win(side_win)
-  vim.cmd("vertical resize 30")
+  vim.cmd("vertical resize " .. width())
   return w
 end
 
@@ -133,36 +187,53 @@ local function create_buf()
   bo.swapfile = false
   bo.buflisted = false
   bo.filetype = "dbdash-sidebar"
-  local function map(lhs, fn)
-    vim.keymap.set("n", lhs, function()
-      fn(buf)
-    end, { buffer = buf, nowait = true, silent = true })
-  end
-  map("<CR>", on_enter)
-  map("t", on_stop)
-  map("r", on_refresh)
-  map("q", function()
-    M.close()
-  end)
   return buf
 end
 
----Open the sidebar on the left, or jump to it when already open.
+local ACTIONS = {
+  select = on_enter,
+  stop = on_stop,
+  refresh = on_refresh,
+  close = function()
+    M.close()
+  end,
+}
+
+---(Re)define the buffer keys from sidebar.keys; keys of a previous setup() are removed.
+local function apply_keys(buf)
+  for _, lhs in ipairs(vim.b[buf].dbdash_keys or {}) do
+    pcall(vim.keymap.del, "n", lhs, { buffer = buf })
+  end
+  local mapped = {}
+  for action, fn in pairs(ACTIONS) do
+    local lhs = opts().keys[action]
+    if lhs then
+      vim.keymap.set("n", lhs, function()
+        fn(buf)
+      end, { buffer = buf, nowait = true, silent = true, desc = "dbdash sidebar: " .. action })
+      mapped[#mapped + 1] = lhs
+    end
+  end
+  vim.b[buf].dbdash_keys = mapped
+end
+
+---Open the sidebar (sidebar.position), or jump to it when already open.
 function M.open()
-  local dir = vim.fn.getcwd()
+  local dir = M.dir()
   if #M.config_files(dir) == 0 then
     vim.notify("No config files found in " .. dir, vim.log.levels.WARN)
     vim.cmd.edit(vim.fn.fnameescape(dir))
     return
   end
   local buf = sidebar_buf() or create_buf()
+  apply_keys(buf)
   local win = sidebar_win(buf)
   if win then
     vim.api.nvim_set_current_win(win)
     M.render(buf)
     return
   end
-  vim.cmd("topleft 30vnew")
+  vim.cmd((opts().position == "right" and "botright " or "topleft ") .. width() .. "vnew")
   local scratch = vim.api.nvim_get_current_buf()
   vim.api.nvim_win_set_buf(0, buf)
   if scratch ~= buf and vim.api.nvim_buf_is_valid(scratch) then

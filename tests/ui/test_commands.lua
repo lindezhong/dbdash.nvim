@@ -216,6 +216,29 @@ T["sidebar lists configs and starts/stops them"] = function()
   eq(child.lua_get("vim.bo.filetype ~= 'dbdash-sidebar'"), true)
 end
 
+T["sidebar width, position and keys come from setup()"] = function()
+  child.o.columns = 160
+  child.lua([[require("dbdash").setup({
+    sidebar = { width = "25%", position = "right", keys = { select = "o", stop = false } },
+  })]])
+  child.cmd("DbDash")
+  local win = child.api.nvim_get_current_win()
+  eq(child.api.nvim_win_get_width(win), 40) -- 25% of 160
+  eq(child.fn.win_screenpos(win)[2] > 80, true) -- on the right
+  eq(child.fn.maparg("<CR>", "n"), "")
+  eq(child.fn.maparg("t", "n"), "")
+  child.type_keys("o")
+  wait_loaded()
+  -- the dashboard opens left of the sidebar, which keeps its width
+  eq(child.fn.win_screenpos(child.api.nvim_get_current_win())[2], 1)
+  eq(child.api.nvim_win_get_width(win), 40)
+  -- a later setup() changes the keys of the existing sidebar buffer
+  child.lua([[require("dbdash").setup({})]])
+  child.cmd("DbDash")
+  eq(child.fn.maparg("o", "n"), "")
+  eq(child.fn.maparg("<CR>", "n") ~= "", true)
+end
+
 T["sidebar without configs opens the directory"] = function()
   local empty = vim.fn.tempname()
   vim.fn.mkdir(empty, "p")
