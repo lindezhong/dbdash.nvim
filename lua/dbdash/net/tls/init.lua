@@ -109,7 +109,13 @@ end
 ---@param sock dbdash.net.Socket
 ---@param info dbdash.db.ConnInfo
 function M.from_info(sock, info)
-  return M.starttls(sock, { host = info.host, mode = info.tls, fingerprint = info.fingerprint })
+  return M.starttls(sock, {
+    host = info.params.tls_host or info.host,
+    mode = info.tls,
+    fingerprint = info.fingerprint,
+    ca = info.params.ca,
+    base_dir = info.base_dir,
+  })
 end
 
 return M

@@ -277,9 +277,11 @@ URL: `<scheme>://[user[:password]@]host[:port][/database][?param=value]`
   sqlite:///absolute/path.db   sqlite://relative/to/config.db
   sqlite:///:memory:
 
-Common parameters: `tls` (disable | require | pin), `fingerprint`
-(sha256:AB:CD:..., required for pin), `connect_timeout` (10s), `timeout`
-(30s), `application_name`.
+Common parameters: `tls` (disable | require | pin | verify-ca |
+verify-full), `fingerprint` (sha256:AB:CD:..., required for pin), `ca`
+(CA bundle for verify-*, relative to the config file), `tls_host` (name to
+verify instead of the URL host), `connect_timeout` (10s), `timeout` (30s),
+`application_name`.
 
 SQLite options (`database.options`): `lib_path`, `readonly`, `create`
 (create a missing file; off by default).
@@ -316,12 +318,26 @@ Each refresh opens a connection, runs the query and closes it.
 
 TLS                                                                *dbdash-tls*
 
-`?tls=require` encrypts the connection (TLS 1.3) without checking the
-certificate: it stops passive eavesdropping but not a man in the middle.
-`?tls=pin&fingerprint=sha256:AB:CD:...` also requires the server's leaf
-certificate to have that SHA-256 fingerprint and to prove possession of its
-key (CertificateVerify). On a mismatch the error shows the fingerprint the
-server presented. Get it with:
+Modes:
+
+  require      encrypt (TLS 1.3) without checking the certificate: stops
+               passive eavesdropping but not a man in the middle.
+  pin          `&fingerprint=sha256:AB:CD:...`: the leaf certificate must
+               have that SHA-256 fingerprint. On a mismatch the error shows
+               the fingerprint the server presented.
+  verify-ca    validate the certificate chain against the system CA store
+               (or `&ca=bundle.pem`, e.g. a cloud provider's CA bundle).
+  verify-full  verify-ca plus the host name: subjectAltName DNS names
+               (left-most `*.` wildcards) and IP addresses; certificates
+               without subjectAltName fall back to the common name.
+
+pin, verify-ca and verify-full also require the server to prove possession
+of its key (CertificateVerify). Chains may use RSA (PKCS#1 v1.5, PSS) and
+ECDSA P-256/P-384 signatures; SHA-1 signatures are rejected; revocation
+(CRL/OCSP) is not checked. The system store is read from the usual bundle
+files on Linux/macOS/BSD and from the certificate store on Windows.
+
+Get a server's fingerprint with:
 >sh
   openssl s_client -connect host:5432 -starttls postgres </dev/null 2>/dev/null |
     openssl x509 -noout -fingerprint -sha256
@@ -330,8 +346,7 @@ PostgreSQL and MySQL negotiate TLS on their normal port; Redis, MongoDB and
 Cassandra start TLS right away (use the server's TLS port; `rediss://` and
 MongoDB's `tls=true` imply `require`). Supported: TLS 1.3 with X25519 or secp256r1 key
 exchange, AES-128-GCM or ChaCha20-Poly1305, RSA-PSS and ECDSA P-256 server
-signatures. Not yet: TLS 1.2 (SQL Server before 2022), `verify-full`
-(certificate chains and host names).
+signatures. Not yet: TLS 1.2 (SQL Server before 2022).
 
 Known risk: the cryptography is pure Lua and not constant-time, so timing
 side channels exist in theory. This is accepted for a client that

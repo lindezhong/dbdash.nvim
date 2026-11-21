@@ -205,7 +205,7 @@ end
 
 function M.login7(info)
   local fields = {
-    M.utf16(vim.fn.hostname()),
+    M.utf16(vim.uv.os_gethostname() or "dbdash"),
     M.utf16(info.user or ""),
     M.obfuscate(M.utf16(info.password or "")),
     M.utf16(info.application_name),
@@ -232,7 +232,7 @@ function M.login7(info)
   local head = le(0x74000004, 4) -- TDS 7.4
     .. le(PACKET_SIZE, 4)
     .. le(0x07000000, 4) -- client program version
-    .. le(vim.fn.getpid() % 65536, 4)
+    .. le(vim.uv.os_getpid() % 65536, 4)
     .. le(0, 4) -- connection id
     .. string.char(0xE0, 0x03, 0x00, 0x00) -- option flags 1, 2, type flags, option flags 3
     .. le(0, 4) -- time zone

@@ -374,7 +374,7 @@ end
 
 function Conn:execute(sql, opts)
   local o = self.info.options or {}
-  local lib_path = o.lib_path ~= nil and o.lib_path ~= vim.NIL and vim.fn.expand(o.lib_path) or ""
+  local lib_path = o.lib_path ~= nil and o.lib_path ~= vim.NIL and o.lib_path:gsub("^~", vim.uv.os_homedir() or "~") or ""
   local raw = async.await(function(cb)
     local work = vim.uv.new_work(worker, cb)
     work:queue(

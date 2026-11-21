@@ -15,7 +15,7 @@ local M = {}
 ---@field port integer?
 ---@field database string? path for sqlite, database name otherwise
 ---@field params table<string, string> all query parameters, decoded
----@field tls "disable"|"require"|"pin"
+---@field tls "disable"|"require"|"pin"|"verify-ca"|"verify-full"
 ---@field fingerprint string? 32 raw bytes of the SHA-256 certificate pin
 ---@field connect_timeout integer ms
 ---@field timeout integer ms
@@ -109,11 +109,9 @@ function M.parse(raw)
   -- Common parameters.
   local p = u.params
   u.tls = (p.tls or "disable"):lower()
-  if u.tls ~= "disable" and u.tls ~= "require" and u.tls ~= "pin" then
-    if u.tls == "verify-full" or u.tls == "verify-ca" then
-      fail("tls=%s is not supported yet; use tls=pin with a certificate fingerprint", u.tls)
-    end
-    fail("tls must be disable, require or pin (got %q)", p.tls)
+  local MODES = { disable = true, require = true, pin = true, ["verify-ca"] = true, ["verify-full"] = true }
+  if not MODES[u.tls] then
+    fail("tls must be disable, require, pin, verify-ca or verify-full (got %q)", p.tls)
   end
   if u.tls == "pin" then
     if not p.fingerprint then

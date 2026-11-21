@@ -57,9 +57,9 @@ local function fingerprint(cert)
   return "sha256:" .. out.stdout:match("=(%S+)")
 end
 
-local function echo(port, opts, line)
+local function echo(port, opts, line, addr)
   return run(function()
-    local s = socket.connect("127.0.0.1", port, { timeout = 5000 })
+    local s = socket.connect(addr or "127.0.0.1", port, { timeout = 5000 })
     local session = tls.starttls(s, vim.tbl_extend("force", { host = "localhost" }, opts))
     s:write(line .. "\n")
     local back = s:read_until("\n")
@@ -121,6 +121,65 @@ T["data larger than one record"] = function()
   eq(#r[1], #line)
   local _, nines = r[1]:gsub("9", "")
   eq(nines, 4000)
+end
+
+local PKI = FIX .. "pki/"
+local function pki_server(leaf, key, chain)
+  local args = { "-cert", PKI .. leaf, "-key", PKI .. key, "-tls1_3" }
+  if chain then
+    vim.list_extend(args, { "-cert_chain", PKI .. chain })
+  end
+  return server(args)
+end
+local function verify_opts(extra)
+  return vim.tbl_extend("force", { mode = "verify-full", ca = PKI .. "root.pem" }, extra or {})
+end
+
+T["verify-full: valid chain by name and by IP"] = function()
+  local port = pki_server("leaf.pem", "leaf.key", "inter.pem")
+  local r = echo(port, verify_opts({ host = "localhost" }), "ok", "localhost")
+  eq({ r.err, r[1] }, { nil, "ko\n" })
+  r = echo(port, verify_opts({ host = "127.0.0.1" }), "ok")
+  eq({ r.err, r[1] }, { nil, "ko\n" })
+end
+
+T["verify-full: RSA-PSS signed leaf with an RSA key"] = function()
+  local port = pki_server("leaf_pss.pem", "leaf_pss.key")
+  local r = echo(port, verify_opts({ host = "localhost" }), "x")
+  eq(r.err, nil)
+end
+
+T["verify-full: failures"] = function()
+  local function err_for(leaf, key, chain, o)
+    local port = pki_server(leaf, key, chain)
+    local r = echo(port, verify_opts(o or { host = "localhost" }), "x")
+    eq(r.err ~= nil, true)
+    eq(r.err.phase, "tls")
+    return r.err.message
+  end
+  eq(err_for("leaf_wronghost.pem", "leaf.key", "inter.pem"):find("host name mismatch: the certificate is for example.com, not localhost") ~= nil, true)
+  eq(err_for("leaf.pem", "leaf.key", "inter.pem", { host = "localhost", ca = PKI .. "other_root.pem" }):find("unable to find a trusted issuer") ~= nil, true)
+  eq(err_for("leaf.pem", "leaf.key", nil):find("unable to find a trusted issuer for \"dbdash leaf\"") ~= nil, true)
+  eq(err_for("leaf_expired.pem", "leaf.key", "inter.pem"):find("has expired") ~= nil, true)
+end
+
+T["verify-ca ignores the host name"] = function()
+  local port = pki_server("leaf_wronghost.pem", "leaf.key", "inter.pem")
+  local r = echo(port, verify_opts({ mode = "verify-ca", host = "localhost" }), "x")
+  eq(r.err, nil)
+end
+
+T["verify-full with the system trust store (DBDASH_NET=1)"] = function()
+  if vim.env.DBDASH_NET ~= "1" then
+    MiniTest.skip("needs internet access (DBDASH_NET=1)")
+  end
+  local r = run(function()
+    local s = socket.connect("www.google.com", 443, { timeout = 10000 })
+    local session = tls.starttls(s, { host = "www.google.com", mode = "verify-full" })
+    s:close()
+    return session.cert.subject
+  end)
+  eq(r.err, nil)
 end
 
 T["tampered CertificateVerify is rejected"] = function()

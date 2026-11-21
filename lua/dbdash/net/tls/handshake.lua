@@ -42,11 +42,17 @@ local SUITES = {
 
 local SIG = {
   ecdsa_secp256r1_sha256 = 0x0403,
+  ecdsa_secp384r1_sha384 = 0x0503,
   rsa_pss_rsae_sha256 = 0x0804,
   rsa_pss_rsae_sha384 = 0x0805,
 }
 -- What we can verify in CertificateVerify.
-local SIG_ALGS = { SIG.ecdsa_secp256r1_sha256, SIG.rsa_pss_rsae_sha256, SIG.rsa_pss_rsae_sha384 }
+local SIG_ALGS = {
+  SIG.ecdsa_secp256r1_sha256,
+  SIG.ecdsa_secp384r1_sha384,
+  SIG.rsa_pss_rsae_sha256,
+  SIG.rsa_pss_rsae_sha384,
+}
 -- What certificates may be signed with (not checked, but servers pick certificates by it).
 local SIG_ALGS_CERT = { 0x0403, 0x0503, 0x0603, 0x0804, 0x0805, 0x0806, 0x0401, 0x0501, 0x0601 }
 
@@ -168,15 +174,69 @@ function M.verify_content(transcript_hash)
   return string.rep(" ", 64) .. "TLS 1.3, server CertificateVerify\0" .. transcript_hash
 end
 
+-- Modes that require the server to prove possession of its certificate key.
+M.STRICT = { pin = true, ["verify-ca"] = true, ["verify-full"] = true }
+
+---Authenticate the server's certificate list (DER strings, leaf first) for the mode:
+---pin compares the leaf fingerprint; verify-ca / verify-full validate the chain against
+---the trust store, and verify-full also the host name. Returns the parsed leaf.
+---@param ders string[]
+---@param opts { host: string, mode: string, fingerprint: string?, ca: string?, base_dir: string? }
+---@return dbdash.x509.Cert
+function M.authenticate(ders, opts)
+  local x509 = require("dbdash.net.tls.x509")
+  local der = ders[1]
+  if not der then
+    fail("the server sent no certificate")
+  end
+  local fp = x509.fingerprint(der)
+  if opts.mode == "pin" and not util.equal(sha256.digest(der), opts.fingerprint) then
+    fail("certificate fingerprint mismatch: the server presented %s", fp)
+  end
+  local ok, cert = pcall(x509.parse, der)
+  if not ok then
+    if M.STRICT[opts.mode] then
+      error(cert, 0)
+    end
+    cert = { der = der }
+  end
+  cert.fingerprint = fp
+  if opts.mode == "verify-ca" or opts.mode == "verify-full" then
+    local verify = require("dbdash.net.tls.verify")
+    local inters = {}
+    for k = 2, #ders do
+      local iok, ic = pcall(x509.parse, ders[k])
+      if iok then
+        inters[#inters + 1] = ic
+      end
+    end
+    local store = require("dbdash.net.tls.truststore").for_info(opts.ca, opts.base_dir)
+    local vok, why = verify.chain(cert, inters, store)
+    if not vok then
+      fail("certificate verification failed: %s (presented %s)", why, fp)
+    end
+    if opts.mode == "verify-full" then
+      local hok, hwhy = verify.host(cert, opts.host)
+      if not hok then
+        fail("certificate verification failed: %s", hwhy)
+      end
+    end
+  end
+  return cert
+end
+
 ---Check a CertificateVerify signature with the leaf certificate's key.
 ---@return boolean ok, string? err
 function M.check_signature(cert, alg, sig, transcript_hash)
   local content = M.verify_content(transcript_hash)
-  if alg == SIG.ecdsa_secp256r1_sha256 then
-    if cert.key_type ~= "ec" then
+  if alg == SIG.ecdsa_secp256r1_sha256 or alg == SIG.ecdsa_secp384r1_sha384 then
+    local p384 = alg == SIG.ecdsa_secp384r1_sha384
+    if cert.key_type ~= "ec" or cert.ec.curve ~= (p384 and "P-384" or "P-256") then
       return false, "signature algorithm does not match the certificate key"
     end
-    return require("dbdash.crypto.ecdsa_p256").verify(cert.ec, sha256.digest(content), sig)
+    local curves = require("dbdash.crypto.ecdsa").curves
+    local hash = p384 and require("dbdash.crypto.sha512").sha384 or sha256
+    return (p384 and curves.p384 or curves.p256):verify(cert.ec, hash.digest(content), sig)
   elseif alg == SIG.rsa_pss_rsae_sha256 or alg == SIG.rsa_pss_rsae_sha384 then
     if cert.key_type ~= "rsa" then
       return false, "signature algorithm does not match the certificate key"
@@ -215,7 +275,7 @@ end
 
 ---Run the handshake on a connected socket (raw I/O). Returns the session.
 ---@param sock dbdash.net.Socket
----@param opts { host: string, mode: "require"|"pin", fingerprint: string? }
+---@param opts { host: string, mode: "require"|"pin"|"verify-ca"|"verify-full", fingerprint: string?, ca: string?, base_dir: string? }
 ---@return dbdash.tls.Session
 function M.run(sock, opts)
   local priv, pub = x25519.keypair()
@@ -303,26 +363,18 @@ function M.run(sock, opts)
       local p = 2 + ctx_len
       local list_len
       list_len, p = rd24(body, p)
-      if list_len == 0 then
-        fail("the server sent no certificate")
+      local stop = p + list_len
+      local ders = {}
+      while p < stop do
+        local clen
+        clen, p = rd24(body, p)
+        ders[#ders + 1] = body:sub(p, p + clen - 1)
+        p = p + clen
+        local elen
+        elen, p = rd16(body, p) -- per-certificate extensions
+        p = p + elen
       end
-      local clen
-      clen, p = rd24(body, p)
-      local der = body:sub(p, p + clen - 1)
-      local fp = require("dbdash.net.tls.x509").fingerprint(der)
-      if opts.mode == "pin" then
-        if not util.equal(require("dbdash.crypto.sha256").digest(der), opts.fingerprint) then
-          fail("certificate fingerprint mismatch: the server presented %s", fp)
-        end
-      end
-      local ok, parsed = pcall(require("dbdash.net.tls.x509").parse, der)
-      if ok then
-        cert = parsed
-      elseif opts.mode == "pin" then
-        error(parsed, 0)
-      end
-      cert = cert or { der = der }
-      cert.fingerprint = fp
+      cert = M.authenticate(ders, opts)
       transcript = transcript .. raw
     elseif t == HS.certificate_verify then
       if not cert then
@@ -335,7 +387,7 @@ function M.run(sock, opts)
       if cert.key_type then
         ok, err = M.check_signature(cert, alg, sig, sha256.digest(transcript))
       end
-      if not ok and opts.mode == "pin" then
+      if not ok and M.STRICT[opts.mode] then
         fail("CertificateVerify signature check failed%s", err and (": " .. err) or "")
       end
       cv_ok = ok
@@ -351,8 +403,8 @@ function M.run(sock, opts)
       fail("unexpected handshake message %d", t)
     end
   end
-  if opts.mode == "pin" and not cv_ok then
-    fail("the server did not prove possession of the pinned certificate")
+  if M.STRICT[opts.mode] and not cv_ok then
+    fail("the server did not prove possession of its certificate key")
   end
 
   -- Application traffic secrets are derived from the transcript up to server Finished.

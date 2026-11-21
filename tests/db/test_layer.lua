@@ -42,8 +42,8 @@ T["url: tls pin requires a valid fingerprint"] = function()
   eq(u.fingerprint:byte(1), 0xAB)
   eq(url_err("postgres://h?tls=pin"):find("requires fingerprint") ~= nil, true)
   eq(url_err("postgres://h?tls=pin&fingerprint=sha256:AB"):find("32 bytes") ~= nil, true)
-  eq(url_err("postgres://h?tls=verify-full"):find("not supported yet") ~= nil, true)
-  eq(url_err("postgres://h?tls=maybe"):find("disable, require or pin") ~= nil, true)
+  eq(url.parse("postgres://h?tls=verify-full&ca=root.pem").tls, "verify-full")
+  eq(url_err("postgres://h?tls=maybe"):find("disable, require, pin, verify%-ca or verify%-full") ~= nil, true)
 end
 
 T["url: invalid input"] = function()

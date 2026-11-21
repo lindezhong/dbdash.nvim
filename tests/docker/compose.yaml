@@ -1,7 +1,8 @@
 # Databases for integration tests (make it). Every server also accepts TLS:
 #   postgres and mysql negotiate it on the same port; redis has a separate TLS port.
-# PostgreSQL and Redis use the test certificate in tests/fixtures (ec_cert.pem); MySQL uses
-# its auto-generated RSA certificate.
+# PostgreSQL serves the test PKI chain (tests/fixtures/pki: leaf for localhost/127.0.0.1
+# signed by an intermediate under root.pem), Redis the self-signed tests/fixtures/ec_cert.pem
+# and MySQL its auto-generated RSA certificate.
 # Host ports avoid the defaults so a local database is not hit by accident.
 name: dbdash-it
 
@@ -39,12 +40,12 @@ services:
       - sh
       - -c
       - >-
-        cp /certs/ec_cert.pem /certs/ec.key /var/lib/postgresql/ &&
-        chown postgres /var/lib/postgresql/ec_cert.pem /var/lib/postgresql/ec.key &&
-        chmod 600 /var/lib/postgresql/ec.key &&
+        cp /certs/pki/leaf_chain.pem /certs/pki/leaf.key /var/lib/postgresql/ &&
+        chown postgres /var/lib/postgresql/leaf_chain.pem /var/lib/postgresql/leaf.key &&
+        chmod 600 /var/lib/postgresql/leaf.key &&
         exec docker-entrypoint.sh postgres -c ssl=on
-        -c ssl_cert_file=/var/lib/postgresql/ec_cert.pem
-        -c ssl_key_file=/var/lib/postgresql/ec.key
+        -c ssl_cert_file=/var/lib/postgresql/leaf_chain.pem
+        -c ssl_key_file=/var/lib/postgresql/leaf.key
     volumes:
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ../fixtures:/certs:ro

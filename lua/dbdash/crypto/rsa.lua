@@ -30,7 +30,60 @@ function M.from_spki(der)
   if alg ~= "1.2.840.113549.1.1.1" then
     error({ phase = "auth", message = "not an RSA public key (algorithm " .. alg .. ")" }, 0)
   end
-  ---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
+  -- DigestInfo prefixes (RFC 8017 §9.2 note 1).
+local DIGEST_INFO = {
+  sha1 = "3021300906052b0e03021a05000414",
+  sha256 = "3031300d060960864801650304020105000420",
+  sha384 = "3041300d060960864801650304020205000430",
+  sha512 = "3051300d060960864801650304020305000440",
+}
+
+---RSASSA-PKCS1-v1_5 verification (RFC 8017 §8.2.2).
+---@param key dbdash.rsa.PublicKey
+---@param hash table hash module (name: sha1/sha256/sha384/sha512)
+---@param msg string the signed message (hashed here)
+---@param sig string
+---@return boolean
+function M.pkcs1_verify(key, hash, msg, sig)
+  if #sig ~= key.size then
+    return false
+  end
+  local s = bn.from_bytes(sig)
+  if bn.cmp(s, key.n) >= 0 then
+    return false
+  end
+  local prefix = DIGEST_INFO[hash.name]
+  if not prefix then
+    return false
+  end
+  local t = util.unhex(prefix) .. hash.digest(msg)
+  if key.size < #t + 11 then
+    return false
+  end
+  local expected = "\0\1" .. string.rep("\255", key.size - #t - 3) .. "\0" .. t
+  local em = bn.to_bytes(bn.modexp(s, key.e, key.n), key.size)
+  return util.equal(em, expected)
+end
+
+---RSAES-PKCS1-v1_5 encryption (RFC 8017 §7.2.1), for the TLS 1.2 RSA key exchange.
+function M.pkcs1_encrypt(key, msg)
+  local k = key.size
+  if #msg > k - 11 then
+    error({ phase = "tls", message = "message too long for RSA PKCS#1 v1.5" }, 0)
+  end
+  local rand = require("dbdash.crypto.random")
+  local ps = {}
+  while #ps < k - #msg - 3 do
+    for c in rand.bytes(k):gmatch(".") do
+      if c ~= "\0" and #ps < k - #msg - 3 then
+        ps[#ps + 1] = c
+      end
+    end
+  end
+  return M.public(key, "\0\2" .. table.concat(ps) .. "\0" .. msg)
+end
+
+---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
 ---long as the hash, as TLS 1.3 requires.
 ---@param key dbdash.rsa.PublicKey
 ---@param hash table hash module
@@ -79,7 +132,60 @@ end
 ---From PEM text ("PUBLIC KEY" or "RSA PUBLIC KEY").
 function M.from_pem(pem)
   if pem:find("BEGIN RSA PUBLIC KEY", 1, true) then
-    ---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
+    -- DigestInfo prefixes (RFC 8017 §9.2 note 1).
+local DIGEST_INFO = {
+  sha1 = "3021300906052b0e03021a05000414",
+  sha256 = "3031300d060960864801650304020105000420",
+  sha384 = "3041300d060960864801650304020205000430",
+  sha512 = "3051300d060960864801650304020305000440",
+}
+
+---RSASSA-PKCS1-v1_5 verification (RFC 8017 §8.2.2).
+---@param key dbdash.rsa.PublicKey
+---@param hash table hash module (name: sha1/sha256/sha384/sha512)
+---@param msg string the signed message (hashed here)
+---@param sig string
+---@return boolean
+function M.pkcs1_verify(key, hash, msg, sig)
+  if #sig ~= key.size then
+    return false
+  end
+  local s = bn.from_bytes(sig)
+  if bn.cmp(s, key.n) >= 0 then
+    return false
+  end
+  local prefix = DIGEST_INFO[hash.name]
+  if not prefix then
+    return false
+  end
+  local t = util.unhex(prefix) .. hash.digest(msg)
+  if key.size < #t + 11 then
+    return false
+  end
+  local expected = "\0\1" .. string.rep("\255", key.size - #t - 3) .. "\0" .. t
+  local em = bn.to_bytes(bn.modexp(s, key.e, key.n), key.size)
+  return util.equal(em, expected)
+end
+
+---RSAES-PKCS1-v1_5 encryption (RFC 8017 §7.2.1), for the TLS 1.2 RSA key exchange.
+function M.pkcs1_encrypt(key, msg)
+  local k = key.size
+  if #msg > k - 11 then
+    error({ phase = "tls", message = "message too long for RSA PKCS#1 v1.5" }, 0)
+  end
+  local rand = require("dbdash.crypto.random")
+  local ps = {}
+  while #ps < k - #msg - 3 do
+    for c in rand.bytes(k):gmatch(".") do
+      if c ~= "\0" and #ps < k - #msg - 3 then
+        ps[#ps + 1] = c
+      end
+    end
+  end
+  return M.public(key, "\0\2" .. table.concat(ps) .. "\0" .. msg)
+end
+
+---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
 ---long as the hash, as TLS 1.3 requires.
 ---@param key dbdash.rsa.PublicKey
 ---@param hash table hash module
@@ -124,7 +230,60 @@ end
 
 return M.from_pkcs1(asn1.pem(pem, "RSA PUBLIC KEY"))
   end
-  ---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
+  -- DigestInfo prefixes (RFC 8017 §9.2 note 1).
+local DIGEST_INFO = {
+  sha1 = "3021300906052b0e03021a05000414",
+  sha256 = "3031300d060960864801650304020105000420",
+  sha384 = "3041300d060960864801650304020205000430",
+  sha512 = "3051300d060960864801650304020305000440",
+}
+
+---RSASSA-PKCS1-v1_5 verification (RFC 8017 §8.2.2).
+---@param key dbdash.rsa.PublicKey
+---@param hash table hash module (name: sha1/sha256/sha384/sha512)
+---@param msg string the signed message (hashed here)
+---@param sig string
+---@return boolean
+function M.pkcs1_verify(key, hash, msg, sig)
+  if #sig ~= key.size then
+    return false
+  end
+  local s = bn.from_bytes(sig)
+  if bn.cmp(s, key.n) >= 0 then
+    return false
+  end
+  local prefix = DIGEST_INFO[hash.name]
+  if not prefix then
+    return false
+  end
+  local t = util.unhex(prefix) .. hash.digest(msg)
+  if key.size < #t + 11 then
+    return false
+  end
+  local expected = "\0\1" .. string.rep("\255", key.size - #t - 3) .. "\0" .. t
+  local em = bn.to_bytes(bn.modexp(s, key.e, key.n), key.size)
+  return util.equal(em, expected)
+end
+
+---RSAES-PKCS1-v1_5 encryption (RFC 8017 §7.2.1), for the TLS 1.2 RSA key exchange.
+function M.pkcs1_encrypt(key, msg)
+  local k = key.size
+  if #msg > k - 11 then
+    error({ phase = "tls", message = "message too long for RSA PKCS#1 v1.5" }, 0)
+  end
+  local rand = require("dbdash.crypto.random")
+  local ps = {}
+  while #ps < k - #msg - 3 do
+    for c in rand.bytes(k):gmatch(".") do
+      if c ~= "\0" and #ps < k - #msg - 3 then
+        ps[#ps + 1] = c
+      end
+    end
+  end
+  return M.public(key, "\0\2" .. table.concat(ps) .. "\0" .. msg)
+end
+
+---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
 ---long as the hash, as TLS 1.3 requires.
 ---@param key dbdash.rsa.PublicKey
 ---@param hash table hash module
@@ -203,7 +362,60 @@ function M.oaep_encrypt(key, msg, hash, seed)
   seed = seed or require("dbdash.crypto.random").bytes(h)
   local masked_db = util.xor(db, M.mgf1(hash, seed, k - h - 1))
   local masked_seed = util.xor(seed, M.mgf1(hash, masked_db, h))
-  ---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
+  -- DigestInfo prefixes (RFC 8017 §9.2 note 1).
+local DIGEST_INFO = {
+  sha1 = "3021300906052b0e03021a05000414",
+  sha256 = "3031300d060960864801650304020105000420",
+  sha384 = "3041300d060960864801650304020205000430",
+  sha512 = "3051300d060960864801650304020305000440",
+}
+
+---RSASSA-PKCS1-v1_5 verification (RFC 8017 §8.2.2).
+---@param key dbdash.rsa.PublicKey
+---@param hash table hash module (name: sha1/sha256/sha384/sha512)
+---@param msg string the signed message (hashed here)
+---@param sig string
+---@return boolean
+function M.pkcs1_verify(key, hash, msg, sig)
+  if #sig ~= key.size then
+    return false
+  end
+  local s = bn.from_bytes(sig)
+  if bn.cmp(s, key.n) >= 0 then
+    return false
+  end
+  local prefix = DIGEST_INFO[hash.name]
+  if not prefix then
+    return false
+  end
+  local t = util.unhex(prefix) .. hash.digest(msg)
+  if key.size < #t + 11 then
+    return false
+  end
+  local expected = "\0\1" .. string.rep("\255", key.size - #t - 3) .. "\0" .. t
+  local em = bn.to_bytes(bn.modexp(s, key.e, key.n), key.size)
+  return util.equal(em, expected)
+end
+
+---RSAES-PKCS1-v1_5 encryption (RFC 8017 §7.2.1), for the TLS 1.2 RSA key exchange.
+function M.pkcs1_encrypt(key, msg)
+  local k = key.size
+  if #msg > k - 11 then
+    error({ phase = "tls", message = "message too long for RSA PKCS#1 v1.5" }, 0)
+  end
+  local rand = require("dbdash.crypto.random")
+  local ps = {}
+  while #ps < k - #msg - 3 do
+    for c in rand.bytes(k):gmatch(".") do
+      if c ~= "\0" and #ps < k - #msg - 3 then
+        ps[#ps + 1] = c
+      end
+    end
+  end
+  return M.public(key, "\0\2" .. table.concat(ps) .. "\0" .. msg)
+end
+
+---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as
 ---long as the hash, as TLS 1.3 requires.
 ---@param key dbdash.rsa.PublicKey
 ---@param hash table hash module
@@ -247,6 +459,59 @@ function M.pss_verify(key, hash, msg, sig)
 end
 
 return M.public(key, "\0" .. masked_seed .. masked_db)
+end
+
+-- DigestInfo prefixes (RFC 8017 §9.2 note 1).
+local DIGEST_INFO = {
+  sha1 = "3021300906052b0e03021a05000414",
+  sha256 = "3031300d060960864801650304020105000420",
+  sha384 = "3041300d060960864801650304020205000430",
+  sha512 = "3051300d060960864801650304020305000440",
+}
+
+---RSASSA-PKCS1-v1_5 verification (RFC 8017 §8.2.2).
+---@param key dbdash.rsa.PublicKey
+---@param hash table hash module (name: sha1/sha256/sha384/sha512)
+---@param msg string the signed message (hashed here)
+---@param sig string
+---@return boolean
+function M.pkcs1_verify(key, hash, msg, sig)
+  if #sig ~= key.size then
+    return false
+  end
+  local s = bn.from_bytes(sig)
+  if bn.cmp(s, key.n) >= 0 then
+    return false
+  end
+  local prefix = DIGEST_INFO[hash.name]
+  if not prefix then
+    return false
+  end
+  local t = util.unhex(prefix) .. hash.digest(msg)
+  if key.size < #t + 11 then
+    return false
+  end
+  local expected = "\0\1" .. string.rep("\255", key.size - #t - 3) .. "\0" .. t
+  local em = bn.to_bytes(bn.modexp(s, key.e, key.n), key.size)
+  return util.equal(em, expected)
+end
+
+---RSAES-PKCS1-v1_5 encryption (RFC 8017 §7.2.1), for the TLS 1.2 RSA key exchange.
+function M.pkcs1_encrypt(key, msg)
+  local k = key.size
+  if #msg > k - 11 then
+    error({ phase = "tls", message = "message too long for RSA PKCS#1 v1.5" }, 0)
+  end
+  local rand = require("dbdash.crypto.random")
+  local ps = {}
+  while #ps < k - #msg - 3 do
+    for c in rand.bytes(k):gmatch(".") do
+      if c ~= "\0" and #ps < k - #msg - 3 then
+        ps[#ps + 1] = c
+      end
+    end
+  end
+  return M.public(key, "\0\2" .. table.concat(ps) .. "\0" .. msg)
 end
 
 ---RSASSA-PSS verification (RFC 8017 §8.1.2) with MGF1 over the same hash and a salt as

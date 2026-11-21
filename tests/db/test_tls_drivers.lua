@@ -15,12 +15,23 @@ T["it: postgres with tls=require and tls=pin"] = function()
   local base = "postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test"
   eq(h.ok(base .. "?tls=require", "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()").rows[1][1], true)
   eq(h.ok(base .. "?tls=require", "SELECT version FROM pg_stat_ssl WHERE pid = pg_backend_pid()").rows[1][1], "TLSv1.3")
-  eq(h.ok(base .. "?tls=pin&fingerprint=" .. fingerprint("ec_cert.pem"), "SELECT 1").rows[1][1], 1)
+  eq(h.ok(base .. "?tls=pin&fingerprint=" .. fingerprint("pki/leaf.pem"), "SELECT 1").rows[1][1], 1)
   local r = h.query(base .. "?tls=pin&fingerprint=" .. WRONG, "SELECT 1")
   eq(r.err.phase, "tls")
-  eq(r.err.message:find(fingerprint("ec_cert.pem"), 1, true) ~= nil, true)
+  eq(r.err.message:find(fingerprint("pki/leaf.pem"), 1, true) ~= nil, true)
   -- md5 user over TLS
   eq(h.ok("postgres://md5_user:md5_pw@127.0.0.1:15432/dbdash_test?tls=require", "SELECT current_user").rows[1][1], "md5_user")
+end
+
+T["it: postgres with tls=verify-full"] = function()
+  h.require_it()
+  local q = "?tls=verify-full&ca=tests/fixtures/pki/root.pem"
+  eq(h.ok("postgres://dbdash:dbdash_pw@localhost:15432/dbdash_test" .. q, "SELECT 1").rows[1][1], 1)
+  eq(h.ok("postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test" .. q, "SELECT 1").rows[1][1], 1)
+  local r = h.query("postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test?tls=verify-full&ca=tests/fixtures/pki/other_root.pem", "SELECT 1")
+  eq({ r.err.phase, r.err.message:find("unable to find a trusted issuer") ~= nil }, { "tls", true })
+  r = h.query("postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test" .. q .. "&tls_host=db.example.com", "SELECT 1")
+  eq(r.err.message:find("host name mismatch") ~= nil, true)
 end
 
 T["it: mysql with TLS (auto-generated RSA certificate)"] = function()
