@@ -13,7 +13,16 @@ M.DB_TYPES = {
   mongodb = true,
   mssql = true,
 }
-local SCHEME_ALIASES = { postgresql = "postgres", sqlserver = "mssql" }
+-- Alternative URL schemes and type names (keep in sync with the drivers' `schemes`).
+local SCHEME_ALIASES = {
+  postgresql = "postgres",
+  sqlserver = "mssql",
+  rediss = "redis",
+  mariadb = "mysql",
+  cql = "cassandra",
+  sqlite3 = "sqlite",
+}
+M.SCHEME_ALIASES = SCHEME_ALIASES
 
 M.CHART_TYPES = {
   table = true,

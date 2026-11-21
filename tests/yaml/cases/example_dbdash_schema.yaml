@@ -67,7 +67,7 @@ definitions:
     properties:
       type:
         description: Database type; inferred from the URL scheme when omitted.
-        enum: [sqlite, postgres, postgresql, mysql, mariadb, redis, mongodb, cassandra, mssql, sqlserver]
+        enum: [sqlite, sqlite3, postgres, postgresql, mysql, mariadb, redis, rediss, mongodb, cassandra, cql, mssql, sqlserver]
       url:
         type: string
         description: |-

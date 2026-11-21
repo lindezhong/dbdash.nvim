@@ -156,4 +156,24 @@ T["multi-panel errors point at the panel"] = function()
   eq(err_of(MULTI .. "    show:\n      type: radar\n"):find(":%d+:%d+: unknown chart type 'radar'") ~= nil, true)
 end
 
+T["every driver URL scheme is accepted, with drivers not loaded yet"] = function()
+  local mods = { "sqlite", "redis", "postgres", "mysql", "cassandra", "mongodb", "mssql" }
+  for _, m in ipairs(mods) do
+    local drv = require("dbdash.db.drivers." .. m)
+    for _, scheme in ipairs(drv.schemes) do
+      local url = scheme .. "://h/x"
+      local cfg, err = load(("database:\n  url: %q\nquery:\n  sql: x\n"):format(url))
+      eq({ url, err and err.message, cfg and cfg.database.type }, { url, nil, drv.name })
+      -- A fresh data layer (as on the first query of a session) resolves the alias too.
+      for k in pairs(package.loaded) do
+        if k:match("^dbdash%.db") and not k:match("^dbdash%.db%.drivers%.") then
+          package.loaded[k] = nil
+        end
+      end
+      local fresh = require("dbdash.db")
+      eq({ scheme, fresh.driver(scheme).name }, { scheme, drv.name })
+    end
+  end
+end
+
 return T

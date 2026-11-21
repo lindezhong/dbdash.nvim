@@ -36,11 +36,15 @@ local by_scheme = {} ---@type table<string, dbdash.db.Driver>
 
 local BUILTIN = {
   sqlite = "dbdash.db.drivers.sqlite",
+  sqlite3 = "dbdash.db.drivers.sqlite",
   redis = "dbdash.db.drivers.redis",
+  rediss = "dbdash.db.drivers.redis",
   postgres = "dbdash.db.drivers.postgres",
   postgresql = "dbdash.db.drivers.postgres",
   mysql = "dbdash.db.drivers.mysql",
+  mariadb = "dbdash.db.drivers.mysql",
   cassandra = "dbdash.db.drivers.cassandra",
+  cql = "dbdash.db.drivers.cassandra",
   mongodb = "dbdash.db.drivers.mongodb",
   mssql = "dbdash.db.drivers.mssql",
   sqlserver = "dbdash.db.drivers.mssql",

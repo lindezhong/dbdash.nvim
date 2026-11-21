@@ -117,13 +117,16 @@
      "description": "Database type; inferred from the URL scheme when omitted.",
      "enum": [
       "sqlite",
+      "sqlite3",
       "postgres",
       "postgresql",
       "mysql",
       "mariadb",
       "redis",
+      "rediss",
       "mongodb",
       "cassandra",
+      "cql",
       "mssql",
       "sqlserver"
      ]
