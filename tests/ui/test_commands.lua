@@ -239,6 +239,46 @@ T["sidebar width, position and keys come from setup()"] = function()
   eq(child.fn.maparg("<CR>", "n") ~= "", true)
 end
 
+T["dashboard keys come from setup()"] = function()
+  child.lua([[require("dbdash").setup({ dashboard = { keys = { show_sql = "S", reset = false } } })]])
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  eq(child.fn.maparg("s", "n"), "")
+  eq(child.fn.maparg("R", "n"), "")
+  eq(child.lua_get("vim.fn.maparg('S', 'n', false, true).desc"), "dbdash: Show the rendered query")
+  eq(child.lua_get("vim.fn.maparg('a', 'n', false, true).buffer"), 1)
+end
+
+T["dashboard.open: vsplit, split, tab; a visible dashboard is jumped to"] = function()
+  local function layout()
+    return child.lua_get("{ #vim.api.nvim_tabpage_list_wins(0), #vim.api.nvim_list_tabpages(), vim.bo.filetype }")
+  end
+  child.lua([[require("dbdash").setup({ dashboard = { open = "vsplit" } })]])
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  eq(layout(), { 2, 1, "dbdash" })
+  child.cmd("wincmd p")
+  child.cmd("DbDashStart board.yaml") -- already visible: jump, no new window
+  eq(layout(), { 2, 1, "dbdash" })
+  child.cmd("only")
+  child.lua([[require("dbdash").setup({ dashboard = { open = "split" } })]])
+  child.cmd("enew")
+  child.cmd("DbDashStart board.yaml")
+  eq(layout(), { 2, 1, "dbdash" })
+  eq(child.fn.winlayout()[1], "col")
+  child.cmd("only")
+  child.cmd("enew")
+  child.lua([[require("dbdash").setup({ dashboard = { open = "tab" } })]])
+  local unnamed = "#vim.tbl_filter(function(b) return vim.fn.buflisted(b) == 1 and vim.fn.bufname(b) == '' end, vim.api.nvim_list_bufs())"
+  local before = child.lua_get(unnamed)
+  child.cmd("DbDashStart board.yaml")
+  eq(layout(), { 1, 2, "dbdash" })
+  eq(child.lua_get(unnamed), before) -- tabnew's empty buffer was removed
+  child.cmd("tabprevious")
+  child.cmd("DbDashStart board.yaml") -- shown in the other tab: go there
+  eq({ child.fn.tabpagenr(), #child.api.nvim_list_tabpages() }, { 2, 2 })
+end
+
 T["sidebar without configs opens the directory"] = function()
   local empty = vim.fn.tempname()
   vim.fn.mkdir(empty, "p")

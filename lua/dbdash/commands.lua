@@ -32,7 +32,7 @@ function M.start(fargs, bang)
     return err("usage: DbDashStart <config.yaml> [name=value ...]")
   end
   local path = table.remove(fargs, 1)
-  sched.start(path, { tokens = fargs, ask_all = bang })
+  sched.start(path, { tokens = fargs, ask_all = bang, open = require("dbdash").options.dashboard.open })
 end
 
 function M.restart()

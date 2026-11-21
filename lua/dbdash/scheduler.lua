@@ -500,12 +500,36 @@ end
 ---@field tokens string[]? command-line name=value arguments
 ---@field ask_all boolean? prompt for every argument (:DbDashStart!)
 ---@field buf integer? buffer to adopt
----@field win integer? window to show the dashboard in (default: current)
+---@field win integer? window to show the dashboard in (default: current, or `open`)
+---@field open "current"|"vsplit"|"split"|"tab"|nil how to show it when no `win` is given
 ---@field no_show boolean? do not display the buffer
 ---@field on_started fun(d: dbdash.Dashboard)?
 
-local function show_in(buf, win)
-  win = win and vim.api.nvim_win_is_valid(win) and win or vim.api.nvim_get_current_win()
+---Show `buf` in `win`; without a window, per `open` ("current" | "vsplit" | "split" |
+---"tab", see setup({ dashboard = { open = ... } })). A dashboard already visible in a
+---split (current tab) or a tab (any tab) is jumped to instead of opened again.
+local function show_in(buf, win, open)
+  if not (win and vim.api.nvim_win_is_valid(win)) then
+    open = open or "current"
+    if open ~= "current" then
+      local wins = open == "tab" and vim.fn.win_findbuf(buf) or vim.tbl_filter(function(w)
+        return vim.api.nvim_win_get_buf(w) == buf
+      end, vim.api.nvim_tabpage_list_wins(0))
+      if wins[1] then
+        vim.api.nvim_set_current_win(wins[1])
+        return
+      end
+      vim.cmd(({ vsplit = "vsplit", split = "split", tab = "tabnew" })[open])
+      if open == "tab" then
+        local scratch = vim.api.nvim_get_current_buf()
+        vim.api.nvim_win_set_buf(0, buf)
+        if scratch ~= buf and vim.fn.bufname(scratch) == "" and not vim.bo[scratch].modified then
+          pcall(vim.api.nvim_buf_delete, scratch, { force = true })
+        end
+      end
+    end
+    win = vim.api.nvim_get_current_win()
+  end
   if vim.api.nvim_win_get_buf(win) ~= buf then
     vim.api.nvim_win_set_buf(win, buf)
   end
@@ -530,8 +554,9 @@ function M.start(path, o)
       end
       existing:restart()
     end
+    buffer.apply_keys(existing.buf)
     if not o.no_show then
-      show_in(existing.buf, o.win)
+      show_in(existing.buf, o.win, o.open)
     end
     if o.on_started then
       o.on_started(existing)
@@ -584,7 +609,7 @@ function M.start(path, o)
       end,
     })
     if not o.no_show then
-      show_in(d.buf, o.win)
+      show_in(d.buf, o.win, o.open)
     end
     d:redraw()
     d:start_timers()

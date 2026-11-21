@@ -29,13 +29,33 @@ local function find(name)
   end
 end
 
-local KEYS = {
-  { "a", "modify_variable", "Modify an argument" },
-  { "A", "show_variables", "Show arguments" },
-  { "r", "restart", "Refresh now" },
-  { "R", "reset_variables", "Reset arguments to defaults" },
-  { "s", "show_sql", "Show the rendered query" },
+-- dashboard.keys action -> command function and description.
+local ACTIONS = {
+  modify = { "modify_variable", "Modify an argument" },
+  show_args = { "show_variables", "Show arguments" },
+  refresh = { "restart", "Refresh now" },
+  reset = { "reset_variables", "Reset arguments to defaults" },
+  show_sql = { "show_sql", "Show the rendered query" },
 }
+
+---(Re)define the buffer keys from setup({ dashboard = { keys = ... } }).
+function M.apply_keys(buf)
+  for _, lhs in ipairs(vim.b[buf].dbdash_keys or {}) do
+    pcall(vim.keymap.del, "n", lhs, { buffer = buf })
+  end
+  local keys = require("dbdash").options.dashboard.keys
+  local mapped = {}
+  for action, def in pairs(ACTIONS) do
+    local lhs = keys[action]
+    if lhs then
+      vim.keymap.set("n", lhs, function()
+        require("dbdash.commands")[def[1]]()
+      end, { buffer = buf, nowait = true, silent = true, desc = "dbdash: " .. def[2] })
+      mapped[#mapped + 1] = lhs
+    end
+  end
+  vim.b[buf].dbdash_keys = mapped
+end
 
 ---Create (or adopt) the buffer for a dashboard.
 ---@param path string
@@ -60,11 +80,7 @@ function M.create(path, buf)
   bo.modified = false
   bo.filetype = "dbdash"
   vim.b[buf].dbdash_path = path
-  for _, k in ipairs(KEYS) do
-    vim.keymap.set("n", k[1], function()
-      require("dbdash.commands")[k[2]]()
-    end, { buffer = buf, nowait = true, silent = true, desc = "dbdash: " .. k[3] })
-  end
+  M.apply_keys(buf)
   return buf
 end
 
