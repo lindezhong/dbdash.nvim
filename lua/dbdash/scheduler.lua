@@ -671,6 +671,15 @@ function M.stop(path, o)
   return true
 end
 
+---On exit: stop timers and ignore queries still running, but keep the dashboards and
+---their arguments so session hooks that run later (VimLeave) can still save them.
+function M.freeze_all()
+  for _, d in pairs(M.dashboards) do
+    d.generation = d.generation + 1
+    d:stop_timers()
+  end
+end
+
 function M.stop_all()
   for path in pairs(M.dashboards) do
     M.stop(path, { keep_buffer = true })

@@ -376,6 +376,19 @@ T["mksession(file) and load_session(file) keep changed arguments"] = function()
   eq(child.lua_get("require('dbdash').load_session(...)", { file }), false)
 end
 
+T["on exit dashboards stop refreshing but mksession() still sees them"] = function()
+  -- Session managers often save on VimLeave, after dbdash's VimLeavePre cleanup.
+  child.cmd("DbDashStart board.yaml n=4")
+  wait_loaded()
+  child.api.nvim_exec_autocmds("VimLeavePre", {})
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].gtimer == nil and require('dbdash.scheduler').list()[1].ctimer == nil"), true)
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1].timer == nil"), true)
+  local file = dir .. "/exit.dbdash"
+  child.lua("require('dbdash').mksession(...)", { file })
+  local data = vim.json.decode(table.concat(vim.fn.readfile(file), "\n"))
+  eq(vim.tbl_values(data.dashboards), { { n = "4" } })
+end
+
 T[":edit dbdash://<path> starts the dashboard"] = function()
   child.cmd("edit dbdash://" .. dir .. "/board.yaml")
   wait_loaded()

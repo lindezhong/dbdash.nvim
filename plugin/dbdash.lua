@@ -123,7 +123,7 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
   group = group,
   callback = function()
     if package.loaded["dbdash.scheduler"] then
-      require("dbdash.scheduler").stop_all()
+      require("dbdash.scheduler").freeze_all()
     end
   end,
 })
