@@ -116,4 +116,22 @@ T["repeated queries that run the progress handler do not abort"] = function()
   end
 end
 
+T["Windows: sqlite:///C:/... is the drive path, relative paths join base_dir"] = function()
+  local drv = require("dbdash.db.drivers.sqlite")
+  local url = require("dbdash.db.url")
+  local os_was = jit.os
+  jit.os = "Windows"
+  local ok, err = pcall(function()
+    eq(drv.parse_url(url.parse("sqlite:///C:/data/app.db")).database, "C:/data/app.db")
+    eq(drv.parse_url(url.parse("sqlite://C:/data/app.db")).database, "C:/data/app.db")
+    local info = url.parse("sqlite://sub/app.db")
+    info.base_dir = "D:/dash"
+    eq(drv.parse_url(info).database, "D:/dash/sub/app.db")
+  end)
+  jit.os = os_was
+  assert(ok, err)
+  -- elsewhere a leading slash stays
+  eq(drv.parse_url(url.parse("sqlite:///C:/data/app.db")).database, "/C:/data/app.db")
+end
+
 return T

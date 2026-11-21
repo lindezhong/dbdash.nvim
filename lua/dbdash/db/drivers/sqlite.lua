@@ -354,6 +354,9 @@ end
 function M.parse_url(info)
   local p = info.database
   if p ~= ":memory:" and not p:match("^file:") then
+    if jit.os == "Windows" then
+      p = p:gsub("^/(%a:[/\\])", "%1") -- sqlite:///C:/data/app.db
+    end
     p = vim.fs.normalize(p)
     if not (p:sub(1, 1) == "/" or p:match("^%a:[/\\]")) and info.base_dir then
       p = vim.fs.joinpath(info.base_dir, p)
