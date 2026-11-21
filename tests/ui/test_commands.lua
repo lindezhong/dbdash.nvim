@@ -290,6 +290,18 @@ T["defaults.history caps the status history"] = function()
   eq(child.lua_get("#require('dbdash.scheduler').list()[1].panels[1].history"), 2)
 end
 
+T["popup border and maximum size come from setup()"] = function()
+  child.o.columns, child.o.lines = 160, 40
+  child.lua([[require("dbdash").setup({ popup = { border = "single", max_width = "50%", max_height = 3 } })]])
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  child.cmd("DbDashStatus") -- several lines, wider than 80 columns
+  local cfg = child.api.nvim_win_get_config(0)
+  eq(cfg.relative, "editor")
+  eq(cfg.border[1], "┌")
+  eq({ cfg.width <= 80, cfg.height }, { true, 3 })
+end
+
 T["sidebar without configs opens the directory"] = function()
   local empty = vim.fn.tempname()
   vim.fn.mkdir(empty, "p")

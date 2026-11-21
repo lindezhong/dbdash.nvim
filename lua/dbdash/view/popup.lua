@@ -12,9 +12,13 @@ function M.open(lines, opts)
   for _, l in ipairs(lines) do
     longest = math.max(longest, W.width(l))
   end
-  local width = math.max(60, math.min(longest + 4, 120))
-  width = math.min(width, vim.o.columns - 4)
-  local height = math.max(1, math.min(#lines, vim.o.lines - 6))
+  local o = require("dbdash").options.popup
+  local size = require("dbdash.util.size")
+  -- Fit the content, within popup.max_width / max_height and the editor.
+  local max_w = math.min(size.resolve(o.max_width, vim.o.columns), vim.o.columns - 4)
+  local max_h = math.min(size.resolve(o.max_height, vim.o.lines), vim.o.lines - 6)
+  local width = math.max(1, math.min(math.max(60, longest + 4), max_w))
+  local height = math.max(1, math.min(#lines, max_h))
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
@@ -35,7 +39,7 @@ function M.open(lines, opts)
     row = math.floor((vim.o.lines - height) / 2) - 1,
     col = math.floor((vim.o.columns - width) / 2),
     style = "minimal",
-    border = "rounded",
+    border = o.border,
     title = opts.title and (" " .. opts.title .. " ") or nil,
     title_pos = opts.title and "center" or nil,
   })
