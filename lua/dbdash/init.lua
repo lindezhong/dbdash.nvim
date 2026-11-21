@@ -30,6 +30,12 @@ local M = {}
 ---@field countdown_format string (default "Next update: {time}s")
 ---@field history integer queries kept for :DbDashStatus (default 20)
 
+---@class dbdash.ErrorsOptions
+---@field notify "once"|"always"|"never" vim.notify for a refresh error: when it first
+---  appears or changes (default), every time, or never (only shown in the dashboard)
+---@field backoff integer consecutive failures wait the interval x 2^(n-1), up to the
+---  interval x backoff; 1 disables backing off (default 8)
+
 ---@class dbdash.Options
 ---@field mappings boolean|table<"start"|"refresh"|"stop"|"list"|"sidebar", string|false>
 ---@field countdown_interval integer ms between countdown updates (default 10000)
@@ -41,6 +47,7 @@ local M = {}
 ---@field dashboard dbdash.DashboardOptions
 ---@field popup dbdash.PopupOptions
 ---@field defaults dbdash.DefaultsOptions
+---@field errors dbdash.ErrorsOptions
 local defaults = {
   mappings = true,
   countdown_interval = 10000,
@@ -70,6 +77,10 @@ local defaults = {
     height = nil,
     countdown_format = "Next update: {time}s",
     history = 20,
+  },
+  errors = {
+    notify = "once",
+    backoff = 8,
   },
 }
 M.DEFAULTS = defaults
@@ -200,6 +211,10 @@ local SPEC = {
     height = optional(int(3)),
     countdown_format = of_type("string"),
     history = int(1),
+  },
+  errors = {
+    notify = enum("once", "always", "never"),
+    backoff = int(1),
   },
 }
 

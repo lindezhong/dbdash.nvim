@@ -119,6 +119,13 @@ function M.status()
     if p.error then
       lines[#lines + 1] = "Error:     " .. sched.format_error(p.error):gsub("\n", " ")
     end
+    if p.retry_at then
+      lines[#lines + 1] = ("Retrying:  failed %d times in a row, next try in %ds (interval x%d)"):format(
+        p.failures,
+        p:remaining(),
+        p.backoff_mult or 1
+      )
+    end
     lines[#lines + 1] = "Recent queries:"
     if #p.history == 0 then
       lines[#lines + 1] = "  (none yet)"

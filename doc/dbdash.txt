@@ -72,6 +72,10 @@ defaults: >lua
       countdown_format = "Next update: {time}s",
       history = 20,        -- queries kept for |:DbDashStatus|
     },
+    errors = {             -- failed refreshes, see |dbdash-errors|
+      notify = "once",     -- "once" | "always" | "never"
+      backoff = 8,         -- retry after at most interval x 8; 1 = off
+    },
   })
 <
 Only the options you pass change; nested tables merge with the defaults, while
@@ -90,6 +94,28 @@ keys), `false` (none) or a table that changes some of them: >lua
 <
 Global keys already mapped by you are not overwritten. `styles`, `ticks` and
 `register` are described in |dbdash-styles|.
+
+Errors                                                         *dbdash-errors*
+
+A config file that does not load (invalid YAML or fields) is reported with
+its line and column, and the dashboard does not start. When a refresh
+fails, the error has a phase: template (the query template), connect,
+tls, auth, query (the database rejected the query, e.g. a SQL syntax
+error), timeout (`connect_timeout` + `timeout` elapsed) or decode. Then:
+
+- the last good result stays on screen, with the error as a red `✗` line
+  above it (with panels: in the panel's header);
+- `errors.notify = "once"` notifies when an error first appears or changes,
+  "always" on every failure, "never" not at all (it still shows in the
+  dashboard and in |:DbDashStatus|);
+- consecutive failures back off: after the n-th the next try waits
+  interval x 2^(n-1), at most interval x `errors.backoff` (1x, 2x, 4x,
+  8x, 8x...). The status shows "retrying" and |:DbDashStatus| the count
+  and the next try; with panels, the top-level interval skips a panel that
+  is backing off;
+- `r` / |:DbDashRestart| tries again right away;
+- the first successful refresh clears the error and returns to the normal
+  interval.
 
 Health checks                                                  *dbdash-health*
 

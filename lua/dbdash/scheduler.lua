@@ -222,11 +222,34 @@ function Panel:render_sql()
   })
 end
 
+---Delay before the next try after `failures` consecutive failures: the interval doubled
+---per failure after the first, at most interval x factor (errors.backoff).
+---@return integer ms
+function M.backoff_delay(interval, failures, factor)
+  local mult = math.min(2 ^ math.max(failures - 1, 0), math.max(factor or 1, 1))
+  return math.floor(interval * mult)
+end
+
 function Panel:fail(err)
   local changed = not self.error or M.format_error(self.error) ~= M.format_error(err)
   self.error = err
-  if changed then
+  local mode = opts().errors.notify
+  if mode == "always" or (mode == "once" and changed) then
     notify(err)
+  end
+  -- Back off: wait longer after each consecutive failure (errors.backoff).
+  self.failures = (self.failures or 0) + 1
+  local interval = self.cfg.show.interval
+  local delay = M.backoff_delay(interval, self.failures, opts().errors.backoff)
+  if delay > interval and not self.d.paused then
+    self.retry_at = now() + delay
+    self.backoff_mult = math.floor(delay / interval + 0.5)
+    local follows_global = self.d.gtimer and not self.cfg.show.own_interval
+    if follows_global then
+      self.next_at = self.retry_at
+    else
+      self:start_timer(delay)
+    end
   end
   if self.d.cfg.multi then
     self.d:redraw() -- the error shows in the panel header
@@ -286,6 +309,13 @@ function Panel:refresh(o)
     end
     self:push_history({ elapsed_ms = rs.elapsed_ms, rows = rs.row_count })
     self.rs = rs
+    if (self.failures or 0) > 0 then
+      local was_backing_off = self.retry_at ~= nil
+      self.failures, self.retry_at, self.backoff_mult = 0, nil, nil
+      if was_backing_off and not self.d.paused and not (self.d.gtimer and not self.cfg.show.own_interval) then
+        self:start_timer() -- back to the normal interval
+      end
+    end
     self:track(rs)
     self:check_thresholds(rs)
     self.error = nil
@@ -527,11 +557,23 @@ function Dashboard:restart(o)
   if self.gtimer then
     self:start_global_timer()
   end
+  local t = now()
   for _, p in ipairs(self.panels) do
-    p:start_timer()
+    -- A timer tick leaves panels that are backing off after failures alone.
+    local backing_off = o and o.timer and p.retry_at and t < p.retry_at
+    if backing_off then
+      p.skip_tick = true
+    else
+      p:start_timer()
+    end
   end
   for _, p in ipairs(self.panels) do
-    p:refresh(ro)
+    if p.skip_tick then
+      p.skip_tick = nil
+      p.next_at = p.retry_at
+    else
+      p:refresh(ro)
+    end
   end
 end
 
@@ -564,6 +606,11 @@ end
 function Dashboard:status_word()
   if self.paused then
     return "paused"
+  end
+  for _, p in ipairs(self.panels) do
+    if p.retry_at then
+      return "retrying"
+    end
   end
   for _, p in ipairs(self.panels) do
     if p.running then

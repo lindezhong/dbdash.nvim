@@ -652,6 +652,80 @@ T["thresholds notify once when a value rises to a notify step"] = function()
   eq(warnings(), { "dbdash: alert.yaml: 60 ≥ 50", "dbdash: alert.yaml: 80 ≥ 50" })
 end
 
+local BROKEN = {
+  "database: { url: 'sqlite:///:memory:' }",
+  "query:",
+  "  sql: SELECT {{ v }} AS n",
+  "  args: [{ name: v, default: oops }]", -- SELECT oops: no such column
+  "show: { type: table, title: Broken, interval: 1s }",
+}
+
+local function panel(expr)
+  return child.lua_get("require('dbdash.scheduler').list()[1].panels[1]." .. expr)
+end
+
+T["backoff: consecutive failures wait 2x, 4x... the interval; success resets"] = function()
+  eq(child.lua_get("require('dbdash.scheduler').backoff_delay(1000, 1, 8)"), 1000)
+  eq(child.lua_get("require('dbdash.scheduler').backoff_delay(1000, 3, 8)"), 4000)
+  eq(child.lua_get("require('dbdash.scheduler').backoff_delay(1000, 6, 8)"), 8000)
+  eq(child.lua_get("require('dbdash.scheduler').backoff_delay(1000, 6, 1)"), 1000)
+  vim.fn.writefile(BROKEN, dir .. "/broken2.yaml")
+  child.cmd("DbDashStart broken2.yaml")
+  child.lua([[_G.wait_for = function(fn) return vim.wait(10000, fn, 20) end]])
+  child.lua([[_G.wait_for(function() return (require("dbdash.scheduler").list()[1].panels[1].failures or 0) >= 3 end)]])
+  eq({ panel("failures"), panel("backoff_mult") }, { 3, 4 })
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1]:remaining() >= 3"), true) -- ~4s, not 1s
+  eq(child.lua_get("require('dbdash.scheduler').list()[1]:status_word()"), "retrying")
+  child.cmd("DbDashStatus")
+  eq(table.concat(lines(), "\n"):find("Retrying:  failed 3 times in a row", 1, true) ~= nil, true)
+  child.cmd("close")
+  -- the default "once": one notification for the repeated error
+  eq(child.lua_get("#vim.tbl_filter(function(n) return n.level == vim.log.levels.ERROR end, _G.notes)"), 1)
+  -- a manual refresh is not delayed; success resets the backoff
+  child.cmd("DbDashUpdateVariable v 1")
+  child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].error == nil end)]])
+  eq({ panel("failures"), panel("retry_at") }, { 0, vim.NIL })
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1]:remaining() <= 1"), true)
+end
+
+T["errors.notify always / never; backoff = 1 keeps the interval"] = function()
+  vim.fn.writefile(BROKEN, dir .. "/broken3.yaml")
+  child.lua([[require("dbdash").setup({ errors = { notify = "always", backoff = 1 } })]])
+  child.cmd("DbDashStart broken3.yaml")
+  child.lua([[_G.wait_for = function(fn) return vim.wait(10000, fn, 20) end]])
+  child.lua([[_G.wait_for(function() return (require("dbdash.scheduler").list()[1].panels[1].failures or 0) >= 3 end)]])
+  eq(panel("retry_at"), vim.NIL)
+  -- "always": one notification per failure
+  eq(child.lua_get("#_G.notes == require('dbdash.scheduler').list()[1].panels[1].failures"), true)
+  child.cmd("DbDashStop")
+  child.lua([[_G.notes = {}; require("dbdash").setup({ errors = { notify = "never" } })]])
+  child.cmd("DbDashStart broken3.yaml")
+  child.lua([[_G.wait_for(function() return (require("dbdash.scheduler").list()[1].panels[1].failures or 0) >= 2 end)]])
+  eq(child.lua_get("#_G.notes"), 0)
+  -- still shown in the dashboard (a virtual line above the first line)
+  local marks = child.lua_get([[vim.tbl_map(function(m) return m[4].virt_lines and m[4].virt_lines[1][1][1] or "" end,
+    vim.api.nvim_buf_get_extmarks(0, require("dbdash.view.buffer").ns_status, 0, -1, { details = true }))]])
+  eq(table.concat(marks, "\n"):find("✗ ", 1, true) ~= nil, true)
+end
+
+T["backoff with panels: the global interval skips a panel that is backing off"] = function()
+  vim.fn.writefile({
+    "database: { url: 'sqlite:///:memory:' }",
+    "interval: 1s",
+    "panels:",
+    "  - query: { sql: SELECT oops }",
+    "    show: { title: Broken }",
+    "  - query: { sql: SELECT 1 AS ok }",
+    "    show: { title: Fine }",
+  }, dir .. "/mixed.yaml")
+  child.cmd("DbDashStart mixed.yaml")
+  child.lua([[vim.wait(4500, function() return false end, 50)]])
+  local broken = child.lua_get("#require('dbdash.scheduler').list()[1].panels[1].history")
+  local fine = child.lua_get("#require('dbdash.scheduler').list()[1].panels[2].history")
+  eq(fine >= 4, true)
+  eq(broken < fine, true) -- 1s, 2s, 4s apart instead of every second
+end
+
 T[":DbDashStyle re-renders cached data with another style"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/line.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("┌") end)]])
