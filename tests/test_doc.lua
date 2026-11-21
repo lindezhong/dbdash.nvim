@@ -42,8 +42,17 @@ T["every template filter, test and global is documented"] = function()
 end
 
 T["every setup option is documented"] = function()
-  local names = vim.tbl_keys(require("dbdash").options)
-  eq(missing(names, "  %s = "), {})
+  local names = {}
+  for k, v in pairs(require("dbdash").DEFAULTS) do
+    names[#names + 1] = k
+    if type(v) == "table" and not vim.islist(v) then
+      for sub in pairs(v) do
+        names[#names + 1] = sub
+      end
+    end
+  end
+  table.insert(names, "height") -- nil by default, so not a key of DEFAULTS.defaults
+  eq(missing(names, " %s = "), {})
 end
 
 T["help tags build and lines fit in 78 columns"] = function()

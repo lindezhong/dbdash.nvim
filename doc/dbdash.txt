@@ -31,19 +31,64 @@ Jinja-like template) and how to show the result.
 ==============================================================================
 2. SETUP                                                        *dbdash-setup*
 
-Install with any plugin manager. Calling setup() is optional: >lua
+Install with any plugin manager. Calling setup() is optional; these are the
+defaults: >lua
 
   require("dbdash").setup({
-    mappings = true,               -- global <leader>d* mappings
-    countdown_interval = 10000,    -- ms between countdown updates
+    mappings = true,       -- global keys, see below
+    countdown_interval = 10000,          -- ms between countdown updates
     countdown_position = "right_align",  -- "eol", "overlay"
-    styles = {},                   -- default renderer/canvas per chart type
-    ticks = "nice",                -- axis ticks: "nice" or "linear"
-    register = {},                 -- custom chart styles and canvases
+    styles = {},           -- default renderer/canvas per chart type
+    ticks = "nice",        -- axis ticks: "nice" or "linear"
+    register = {},         -- custom chart styles and canvases
+    sidebar = {
+      width = 30,          -- columns, or "30%" of the editor width
+      position = "left",   -- "left" | "right"
+      dir = nil,           -- directory to list: nil = current directory,
+                           -- a path, or a function returning one
+      pattern = { "*.yaml", "*.yml" },               -- files to list
+      exclude = { "*.schema.yaml", "*.schema.yml" }, -- files to skip
+      recursive = false,   -- also list subdirectories
+      keys = { select = "<CR>", stop = "t", refresh = "r", close = "q" },
+    },
+    dashboard = {
+      open = "current",    -- where :DbDashStart shows a dashboard:
+                           -- "current" | "vsplit" | "split" | "tab"
+      keys = { modify = "a", show_args = "A", refresh = "r",
+               reset = "R", show_sql = "s" },
+    },
+    popup = {              -- :DbDashShowSQL and the other floats
+      border = "rounded",  -- any 'winborder' value or a list of chars
+      max_width = 120,     -- columns or "N%"
+      max_height = "100%", -- rows or "N%"
+    },
+    defaults = {           -- used when a config file does not say
+      interval = "30s",    -- refresh interval
+      timeout = "30s",     -- query timeout (URL `timeout` wins)
+      connect_timeout = "10s",  -- (URL `connect_timeout` wins)
+      max_rows = 10000,
+      height = nil,        -- plot rows; nil = each chart's own (15)
+      countdown_format = "Next update: {time}s",
+      history = 20,        -- queries kept for |:DbDashStatus|
+    },
   })
 <
-`styles`, `ticks` and `register` are described in |dbdash-styles|. Existing
-mappings of the same keys are not overwritten.
+Only the options you pass change; nested tables merge with the defaults, while
+lists (`pattern`, `exclude`) replace them. Invalid or unknown options are
+reported with their path (e.g. "sidebar.width: invalid size") and fall back
+to the default.
+
+Sizes are a number of cells or a percentage string of the editor width or
+height ("30%"), computed when the window opens.
+
+Keys: set a key to `false` to remove it. `mappings` is `true` (all global
+keys), `false` (none) or a table that changes some of them: >lua
+  mappings = { start = "<leader>ds", refresh = "<leader>dr",
+               stop = "<leader>dt", list = "<leader>dl",
+               sidebar = "<leader>dd" }  -- the defaults; false removes one
+<
+Global keys already mapped by you are not overwritten. `styles`, `ticks` and
+`register` are described in |dbdash-styles|.
 
 ==============================================================================
 3. COMMANDS                                                  *dbdash-commands*
