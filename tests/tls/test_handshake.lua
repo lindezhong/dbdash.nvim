@@ -37,20 +37,38 @@ local function run(fn)
 end
 
 ---Start s_server; returns its port once it accepts connections.
+---Ports come from below the usual ephemeral range (32768+): a port there may be held by an
+---outgoing connection, so s_server cannot bind it, and a probe connect to it can even
+---succeed by connecting the socket to itself. If s_server exits anyway, try another port.
 local function server(args)
-  local port = math.random(20000, 40000)
-  local cmd = { "openssl", "s_server", "-accept", tostring(port), "-rev", "-quiet" }
-  vim.list_extend(cmd, args)
-  servers[#servers + 1] = vim.system(cmd, { text = true })
-  local up = vim.wait(5000, function()
-    local r = run(function()
-      local s = socket.connect("127.0.0.1", port, { connect_timeout = 200 })
-      s:close()
+  for _ = 1, 5 do
+    local port = 20000 + (vim.uv.hrtime() + math.random(0, 9999)) % 12000
+    local cmd = { "openssl", "s_server", "-accept", tostring(port), "-rev", "-quiet" }
+    vim.list_extend(cmd, args)
+    local exited = false
+    local proc = vim.system(cmd, { text = true }, function()
+      exited = true
     end)
-    return r.err == nil
-  end, 50)
-  assert(up, "s_server did not start")
-  return port
+    servers[#servers + 1] = proc
+    local up = vim.wait(5000, function()
+      if exited then
+        return true
+      end
+      local r = run(function()
+        local s = socket.connect("127.0.0.1", port, { connect_timeout = 200 })
+        s:close()
+      end)
+      return r.err == nil
+    end, 50)
+    -- Give a failed bind a moment to show up as an exit before trusting the probe.
+    vim.wait(30, function()
+      return exited
+    end, 5)
+    if up and not exited then
+      return port
+    end
+  end
+  error("s_server did not start")
 end
 
 local function fingerprint(cert)
