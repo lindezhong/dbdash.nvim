@@ -36,6 +36,10 @@ M.BASE = {
   DbDashDown = { link = "DiagnosticError" },
   -- Sidebar: directories (name and arrow), running and idle dashboards.
   DbDashSidebarDir = { link = "Directory" },
+  -- Sidebar cursor line: the window's CursorLine (empty) and the underline of the cursor
+  -- line's name, which leaves the ●/◐/○ marker in its own color.
+  DbDashSidebarCursorLine = {},
+  DbDashSidebarCursor = { underline = true, cterm = { underline = true } },
   DbDashSidebarRunning = { link = "DiagnosticOk" },
   DbDashSidebarPaused = { link = "DiagnosticWarn" },
   DbDashSidebarIdle = { link = "Normal" },

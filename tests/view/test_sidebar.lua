@@ -80,8 +80,9 @@ T["tree: files first, then directories; expanded ones show their content indente
   })
   -- line -> node mapping
   local nodes = vim.b[buf].dbdash_sidebar_nodes
-  eq(nodes[tostring(sidebar.HEADER_LINES + 7)], { path = dir .. "/sub/e.yaml" })
-  eq(nodes[tostring(sidebar.HEADER_LINES + 8)], { path = dir .. "/sub/deeper", dir = true })
+  -- name_col: where the name starts (after the indent and the ●/◐/○ marker)
+  eq(nodes[tostring(sidebar.HEADER_LINES + 7)], { path = dir .. "/sub/e.yaml", name_col = 2 + #"○" + 1 })
+  eq(nodes[tostring(sidebar.HEADER_LINES + 8)], { path = dir .. "/sub/deeper", dir = true, name_col = 2 })
   sidebar.toggle(dir, dir .. "/sub") -- collapse: its children are hidden, state kept
   eq(#render(), 6)
   sidebar.toggle(dir, dir .. "/sub")

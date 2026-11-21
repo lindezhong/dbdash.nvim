@@ -244,6 +244,59 @@ T["sidebar directories expand, collapse and open nested dashboards"] = function(
   eq({ #lines(), lines()[8] }, { 8, "▸ team/" })
 end
 
+T["sidebar cursorline: the usual CursorLine by default, or none"] = function()
+  child.cmd("DbDash")
+  eq(child.lua_get("{ vim.wo.cursorline, vim.wo.winhighlight }"), { true, "" })
+  eq(child.lua_get("#vim.api.nvim_buf_get_extmarks(0, require('dbdash.view.sidebar').CURSOR_NS, 0, -1, {})"), 0)
+  child.lua([[require("dbdash").setup({ sidebar = { cursorline = false } })]])
+  child.cmd("DbDash") -- reapplied to the open sidebar
+  eq(child.lua_get("vim.wo.cursorline"), false)
+  child.lua([[require("dbdash").setup({ sidebar = { cursorline = "under" } })]])
+  eq(child.lua_get("_G.notes[#_G.notes].msg"):find('sidebar.cursorline: must be "line", "name" or false', 1, true) ~= nil, true)
+end
+
+T["sidebar cursorline = name: underline after the marker, marker keeps its color"] = function()
+  vim.fn.mkdir(dir .. "/team", "p")
+  child.lua([[require("dbdash").setup({ sidebar = { cursorline = "name" } })]])
+  child.cmd("DbDash")
+  eq(child.lua_get("vim.wo.winhighlight"), "CursorLine:DbDashSidebarCursorLine")
+  -- no attributes of its own (no underline, no background)
+  eq(child.lua_get("vim.tbl_keys(vim.api.nvim_get_hl(0, { name = 'DbDashSidebarCursorLine' }))"), { "default" })
+  eq(child.lua_get("vim.api.nvim_get_hl(0, { name = 'DbDashSidebarCursor' }).underline"), true)
+  local function cursor_mark()
+    return child.lua_get([[(function()
+      local m = vim.api.nvim_buf_get_extmarks(0, require("dbdash.view.sidebar").CURSOR_NS, 0, -1, { details = true })
+      if #m ~= 1 then return #m end
+      local line = vim.api.nvim_buf_get_lines(0, m[1][2], m[1][2] + 1, false)[1]
+      return { m[1][2] + 1, line:sub(m[1][3] + 1, m[1][4].end_col), m[1][4].hl_group }
+    end)()]])
+  end
+  local function marker(lnum)
+    return child.lua_get(([[(function()
+      for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, require("dbdash.view.buffer").ns, { %d, 0 }, { %d, -1 }, { details = true })) do
+        return m[4].hl_group
+      end
+    end)()]]):format(lnum - 1, lnum - 1))
+  end
+  -- start board.yaml, come back: its line is ● and the cursor is on it
+  child.cmd("6")
+  child.type_keys("<CR>")
+  wait_loaded()
+  child.cmd("wincmd h")
+  child.cmd("6")
+  eq(lines()[6], "● board.yaml")
+  eq(cursor_mark(), { 6, "board.yaml", "DbDashSidebarCursor" }) -- not the ●
+  eq(marker(6), "DbDashSidebarRunning")
+  child.cmd("7")
+  eq(cursor_mark(), { 7, "broken.yaml", "DbDashSidebarCursor" })
+  child.cmd("8") -- a directory: arrow and name share a color, the whole entry is underlined
+  eq(cursor_mark(), { 8, "▸ team/", "DbDashSidebarCursor" })
+  child.cmd("1")
+  eq(cursor_mark(), { 1, "DbDash Sidebar", "DbDashSidebarCursor" })
+  child.cmd("3") -- empty line: nothing
+  eq(cursor_mark(), 0)
+end
+
 T["sidebar width, position and keys come from setup()"] = function()
   child.o.columns = 160
   child.lua([[require("dbdash").setup({

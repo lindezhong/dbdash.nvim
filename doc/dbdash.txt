@@ -50,6 +50,8 @@ defaults: >lua
       exclude = { "*.schema.yaml", "*.schema.yml" }, -- files and
                            -- directories to skip, e.g. "node_modules"
       keys = { select = "<CR>", stop = "t", refresh = "r", close = "q" },
+      cursorline = "line", -- "line": the usual CursorLine; "name": only the
+                           -- name, see |dbdash-highlights|; false: none
     },
     dashboard = {
       open = "current",    -- where :DbDashStart shows a dashboard:
@@ -171,7 +173,9 @@ database:
     directories show `▸` (collapsed) or `▾` (expanded) and stay expanded
     when the sidebar is reopened. Hidden directories and names matching
     `sidebar.exclude` (by default `*.schema.yaml`) are not listed; without
-    config files the list says so.
+    config files the list says so. The cursor line is your usual
+    'cursorline'; `sidebar.cursorline = "name"` marks only the name (when an
+    underlined CursorLine would turn partly green under ●), false hides it.
 
                                                                 *dbdash-pause*
 A dashboard that no window of the current tab page shows (you switched the
@@ -791,7 +795,12 @@ All groups link to standard groups by default:
 Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
 `Directory`), `DbDashSidebarRunning` (● of running dashboards, links to
 `DiagnosticOk`), `DbDashSidebarPaused` (◐ of paused ones, links to
-`DiagnosticWarn`), `DbDashSidebarIdle` (○, links to `Normal`).
+`DiagnosticWarn`), `DbDashSidebarIdle` (○, links to `Normal`). With
+`sidebar.cursorline = "name"` the sidebar window's cursor line uses
+`DbDashSidebarCursorLine` (empty) instead of `CursorLine`, and
+`DbDashSidebarCursor` (underline) marks the name on the cursor line without
+the ●/◐/○ marker: a terminal draws an underline in the text color, so with an
+underlined CursorLine the green ● leaves a green piece in the line.
 
 Colors in configs may be hex ("#3498db"), names ("blue", "bold blue"),
 or existing highlight groups ("DiagnosticOk").

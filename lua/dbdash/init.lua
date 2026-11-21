@@ -10,6 +10,8 @@ local M = {}
 ---@field pattern string[] file globs to list (default { "*.yaml", "*.yml" })
 ---@field exclude string[] file and directory name globs to skip (default { "*.schema.yaml", "*.schema.yml" })
 ---@field keys table<"select"|"stop"|"refresh"|"close", string|false>
+---@field cursorline "line"|"name"|false cursor line: the global CursorLine over the whole line
+---  (default), DbDashSidebarCursor on the name only (keeps the ●/◐/○ marker's color), or none
 
 ---@class dbdash.DashboardOptions
 ---@field open "current"|"vsplit"|"split"|"tab" where :DbDashStart shows a dashboard
@@ -62,6 +64,7 @@ local defaults = {
     pattern = { "*.yaml", "*.yml" },
     exclude = { "*.schema.yaml", "*.schema.yml" },
     keys = { select = "<CR>", stop = "t", refresh = "r", close = "q" },
+    cursorline = "line",
   },
   dashboard = {
     open = "current",
@@ -192,6 +195,11 @@ local SPEC = {
     pattern = string_list,
     exclude = string_list,
     keys = keys({ "select", "stop", "refresh", "close" }),
+    cursorline = function(v)
+      if v ~= "line" and v ~= "name" and v ~= false then
+        return 'must be "line", "name" or false'
+      end
+    end,
   },
   dashboard = {
     open = enum("current", "vsplit", "split", "tab"),

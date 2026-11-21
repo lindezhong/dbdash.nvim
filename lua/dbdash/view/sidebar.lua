@@ -133,14 +133,14 @@ function M.render(buf)
       end
       lines[#lines + 1] = indent .. mark .. " " .. f
       hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #indent + #mark, group = group }
-      nodes[tostring(#lines)] = { path = path }
+      nodes[tostring(#lines)] = { path = path, name_col = #indent + #mark + 1 }
     end
     for _, d in ipairs(e.dirs) do
       local path = vim.fs.joinpath(dir, d)
       local open = is_expanded(root, path)
       lines[#lines + 1] = indent .. (open and "▾" or "▸") .. " " .. d .. "/"
       hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #lines[#lines], group = "DbDashSidebarDir" }
-      nodes[tostring(#lines)] = { path = path, dir = true }
+      nodes[tostring(#lines)] = { path = path, dir = true, name_col = #indent }
       if open then
         walk(path, depth + 1)
       end
@@ -161,7 +161,29 @@ function M.render(buf)
     vim.api.nvim_buf_set_extmark(buf, ns, h.row, h.col_s, { end_col = h.col_e, hl_group = h.group })
   end
   vim.b[buf].dbdash_sidebar_nodes = nodes
+  M.update_cursor(buf)
   return root
+end
+
+local CURSOR_NS = vim.api.nvim_create_namespace("dbdash_sidebar_cursor")
+M.CURSOR_NS = CURSOR_NS
+
+---With sidebar.cursorline = "name": mark the cursor line's name with DbDashSidebarCursor
+---(an underline by default), leaving out the running/paused/idle marker so it keeps its
+---own color; the window's CursorLine is then DbDashSidebarCursorLine (empty by default).
+function M.update_cursor(buf)
+  vim.api.nvim_buf_clear_namespace(buf, CURSOR_NS, 0, -1)
+  local win = sidebar_win(buf)
+  if not win or opts().cursorline ~= "name" then
+    return
+  end
+  local lnum = vim.api.nvim_win_get_cursor(win)[1]
+  local line = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
+  local node = (vim.b[buf].dbdash_sidebar_nodes or {})[tostring(lnum)]
+  local s = node and node.name_col or 0
+  if #line > s then
+    vim.api.nvim_buf_set_extmark(buf, CURSOR_NS, lnum - 1, s, { end_col = #line, hl_group = "DbDashSidebarCursor" })
+  end
 end
 
 ---Re-render the sidebar if it exists (after dashboards start or stop).
@@ -257,6 +279,12 @@ local function create_buf()
   bo.swapfile = false
   bo.buflisted = false
   bo.filetype = "dbdash-sidebar"
+  vim.api.nvim_create_autocmd("CursorMoved", {
+    buffer = buf,
+    callback = function()
+      M.update_cursor(buf)
+    end,
+  })
   return buf
 end
 
@@ -268,6 +296,13 @@ local ACTIONS = {
     M.close()
   end,
 }
+
+---Cursor line of the sidebar window per sidebar.cursorline (see M.update_cursor).
+function M.set_cursorline(win)
+  local mode = opts().cursorline
+  vim.wo[win].cursorline = mode ~= false
+  vim.wo[win].winhighlight = mode == "name" and "CursorLine:DbDashSidebarCursorLine" or ""
+end
 
 ---(Re)define the buffer keys from sidebar.keys; keys of a previous setup() are removed.
 local function apply_keys(buf)
@@ -296,6 +331,7 @@ function M.open()
   local win = sidebar_win(buf)
   if win then
     vim.api.nvim_set_current_win(win)
+    M.set_cursorline(win)
     M.render(buf)
     return
   end
@@ -307,7 +343,7 @@ function M.open()
   end
   win = vim.api.nvim_get_current_win()
   local wo = vim.wo[win]
-  wo.cursorline = true
+  M.set_cursorline(win)
   wo.number = false
   wo.relativenumber = false
   wo.wrap = false
@@ -317,6 +353,7 @@ function M.open()
   M.render(buf)
   local first = math.min(HEADER_LINES + 1, vim.api.nvim_buf_line_count(buf))
   vim.api.nvim_win_set_cursor(win, { first, 0 })
+  M.update_cursor(buf)
 end
 
 ---Close the sidebar window(s) in the current tab.

@@ -107,7 +107,7 @@ In a dashboard: `r` refresh, `a` modify an argument, `A` show arguments, `R` res
 arguments, `s` show the query, `e` export the result. Global mappings: `<leader>ds` start, `<leader>dr` refresh,
 `<leader>dt` stop, `<leader>dl` list, `<leader>dd` sidebar.
 
-Every key, the sidebar (width, position, directory, file globs), where dashboards open,
+Every key, the sidebar (width, position, directory, file globs, cursor line), where dashboards open,
 the popup border and size, and the default interval, timeouts and row limit can be set
 in `setup()`; see `:help dbdash-setup`. Colors use highlight groups (`:help
 dbdash-highlights`), e.g. `DbDashSidebarDir` for sidebar directories.
