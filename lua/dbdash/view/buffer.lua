@@ -36,6 +36,7 @@ local ACTIONS = {
   refresh = { "restart", "Refresh now" },
   reset = { "reset_variables", "Reset arguments to defaults" },
   show_sql = { "show_sql", "Show the rendered query" },
+  export = { "export", "Export the result" },
 }
 
 ---(Re)define the buffer keys from setup({ dashboard = { keys = ... } }).
@@ -49,6 +50,9 @@ function M.apply_keys(buf)
     local lhs = keys[action]
     if lhs then
       vim.keymap.set("n", lhs, function()
+        if action == "export" then
+          return require("dbdash.commands").export({}, false, vim.v.register) -- "xe: register x
+        end
         require("dbdash.commands")[def[1]]()
       end, { buffer = buf, nowait = true, silent = true, desc = "dbdash: " .. def[2] })
       mapped[#mapped + 1] = lhs

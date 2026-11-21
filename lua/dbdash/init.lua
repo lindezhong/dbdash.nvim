@@ -14,7 +14,7 @@ local M = {}
 ---@class dbdash.DashboardOptions
 ---@field open "current"|"vsplit"|"split"|"tab" where :DbDashStart shows a dashboard
 ---@field pause_hidden boolean stop refreshing while no window of the current tab shows it
----@field keys table<"modify"|"show_args"|"refresh"|"reset"|"show_sql", string|false>
+---@field keys table<"modify"|"show_args"|"refresh"|"reset"|"show_sql"|"export", string|false>
 
 ---@class dbdash.PopupOptions
 ---@field border string|string[] floating window border (default "rounded")
@@ -59,7 +59,7 @@ local defaults = {
   dashboard = {
     open = "current",
     pause_hidden = true,
-    keys = { modify = "a", show_args = "A", refresh = "r", reset = "R", show_sql = "s" },
+    keys = { modify = "a", show_args = "A", refresh = "r", reset = "R", show_sql = "s", export = "e" },
   },
   popup = { border = "rounded", max_width = 120, max_height = "100%" },
   defaults = {
@@ -185,7 +185,7 @@ local SPEC = {
   dashboard = {
     open = enum("current", "vsplit", "split", "tab"),
     pause_hidden = of_type("boolean"),
-    keys = keys({ "modify", "show_args", "refresh", "reset", "show_sql" }),
+    keys = keys({ "modify", "show_args", "refresh", "reset", "show_sql", "export" }),
   },
   popup = {
     border = of_type("string", "table"),

@@ -56,7 +56,7 @@ defaults: >lua
                            -- "current" | "vsplit" | "split" | "tab"
       pause_hidden = true, -- no queries while not on screen, see below
       keys = { modify = "a", show_args = "A", refresh = "r",
-               reset = "R", show_sql = "s" },
+               reset = "R", show_sql = "s", export = "e" },
     },
     popup = {              -- :DbDashShowSQL and the other floats
       border = "rounded",  -- any 'winborder' value or a list of chars
@@ -173,6 +173,15 @@ its next refresh is due, and otherwise continues the countdown. Set
 :DbDashShowSQL                                                *:DbDashShowSQL*
     Show the rendered query in a floating window ("q"/<Esc> close, "y" yank).
 
+:DbDashExport[!] [{format}] [{file}]                          *:DbDashExport*
+    Export the result of the current dashboard (with panels: the one under
+    the cursor, or pick one) as `csv`, `tsv`, `json` or `markdown`; without
+    {format} pick one. Without {file} the text goes into the unnamed
+    register, or the one given before the command (`"x:DbDashExport csv`,
+    `"xe`). An existing {file} is only overwritten with [!]. The whole
+    result is exported (not the truncated cells): NULL is empty in csv, tsv
+    and markdown and `null` in json; binary values are `\x` hex.
+
 :DbDashStyle {type} {style}                                     *:DbDashStyle*
 :DbDashStyle canvas {name}
 :DbDashStyle reset
@@ -203,11 +212,11 @@ Global:
   <leader>dd   :DbDash
 
 Dashboard buffer (`dashboard.keys`: modify, show_args, refresh, reset,
-show_sql):
+show_sql, export):
 
   a   modify an argument          A   show arguments
   r   refresh now                 R   reset arguments
-  s   show the rendered query
+  s   show the rendered query     e   export the result
 
 Sidebar (`sidebar.keys`: select, stop, refresh, close):
 

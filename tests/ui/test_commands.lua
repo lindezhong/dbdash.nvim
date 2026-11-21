@@ -563,6 +563,44 @@ T["pause_hidden = false keeps hidden dashboards refreshing"] = function()
   eq(runs() >= before + 1, true)
 end
 
+T[":DbDashExport: register, named register, file, overwrite with !"] = function()
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  child.cmd("DbDashExport csv")
+  eq(child.fn.getreg('"'), "n,label,ids_sql\n1,hello,\"(1, 2)\"\n")
+  eq(child.fn.getregtype('"'), "V")
+  eq(child.lua_get("_G.notes[#_G.notes].msg"), 'dbdash: exported 1 rows as csv to register "')
+  child.cmd('normal! "xyy') -- make sure x is set before
+  child.type_keys('"x', ":DbDashExport json<CR>")
+  eq(vim.json.decode(child.fn.getreg("x")), { { n = 1, label = "hello", ids_sql = "(1, 2)" } })
+  local file = dir .. "/out.md"
+  child.cmd("DbDashExport markdown " .. file)
+  eq(vim.fn.readfile(file), { "| n | label | ids_sql |", "| ---: | --- | --- |", "| 1 | hello | (1, 2) |" })
+  child.cmd("DbDashExport tsv " .. file)
+  eq(child.lua_get("_G.notes[#_G.notes].msg"):find("exists %(add ! to overwrite%)") ~= nil, true)
+  eq(vim.fn.readfile(file)[1], "| n | label | ids_sql |")
+  child.cmd("DbDashExport! tsv " .. file)
+  eq(vim.fn.readfile(file), { "n\tlabel\tids_sql", "1\thello\t(1, 2)" })
+  child.cmd("DbDashExport xml")
+  eq(child.lua_get("_G.notes[#_G.notes].msg"):find("unknown export format") ~= nil, true)
+  eq(child.lua_get("vim.fn.getcompletion('DbDashExport j', 'cmdline')"), { "json" })
+end
+
+T["export key picks a format; with panels the one under the cursor"] = function()
+  child.cmd("DbDashStart " .. ROOT .. "/example/multi_panel.yaml")
+  child.lua([[_G.wait_for(function()
+    local d = require("dbdash.scheduler").list()[1]
+    for _, p in ipairs(d.panels) do if not p.rs then return false end end
+    return true
+  end)]])
+  child.lua([[vim.ui.select = function(items, _, cb) cb("csv") end]])
+  local r = child.lua_get("require('dbdash.scheduler').list()[1].regions[2]")
+  child.api.nvim_win_set_cursor(0, { r.row_s + 2, r.x + 1 })
+  child.type_keys("e")
+  local second = child.lua_get("require('dbdash.export').format(require('dbdash.scheduler').list()[1].panels[2].rs, 'csv')")
+  eq(child.fn.getreg('"'), second)
+end
+
 T[":DbDashStyle re-renders cached data with another style"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/line.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("┌") end)]])

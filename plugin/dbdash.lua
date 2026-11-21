@@ -71,6 +71,16 @@ end, { desc = "Reset dashboard arguments to their defaults" })
 command("DbDashShowSQL", function()
   cmds().show_sql()
 end, { desc = "Show the rendered query" })
+command("DbDashExport", function(o)
+  cmds().export(o.fargs, o.bang, vim.v.register) -- "x:DbDashExport picks register x
+end, {
+  nargs = "*",
+  bang = true,
+  complete = function(a, l)
+    return cmds().complete_export(a, l)
+  end,
+  desc = "Export the result: DbDashExport[!] [csv|tsv|json|markdown] [file]",
+})
 command("DbDashStyle", function(o)
   cmds().style(o.fargs)
 end, {

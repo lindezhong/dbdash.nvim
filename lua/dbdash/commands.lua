@@ -232,6 +232,70 @@ function M.reset_variables()
   end
 end
 
+---:DbDashExport[!] [{format}] [{file}]: the result of the panel under the cursor as csv,
+---tsv, json or markdown, into a register (default: unnamed, or "x:DbDashExport) or a file
+---(overwritten only with !). Without a format, one is picked with vim.ui.select.
+---@param fargs string[]
+---@param bang boolean?
+---@param reg string? register given with "x
+function M.export(fargs, bang, reg)
+  local d = current()
+  if not d then
+    return
+  end
+  fargs = fargs or {}
+  local export = require("dbdash.export")
+  local function run(fmt)
+    if not vim.tbl_contains(export.FORMATS, fmt) then
+      return err(("unknown export format %q (use %s)"):format(fmt, table.concat(export.FORMATS, ", ")))
+    end
+    with_panel(d, function(p)
+      if not p.rs then
+        return err("nothing to export yet: " .. (p.error and sched.format_error(p.error) or "no result"))
+      end
+      local out = export.format(p.rs, fmt)
+      local what = ("%d rows as %s"):format(p.rs.row_count, fmt)
+      local file = fargs[2]
+      if file then
+        file = vim.fn.fnamemodify(vim.fn.expand(file), ":p")
+        if vim.uv.fs_stat(file) and not bang then
+          return err(file .. " exists (add ! to overwrite)")
+        end
+        local f, ferr = io.open(file, "wb")
+        if not f then
+          return err("cannot write " .. file .. ": " .. tostring(ferr))
+        end
+        f:write(out)
+        f:close()
+        vim.notify(("dbdash: exported %s to %s"):format(what, vim.fn.fnamemodify(file, ":~:.")))
+      else
+        reg = (reg and reg ~= "") and reg or '"'
+        vim.fn.setreg(reg, out, "l")
+        vim.notify(("dbdash: exported %s to register %s"):format(what, reg))
+      end
+    end)
+  end
+  if fargs[1] then
+    return run(fargs[1])
+  end
+  vim.ui.select(export.FORMATS, { prompt = "Export format" }, function(fmt)
+    if fmt then
+      run(fmt)
+    end
+  end)
+end
+
+---Completion for :DbDashExport: a format, then a file.
+function M.complete_export(arglead, cmdline)
+  local words = vim.split(cmdline:gsub("^%s*%S+%s*", ""), "%s+", { trimempty = true })
+  if #words == 0 or (#words == 1 and arglead ~= "") then
+    return vim.tbl_filter(function(f)
+      return vim.startswith(f, arglead)
+    end, require("dbdash.export").FORMATS)
+  end
+  return vim.fn.getcompletion(arglead, "file")
+end
+
 function M.show_sql()
   local d = current()
   if not d then
