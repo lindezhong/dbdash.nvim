@@ -1,120 +1,15 @@
--- AES-128/256-GCM (FIPS 197, NIST SP 800-38D). Encryption-only AES with T-tables; GHASH
--- multiplies bit by bit over four 32-bit words.
+-- AES-128/256-GCM (NIST SP 800-38D) on top of dbdash.crypto.aes; GHASH multiplies bit by
+-- bit over four 32-bit words.
 local bit = require("bit")
 local util = require("dbdash.crypto.util")
+local aes = require("dbdash.crypto.aes")
 
-local band, bor, bxor, lshift, rshift, ror, tobit = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift, bit.ror, bit.tobit
+local band, bor, bxor, lshift, rshift, tobit = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift, bit.tobit
+local expand, encrypt_words, word = aes.expand, aes.encrypt_words, aes.word
 
 local M = {}
 
--- S-box and tables ----------------------------------------------------------------------------
-
-local SBOX = {}
-do
-  -- Generate the S-box from the multiplicative inverse in GF(2^8) and the affine transform.
-  local function mul(a, b)
-    local p = 0
-    for _ = 1, 8 do
-      if band(b, 1) ~= 0 then
-        p = bxor(p, a)
-      end
-      local hi = band(a, 0x80)
-      a = band(lshift(a, 1), 0xff)
-      if hi ~= 0 then
-        a = bxor(a, 0x1b)
-      end
-      b = rshift(b, 1)
-    end
-    return p
-  end
-  for x = 0, 255 do
-    local inv = 0
-    if x ~= 0 then
-      for y = 1, 255 do
-        if mul(x, y) == 1 then
-          inv = y
-          break
-        end
-      end
-    end
-    local s = inv
-    for k = 1, 4 do
-      s = bxor(s, band(bor(lshift(inv, k), rshift(inv, 8 - k)), 0xff))
-    end
-    SBOX[x] = bxor(s, 0x63)
-  end
-end
-
-local function xtime(a)
-  a = lshift(a, 1)
-  if band(a, 0x100) ~= 0 then
-    a = bxor(a, 0x11b)
-  end
-  return a
-end
-
-local TE0, TE1, TE2, TE3 = {}, {}, {}, {}
-for x = 0, 255 do
-  local s = SBOX[x]
-  local s2 = xtime(s)
-  local s3 = bxor(s2, s)
-  local w = tobit(bor(lshift(s2, 24), lshift(s, 16), lshift(s, 8), s3))
-  TE0[x], TE1[x], TE2[x], TE3[x] = w, ror(w, 8), ror(w, 16), ror(w, 24)
-end
-
-local function word(s, i)
-  local a, b, c, d = s:byte(i, i + 3)
-  return tobit(bor(lshift(a, 24), lshift(b, 16), lshift(c, 8), d))
-end
-
----Expand a 16- or 32-byte key into round keys.
-local function expand(key)
-  local nk = #key / 4
-  local rounds = nk + 6
-  local w = {}
-  for i = 0, nk - 1 do
-    w[i] = word(key, i * 4 + 1)
-  end
-  local rcon = 1
-  for i = nk, 4 * (rounds + 1) - 1 do
-    local t = w[i - 1]
-    if i % nk == 0 then
-      t = bor(lshift(SBOX[band(rshift(t, 16), 255)], 24), lshift(SBOX[band(rshift(t, 8), 255)], 16), lshift(SBOX[band(t, 255)], 8), SBOX[band(rshift(t, 24), 255)])
-      t = bxor(t, lshift(rcon, 24))
-      rcon = xtime(rcon)
-    elseif nk > 6 and i % nk == 4 then
-      t = bor(lshift(SBOX[band(rshift(t, 24), 255)], 24), lshift(SBOX[band(rshift(t, 16), 255)], 16), lshift(SBOX[band(rshift(t, 8), 255)], 8), SBOX[band(t, 255)])
-    end
-    w[i] = tobit(bxor(w[i - nk], t))
-  end
-  return { w = w, rounds = rounds }
-end
-
----Encrypt one block given as four words; returns four words.
-local function encrypt_words(ks, s0, s1, s2, s3)
-  local w = ks.w
-  s0, s1, s2, s3 = bxor(s0, w[0]), bxor(s1, w[1]), bxor(s2, w[2]), bxor(s3, w[3])
-  local k = 4
-  for _ = 1, ks.rounds - 1 do
-    local t0 = bxor(TE0[rshift(s0, 24)], TE1[band(rshift(s1, 16), 255)], TE2[band(rshift(s2, 8), 255)], TE3[band(s3, 255)], w[k])
-    local t1 = bxor(TE0[rshift(s1, 24)], TE1[band(rshift(s2, 16), 255)], TE2[band(rshift(s3, 8), 255)], TE3[band(s0, 255)], w[k + 1])
-    local t2 = bxor(TE0[rshift(s2, 24)], TE1[band(rshift(s3, 16), 255)], TE2[band(rshift(s0, 8), 255)], TE3[band(s1, 255)], w[k + 2])
-    local t3 = bxor(TE0[rshift(s3, 24)], TE1[band(rshift(s0, 16), 255)], TE2[band(rshift(s1, 8), 255)], TE3[band(s2, 255)], w[k + 3])
-    s0, s1, s2, s3 = t0, t1, t2, t3
-    k = k + 4
-  end
-  local function last(a, b, c, d, rk)
-    return tobit(bxor(bor(lshift(SBOX[rshift(a, 24)], 24), lshift(SBOX[band(rshift(b, 16), 255)], 16), lshift(SBOX[band(rshift(c, 8), 255)], 8), SBOX[band(d, 255)]), rk))
-  end
-  return last(s0, s1, s2, s3, w[k]), last(s1, s2, s3, s0, w[k + 1]), last(s2, s3, s0, s1, w[k + 2]), last(s3, s0, s1, s2, w[k + 3])
-end
-
----AES block encryption (16-byte string).
-function M.encrypt_block(key, block)
-  local ks = type(key) == "table" and key or expand(key)
-  local a, b, c, d = encrypt_words(ks, word(block, 1), word(block, 5), word(block, 9), word(block, 13))
-  return util.be32(a) .. util.be32(b) .. util.be32(c) .. util.be32(d)
-end
+M.encrypt_block = aes.encrypt_block
 
 -- GHASH -------------------------------------------------------------------------------------
 
