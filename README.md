@@ -10,6 +10,7 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
 - **Charts**: table, line, area, bar, histogram, boxplot, heatmap, scatter, bubble, pie,
   each with alternative styles (braille / block canvases, vertical bars, round pie, ...).
 - **Several panels** per dashboard in a grid, each refreshing on its own interval.
+  Dashboards that are not on screen pause and catch up when shown again.
 - **Query templates**: a Jinja2 subset with SQL-safe quoting filters, autoescape, macros
   and imports.
 - **Arguments**: typed variables set from the command line, prompts or in the dashboard.
@@ -80,7 +81,7 @@ show:
 
 Then `:DbDashStart signups.yaml hours=48`, or `:DbDash` for a sidebar listing the configs
 of the current directory as a tree: `<CR>` on a directory expands it, on a file starts its
-dashboard; `●` marks running dashboards, `○` the others.
+dashboard; `●` marks running dashboards, `◐` paused ones (not on screen), `○` the others.
 
 To try it without a database server, open any file in [`example/`](example): they all use
 an in-memory SQLite database.

@@ -187,9 +187,17 @@ function Panel:fail(err)
 end
 
 ---Run the panel's query now (unless one is in flight).
-function Panel:refresh()
+---Run the panel's query. While the previous query still runs, a timer refresh is
+---skipped (and recorded); a requested one (`o.queue`: manual refresh, changed
+---arguments) runs again as soon as the previous query finishes.
+---@param o { queue: boolean? }?
+function Panel:refresh(o)
   if self.running then
-    self:push_history({ skipped = true })
+    if o and o.queue then
+      self.rerun = true
+    else
+      self:push_history({ skipped = true })
+    end
     return
   end
   local sql, err = self:render_sql()
@@ -214,6 +222,14 @@ function Panel:refresh()
       return -- stopped meanwhile
     end
     self.running = false
+    if self.rerun then
+      self.rerun = false
+      vim.schedule(function()
+        if gen == self.d.generation then
+          self:refresh({ queue = true })
+        end
+      end)
+    end
     if qerr then
       self:push_history({ error = M.format_error(qerr) })
       self:fail(qerr)
@@ -228,20 +244,22 @@ end
 
 ---(Re)start the panel's own timer. Panels that just follow the top-level interval of a
 ---multi-panel dashboard have no timer of their own: the global timer drives them.
-function Panel:start_timer()
+---@param first integer? ms until the first tick (default: the interval), used on resume
+function Panel:start_timer(first)
   local interval = self.cfg.show.interval
-  self.next_at = now() + interval
+  first = first or interval
+  self.next_at = now() + first
   local d = self.d
   if d.cfg.multi and d.gtimer and not self.cfg.show.own_interval then
     return
   end
   self.timer = self.timer or vim.uv.new_timer()
   self.timer:stop()
-  self.timer:start(interval, interval, function()
+  self.timer:start(first, interval, function()
     self.next_at = now() + interval
     vim.schedule(function()
       if self.timer then
-        self:refresh()
+        self:refresh() -- a timer tick: skipped while the previous query runs
       end
     end)
   end)
@@ -427,23 +445,42 @@ function Dashboard:panel_at(lnum, dcol)
 end
 
 ---Refresh every panel now and restart all timers.
-function Dashboard:restart()
-  if self.gtimer then
-    local interval = self.cfg.interval
-    self.gtimer:stop()
-    self.gtimer:start(interval, interval, function()
-      vim.schedule(function()
-        if self.gtimer then
-          self:restart()
-        end
-      end)
+---Start (or restart) the global timer of a multi-panel dashboard.
+---@param first integer? ms until the first tick (default: the interval)
+function Dashboard:start_global_timer(first)
+  local interval = self.cfg.interval
+  first = first or interval
+  self.gnext_at = now() + first
+  self.gtimer:stop()
+  self.gtimer:start(first, interval, function()
+    vim.schedule(function()
+      if self.gtimer then
+        self:restart({ timer = true })
+      end
     end)
+  end)
+end
+
+---Refresh every panel now and restart the timers. User actions (refresh key, changed
+---arguments) queue a refresh behind a running query; timer ticks (`o.timer`) skip it.
+---@param o { timer: boolean? }?
+function Dashboard:restart(o)
+  local ro = { queue = not (o and o.timer) }
+  if self.paused then
+    -- Not visible (setup({ dashboard = { pause_hidden = true } })): refresh once, no timers.
+    for _, p in ipairs(self.panels) do
+      p:refresh(ro)
+    end
+    return
+  end
+  if self.gtimer then
+    self:start_global_timer()
   end
   for _, p in ipairs(self.panels) do
     p:start_timer()
   end
   for _, p in ipairs(self.panels) do
-    p:refresh()
+    p:refresh(ro)
   end
 end
 
@@ -474,6 +511,9 @@ end
 
 ---State summary across panels: "running query", "error" or "idle".
 function Dashboard:status_word()
+  if self.paused then
+    return "paused"
+  end
   for _, p in ipairs(self.panels) do
     if p.running then
       return "running query"
@@ -488,6 +528,58 @@ function Dashboard:status_word()
 end
 
 ---Seconds until the next refresh of any panel.
+---Stop refreshing while no window of the current tab page shows the dashboard.
+function Dashboard:pause()
+  if self.paused then
+    return
+  end
+  self.paused = true
+  self:stop_timers()
+  require("dbdash.view.sidebar").refresh()
+end
+
+---Continue after pause(): refresh what is due now, keep the remaining time of the rest.
+function Dashboard:resume()
+  if not self.paused then
+    return
+  end
+  self.paused = false
+  local t = now()
+  self.ctimer = vim.uv.new_timer()
+  local every = opts().countdown_interval
+  self.ctimer:start(every, every, function()
+    vim.schedule(function()
+      if self.ctimer then
+        self:update_status()
+      end
+    end)
+  end)
+  if self.cfg.multi and self.cfg.interval then
+    self.gtimer = vim.uv.new_timer()
+    local left = (self.gnext_at or t) - t
+    if left <= 0 then
+      self:restart({ timer = true }) -- the global interval elapsed: refresh every panel
+      require("dbdash.view.sidebar").refresh()
+      return
+    end
+    self:start_global_timer(left)
+  end
+  for _, p in ipairs(self.panels) do
+    local follows_global = self.gtimer and not p.cfg.show.own_interval
+    if not follows_global then
+      local left = (p.next_at or t) - t
+      if left <= 0 then
+        p:start_timer()
+        p:refresh()
+      else
+        p:start_timer(left)
+      end
+    end
+  end
+  self:update_status()
+  require("dbdash.view.sidebar").refresh()
+end
+
 function Dashboard:remaining()
   local r
   for _, p in ipairs(self.panels) do
@@ -617,6 +709,7 @@ function M.start(path, o)
     end
     d:redraw()
     d:start_timers()
+    vim.schedule(M.update_visibility) -- e.g. restored by a session into another tab
     require("dbdash.view.sidebar").refresh()
     if o.on_started then
       o.on_started(d)
@@ -674,6 +767,23 @@ end
 
 ---On exit: stop timers and ignore queries still running, but keep the dashboards and
 ---their arguments so session hooks that run later (VimLeave) can still save them.
+---Pause dashboards that no window of the current tab page shows, resume the others
+---(setup({ dashboard = { pause_hidden = true } }), the default).
+function M.update_visibility()
+  local pause_hidden = opts().dashboard.pause_hidden
+  local shown = {}
+  for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    shown[vim.api.nvim_win_get_buf(w)] = true
+  end
+  for _, d in pairs(M.dashboards) do
+    if not pause_hidden or shown[d.buf] then
+      d:resume()
+    else
+      d:pause()
+    end
+  end
+end
+
 function M.freeze_all()
   for _, d in pairs(M.dashboards) do
     d.generation = d.generation + 1

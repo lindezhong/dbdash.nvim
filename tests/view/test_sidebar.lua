@@ -93,15 +93,21 @@ T["highlights: directories with their arrow, running and idle markers"] = functi
   local _, marks = render()
   eq(marks, {
     { "DbDashSidebarRunning", "●" }, -- legend
+    { "DbDashSidebarPaused", "◐" },
     { "DbDashSidebarIdle", "○" },
     { "DbDashSidebarIdle", "○" },
     { "DbDashSidebarDir", "▸ deeper/" },
   })
   local links = {}
-  for _, g in ipairs({ "DbDashSidebarDir", "DbDashSidebarRunning", "DbDashSidebarIdle" }) do
+  for _, g in ipairs({ "DbDashSidebarDir", "DbDashSidebarRunning", "DbDashSidebarPaused", "DbDashSidebarIdle" }) do
     links[g] = vim.api.nvim_get_hl(0, { name = g }).link
   end
-  eq(links, { DbDashSidebarDir = "Directory", DbDashSidebarRunning = "DiagnosticOk", DbDashSidebarIdle = "Normal" })
+  eq(links, {
+    DbDashSidebarDir = "Directory",
+    DbDashSidebarRunning = "DiagnosticOk",
+    DbDashSidebarPaused = "DiagnosticWarn",
+    DbDashSidebarIdle = "Normal",
+  })
 end
 
 T["an empty directory says so"] = function()

@@ -192,7 +192,7 @@ T["sidebar lists configs and starts/stops them"] = function()
     "DbDash Sidebar",
     "Directory: " .. child.lua_get("vim.fn.fnamemodify(vim.fn.getcwd(), ':~')"),
     "",
-    "● = Running  ○ = Not running",
+    "● = Running  ◐ = Paused  ○ = Not running",
     "",
     "○ board.yaml",
     "○ broken.yaml",
@@ -394,7 +394,8 @@ T["mksession(file) and load_session(file) keep changed arguments"] = function()
   -- load into a running dashboard
   child.cmd("DbDashResetVariables")
   eq(child.lua_get("{ require('dbdash').load_session(...) }", { file }), { true })
-  child.lua([[_G.wait_for(function() return vim.api.nvim_buf_get_lines(0, 0, 1, false)[1]:find("n=9") end)]])
+  -- the argument line is redrawn when the refreshed query finishes
+  child.lua([[_G.wait_for(function() return vim.api.nvim_buf_get_lines(0, 0, 1, false)[1] == "n=9  label=hello  ids=3,4" end)]])
   eq(lines()[1], "n=9  label=hello  ids=3,4")
   -- load before the dashboard runs (as when a session is sourced): applied when it
   -- starts; unknown arguments and invalid values are skipped
@@ -442,6 +443,124 @@ T["timer refreshes on the interval and restart resets the countdown"] = function
   eq(#h >= 3, true)
   eq(h[1].rows, 1)
   eq(child.lua_get("require('dbdash.scheduler').list()[1]:remaining() <= 1"), true)
+end
+
+local function fast_board()
+  local fast = CFG:gsub("interval: 1h", "interval: 1s")
+  vim.fn.writefile(vim.split(fast, "\n"), dir .. "/fast.yaml")
+  child.cmd("DbDashStart fast.yaml")
+  wait_loaded()
+end
+
+local function runs()
+  return child.lua_get("#require('dbdash.scheduler').list()[1].panels[1].history")
+end
+
+local function paused()
+  return child.lua_get("require('dbdash.scheduler').list()[1].paused == true")
+end
+
+local function settle(ms)
+  child.lua(("vim.wait(%d, function() return false end, 20)"):format(ms))
+end
+
+T["changing an argument while a query runs re-runs it with the new value"] = function()
+  -- Regression: the refresh for the new value was skipped because the previous query
+  -- was still running, so the dashboard showed the old value until the next interval.
+  local slow = CFG:gsub(
+    "SELECT {{ n }} AS n,",
+    "SELECT {{ n }} AS n, (WITH RECURSIVE c(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM c WHERE i < 1500000) SELECT count(*) FROM c) AS big,"
+  )
+  vim.fn.writefile(vim.split(slow, "\n"), dir .. "/slow.yaml")
+  child.cmd("DbDashStart slow.yaml")
+  child.lua([[_G.wait_for = function(fn) return vim.wait(20000, fn, 10) end]])
+  child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].rs ~= nil end)]])
+  child.cmd("DbDashRestart")
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1].running"), true)
+  child.cmd("DbDashUpdateVariable n 5") -- while the query runs
+  child.lua([[_G.wait_for(function()
+    local p = require("dbdash.scheduler").list()[1].panels[1]
+    return not p.running and p.rs.rows[1][1] == 5
+  end)]])
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1].rs.rows[1][1]"), 5)
+end
+
+T["hidden dashboards pause; showing them again refreshes what is due"] = function()
+  fast_board()
+  child.cmd("enew") -- the buffer stays, another buffer is shown
+  settle(100)
+  eq(paused(), true)
+  eq(child.lua_get("require('dbdash.scheduler').list()[1]:status_word()"), "paused")
+  local before = runs()
+  settle(2500)
+  eq(runs(), before) -- no queries while hidden
+  child.cmd("buffer fast.yaml")
+  child.lua([[_G.wait_for(function() return not require("dbdash.scheduler").list()[1].paused end)]])
+  child.lua(([[_G.wait_for(function() return #require("dbdash.scheduler").list()[1].panels[1].history > %d end)]]):format(before))
+  eq(runs() > before, true) -- due: refreshed right away
+  settle(2200)
+  eq(runs() >= before + 2, true) -- and the timer runs again
+end
+
+T["visible in a split without the cursor keeps refreshing"] = function()
+  fast_board()
+  child.cmd("vsplit")
+  child.cmd("enew") -- cursor in the other window, dashboard still on screen
+  settle(100)
+  eq(paused(), false)
+  local before = runs()
+  settle(2200)
+  eq(runs() >= before + 1, true)
+  -- two windows show it; closing one does not pause
+  child.cmd("buffer fast.yaml")
+  child.cmd("close")
+  settle(100)
+  eq(paused(), false)
+end
+
+T["shown only in another tab page: paused until that tab is entered"] = function()
+  fast_board()
+  child.cmd("tabnew")
+  settle(100)
+  eq(paused(), true)
+  local before = runs()
+  settle(1500)
+  eq(runs(), before)
+  child.cmd("tabprevious")
+  settle(100)
+  eq(paused(), false)
+end
+
+T["resuming before the next refresh keeps the remaining time"] = function()
+  child.cmd("DbDashStart board.yaml") -- interval 1h
+  wait_loaded()
+  child.cmd("enew")
+  settle(100)
+  eq(paused(), true)
+  local before = runs()
+  child.cmd("buffer board.yaml")
+  settle(200)
+  eq({ paused(), runs() }, { false, before }) -- not due: no refresh
+  eq(child.lua_get("require('dbdash.scheduler').list()[1]:remaining() > 3500"), true)
+end
+
+T["the sidebar marks paused dashboards with ◐"] = function()
+  fast_board()
+  child.cmd("enew")
+  settle(100)
+  child.cmd("DbDash")
+  eq(vim.tbl_contains(lines(), "◐ fast.yaml"), true)
+end
+
+T["pause_hidden = false keeps hidden dashboards refreshing"] = function()
+  child.lua([[require("dbdash").setup({ dashboard = { pause_hidden = false } })]])
+  fast_board()
+  child.cmd("enew")
+  settle(100)
+  eq(paused(), false)
+  local before = runs()
+  settle(2200)
+  eq(runs() >= before + 1, true)
 end
 
 T[":DbDashStyle re-renders cached data with another style"] = function()

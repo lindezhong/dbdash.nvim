@@ -100,7 +100,7 @@ M.HEADER = {
   "DbDash Sidebar",
   "", -- Directory: ...
   "",
-  "● = Running  ○ = Not running",
+  "● = Running  ◐ = Paused  ○ = Not running",
   "",
 }
 
@@ -114,7 +114,8 @@ function M.render(buf)
   lines[2] = "Directory: " .. vim.fn.fnamemodify(root, ":~")
   local hl = {
     { row = 3, col_s = 0, col_e = #"●", group = "DbDashSidebarRunning" },
-    { row = 3, col_s = #"● = Running  ", col_e = #"● = Running  ○", group = "DbDashSidebarIdle" },
+    { row = 3, col_s = #"● = Running  ", col_e = #"● = Running  ◐", group = "DbDashSidebarPaused" },
+    { row = 3, col_s = #"● = Running  ◐ = Paused  ", col_e = #"● = Running  ◐ = Paused  ○", group = "DbDashSidebarIdle" },
   }
   local nodes = {}
 
@@ -123,15 +124,15 @@ function M.render(buf)
     local indent = string.rep("  ", depth)
     for _, f in ipairs(e.files) do
       local path = vim.fs.joinpath(dir, f)
-      local running = sched.get(path) ~= nil
-      local mark = running and "●" or "○"
+      local d = sched.get(path)
+      local mark, group = "○", "DbDashSidebarIdle"
+      if d and d.paused then
+        mark, group = "◐", "DbDashSidebarPaused"
+      elseif d then
+        mark, group = "●", "DbDashSidebarRunning"
+      end
       lines[#lines + 1] = indent .. mark .. " " .. f
-      hl[#hl + 1] = {
-        row = #lines - 1,
-        col_s = #indent,
-        col_e = #indent + #mark,
-        group = running and "DbDashSidebarRunning" or "DbDashSidebarIdle",
-      }
+      hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #indent + #mark, group = group }
       nodes[tostring(#lines)] = { path = path }
     end
     for _, d in ipairs(e.dirs) do

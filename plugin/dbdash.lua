@@ -127,6 +127,17 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
     end
   end,
 })
+-- Dashboards not shown in the current tab page pause (dashboard.pause_hidden).
+vim.api.nvim_create_autocmd({ "BufWinEnter", "BufWinLeave", "WinClosed", "TabEnter" }, {
+  group = group,
+  callback = function()
+    if package.loaded["dbdash.scheduler"] then
+      vim.schedule(function()
+        require("dbdash.scheduler").update_visibility()
+      end)
+    end
+  end,
+})
 vim.api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
   group = group,
   callback = function()

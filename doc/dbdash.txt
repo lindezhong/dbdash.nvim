@@ -54,6 +54,7 @@ defaults: >lua
     dashboard = {
       open = "current",    -- where :DbDashStart shows a dashboard:
                            -- "current" | "vsplit" | "split" | "tab"
+      pause_hidden = true, -- no queries while not on screen, see below
       keys = { modify = "a", show_args = "A", refresh = "r",
                reset = "R", show_sql = "s" },
     },
@@ -120,7 +121,10 @@ database:
     interactively; without it only `required` arguments without a value.
 
 :DbDashRestart                                                *:DbDashRestart*
-    Run the current dashboard's query now and restart its countdown.
+    Run the current dashboard's query now and restart its countdown. If a
+    query is still running, it runs again as soon as that one finishes (the
+    same happens when an argument changes); timer refreshes that come while
+    a query runs are skipped instead.
 
 :DbDashStop [{config}]                                           *:DbDashStop*
     Stop a dashboard (default: the current one) and close its buffer.
@@ -136,11 +140,20 @@ database:
 :DbDash                                                              *:DbDash*
     Open the sidebar: the *.yaml / *.yml files of the current directory and
     its subdirectories as a tree (see `sidebar` in |dbdash-setup| for the
-    directory, globs and width). Files show `●` when their dashboard runs and
-    `○` otherwise; directories show `▸` (collapsed) or `▾` (expanded) and
-    stay expanded when the sidebar is reopened. Hidden directories and names
-    matching `sidebar.exclude` (by default `*.schema.yaml`) are not listed;
-    without config files the list says so.
+    directory, globs and width). Files show `●` when their dashboard runs,
+    `◐` when it is paused (see |dbdash-pause|) and `○` otherwise;
+    directories show `▸` (collapsed) or `▾` (expanded) and stay expanded
+    when the sidebar is reopened. Hidden directories and names matching
+    `sidebar.exclude` (by default `*.schema.yaml`) are not listed; without
+    config files the list says so.
+
+                                                                *dbdash-pause*
+A dashboard that no window of the current tab page shows (you switched the
+window to another buffer, or it is only in another tab page) pauses: no
+queries, no countdown. A window that shows it counts even when the cursor
+is in another window. When it is shown again, it refreshes right away if
+its next refresh is due, and otherwise continues the countdown. Set
+`dashboard.pause_hidden = false` to keep hidden dashboards refreshing.
 
 :DbDashClose                                                    *:DbDashClose*
     Close the sidebar.
@@ -714,7 +727,8 @@ All groups link to standard groups by default:
 
 Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
 `Directory`), `DbDashSidebarRunning` (● of running dashboards, links to
-`DiagnosticOk`), `DbDashSidebarIdle` (○, links to `Normal`).
+`DiagnosticOk`), `DbDashSidebarPaused` (◐ of paused ones, links to
+`DiagnosticWarn`), `DbDashSidebarIdle` (○, links to `Normal`).
 
 Colors in configs may be hex ("#3498db"), names ("blue", "bold blue"),
 or existing highlight groups ("DiagnosticOk").
