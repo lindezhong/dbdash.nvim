@@ -1,0 +1,54 @@
+│                  Headcount share
+  ^ 18-33 DbDashTitle
+│   ▄▟██▙▄   
+  ^ 3-12 DbDashSeries4
+  ^ 12-21 DbDashSeries1
+│  ▟██████▙  
+  ^ 2-14 DbDashSeries4
+  ^ 14-26 DbDashSeries1
+│ ▟████████▙ 
+  ^ 1-16 DbDashSeries4
+  ^ 16-31 DbDashSeries1
+│▐██████████▌
+  ^ 0-18 DbDashSeries4
+  ^ 18-36 DbDashSeries1
+│▟██████████▙   ■ IT                       42   22.8%
+  ^ 0-18 DbDashSeries4
+  ^ 18-36 DbDashSeries1
+  ^ 39-42 DbDashSeries1
+  ^ 42-65 DbDashLabel
+  ^ 65-70 DbDashNumber
+  ^ 70-78 DbDashMuted
+│████████████   ■ HR                        7    3.8%
+  ^ 0-18 DbDashSeries4
+  ^ 18-33 DbDashSeries1
+  ^ 33-36 DbDashSeries2
+  ^ 39-42 DbDashSeries2
+  ^ 42-65 DbDashLabel
+  ^ 65-70 DbDashNumber
+  ^ 70-78 DbDashMuted
+│████████████   ■ Finance                  15    8.2%
+  ^ 0-18 DbDashSeries4
+  ^ 18-24 DbDashSeries3
+  ^ 24-36 DbDashSeries2
+  ^ 39-42 DbDashSeries3
+  ^ 42-65 DbDashLabel
+  ^ 65-70 DbDashNumber
+  ^ 70-78 DbDashMuted
+│▜██████████▛   ■ Research & Development  120   65.2%
+  ^ 0-24 DbDashSeries4
+  ^ 24-36 DbDashSeries3
+  ^ 39-42 DbDashSeries4
+  ^ 42-65 DbDashLabel
+  ^ 65-70 DbDashNumber
+  ^ 70-78 DbDashMuted
+│▐██████████▌
+  ^ 0-27 DbDashSeries4
+  ^ 27-36 DbDashSeries3
+│ ▜████████▛ 
+  ^ 1-28 DbDashSeries4
+  ^ 28-31 DbDashSeries3
+│  ▜██████▛  
+  ^ 2-26 DbDashSeries4
+│   ▀▜██▛▀   
+  ^ 3-21 DbDashSeries4

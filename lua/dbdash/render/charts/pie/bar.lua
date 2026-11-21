@@ -1,9 +1,6 @@
 -- "Pie" as one proportional bar plus a legend with values and percentages.
 --   ███████████████▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░
 --   ■ IT        42   35.0%
-local C = require("dbdash.render.charts.common")
-local W = require("dbdash.util.width")
-local fmt = require("dbdash.render.format")
 
 local M = { name = "bar" }
 
@@ -32,37 +29,23 @@ end
 M.apportion = apportion
 
 function M.render(rs, show, ctx)
-  local style = C.nn(show.style) or {}
-  local li = C.col(rs, C.nn(show.label_column), "label_column")
-  local vi = C.col(rs, C.nn(show.value_column), "value_column")
-  local items, sum = {}, 0
-  for _, row in ipairs(rs.rows) do
-    local v = C.num(row[vi])
-    if v and v > 0 then
-      items[#items + 1] = { label = C.text(row[li]), value = v }
-      sum = sum + v
-    end
-  end
+  local P = require("dbdash.render.charts.pie.common")
+  local items, sum = P.items(rs, show, ctx)
   local lines, hl = {}, {}
-  local function add(s, spans)
+  local function add(s, spans, shift)
     lines[#lines + 1] = s
     for _, sp in ipairs(spans or {}) do
-      hl[#hl + 1] = { row = #lines - 1, col_s = sp[1], col_e = sp[2], group = sp[3] }
+      hl[#hl + 1] = { row = #lines - 1, col_s = sp[1] + (shift or 0), col_e = sp[2] + (shift or 0), group = sp[3] }
     end
   end
-  local title = C.nn(show.title)
   local width = math.max(10, ctx.width - 2)
-  if title and title ~= "" then
-    local t = W.truncate(title, width)
-    local pad = math.max(0, math.floor((width - W.width(t)) / 2)) + 1
-    add(string.rep(" ", pad) .. t, { { pad, pad + #t, "DbDashTitle" } })
+  local title = P.title(show, width)
+  if title then
+    add(" " .. title.text, title.spans, 1)
   end
   if #items == 0 then
     add("(no positive values to plot)", { { 0, 28, "DbDashMuted" } })
     return { lines = lines, hl = hl }
-  end
-  for i, it in ipairs(items) do
-    it.group = C.color(ctx, show, i, nil, it.label)
   end
   local sizes = apportion(vim.tbl_map(function(it)
     return it.value
@@ -77,38 +60,8 @@ function M.render(rs, show, ctx)
   add(table.concat(parts), spans)
   add(table.concat(parts), spans)
   add("")
-
-  local show_labels = C.nn(style.show_labels) ~= false
-  local show_values = C.nn(style.show_values) ~= false
-  local show_pct = C.nn(style.show_percentages) ~= false
-  local lw, vw = 0, 0
-  for _, it in ipairs(items) do
-    lw = math.max(lw, W.width(it.label))
-    vw = math.max(vw, #fmt.number(it.value))
-  end
-  lw = math.min(lw, 30)
-  for _, it in ipairs(items) do
-    local b = { " " }
-    local p = 1
-    local sp = {}
-    local function put(s, g)
-      if g then
-        sp[#sp + 1] = { p, p + #s, g }
-      end
-      b[#b + 1] = s
-      p = p + #s
-    end
-    put("■", it.group)
-    if show_labels then
-      put(" " .. W.pad(it.label, lw), "DbDashLabel")
-    end
-    if show_values then
-      put("  " .. W.pad(fmt.number(it.value), vw, "right"), "DbDashNumber")
-    end
-    if show_pct then
-      put(("  %5.1f%%"):format(it.value / sum * 100), "DbDashMuted")
-    end
-    add(table.concat(b), sp)
+  for _, l in ipairs(P.legend(items, sum, show)) do
+    add(" " .. l.text, l.spans, 1)
   end
   return { lines = lines, hl = hl }
 end

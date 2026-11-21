@@ -39,7 +39,7 @@ M.BUILTIN = {
     histogram = { "horizontal", "vertical" },
     boxplot = { "boxdraw" },
     heatmap = { "halfblock", "block" },
-    pie = { "bar" },
+    pie = { "bar", "circle" },
   },
   canvas = { "braille", "quadrant", "block", "halfblock", "ascii" },
   ticks = { "nice", "linear" },

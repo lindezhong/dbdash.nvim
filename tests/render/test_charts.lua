@@ -81,6 +81,12 @@ T["pie as a proportional bar"] = function()
   golden({ type = "pie", title = "Headcount share", label_column = "department", value_column = "headcount", colors = { "#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4" } }, fx.departments(), "departments")
 end
 
+T["pie as a circle"] = function()
+  local show = { type = "pie", renderer = "circle", title = "Headcount share", label_column = "department", value_column = "headcount" }
+  golden(show, fx.departments(), "departments")
+  golden(vim.tbl_extend("force", show, { canvas = "quadrant" }), fx.departments(), "departments-quadrant")
+end
+
 T["missing columns are reported in place of the chart"] = function()
   local out = render.render(fx.hourly_visits(), { type = "line", x_column = "nope", y_column = "visits" }, SIZE)
   eq(out.lines[1], "column 'nope' (show.x_column) not found; available: hour, visits, signups")
@@ -98,6 +104,7 @@ T["every chart fits the requested width"] = function()
       { { type = "boxplot", category_column = "class", value_column = "score" }, fx.scores() },
       { { type = "heatmap", x_column = "hour", y_column = "day", value_column = "activity" }, fx.activity() },
       { { type = "pie", label_column = "department", value_column = "headcount" }, fx.departments() },
+      { { type = "pie", renderer = "circle", label_column = "department", value_column = "headcount" }, fx.departments() },
     }) do
       local out = render.render(case[2], case[1], { width = w, height = 20 })
       for _, l in ipairs(out.lines) do

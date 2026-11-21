@@ -184,7 +184,7 @@ Styles                                                           *dbdash-styles*
   histogram  horizontal, vertical
   boxplot    boxdraw
   heatmap    halfblock, block
-  pie        bar
+  pie        bar, circle                        (circle: canvas)
   table      box
 
 Pick per config with `show.renderer` / `show.canvas`, or set defaults:  >lua
