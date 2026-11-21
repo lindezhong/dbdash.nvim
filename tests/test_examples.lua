@@ -56,9 +56,16 @@ T["examples cover every chart type and alternative style"] = function()
   end
 end
 
+---True when python3 with jsonschema and PyYAML can validate (dev machines only).
+local function have_python()
+  local ok, r = pcall(function()
+    return vim.system({ "python3", "-I", "-c", "import jsonschema, yaml" }):wait()
+  end)
+  return ok and r.code == 0
+end
+
 T["examples validate against the schema"] = function()
-  local check = vim.system({ "python3", "-I", "-c", "import jsonschema, yaml" }):wait()
-  if check.code ~= 0 then
+  if not have_python() then
     MiniTest.skip("python3 with jsonschema and PyYAML is needed")
   end
   local r = vim.system({ "python3", "-I", "tests/examples_schema.py" }, { text = true }):wait()
@@ -67,8 +74,7 @@ T["examples validate against the schema"] = function()
 end
 
 T["the schema rejects invalid configs"] = function()
-  local check = vim.system({ "python3", "-I", "-c", "import jsonschema, yaml" }):wait()
-  if check.code ~= 0 then
+  if not have_python() then
     MiniTest.skip("python3 with jsonschema and PyYAML is needed")
   end
   local f = vim.fn.tempname() .. ".yaml"

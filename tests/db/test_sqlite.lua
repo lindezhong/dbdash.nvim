@@ -130,8 +130,9 @@ T["Windows: sqlite:///C:/... is the drive path, relative paths join base_dir"] =
   end)
   jit.os = os_was
   assert(ok, err)
-  -- elsewhere a leading slash stays
-  eq(drv.parse_url(url.parse("sqlite:///C:/data/app.db")).database, "/C:/data/app.db")
+  if os_was ~= "Windows" then -- elsewhere a leading slash stays
+    eq(drv.parse_url(url.parse("sqlite:///C:/data/app.db")).database, "/C:/data/app.db")
+  end
 end
 
 return T

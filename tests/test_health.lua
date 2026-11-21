@@ -56,10 +56,14 @@ T["dbdash: setup() errors and passwords.json problems are reported"] = function(
   local text = check("dbdash")
   eq(has(text, "WARNING sidebar.width: invalid size"), true)
   eq(has(text, "passwords.json: 1 entries"), true)
-  eq(has(text, "can be read by other users"), true)
-  eq(has(text, "chmod 600"), true)
-  vim.uv.fs_chmod(cred.file(), tonumber("600", 8))
-  eq(has(check("dbdash"), "can be read by other users"), false)
+  if jit.os ~= "Windows" then -- no Unix permissions to check there
+    eq(has(text, "can be read by other users"), true)
+    eq(has(text, "chmod 600"), true)
+    vim.uv.fs_chmod(cred.file(), tonumber("600", 8))
+    eq(has(check("dbdash"), "can be read by other users"), false)
+  else
+    eq(has(text, "can be read by other users"), false)
+  end
   vim.fn.writefile({ "[" }, cred.file())
   vim.uv.fs_utime(cred.file(), os.time() + 5, os.time() + 5)
   eq(has(check("dbdash"), "ERROR"), true)

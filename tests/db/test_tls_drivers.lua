@@ -3,9 +3,18 @@ local h = require("tests.helpers")
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()
 
+---SHA-256 fingerprint of a fixture certificate: from openssl when it is installed (an
+---independent reference), else computed here (e.g. on Windows).
 local function fingerprint(cert)
-  local out = vim.system({ "openssl", "x509", "-in", "tests/fixtures/" .. cert, "-noout", "-fingerprint", "-sha256" }, { text = true }):wait()
-  return "sha256:" .. out.stdout:match("=(%S+)")
+  local path = "tests/fixtures/" .. cert
+  local ok, out = pcall(function()
+    return vim.system({ "openssl", "x509", "-in", path, "-noout", "-fingerprint", "-sha256" }, { text = true }):wait()
+  end)
+  if ok and out.code == 0 then
+    return "sha256:" .. out.stdout:match("=(%S+)")
+  end
+  local pem = table.concat(vim.fn.readfile(path), "\n")
+  return require("dbdash.net.tls.x509").fingerprint(require("dbdash.net.tls.truststore").pem_certs(pem)[1])
 end
 
 local WRONG = "sha256:" .. string.rep("00:", 31) .. "00"

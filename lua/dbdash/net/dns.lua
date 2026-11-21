@@ -1,7 +1,7 @@
 -- Minimal DNS client for SRV and TXT lookups (mongodb+srv). Runs inside util.async tasks.
 --
 -- Queries go over UDP to the name servers from /etc/resolv.conf (or an explicit server),
--- retrying over TCP when the answer is truncated. On Windows, DnsQuery_W (dnsapi, a system
+-- retrying over TCP when the answer is truncated. On Windows, DnsQuery_UTF8 (dnsapi, a system
 -- DLL) is used instead unless a server is given.
 local async = require("dbdash.util.async")
 local bit = require("bit")
@@ -197,54 +197,44 @@ local function tcp_query(server, packet, timeout)
   return res
 end
 
----Windows: DnsQuery_W through dnsapi.
+---Windows: DnsQuery_UTF8 through dnsapi (UTF-8 names in and out).
 local function windows_query(name, qtype)
   local ffi = require("ffi")
   pcall(ffi.cdef, [[
-    typedef struct DBDASH_DNS_RECORDW {
-      struct DBDASH_DNS_RECORDW *pNext; uint16_t *pName; uint16_t wType; uint16_t wDataLength;
+    typedef struct DBDASH_DNS_RECORDA {
+      struct DBDASH_DNS_RECORDA *pNext; char *pName; uint16_t wType; uint16_t wDataLength;
       uint32_t Flags; uint32_t dwTtl; uint32_t dwReserved;
       union {
-        struct { uint16_t *pNameTarget; uint16_t wPriority; uint16_t wWeight; uint16_t wPort; uint16_t Pad; } SRV;
-        struct { uint32_t dwStringCount; uint16_t *pStringArray[1]; } TXT;
+        struct { char *pNameTarget; uint16_t wPriority; uint16_t wWeight; uint16_t wPort; uint16_t Pad; } SRV;
+        struct { uint32_t dwStringCount; char *pStringArray[1]; } TXT;
       } Data;
-    } DBDASH_DNS_RECORDW;
-    long DnsQuery_W(const uint16_t *name, uint16_t type, uint32_t options, void *extra,
-                    DBDASH_DNS_RECORDW **results, void *reserved);
-    void DnsRecordListFree(DBDASH_DNS_RECORDW *list, int freetype);
+    } DBDASH_DNS_RECORDA;
+    long DnsQuery_UTF8(const char *name, uint16_t type, uint32_t options, void *extra,
+                       DBDASH_DNS_RECORDA **results, void *reserved);
+    void DnsRecordListFree(DBDASH_DNS_RECORDA *list, int freetype);
   ]])
   local dnsapi = ffi.load("dnsapi")
-  local function wide(s)
-    local buf = ffi.new("uint16_t[?]", #s + 1)
-    for i = 1, #s do
-      buf[i - 1] = s:byte(i)
-    end
-    return buf
-  end
-  local function narrow(p)
-    local out, i = {}, 0
-    while p[i] ~= 0 do
-      out[#out + 1] = string.char(p[i] < 128 and p[i] or 63)
-      i = i + 1
-    end
-    return table.concat(out)
-  end
-  local res = ffi.new("DBDASH_DNS_RECORDW*[1]")
-  local rc = dnsapi.DnsQuery_W(wide(name), qtype, 0, nil, res, nil)
-  if rc ~= 0 then
-    fail("lookup of %s failed (error %d)", name, tonumber(rc))
+  local res = ffi.new("DBDASH_DNS_RECORDA*[1]")
+  local rc = tonumber(dnsapi.DnsQuery_UTF8(name, qtype, 0, nil, res, nil))
+  if rc == 9003 then -- DNS_ERROR_RCODE_NAME_ERROR
+    fail("%s does not exist (NXDOMAIN)", name)
+  elseif rc == 9501 then -- DNS_INFO_NO_RECORDS
+    return {}
+  elseif rc ~= 0 then
+    fail("lookup of %s failed (error %d)", name, rc)
   end
   local answers = {}
   local r = res[0]
   while r ~= nil do
     if r.wType == qtype then
-      local a = { type = qtype, name = narrow(r.pName), ttl = r.dwTtl }
+      local a = { type = qtype, name = ffi.string(r.pName), ttl = r.dwTtl }
       if qtype == M.TYPE.SRV then
-        a.srv = { priority = r.Data.SRV.wPriority, weight = r.Data.SRV.wWeight, port = r.Data.SRV.wPort, target = narrow(r.Data.SRV.pNameTarget) }
+        local d = r.Data.SRV
+        a.srv = { priority = d.wPriority, weight = d.wWeight, port = d.wPort, target = ffi.string(d.pNameTarget) }
       else
         a.txt = {}
         for k = 0, r.Data.TXT.dwStringCount - 1 do
-          a.txt[#a.txt + 1] = narrow(r.Data.TXT.pStringArray[k])
+          a.txt[#a.txt + 1] = ffi.string(r.Data.TXT.pStringArray[k])
         end
       end
       answers[#answers + 1] = a

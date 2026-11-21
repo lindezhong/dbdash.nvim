@@ -92,7 +92,7 @@ end
 T["start shows a dashboard buffer"] = function()
   child.cmd("DbDashStart board.yaml")
   wait_loaded()
-  eq(child.lua_get("vim.api.nvim_buf_get_name(0)"), "dbdash://" .. dir .. "/board.yaml")
+  eq(child.lua_get("vim.api.nvim_buf_get_name(0)"), "dbdash://" .. vim.fs.normalize(dir) .. "/board.yaml")
   eq(child.lua_get("{ vim.bo.buftype, vim.bo.filetype, vim.bo.modifiable, vim.bo.swapfile }"), { "", "dbdash", false, false })
   child.cmd("write") -- nothing to write, no error
   eq(child.lua_get("vim.bo.modified"), false) -- never blocks :quit

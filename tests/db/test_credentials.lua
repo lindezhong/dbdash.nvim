@@ -35,7 +35,9 @@ local function run(fn)
 end
 
 T["the data directory is isolated from the user's"] = function()
-  eq(file:find("/deps/xdg/data/", 1, true) ~= nil, true)
+  local xdg = vim.fs.normalize(assert(vim.env.XDG_DATA_HOME))
+  eq(vim.startswith(vim.fs.normalize(file), xdg), true)
+  eq(xdg:find("/deps/xdg", 1, true) ~= nil, true)
 end
 
 T["${ENV} expands, percent-encodes URL characters, $${ stays literal"] = function()
@@ -75,9 +77,13 @@ T["passwords.json: most specific key first"] = function()
   eq(pcall(pw, "postgres://app@db/shop"), false)
 end
 
+local WIN = jit.os == "Windows"
+
 T["password_cmd: output is the password, cached, failures reported"] = function()
   local count = vim.fn.tempname()
-  local cmd = ("echo x >> %s; printf 'secret\\nignored'"):format(count)
+  -- string commands run through sh -c, on Windows through cmd /c
+  local cmd = WIN and ("echo x>>%s& echo secret& echo ignored"):format(count)
+    or ("echo x >> %s; printf 'secret\\nignored'"):format(count)
   local info = url.parse("postgres://app@db/shop")
   local r = run(function()
     return cred.from_cmd(cmd, info), cred.from_cmd(cmd, info)
@@ -90,11 +96,12 @@ T["password_cmd: output is the password, cached, failures reported"] = function(
   end)
   eq(#vim.fn.readfile(count), 2)
   r = run(function()
-    return cred.from_cmd({ "sh", "-c", "echo nope >&2; exit 3" }, info)
+    local argv = WIN and { "cmd.exe", "/c", "echo nope 1>&2& exit /b 3" } or { "sh", "-c", "echo nope >&2; exit 3" }
+    return cred.from_cmd(argv, info)
   end)
-  eq({ r.err.phase, r.err.message }, { "connect", "password_cmd failed (exit 3): nope" })
+  eq({ r.err.phase, vim.trim(r.err.message) }, { "connect", "password_cmd failed (exit 3): nope" })
   r = run(function()
-    return cred.from_cmd("true", info)
+    return cred.from_cmd(WIN and "rem" or "true", info)
   end)
   eq(r.err.message, "password_cmd printed no password")
 end

@@ -657,7 +657,10 @@ verify instead of the URL host), `connect_timeout` and `timeout` (default
 10s and 30s, see `defaults` in |dbdash-setup|), `application_name`.
 
 SQLite options (`database.options`): `lib_path`, `readonly`, `create`
-(create a missing file; off by default).
+(create a missing file; off by default). On Windows put sqlite3.dll (from
+https://sqlite.org/download.html) next to nvim.exe or on PATH, or point
+`lib_path` at it; winsqlite3.dll of newer Windows versions is used
+otherwise. `sqlite:///C:/data/app.db` is a drive path there.
 
 Passwords                                                 *dbdash-passwords*
 
