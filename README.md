@@ -49,6 +49,9 @@ vim.pack.add({ "https://github.com/lindezhong/dbdash.nvim" })
 ```
 
 `setup()` is optional. Run `:helptags ALL` if your plugin manager does not build help tags.
+`:checkhealth dbdash` checks the plugin; `:checkhealth dbdash.sqlite` (or `.postgres`,
+`.mongodb`, ...) checks what one database needs, such as the SQLite library or CA
+certificates.
 
 ## Quick start
 

@@ -75,6 +75,10 @@ M.DEFAULTS = defaults
 ---@type dbdash.Options
 M.options = vim.deepcopy(defaults)
 
+---Problems found by the last setup() call (empty when setup() was not called).
+---@type string[]
+M.setup_errors = {}
+
 -- Validation -------------------------------------------------------------------------------
 
 local size = require("dbdash.util.size")
@@ -285,6 +289,7 @@ end
 function M.setup(opts)
   opts = vim.deepcopy(opts or {})
   local errors = M.validate(opts)
+  M.setup_errors = errors -- shown by :checkhealth dbdash
   if #errors > 0 then
     vim.notify("dbdash setup: " .. table.concat(errors, "\n"), vim.log.levels.ERROR)
   end

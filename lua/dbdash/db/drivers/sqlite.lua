@@ -22,7 +22,7 @@ local M = {
 }
 
 -- Runs in a worker thread: must not use upvalues. Arguments and result are strings.
-local function worker(path, sql, max_rows, timeout_ms, lib_path, readonly, create)
+local function worker(path, sql, max_rows, timeout_ms, libs, readonly, create)
   -- The progress handler is a Lua callback called from sqlite3_step. LuaJIT raises "bad
   -- callback" (and Neovim aborts) when a callback runs inside a JIT-compiled FFI call, which
   -- happens once the step loop gets hot in the reused thread VM. Keep this code interpreted.
@@ -59,15 +59,9 @@ local function worker(path, sql, max_rows, timeout_ms, lib_path, readonly, creat
     return vim.json.encode(t)
   end
 
-  local candidates
-  if lib_path ~= "" then
-    candidates = { lib_path }
-  elseif jit.os == "Windows" then
-    candidates = { "sqlite3.dll", "winsqlite3.dll" }
-  elseif jit.os == "OSX" then
-    candidates = { "/usr/lib/libsqlite3.dylib", "libsqlite3.dylib", "sqlite3" }
-  else
-    candidates = { "libsqlite3.so.0", "libsqlite3.so", "sqlite3" }
+  local candidates = {}
+  for name in libs:gmatch("[^\n]+") do
+    candidates[#candidates + 1] = name
   end
   local lib, load_errs = nil, {}
   for _, name in ipairs(candidates) do
@@ -376,9 +370,23 @@ function M.connect(info)
   return setmetatable({ info = info }, Conn)
 end
 
+---Library names tried in order: database.options.lib_path, or the usual names per OS.
+---@param lib_path string?
+---@return string[]
+function M.lib_candidates(lib_path)
+  if lib_path and lib_path ~= "" then
+    return { (lib_path:gsub("^~", vim.uv.os_homedir() or "~")) }
+  elseif jit.os == "Windows" then
+    return { "sqlite3.dll", "winsqlite3.dll" }
+  elseif jit.os == "OSX" then
+    return { "/usr/lib/libsqlite3.dylib", "libsqlite3.dylib", "sqlite3" }
+  end
+  return { "libsqlite3.so.0", "libsqlite3.so", "sqlite3" }
+end
+
 function Conn:execute(sql, opts)
   local o = self.info.options or {}
-  local lib_path = o.lib_path ~= nil and o.lib_path ~= vim.NIL and o.lib_path:gsub("^~", vim.uv.os_homedir() or "~") or ""
+  local lib_path = o.lib_path ~= nil and o.lib_path ~= vim.NIL and o.lib_path or nil
   local raw = async.await(function(cb)
     local work = vim.uv.new_work(worker, cb)
     work:queue(
@@ -386,7 +394,7 @@ function Conn:execute(sql, opts)
       sql,
       tostring(opts.max_rows),
       tostring(opts.timeout),
-      lib_path,
+      table.concat(M.lib_candidates(lib_path), "\n"),
       o.readonly == true and "1" or "0",
       o.create == true and "1" or "0"
     )

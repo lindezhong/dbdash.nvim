@@ -90,6 +90,24 @@ keys), `false` (none) or a table that changes some of them: >lua
 Global keys already mapped by you are not overwritten. `styles`, `ticks` and
 `register` are described in |dbdash-styles|.
 
+Health checks                                                  *dbdash-health*
+
+`:checkhealth dbdash` checks the plugin itself: Neovim and LuaJIT, the
+options of the last setup() call, and the passwords file
+(|dbdash-passwords|). What a database needs is checked only for that
+database:
+
+  :checkhealth dbdash.sqlite     the SQLite library and its version
+  :checkhealth dbdash.postgres   the driver and the system CA store (needed
+               dbdash.mysql      for tls=verify-ca / verify-full without ca=)
+               dbdash.mssql
+               dbdash.redis
+               dbdash.cassandra
+  :checkhealth dbdash.mongodb    the same, plus the DNS name servers used by
+                                 mongodb+srv://
+
+`:checkhealth dbdash*` runs all of them.
+
 ==============================================================================
 3. COMMANDS                                                  *dbdash-commands*
 
@@ -593,8 +611,8 @@ wins, then `database.password_cmd`, then `passwords.json`:
   the database's default): >json
     { "postgres://app@db.internal:5432/app": "secret",
       "redis://cache.internal:6379": "redis-secret" }
-<  Keep it readable by you only (chmod 600). Changes are picked up without
-  restarting.
+<  Keep it readable by you only (chmod 600; `:checkhealth dbdash` warns
+  otherwise). Changes are picked up without restarting.
 
 PostgreSQL  `postgres://user:pass@host:5432/db`  cleartext, md5 and
             SCRAM-SHA-256 authentication; `options` URL parameter is sent as
