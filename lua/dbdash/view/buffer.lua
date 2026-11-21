@@ -49,7 +49,10 @@ function M.create(path, buf)
     vim.api.nvim_buf_set_name(buf, name)
   end
   local bo = vim.bo[buf]
-  bo.buftype = "nofile"
+  -- A normal buffer, not nofile/acwrite: :mksession treats those as having no file name
+  -- and skips their windows unless 'sessionoptions' has "blank" (often removed). Reads and
+  -- writes of dbdash://* go to BufReadCmd / a no-op BufWriteCmd (plugin/dbdash.lua).
+  bo.buftype = ""
   bo.bufhidden = "hide"
   bo.swapfile = false
   bo.buflisted = true

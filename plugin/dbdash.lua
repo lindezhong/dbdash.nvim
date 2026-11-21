@@ -94,9 +94,23 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
   pattern = "dbdash://*",
   callback = function(ev)
     local path = require("dbdash.view.buffer").path_of(ev.match)
-    if path then
-      require("dbdash.scheduler").start(path, { buf = ev.buf, no_show = true })
+    if not path then
+      return
     end
+    local sched = require("dbdash.scheduler")
+    local d = sched.get(path)
+    if d and d.buf == ev.buf then
+      d:redraw() -- :edit cleared the buffer of a running dashboard
+    else
+      sched.start(path, { buf = ev.buf, no_show = true })
+    end
+  end,
+})
+vim.api.nvim_create_autocmd("BufWriteCmd", {
+  group = group,
+  pattern = "dbdash://*",
+  callback = function(ev)
+    vim.bo[ev.buf].modified = false -- dashboards have nothing to write
   end,
 })
 vim.api.nvim_create_autocmd("SessionLoadPost", {

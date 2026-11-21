@@ -93,7 +93,11 @@ T["start shows a dashboard buffer"] = function()
   child.cmd("DbDashStart board.yaml")
   wait_loaded()
   eq(child.lua_get("vim.api.nvim_buf_get_name(0)"), "dbdash://" .. dir .. "/board.yaml")
-  eq(child.lua_get("{ vim.bo.buftype, vim.bo.filetype, vim.bo.modifiable, vim.bo.swapfile }"), { "nofile", "dbdash", false, false })
+  eq(child.lua_get("{ vim.bo.buftype, vim.bo.filetype, vim.bo.modifiable, vim.bo.swapfile }"), { "", "dbdash", false, false })
+  child.cmd("write") -- nothing to write, no error
+  eq(child.lua_get("vim.bo.modified"), false) -- never blocks :quit
+  child.cmd("edit") -- reloading keeps the running dashboard
+  eq({ child.lua_get("vim.bo.filetype"), child.lua_get("#require('dbdash.scheduler').list()") }, { "dbdash", 1 })
   eq(lines()[1], "n=1  label=hello  ids=1,2")
   eq(find_line("│%s+1 │ hello │ %(1, 2%)") ~= nil, true)
   for _, k in ipairs({ "a", "A", "r", "R", "s" }) do
@@ -232,6 +236,30 @@ T["sessions restore running dashboards"] = function()
   eq(child.lua_get("vim.bo.filetype"), "dbdash")
   -- arguments are session-only: defaults after restore
   eq(lines()[1], "n=1  label=hello  ids=1,2")
+end
+
+T["sessions without 'blank' in sessionoptions keep dashboard windows"] = function()
+  -- Regression: session setups often drop "blank", and :mksession then skipped the windows
+  -- of nofile buffers, so dashboards were neither shown nor restarted.
+  vim.fn.writefile(vim.split(CFG, "\n"), dir .. "/second.yaml")
+  child.cmd("set sessionoptions-=blank")
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  child.cmd("vsplit")
+  child.cmd("DbDashStart second.yaml")
+  child.lua([[_G.wait_for(function() return #require("dbdash.scheduler").list() == 2 end)]])
+  local session = dir .. "/Session2.vim"
+  child.cmd("mksession! " .. vim.fn.fnameescape(session))
+  setup_child(true)
+  child.cmd("source " .. vim.fn.fnameescape(session))
+  child.lua([[_G.wait_for(function()
+    local ds = require("dbdash.scheduler").list()
+    return #ds == 2 and ds[1].panels[1].rs ~= nil and ds[2].panels[1].rs ~= nil
+  end)]])
+  eq(child.lua_get("#require('dbdash.scheduler').list()"), 2)
+  eq(child.lua_get([[vim.tbl_map(function(w)
+    return vim.bo[vim.api.nvim_win_get_buf(w)].filetype
+  end, vim.api.nvim_list_wins())]]), { "dbdash", "dbdash" })
 end
 
 T[":edit dbdash://<path> starts the dashboard"] = function()
