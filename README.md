@@ -13,6 +13,8 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
 - **Query templates**: a Jinja2 subset with SQL-safe quoting filters, autoescape, macros
   and imports.
 - **Arguments**: typed variables set from the command line, prompts or in the dashboard.
+- **Sidebar**: browse config files and subdirectories as a tree, start and stop dashboards.
+- **Sessions**: dashboards come back with `:mksession`; changed arguments can be kept too.
 - **TLS**: `require`, certificate pinning, `verify-ca` / `verify-full` against the system
   CA store or a CA bundle.
 
@@ -29,10 +31,12 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-  "<owner>/dbdash.nvim",
-  cmd = { "DbDash", "DbDashStart" },
+  "lindezhong/dbdash.nvim",
+  -- Load at startup: the plugin file only defines commands, mappings and autocmds
+  -- (modules load on first use), and sessions need its dbdash:// buffer handler.
+  lazy = false,
   opts = { -- optional, see :help dbdash-setup
-    sidebar = { width = "30%" },     -- columns or a percentage of the editor
+    sidebar = { width = "25%" },     -- columns or a percentage of the editor
     dashboard = { open = "vsplit" }, -- where :DbDashStart shows a dashboard
   },
 }
@@ -41,7 +45,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 With the built-in package manager:
 
 ```lua
-vim.pack.add({ "https://github.com/<owner>/dbdash.nvim" })
+vim.pack.add({ "https://github.com/lindezhong/dbdash.nvim" })
 ```
 
 `setup()` is optional. Run `:helptags ALL` if your plugin manager does not build help tags.
@@ -72,7 +76,8 @@ show:
 ```
 
 Then `:DbDashStart signups.yaml hours=48`, or `:DbDash` for a sidebar listing the configs
-in the current directory, with subdirectories you can expand.
+of the current directory as a tree: `<CR>` on a directory expands it, on a file starts its
+dashboard; `●` marks running dashboards, `○` the others.
 
 To try it without a database server, open any file in [`example/`](example): they all use
 an in-memory SQLite database.
@@ -89,7 +94,7 @@ an in-memory SQLite database.
 | `:DbDashShowVariables`, `:DbDashModifyVariable`, `:DbDashUpdateVariable {name} {value}`, `:DbDashResetVariables` | Show and change arguments |
 | `:DbDashShowSQL` | Show the rendered query |
 | `:DbDashStyle {type} {style}` | Re-render with another style, e.g. `:DbDashStyle line asciichart` |
-| `:DbDashMksession[!] [{file}]` | Write a session that restores dashboards |
+| `:DbDashMksession[!] [{file}]` | Write a session (any `:mksession` restores dashboards) |
 
 In a dashboard: `r` refresh, `a` modify an argument, `A` show arguments, `R` reset
 arguments, `s` show the query. Global mappings: `<leader>ds` start, `<leader>dr` refresh,
@@ -97,7 +102,20 @@ arguments, `s` show the query. Global mappings: `<leader>ds` start, `<leader>dr`
 
 Every key, the sidebar (width, position, directory, file globs), where dashboards open,
 the popup border and size, and the default interval, timeouts and row limit can be set
-in `setup()`; see `:help dbdash-setup`.
+in `setup()`; see `:help dbdash-setup`. Colors use highlight groups (`:help
+dbdash-highlights`), e.g. `DbDashSidebarDir` for sidebar directories.
+
+### Sessions
+
+Dashboard buffers are named `dbdash://<config path>`, so a session written by `:mksession`
+(or any session manager) reopens and restarts them, also when `'sessionoptions'` lacks
+`blank`. They restart with default arguments; to keep the changed ones, save and load them
+next to the session file from your session setup:
+
+```lua
+require("dbdash").mksession(session_file .. ".dbdash")   -- after :mksession
+require("dbdash").load_session(session_file .. ".dbdash") -- after sourcing the session
+```
 
 ## Configuration
 
@@ -138,7 +156,9 @@ mssql://user:pass@host:1433/db
 
 Common parameters: `tls=disable|require|pin|verify-ca|verify-full`,
 `fingerprint=sha256:...` (for `pin`), `ca=bundle.pem`, `tls_host=name`,
-`connect_timeout=10s`, `timeout=30s`. Passwords are percent-decoded. The query language
+`connect_timeout=10s`, `timeout=30s` (defaults changeable in `setup({ defaults })`).
+Passwords are percent-decoded. Also accepted: `sqlite3://`, `postgresql://`, `mariadb://`,
+`cql://`, `sqlserver://`. The query language
 follows the database: SQL, CQL, one Redis command, or a JSON document for MongoDB.
 Details: `:help dbdash-databases` and `:help dbdash-tls`.
 
@@ -160,7 +180,10 @@ The SQL filters quote for the dashboard's database (MySQL backslashes, SQL Serve
 
 ## Coming from vim-dashboard
 
-Existing configs mostly work. Differences:
+No Python, venv or pynvim any more. Commands are renamed from `:Dashboard…` to
+`:DbDash…` one to one (`:Dashboard` → `:DbDash`, `:DashboardStart` → `:DbDashStart`,
+`:DashboardMksession` → `:DbDashMksession`, ...); the buffer and sidebar keys are the
+same. Existing configs mostly work. Differences:
 
 - Arguments use `name:`; the old `key:` is rejected with a hint.
 - Fields only meaningful for matplotlib are ignored.
