@@ -4,7 +4,7 @@ Author:  dbdash.nvim contributors
 License: see LICENSE
 
 ==============================================================================
-CONTENTS                                                       *dbdash-contents*
+CONTENTS                                                     *dbdash-contents*
 
   1. Introduction ............................ |dbdash-intro|
   2. Setup ................................... |dbdash-setup|
@@ -18,7 +18,7 @@ CONTENTS                                                       *dbdash-contents*
  10. Lua API ................................. |dbdash-api|
 
 ==============================================================================
-1. INTRODUCTION                                                   *dbdash-intro*
+1. INTRODUCTION                                                 *dbdash-intro*
 
 dbdash.nvim runs a query on an interval and shows the result in a buffer as a
 table or a terminal chart. It is written in pure Lua for Neovim 0.12+ and has
@@ -29,7 +29,7 @@ Each config file (YAML) describes one dashboard: the database, the query (a
 Jinja-like template) and how to show the result.
 
 ==============================================================================
-2. SETUP                                                          *dbdash-setup*
+2. SETUP                                                        *dbdash-setup*
 
 Install with any plugin manager. Calling setup() is optional: >lua
 
@@ -37,49 +37,55 @@ Install with any plugin manager. Calling setup() is optional: >lua
     mappings = true,               -- global <leader>d* mappings
     countdown_interval = 10000,    -- ms between countdown updates
     countdown_position = "right_align",  -- "eol", "overlay"
+    styles = {},                   -- default renderer/canvas per chart type
+    ticks = "nice",                -- axis ticks: "nice" or "linear"
+    register = {},                 -- custom chart styles and canvases
   })
 <
-==============================================================================
-3. COMMANDS                                                    *dbdash-commands*
+`styles`, `ticks` and `register` are described in |dbdash-styles|. Existing
+mappings of the same keys are not overwritten.
 
-:DbDashStart[!] {config} [{name}={value} ...]                    *:DbDashStart*
+==============================================================================
+3. COMMANDS                                                  *dbdash-commands*
+
+:DbDashStart[!] {config} [{name}={value} ...]                   *:DbDashStart*
     Start the dashboard for {config} in the current window, or switch to it
     when it is already running. Arguments after the file set query arguments
     for this session (|dbdash-arguments|). With [!], every argument is asked
     for interactively; without it only `required` arguments without a value.
 
-:DbDashRestart                                                 *:DbDashRestart*
+:DbDashRestart                                                *:DbDashRestart*
     Run the current dashboard's query now and restart its countdown.
 
-:DbDashStop [{config}]                                            *:DbDashStop*
+:DbDashStop [{config}]                                           *:DbDashStop*
     Stop a dashboard (default: the current one) and close its buffer.
 
-:DbDashList                                                       *:DbDashList*
+:DbDashList                                                      *:DbDashList*
     List running dashboards.
 
-:DbDashStatus                                                   *:DbDashStatus*
+:DbDashStatus                                                  *:DbDashStatus*
     Show the current dashboard's config, database, next refresh and the last
     20 queries (duration, rows, errors, skipped refreshes).
 
-:DbDash                                                               *:DbDash*
+:DbDash                                                              *:DbDash*
     Open the sidebar listing *.yaml / *.yml files in the current directory.
 
-:DbDashClose                                                     *:DbDashClose*
+:DbDashClose                                                    *:DbDashClose*
     Close the sidebar.
 
-:DbDashShowVariables                                     *:DbDashShowVariables*
+:DbDashShowVariables                                    *:DbDashShowVariables*
     Show the current dashboard's arguments and values.
 
-:DbDashModifyVariable                                   *:DbDashModifyVariable*
+:DbDashModifyVariable                                  *:DbDashModifyVariable*
     Pick an argument and enter a new value.
 
-:DbDashUpdateVariable {name} {value}                    *:DbDashUpdateVariable*
+:DbDashUpdateVariable {name} {value}                   *:DbDashUpdateVariable*
     Set an argument directly.
 
-:DbDashResetVariables                                   *:DbDashResetVariables*
+:DbDashResetVariables                                  *:DbDashResetVariables*
     Reset all arguments to their defaults.
 
-:DbDashShowSQL                                                 *:DbDashShowSQL*
+:DbDashShowSQL                                                *:DbDashShowSQL*
     Show the rendered query in a floating window ("q"/<Esc> close, "y" yank).
 
 :DbDashStyle {type} {style}                                     *:DbDashStyle*
@@ -89,14 +95,14 @@ Install with any plugin manager. Calling setup() is optional: >lua
     querying again, e.g. `:DbDashStyle line quadrant`, `:DbDashStyle bar
     vertical`, `:DbDashStyle canvas block`. Lasts until the dashboard stops.
 
-:DbDashMksession[!] [{file}]                                 *:DbDashMksession*
+:DbDashMksession[!] [{file}]                                *:DbDashMksession*
 :Mksession[!] [{file}]                                            *:Mksession*
     Write a session. Dashboard buffers are named `dbdash://<config path>` and
     are restarted (with default arguments) when the session is loaded. The
     `mksession` command-line abbreviation points here.
 
 ==============================================================================
-4. MAPPINGS                                                    *dbdash-mappings*
+4. MAPPINGS                                                  *dbdash-mappings*
 
 Global (disable with `setup({ mappings = false })`):
 
@@ -119,7 +125,7 @@ Sidebar:
   q     close the sidebar
 
 ==============================================================================
-5. CONFIG FILES                                                  *dbdash-config*
+5. CONFIG FILES                                                *dbdash-config*
 
 >yaml
   database:
@@ -149,25 +155,36 @@ Sidebar:
     show_countdown: true
     countdown_format: "Next update: {time}s"
 <
+Top-level fields: `database`, `query`, `show` (one chart) or `panels`,
+`layout`, `args`, `args_show` (several charts, |dbdash-panels|), and
+`interval` (default refresh interval; `show.interval` wins). Durations are
+numbers of seconds or strings with a unit: "500ms", "30s", "5m", "1h".
+`query.max_rows` caps the rows read; `query.timeout` defaults to the URL's
+`timeout` or 30s. Fields the plugin does not use are ignored (the legacy
+configs have many matplotlib-only ones); invalid values of known fields are
+reported with their line and column. The full list of fields is in
+`example/dbdash.schema.yaml` (|dbdash-examples|).
+
 Table options: `column_list: [{column, alias, width}]`, `style.border`,
 `style.header_style`, `style.border_style`, `style.title_style`,
 `style.show_lines`, `style.null_text`.
 
-Examples and schema                                            *dbdash-examples*
+Examples and schema                                          *dbdash-examples*
 
-The `example/` directory of the plugin has a runnable config (SQLite, no setup)
-for every chart type, the alternative styles (`styles.yaml`), several panels
-(`multi_panel.yaml`), arguments and templates (`template_example.yaml`), macros
-and autoescape (`macros.yaml`) and a SQLite file (`sqlite_file.yaml`).
+The `example/` directory of the plugin has a runnable config (SQLite, no
+setup) for every chart type, the alternative styles (`styles.yaml`), several
+panels (`multi_panel.yaml`), arguments and templates
+(`template_example.yaml`), macros and autoescape (`macros.yaml`) and a SQLite
+file (`sqlite_file.yaml`).
 
 `example/dbdash.schema.yaml` is a JSON Schema for config files. It lists every
 field and the URL format of each database. Editors using yaml-language-server
 validate and complete a config that starts with: >yaml
-  # yaml-language-server: $schema=/path/to/dbdash.nvim/example/dbdash.schema.yaml
+  # yaml-language-server: $schema=/path/to/example/dbdash.schema.yaml
 <
 The sidebar does not list `*.schema.yaml` files.
 
-Multiple panels                                                  *dbdash-panels*
+Multiple panels                                                *dbdash-panels*
 
 One config can hold several charts in a grid: >yaml
   database: { url: "postgres://..." }   # shared; a panel may set its own
@@ -189,7 +206,7 @@ refreshes and their timers restart. Arguments with the same name must be
 declared identically. In the dashboard, `s` and |:DbDashStyle| act on the
 panel under the cursor (or ask which one); `r` refreshes all panels.
 
-Chart fields:                                                    *dbdash-charts*
+Chart fields:                                                  *dbdash-charts*
 
   line       x_column, y_columns [{column, label, color}] (or y_column),
              line_style.{fill_area, show_points}, legend.{show, position},
@@ -209,7 +226,7 @@ Chart fields:                                                    *dbdash-charts*
 rows (default 15). `axes.y_axis.format` takes a Python format such as
 "{:,.0f}" or "{:.1%}".
 
-Styles                                                           *dbdash-styles*
+Styles                                                         *dbdash-styles*
 
   type       renderer (first is the default)    canvas
   line       canvas, asciichart                 braille, quadrant, block,
@@ -226,7 +243,10 @@ Styles                                                           *dbdash-styles*
 Pick per config with `show.renderer` / `show.canvas`, or set defaults:  >lua
 
   require("dbdash").setup({
-    styles = { line = { canvas = "quadrant" }, bar = { renderer = "vertical" } },
+    styles = {
+      line = { canvas = "quadrant" },
+      bar = { renderer = "vertical" },
+    },
     ticks = "nice",           -- or "linear"
     register = {              -- your own implementations
       ["chart/bar/mine"] = require("my.bar_style"),
@@ -234,57 +254,239 @@ Pick per config with `show.renderer` / `show.canvas`, or set defaults:  >lua
     },
   })
 <
-A chart style is `{ render = function(resultset, show, ctx) -> { lines, hl } }`;
-see lua/dbdash/render/ for the canvas, ticks, frame and palette interfaces.
+A chart style is a table `{ render = fn }` where
+`fn(resultset, show, ctx)` returns `{ lines, hl }`; see lua/dbdash/render/
+for the canvas, ticks, frame and palette interfaces.
 
 The YAML parser supports a subset: block and flow collections, quoted and
 plain scalars, block scalars, comments. Anchors, tags and multiple documents
 are rejected with a line and column.
 
 ==============================================================================
-6. TEMPLATES                                                  *dbdash-templates*
+6. TEMPLATES                                                *dbdash-templates*
 
-`query.sql` is a Jinja subset with `trim_blocks` and `lstrip_blocks`:
-if/elif/else, for/else (with `loop`), set, raw, macro (defaults, keyword
-arguments), import / from-import, filters and tests, Python truthiness and
-strict undefined variables.
+`query.sql` is a template rendered before every run. The language is a subset
+of Jinja2 with `trim_blocks` and `lstrip_blocks` enabled, and behaves like
+Jinja2 (Python semantics) for everything it supports. The rendered text is
+what |:DbDashShowSQL| (`s`) shows.
 
-Imports are relative to the config file's directory; imported templates do
-not see the caller's variables and only export their macros: >jinja
+Variables                                              *dbdash-template-vars*
+
+The variables are the query arguments (|dbdash-arguments|), with these
+types:
+
+  string          text
+  number, int     a number
+  boolean         true / false
+  list            a list: `departments[0]`, `for d in departments`
+  map             a mapping: `filters.region`, `filters.items()`
+  no value        `none` (prints "None"; test with `is none`)
+
+Using a name that is not an argument is an error ("'x' is undefined"), as in
+Jinja's StrictUndefined; test optional names with `is defined`.
+
+Syntax                                                *dbdash-template-syntax*
+
+  {{ expr }}          output an expression
+  {% stmt %}          statement
+  {# ... #}           comment
+  {%- / -%}  {{- / -}}  strip whitespace before / after the tag
+  {%+                 keep the indentation that lstrip_blocks would remove
+
+With `trim_blocks` the newline after a statement tag is removed, and with
+`lstrip_blocks` spaces before a statement tag at the start of a line are
+removed, so statements on their own lines leave no blank lines: >jinja
+  SELECT * FROM users
+  WHERE 1 = 1
+  {% if min_age %}
+    AND age >= {{ min_age }}
+  {% endif %}
+<
+Statements:
+
+  {% if a %} ... {% elif b %} ... {% else %} ... {% endif %}
+  {% for x in xs %} ... {% else %} (empty) ... {% endfor %}
+  {% for k, v in m.items() %} ... {% endfor %}
+  {% set name = expr %}       {% set a, b = pair %}
+  {% raw %} {{ not rendered }} {% endraw %}
+  {% macro name(a, b=default) %} ... {% endmacro %}
+  {% import 'file.sql' as lib %}         then {{ lib.name(...) }}
+  {% from 'file.sql' import name, other as alias %}
+
+Inside a loop: `loop.index` (from 1), `loop.index0`, `loop.revindex`,
+`loop.revindex0`, `loop.first`, `loop.last`, `loop.length`. A `set` inside a
+loop does not change the variable outside it (Jinja scoping).
+
+Expressions:
+
+  literals     'text' "text" 42 3.14 true false none (True/False/None too)
+               [1, 2] (1, 2) {'key': value}
+  access       m.key  m['key']  xs[0]  xs[-1]  'text'[1]
+  math         + - * / // % **      (/ always divides, // floors)
+  strings      'a' ~ b (concatenate as text)   'a' + 'b'
+  compare      == != < <= > >=   x in xs   x not in xs
+  logic        and or not        a if cond else b
+  tests        x is defined, x is not none, ...
+  filters      x | name   x | name(arg, key=value)   chained left to right
+  calls        macro(...)  range(...)  and the methods below
+
+Truthiness follows Python: none, false, 0, "" and empty lists and mappings
+are false.
+
+Filters                                              *dbdash-template-filters*
+
+  default(value, boolean=false)  (alias d) value when x is undefined; with
+                         boolean=true also when x is false/empty/none
+  length                 (alias count) items of a list, mapping or string
+  upper, lower           change case
+  trim(chars)            strip whitespace (or the given characters)
+  replace(old, new, count)
+  join(sep, attribute=)  join items; attribute picks a key of each mapping
+  first, last            first / last item
+  int(default=0, base=10)  to integer ("ff"|int(base=16) is 255)
+  float(default=0.0)     to number
+  string                 to text
+  abs                    absolute value
+  round(precision=0, method='common')  'common' rounds half to even like
+                         Python, 'ceil' and 'floor' round up or down
+  tojson(indent)         JSON text (use it to put values into MongoDB queries)
+  safe                   mark as SQL so autoescape leaves it alone
+
+SQL filters, quoted for the dashboard's database (|dbdash-template-dialects|):
+
+  sql_quote              a literal: 'it''s', 42, TRUE, NULL
+  sql_escape             string content without the quotes: it''s
+  sql_in                 a list as (1, 2, 3); a mapping uses its keys;
+                         an empty list gives (NULL), so `x IN (NULL)`
+                         matches nothing
+  sql_id                 an identifier: "order", "public"."t" (dots split
+                         the parts)
+  sql_limit              a positive integer, or "" for none; anything else
+                         is an error
+
+Functions:
+
+  range(stop) range(start, stop[, step])   integers, like Python
+  sql_case(conditions, default)  CASE WHEN <key> THEN <value> ... ELSE
+                         <default> END from a mapping; keys and values are
+                         inserted as written
+  sql_concat(a, b, ...)  CONCAT(...) (SQLite: a || b); strings become quoted
+                         literals, other values are inserted as text
+
+Tests (`x is name`, `x is not name`): defined, undefined, none, number,
+string, mapping, sequence, true, false.
+
+Methods: on mappings items(), keys(), values(), get(key, default); on strings
+upper(), lower(), strip(chars), startswith(prefix), endswith(suffix)
+(prefix/suffix may be a tuple). Other method calls are errors.
+
+Examples: >jinja
+  WHERE status = {{ status | sql_quote }}
+    AND dept IN {{ departments | sql_in }}
+    {% if search is not none and search | trim %}
+    AND name LIKE {{ ('%' ~ search ~ '%') | sql_quote }}
+    {% endif %}
+  ORDER BY {{ sort_column | sql_id }}
+  LIMIT {{ limit | sql_limit }}
+<
+Autoescape                                        *dbdash-template-autoescape*
+
+With `query.autoescape: true`, every `{{ value }}` is written as a literal of
+the database's dialect, as if `| sql_quote` were applied: strings are quoted
+and escaped, lists become (a, b), none becomes NULL, numbers and booleans
+stay literals. Output of the SQL filters and functions and of `| safe` is
+inserted as is, so use `| safe` for SQL fragments such as column names: >jinja
+  SELECT {{ column | safe }} FROM t WHERE name = {{ name }}
+<A mapping cannot be autoescaped (use `| tojson` or pick a key). Values
+inside `{% %}` statements are never escaped.
+
+Dialects                                            *dbdash-template-dialects*
+
+The SQL filters and autoescape follow the database type:
+
+  sqlite, postgres, cassandra   'it''s'  "ident"  TRUE/FALSE
+  mysql                         'it\'s'-style backslash escapes, `ident`
+  mssql                         N'...' for non-ASCII text, [ident], 1/0
+  mongodb                       JSON: "text", [1, 2], {"k": 1}, true, null
+  redis                         "double quoted" with backslash escapes, 1/0
+
+Imports                                              *dbdash-template-imports*
+
+Paths in import and from-import are relative to the config file's
+directory. An imported file only exports its macros; it does not see the
+importing template's variables, so pass values as macro arguments: >jinja
+  {# macros/filters.sql #}
+  {% macro in_list(column, values) -%}
+  {{ column | safe }} IN {{ values | sql_in }}
+  {%- endmacro %}
+
+  {# query.sql #}
   {% from 'macros/filters.sql' import in_list %}
   SELECT * FROM users WHERE {{ in_list('dept', departments) }}
 <
-Not supported: extends, block, include, call/caller, filter blocks, with,
-block set, namespace(), break/continue, recursive loops, loop.cycle, slices,
-arbitrary method calls, custom tests, *args/**kwargs.
+Errors                                                *dbdash-template-errors*
 
-Filters: default (d), length (count), upper, lower, trim, replace, join,
-first, last, int, float, string, abs, round, tojson, safe, and the SQL
-filters sql_escape, sql_quote, sql_in, sql_id, sql_limit.
-Globals: range(), sql_case(conditions, default), sql_concat(...).
-Tests: defined, undefined, none, number, string, mapping, sequence, true,
-false. Methods: items, keys, values, get, upper, lower, strip, startswith,
-endswith.
+Syntax and runtime errors stop the refresh and are shown in the dashboard
+with the config file and line, e.g. "board.yaml:12: 'region' is undefined".
 
-SQL filters follow the database dialect (MySQL escapes backslashes, MSSQL
-quotes identifiers with [], MongoDB gets JSON strings).
+Not supported (error with the reason): extends, block, include, call/caller,
+filter blocks, with, block set, namespace(), break/continue, loop filtering
+(`for ... if`), recursive loops, loop.cycle/previtem/nextitem, slices,
+custom filters/tests, *args/**kwargs, other method calls.
 
 Known difference from Jinja: numbers have one Lua type, so integral floats
-print without ".0" (`{{ 4 / 2 }}` is `2`).
+print without ".0" (`{{ 4 / 2 }}` is `2`, Jinja prints `2.0`).
 
 ==============================================================================
-7. ARGUMENTS                                                  *dbdash-arguments*
+7. ARGUMENTS                                                *dbdash-arguments*
 
-Precedence: command line > edited in the dashboard > interactive input >
-`default`. Values last for the session only. On the command line:
+Arguments are the variables of the query template, declared in `query.args`
+(and in the top-level `args` for |dbdash-panels|): >yaml
+  args:
+    - name: departments     # template variable name (letters, digits, _)
+      type: list            # string (default) | number | int | boolean |
+                            # list | map
+      default: [IT, HR]     # value when nothing else sets it
+      required: false       # ask at start when there is no value
+      show: true            # include in the args_show line
+      choices: [IT, HR, Finance]   # completion and picker candidates
+      description: "Departments to include"
+<
+An argument without a default and without a value is `none` in the template
+(|dbdash-template-vars|). The legacy `key:` field is rejected; use `name:`.
 
-  list   ids=1,2,3            map   filters=region:Asia,level:senior
-  boolean  true/false/1/0/yes/no
+Where values come from (highest first):
 
-Escape commas and colons with a backslash or quote the value.
+  1. the command line: `:DbDashStart board.yaml min_age=30 ids=1,2,3`
+  2. edits in the dashboard: `a` / |:DbDashModifyVariable|,
+     |:DbDashUpdateVariable|
+  3. interactive input at start: `required` arguments without a value, or
+     every argument with `:DbDashStart!`
+  4. `default`
+
+Values last until the dashboard stops; `R` / |:DbDashResetVariables| goes
+back to the defaults. Changing a value refreshes the dashboard (all panels).
+
+Text input (command line, prompts) is parsed by type:
+
+  string   as written
+  number   a number; int: an integer
+  boolean  true/false, 1/0, yes/no (any case)
+  list     a,b,c   (empty input: empty list)
+  map      key:value,key2:value2
+
+List items and map values are numbers when the `default` and `choices` are
+all numbers, strings otherwise. Escape `,` and `:` with a backslash, or quote
+the item: `names='Smith, J',"a:b"`. On the command line, write a space in a
+value as `\ `: `title=two\ words`.
+
+`args_show: true` (in `query`, or at the top level with panels) shows the
+values above the chart, except arguments with `show: false`. `A` /
+|:DbDashShowVariables| lists all arguments with their values (and the
+default when the value differs).
 
 ==============================================================================
-8. DATABASES                                                  *dbdash-databases*
+8. DATABASES                                                *dbdash-databases*
 
 URL: `<scheme>://[user[:password]@]host[:port][/database][?param=value]`
 
@@ -312,14 +514,16 @@ Redis       `redis://[user]:pass@host:6379/0`  the query is one command,
             section,key,value; SCAN iterates the cursor; others: value,
             index,value or key,value).
 
-MongoDB     `mongodb://user:pass@host:27017/db?authSource=admin`  SCRAM-SHA-256
-            (or `authMechanism=SCRAM-SHA-1`). The query is a JSON document: >json
+MongoDB     `mongodb://user:pass@host:27017/db?authSource=admin`
+            SCRAM-SHA-256 (or `authMechanism=SCRAM-SHA-1`). The query is a
+            JSON document: >json
               {"collection": "orders", "operation": "find",
                "filter": {"status": "paid"}, "projection": {"_id": 0},
                "sort": {"created_at": -1}, "limit": 100, "flatten": 1}
 <           operation: find | aggregate (`pipeline`; omit `collection` for
             database-level stages such as $documents) | count | distinct
-            (`field`) | command (`"command": {...}`, the reply as one row). Use Extended JSON for special values ({"$oid": ...},
+            (`field`) | command (`"command": {...}`, the reply as one
+            row). Use Extended JSON for special values ({"$oid": ...},
             {"$date": "2026-01-01T00:00:00Z"}, {"$numberLong": "1"}) and
             `| tojson` in templates. Columns are the union of top-level keys;
             `flatten` expands nested documents to a.b columns.
@@ -342,7 +546,7 @@ SQL Server  `mssql://user:pass@host:1433/db`  SQL authentication. With
 
 Each refresh opens a connection, runs the query and closes it.
 
-TLS                                                                *dbdash-tls*
+TLS                                                               *dbdash-tls*
 
 Modes:
 
@@ -365,8 +569,8 @@ files on Linux/macOS/BSD and from the certificate store on Windows.
 
 Get a server's fingerprint with:
 >sh
-  openssl s_client -connect host:5432 -starttls postgres </dev/null 2>/dev/null |
-    openssl x509 -noout -fingerprint -sha256
+  openssl s_client -connect host:5432 -starttls postgres </dev/null \
+    2>/dev/null | openssl x509 -noout -fingerprint -sha256
 <
 PostgreSQL, MySQL and SQL Server negotiate TLS on their normal port; Redis,
 MongoDB and Cassandra start TLS right away (use the server's TLS port;
@@ -386,7 +590,7 @@ networks.
 Oracle is not supported.
 
 ==============================================================================
-9. HIGHLIGHTS                                                *dbdash-highlights*
+9. HIGHLIGHTS                                              *dbdash-highlights*
 
 All groups link to standard groups by default:
 
@@ -398,7 +602,7 @@ Colors in configs may be hex ("#3498db"), names ("blue", "bold blue"),
 or existing highlight groups ("DiagnosticOk").
 
 ==============================================================================
-10. LUA API                                                         *dbdash-api*
+10. LUA API                                                       *dbdash-api*
 
 require("dbdash").start({config}, {tokens})   start a dashboard
 require("dbdash").stop({config})              stop it
