@@ -1,0 +1,11 @@
+│Active users
+  ^ 0-12 DbDashTitle
+│▄█  █▀█ █ █ ▀▀█
+  ^ 0-35 DbDashStatValue
+│ █  █ █ ▀▀█   █
+  ^ 0-29 DbDashStatValue
+│▄█▄ █▄█   █   █
+  ^ 0-31 DbDashStatValue
+│↑ 4.7%  ▁▄▂▆█
+  ^ 0-8 DbDashUp
+  ^ 10-25 DbDashSeries1

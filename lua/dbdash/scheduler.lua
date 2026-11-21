@@ -131,6 +131,23 @@ function Panel:push_history(entry)
   end
 end
 
+---Keep the panel's value for stat charts (change since the previous refresh, sparkline).
+function Panel:track(rs)
+  local show = self.cfg.show
+  if show.type ~= "stat" then
+    return
+  end
+  local C = require("dbdash.render.charts.stat.common")
+  local v = C.track(rs, show)
+  if v then
+    self.values = self.values or {}
+    table.insert(self.values, v)
+    while #self.values > C.HISTORY do
+      table.remove(self.values, 1)
+    end
+  end
+end
+
 ---Seconds until the panel's next refresh.
 function Panel:remaining()
   return math.max(0, math.ceil((self.next_at - now()) / 1000))
@@ -237,6 +254,7 @@ function Panel:refresh(o)
     end
     self:push_history({ elapsed_ms = rs.elapsed_ms, rows = rs.row_count })
     self.rs = rs
+    self:track(rs)
     self.error = nil
     self.d:redraw()
   end)
@@ -314,7 +332,7 @@ end
 ---Render one panel's chart (or a placeholder) at the given size.
 local function render_panel(p, show, width, height)
   if p.rs then
-    local ok, out = pcall(require("dbdash.render").render, p.rs, show, { width = width, height = height })
+    local ok, out = pcall(require("dbdash.render").render, p.rs, show, { width = width, height = height, history = p.values })
     if ok then
       return out
     end

@@ -1,0 +1,2 @@
+│column 'nope' not found
+  ^ 0-23 DbDashWarn

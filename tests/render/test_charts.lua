@@ -145,4 +145,53 @@ T["python format subset"] = function()
   eq(f.python(1, "{:x}"), nil)
 end
 
+-- stat ----------------------------------------------------------------------------------
+
+local function stat_rs(v, typ)
+  return require("dbdash.db.resultset").new(
+    { { name = "label", type = "string" }, { name = "users", type = typ or "integer" } },
+    v == nil and {} or { { "all", v } }
+  )
+end
+
+local function stat(case, show, rs, opts)
+  local out = render.render(rs, vim.tbl_extend("force", { type = "stat" }, show), vim.tbl_extend("force", SIZE, opts or {}))
+  helpers.golden("stat/big/" .. case, out)
+  return out
+end
+
+T["stat: big digits, change and sparkline"] = function()
+  stat("up", { title = "Active users" }, stat_rs(1047), { history = { 880, 950, 900, 1000, 1047 } })
+end
+
+T["stat: decrease, first refresh, unchanged"] = function()
+  stat("down", { title = "Errors" }, stat_rs(80), { history = { 100, 80 } })
+  stat("first", { title = "Errors" }, stat_rs(80), { history = { 80 } })
+  stat("same", { title = "Errors" }, stat_rs(80), { history = { 80, 80 } })
+end
+
+T["stat: format, unit, value_column, options off"] = function()
+  stat("format_unit", { value_column = "users", format = "{:,.1f}", unit = "ms", delta = false, sparkline = false },
+    stat_rs(1234.56, "number"))
+end
+
+T["stat: falls back to one line when narrow or not drawable"] = function()
+  stat("narrow", { title = "Active users", format = "{:,}" }, stat_rs(1234567), { width = 20, history = { 1, 2 } })
+  stat("text", { value_column = "label" }, stat_rs(5))
+end
+
+T["stat: no rows, unknown column"] = function()
+  stat("empty", {}, stat_rs(nil))
+  stat("bad_column", { value_column = "nope" }, stat_rs(1))
+end
+
+T["stat: values for the history"] = function()
+  local C = require("dbdash.render.charts.stat.common")
+  eq(C.track(stat_rs(5), {}), 5)
+  eq(C.track(stat_rs("12.5", "decimal"), {}), 12.5)
+  eq(C.track(stat_rs(5), { value_column = "label" }), nil)
+  eq(C.delta({ 0, 5 }).text, "↑ 5")
+  eq(C.sparkline({ 1, 2, 3, 4, 5, 6, 7, 8 }, 20), "▁▂▃▄▅▆▇█")
+end
+
 return T

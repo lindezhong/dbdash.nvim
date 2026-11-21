@@ -53,6 +53,17 @@
     "show_countdown": true,
     "countdown_format": "{time}s"
    }
+  },
+  {
+   "query": {
+    "sql": "SELECT abs(random() % 5000) AS orders\n"
+   },
+   "show": {
+    "type": "stat",
+    "title": "Orders today",
+    "format": "{:,}",
+    "interval": "10s"
+   }
   }
  ]
 }

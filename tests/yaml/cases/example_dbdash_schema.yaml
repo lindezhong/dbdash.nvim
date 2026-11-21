@@ -234,7 +234,7 @@ definitions:
     type: object
     properties:
       type:
-        enum: [table, line, area, bar, histogram, boxplot, heatmap, bubble, pie, scatter]
+        enum: [table, line, area, bar, histogram, boxplot, heatmap, bubble, pie, scatter, stat]
         default: table
       title: { type: string }
       interval:
@@ -254,6 +254,7 @@ definitions:
             table: box          line: canvas, asciichart     scatter/area/bubble: canvas
             bar: horizontal, vertical    histogram: horizontal, vertical
             boxplot: boxdraw    heatmap: halfblock, block    pie: bar, circle
+            stat: big
           Custom styles registered with setup({ register = ... }) are accepted too.
       canvas:
         type: string
@@ -306,12 +307,18 @@ definitions:
         properties:
           fill_area: { type: boolean }
           show_points: { type: boolean }
-      value_column: { type: string }
+      value_column: { type: string, description: "histogram, boxplot, heatmap, pie; stat: the value (default the first numeric column)." }
       category_column: { type: string }
       label_column: { type: string }
       size_column: { type: string }
       color_column: { type: string }
       bins: { type: integer, minimum: 1 }
+      format:
+        type: string
+        description: 'stat: Python format of the value, e.g. "{:,}", "{:.1f}", "{:.1%}".'
+      unit: { type: string, description: "stat: text shown after the value." }
+      delta: { type: boolean, default: true, description: "stat: show the change since the previous refresh." }
+      sparkline: { type: boolean, default: true, description: "stat: show the last 20 values." }
       column_list:
         type: array
         description: Table columns to show, in order (all columns when omitted).

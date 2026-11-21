@@ -25,6 +25,7 @@ M.DEFAULTS = {
   boxplot = { renderer = "boxdraw" },
   heatmap = { renderer = "halfblock" },
   pie = { renderer = "bar" },
+  stat = { renderer = "big" },
 }
 
 -- Built-in names, for completion and documentation.
@@ -40,6 +41,7 @@ M.BUILTIN = {
     boxplot = { "boxdraw" },
     heatmap = { "halfblock", "block" },
     pie = { "bar", "circle" },
+    stat = { "big" },
   },
   canvas = { "braille", "quadrant", "block", "halfblock", "ascii" },
   ticks = { "nice", "linear" },

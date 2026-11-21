@@ -601,6 +601,23 @@ T["export key picks a format; with panels the one under the cursor"] = function(
   eq(child.fn.getreg('"'), second)
 end
 
+T["stat dashboards keep recent values for the change and the sparkline"] = function()
+  vim.fn.writefile({
+    "database: { url: 'sqlite:///:memory:' }",
+    "query: { sql: 'SELECT abs(random() % 1000) AS v' }",
+    "show: { type: stat, title: Orders, interval: 1s }",
+  }, dir .. "/stat.yaml")
+  child.cmd("DbDashStart stat.yaml")
+  child.lua([[_G.wait_for = function(fn) return vim.wait(8000, fn, 20) end]])
+  child.lua([[_G.wait_for(function()
+    return #(require("dbdash.scheduler").list()[1].panels[1].values or {}) >= 3
+  end)]])
+  local text = table.concat(lines(), "\n")
+  eq(text:find("Orders", 1, true) ~= nil, true)
+  eq(text:find("[↑↓=] ") ~= nil, true) -- change since the previous refresh
+  eq(text:find("[▁▂▃▄▅▆▇█][▁▂▃▄▅▆▇█]") ~= nil, true) -- sparkline
+end
+
 T[":DbDashStyle re-renders cached data with another style"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/line.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("┌") end)]])

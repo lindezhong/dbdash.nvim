@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=./dbdash.schema.yaml
+#
+# Stat ("KPI") chart: one value in large digits, its change since the previous refresh
+# and a sparkline of the last 20 refreshes. Leave it open for a few refreshes to see
+# the change and the sparkline.
+#
+# The value is the first row of value_column (default: the first numeric column).
+# format takes a Python format ("{:,}", "{:.1f}", "{:.1%}"); unit is shown after it.
+# delta: false / sparkline: false hide the second line's parts.
+
+database:
+  url: "sqlite:///:memory:"
+
+query:
+  sql: |
+    SELECT 'active' AS label, 900 + abs(random() % 300) AS users
+
+show:
+  type: stat
+  title: "Active users"
+  value_column: users
+  format: "{:,}"
+  unit: users
+  interval: 5s

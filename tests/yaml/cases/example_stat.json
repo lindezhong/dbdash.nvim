@@ -1,0 +1,16 @@
+{
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "sql": "SELECT 'active' AS label, 900 + abs(random() % 300) AS users\n"
+ },
+ "show": {
+  "type": "stat",
+  "title": "Active users",
+  "value_column": "users",
+  "format": "{:,}",
+  "unit": "users",
+  "interval": "5s"
+ }
+}

@@ -1,0 +1,11 @@
+│Errors
+  ^ 0-6 DbDashTitle
+│█▀█ █▀█
+  ^ 0-19 DbDashStatValue
+│█▀█ █ █
+  ^ 0-17 DbDashStatValue
+│█▄█ █▄█
+  ^ 0-19 DbDashStatValue
+│↓ 20.0%  █▁
+  ^ 0-9 DbDashDown
+  ^ 11-17 DbDashSeries1

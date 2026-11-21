@@ -1,0 +1,7 @@
+│Active users
+  ^ 0-12 DbDashTitle
+│1,234,567
+  ^ 0-9 DbDashStatValue
+│↑ 100.0%  ▁█
+  ^ 0-10 DbDashUp
+  ^ 12-18 DbDashSeries1

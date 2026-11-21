@@ -250,7 +250,8 @@ Sidebar (`sidebar.keys`: select, stop, refresh, close):
         choices: [18, 30, 50]
   show:
     type: table             # table | line | area | bar | histogram |
-                            # boxplot | heatmap | bubble | pie | scatter
+                            # boxplot | heatmap | bubble | pie | scatter |
+                            # stat
     title: "Users"
     interval: 60s           # s, m, h or ms
     show_countdown: true
@@ -324,6 +325,13 @@ Chart fields:                                                  *dbdash-charts*
   bubble     x_column, y_column, size_column, color_column, label_column
   pie        label_column, value_column,
              style.{show_percentages, show_values, show_labels}, colors
+  stat       value_column (default: the first numeric column; first row),
+             format (Python format), unit, delta, sparkline
+
+A stat chart shows one value in large digits (one line when the window is
+too narrow), its change since the previous refresh (↑ 4.7%, ↓ 3.0%) and a
+sparkline of the last 20 refreshes; the history starts when the dashboard
+starts. `delta: false` and `sparkline: false` hide them.
 
 `colors` is a list (by series index) or a mapping (by category name). `width`
 caps the chart width (default: the window), `height` sets the plot rows
@@ -343,6 +351,7 @@ Styles                                                         *dbdash-styles*
   heatmap    halfblock, block
   pie        bar, circle                        (circle: canvas)
   table      box
+  stat       big
 
 Pick per config with `show.renderer` / `show.canvas`, or set defaults:  >lua
 
@@ -733,6 +742,8 @@ All groups link to standard groups by default:
   DbDashAxis DbDashLabel DbDashError DbDashWarn DbDashCountdown
   DbDashArgName DbDashArgValue
   DbDashSeries1 ... DbDashSeries8   chart series colors (palette "theme")
+  DbDashStatValue (Number), DbDashUp (DiagnosticOk), DbDashDown
+  (DiagnosticError)                 stat value and its change
 
 Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
 `Directory`), `DbDashSidebarRunning` (● of running dashboards, links to

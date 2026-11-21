@@ -30,6 +30,10 @@ M.BASE = {
   DbDashCountdown = { link = "Comment" },
   DbDashArgName = { link = "Identifier" },
   DbDashArgValue = { link = "String" },
+  -- Stat chart: the value, and its change since the previous refresh.
+  DbDashStatValue = { link = "Number" },
+  DbDashUp = { link = "DiagnosticOk" },
+  DbDashDown = { link = "DiagnosticError" },
   -- Sidebar: directories (name and arrow), running and idle dashboards.
   DbDashSidebarDir = { link = "Directory" },
   DbDashSidebarRunning = { link = "DiagnosticOk" },

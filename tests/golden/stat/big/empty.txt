@@ -1,0 +1,2 @@
+│the query returned no rows
+  ^ 0-26 DbDashWarn

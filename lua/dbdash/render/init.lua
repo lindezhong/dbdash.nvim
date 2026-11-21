@@ -17,6 +17,8 @@ local M = {}
 ---@field limits fun(lo: number, hi: number, count: integer): number, number, number
 ---@field frame table
 ---@field palette fun(i: integer): string
+---@field history number[]? recent values of this panel, oldest first (stat charts)
+---@field value_group string? highlight group for the value (stat thresholds)
 
 ---@class dbdash.render.Output
 ---@field lines string[]
@@ -66,7 +68,7 @@ end
 ---Render a result set according to the show config.
 ---@param rs dbdash.db.ResultSet
 ---@param show table
----@param opts { width: integer, height: integer? }
+---@param opts { width: integer, height: integer?, history: number[]? }
 ---@return dbdash.render.Output
 function M.render(rs, show, opts)
   local renderer, canvas = registry.resolve(show, options().styles)
@@ -80,6 +82,7 @@ function M.render(rs, show, opts)
     if h then
       ctx.plot_height = h
     end
+    ctx.history = opts.history
     local style = need("chart/" .. show.type .. "/" .. renderer)
     return (style.render or style)(rs, show, ctx)
   end)
