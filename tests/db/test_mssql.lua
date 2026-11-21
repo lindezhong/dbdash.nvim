@@ -21,6 +21,15 @@ T["prelogin round trip"] = function()
   eq(ms.parse_prelogin(p), 2)
 end
 
+T["strict mode offers ALPN tds/8.0"] = function()
+  local hs = require("dbdash.net.tls.handshake")
+  local ch = hs.client_hello("db", { x25519 = string.rep("\1", 32), p256 = "\4" .. string.rep("\1", 64) }, string.rep("\0", 32), "", { alpn = { "tds/8.0" } })
+  eq(ch:find("\0\16\0\10\0\8\7tds/8.0", 1, true) ~= nil, true)
+  local no13 = hs.client_hello("db", { x25519 = string.rep("\1", 32), p256 = "\4" .. string.rep("\1", 64) }, string.rep("\0", 32), "", { tls13 = false })
+  eq(no13:find("\0\43", 1, true), nil) -- no supported_versions
+  eq(no13:find("\19\1", 1, true), nil) -- no TLS 1.3 suites
+end
+
 -- Integration (make it) ---------------------------------------------------------------------
 
 local URL = "mssql://sa:Dbdash_pw1@127.0.0.1:11433/master"
@@ -66,8 +75,28 @@ T["it: batches, rows, max_rows, errors"] = function()
   eq({ r.err.phase, r.err.code }, { "query", "208" })
   r = h.query("mssql://sa:wrong@127.0.0.1:11433/master", "SELECT 1")
   eq({ r.err.phase, r.err.code }, { "auth", "18456" })
-  r = h.query(URL .. "?tls=require", "SELECT 1")
-  eq(r.err.message:find("TLS 1.2") ~= nil, true)
+end
+
+T["it: encrypted connections"] = function()
+  h.require_it()
+  local enc = "SELECT encrypt_option FROM sys.dm_exec_connections WHERE session_id = @@SPID"
+  eq(h.ok(URL .. "?tls=require", enc).rows[1][1], "TRUE")
+  -- encrypt=strict (TDS 8) is not tested here: the SQL Server 2022 container closes strict
+  -- connections even with a configured certificate (microsoft/mssql-docker#878).
+  eq(h.ok(URL, enc).rows[1][1], "FALSE")
+  -- pin: learn the server's (self-signed) fingerprint from a mismatch
+  local wrong = "sha256:" .. string.rep("00:", 31) .. "00"
+  local r = h.query(URL .. "?tls=pin&fingerprint=" .. wrong, "SELECT 1")
+  local fp = r.err.message:match("presented (sha256:[%x:]+)")
+  eq(fp ~= nil, true)
+  eq(h.ok(URL .. "?tls=pin&fingerprint=" .. fp, "SELECT 1").rows[1][1], 1)
+  -- verify-full with the test PKI; SQL Server only sends its leaf, so the CA bundle carries
+  -- the intermediate too.
+  local full = "mssql://sa:Dbdash_pw1@localhost:11433/master?tls=verify-full&ca=tests/fixtures/pki/ca_bundle.pem"
+  eq(h.ok(full, "SELECT 1").rows[1][1], 1)
+  -- a large result through TLS records
+  local rs = h.ok(URL .. "?tls=require", "SELECT TOP 5000 a.object_id, a.name FROM sys.all_objects a CROSS JOIN sys.all_objects b")
+  eq(rs.row_count, 5000)
 end
 
 return T

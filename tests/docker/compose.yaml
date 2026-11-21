@@ -92,8 +92,12 @@ services:
 
   mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    hostname: dbdash-mssql
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "Dbdash_pw1"
       MSSQL_PID: Developer
+    volumes:
+      - ./mssql.conf:/var/opt/mssql/mssql.conf:ro
+      - ../fixtures:/certs:ro
     ports: ["11433:1433"]

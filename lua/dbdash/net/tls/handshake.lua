@@ -103,19 +103,22 @@ end
 ---for both groups are sent up front (some servers, e.g. PostgreSQL by default, only accept
 ---secp256r1), so no HelloRetryRequest is needed.
 ---@param shares { x25519: string, p256: string }
----@param o { alpn: string[]?, tls12: boolean? }? tls12 = false offers TLS 1.3 only
+---@param o { alpn: string[]?, tls12: boolean?, tls13: boolean? }? tls12 = false offers TLS 1.3 only; tls13 = false offers TLS 1.2 only
 function M.client_hello(host, shares, random, session_id, o)
   o = o or {}
   local tls12 = o.tls12 ~= false
+  local tls13 = o.tls13 ~= false
   local key_shares = u16(GROUP_X25519) .. vec16(shares.x25519) .. u16(GROUP_P256) .. vec16(shares.p256)
   local sig_algs = vim.list_extend(vim.deepcopy(SIG_ALGS), tls12 and SIG_ALGS_12 or {})
   local exts = {
-    ext(43, tls12 and (u8(4) .. u16(0x0304) .. u16(0x0303)) or (u8(2) .. u16(0x0304))), -- supported_versions
     ext(10, vec16(list16({ GROUP_X25519, GROUP_P256 }))), -- supported_groups
-    ext(51, vec16(key_shares)), -- key_share
     ext(13, vec16(list16(sig_algs))), -- signature_algorithms
     ext(50, vec16(list16(SIG_ALGS_CERT))), -- signature_algorithms_cert
   }
+  if tls13 then
+    exts[#exts + 1] = ext(43, tls12 and (u8(4) .. u16(0x0304) .. u16(0x0303)) or (u8(2) .. u16(0x0304))) -- supported_versions
+    exts[#exts + 1] = ext(51, vec16(key_shares)) -- key_share
+  end
   if tls12 then
     exts[#exts + 1] = ext(11, u8(1) .. u8(0)) -- ec_point_formats: uncompressed
     exts[#exts + 1] = ext(0xff01, u8(0)) -- renegotiation_info (initial handshake)
@@ -133,7 +136,7 @@ function M.client_hello(host, shares, random, session_id, o)
     local name = u8(0) .. vec16(host)
     table.insert(exts, 1, ext(0, vec16(name))) -- server_name
   end
-  local suites = { 0x1301, 0x1303 }
+  local suites = tls13 and { 0x1301, 0x1303 } or {}
   if tls12 then
     vim.list_extend(suites, require("dbdash.net.tls.handshake12").ORDER)
   end
@@ -156,8 +159,9 @@ end
 ---@field etm boolean TLS 1.2 encrypt-then-MAC
 
 ---Parse ServerHello.
+---@param offered13 boolean? false when the ClientHello did not offer TLS 1.3
 ---@return dbdash.tls.ServerHello
-function M.parse_server_hello(body)
+function M.parse_server_hello(body, offered13)
   local legacy = rd16(body, 1)
   local p = 3
   local random = body:sub(p, p + 31)
@@ -203,7 +207,7 @@ function M.parse_server_hello(body)
       fail("the server only supports TLS versions older than 1.2 (0x%04x)", legacy)
     end
     local tail = random:sub(25)
-    if tail == "DOWNGRD\1" or tail == "DOWNGRD\0" then
+    if offered13 ~= false and (tail == "DOWNGRD\1" or tail == "DOWNGRD\0") then
       fail("TLS downgrade detected (the server supports TLS 1.3 but negotiated an older version)")
     end
     info.version = 0x0303
@@ -339,6 +343,7 @@ function M.run(sock, opts)
   local ch = M.client_hello(opts.host, { x25519 = pub, p256 = ppub }, client_random, rand.bytes(32), {
     alpn = opts.alpn,
     tls12 = opts.tls12,
+    tls13 = opts.tls13,
   })
   sock:raw_write(record.header(TYPE.handshake, #ch) .. ch)
   local transcript = ch
@@ -384,7 +389,7 @@ function M.run(sock, opts)
   if t ~= HS.server_hello then
     fail("expected ServerHello, got handshake message %d", t)
   end
-  local sh = M.parse_server_hello(body)
+  local sh = M.parse_server_hello(body, opts.tls13)
   transcript = transcript .. raw
   if sh.version == 0x0303 then
     return require("dbdash.net.tls.handshake12").finish(sock, {

@@ -1,6 +1,7 @@
 """Generate the test PKI for verify-full (dev-only; outputs are committed).
 
 root (RSA 2048) -> inter (EC P-384, signed sha256WithRSA) -> leaf (EC P-256, ecdsa-with-SHA384)
+leaf_rsa: RSA leaf for servers that need RSA certificates (SQL Server).
 Variants: leaf_cn (no SAN), leaf_expired, leaf_wronghost, leaf_critical (unknown critical
 extension), leaf_pss (RSA, signed by root with RSA-PSS), other_root (unrelated CA).
 Also signature vectors for PKCS#1 v1.5 and P-384 ECDSA.
@@ -64,18 +65,26 @@ leaf_expired = build("dbdash expired", "dbdash test intermediate", leaf_key.publ
 leaf_wronghost = build("dbdash wrong host", "dbdash test intermediate", leaf_key.public_key(), inter_key, san=[x509.DNSName("example.com")], alg=hashes.SHA384())
 leaf_critical = build("dbdash critical", "dbdash test intermediate", leaf_key.public_key(), inter_key, san=SAN, alg=hashes.SHA384(),
                       extra=[(x509.UnrecognizedExtension(ObjectIdentifier("1.3.6.1.4.1.99999.1"), b"\x05\x00"), True)])
+rsa_leaf_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+# SQL Server only accepts strict (TDS 8) connections with a certificate for its host name.
+leaf_rsa = build("dbdash-mssql", "dbdash test intermediate", rsa_leaf_key.public_key(), inter_key,
+                 san=SAN + [x509.DNSName("dbdash-mssql")], alg=hashes.SHA384())
 pss_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 leaf_pss = build("dbdash pss", "dbdash test root", pss_key.public_key(), root_key, san=SAN, pss=True)
 other_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 other_root = build("dbdash other root", "dbdash other root", other_key.public_key(), other_key, ca=True)
 
-for k, fn in [(root_key, "root.key"), (inter_key, "inter.key"), (leaf_key, "leaf.key"), (pss_key, "leaf_pss.key")]:
+for k, fn in [(root_key, "root.key"), (inter_key, "inter.key"), (leaf_key, "leaf.key"), (pss_key, "leaf_pss.key"), (rsa_leaf_key, "leaf_rsa.key")]:
     save_key(k, fn)
 for c, fn in [(root, "root.pem"), (inter, "inter.pem"), (leaf, "leaf.pem"), (leaf_cn, "leaf_cn.pem"), (leaf_expired, "leaf_expired.pem"),
-              (leaf_wronghost, "leaf_wronghost.pem"), (leaf_critical, "leaf_critical.pem"), (leaf_pss, "leaf_pss.pem"), (other_root, "other_root.pem")]:
+              (leaf_wronghost, "leaf_wronghost.pem"), (leaf_critical, "leaf_critical.pem"), (leaf_pss, "leaf_pss.pem"), (other_root, "other_root.pem"),
+              (leaf_rsa, "leaf_rsa.pem")]:
     save(c, fn)
-# Chain file for servers: leaf followed by the intermediate.
+# Chain files for servers: leaf followed by the intermediate.
 (out / "leaf_chain.pem").write_bytes(leaf.public_bytes(serialization.Encoding.PEM) + inter.public_bytes(serialization.Encoding.PEM))
+# CA bundle with the intermediate, for servers that only send their leaf (SQL Server).
+(out / "ca_bundle.pem").write_bytes(root.public_bytes(serialization.Encoding.PEM) + inter.public_bytes(serialization.Encoding.PEM))
+(out / "leaf_rsa_chain.pem").write_bytes(leaf_rsa.public_bytes(serialization.Encoding.PEM) + inter.public_bytes(serialization.Encoding.PEM))
 
 msg = b"dbdash signature test"
 vectors = {

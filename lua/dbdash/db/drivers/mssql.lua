@@ -1,8 +1,6 @@
--- SQL Server driver (design §8.4): TDS 7.4 without encryption (PRELOGIN ENCRYPT_NOT_SUP),
--- SQL authentication via LOGIN7, SQL_BATCH, and COLMETADATA / ROW / NBCROW decoding.
---
--- TLS for SQL Server needs TLS 1.2 inside TDS packets (or TDS 8 strict mode), which is not
--- implemented yet; servers that force encryption are reported clearly.
+-- SQL Server driver (design §8.4): TDS 7.4, optionally encrypted (TLS negotiated in
+-- PRELOGIN, or TDS 8 strict mode), SQL authentication via LOGIN7, SQL_BATCH, and
+-- COLMETADATA / ROW / NBCROW decoding.
 local bit = require("bit")
 local ffi = require("ffi")
 local dberr = require("dbdash.db.error")
@@ -14,7 +12,7 @@ local M = {
   name = "mssql",
   schemes = { "mssql", "sqlserver" },
   dialect = dialect.get("mssql"),
-  capabilities = { tls = false, sql = true, query_language = "sql" },
+  capabilities = { tls = true, sql = true, query_language = "sql" },
 }
 
 local NULL = vim.NIL
@@ -163,10 +161,10 @@ end
 
 local ENCRYPT = { OFF = 0, ON = 1, NOT_SUP = 2, REQ = 3 }
 
-function M.prelogin()
+function M.prelogin(encrypt)
   local opts = {
     { 0x00, "\16\0\0\0\0\0" }, -- VERSION
-    { 0x01, string.char(ENCRYPT.NOT_SUP) }, -- ENCRYPTION
+    { 0x01, string.char(encrypt or ENCRYPT.NOT_SUP) }, -- ENCRYPTION
     { 0x02, "\0" }, -- INSTOPT
     { 0x03, "\0\0\0\0" }, -- THREADID
     { 0x04, "\0" }, -- MARS
@@ -663,17 +661,54 @@ function M.parse_url(info)
   return info
 end
 
+---Handshake transport that carries TLS records inside TDS PRELOGIN packets (TDS 7.x).
+local function tds_io(c)
+  local io = { buf = "" }
+  function io:raw_write(data)
+    c:send(PKT.PRELOGIN, data)
+  end
+  function io:raw_read_exact(n)
+    while #self.buf < n do
+      local h = c.sock:read_exact(8)
+      local len = h:byte(3) * 256 + h:byte(4)
+      self.buf = self.buf .. c.sock:read_exact(len - 8)
+    end
+    local out = self.buf:sub(1, n)
+    self.buf = self.buf:sub(n + 1)
+    return out
+  end
+  return io
+end
+
+---TLS modes:
+---  tls=disable                  no encryption (the server must not force it)
+---  tls=require|pin|verify-*     TDS 7.4 with TLS negotiated in PRELOGIN (usually TLS 1.2)
+---  &encrypt=strict              TDS 8 (SQL Server 2022+): TLS first, ALPN tds/8.0
 function M.connect(info)
-  if info.tls ~= "disable" then
-    dberr.raise("config", "TLS for SQL Server needs TLS 1.2 inside TDS, which is not available yet; use tls=disable on a trusted network")
+  local strict = (info.params.encrypt or ""):lower() == "strict"
+  if strict and info.tls == "disable" then
+    info.tls = "require"
   end
   local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
   local c = setmetatable({ sock = sock, packet_size = PACKET_SIZE }, Conn)
   local ok, err = pcall(function()
-    c:send(PKT.PRELOGIN, M.prelogin())
+    local tls = require("dbdash.net.tls")
+    if strict then
+      tls.from_info(sock, info, { alpn = { "tds/8.0" } })
+    end
+    local want = info.tls ~= "disable"
+    c:send(PKT.PRELOGIN, M.prelogin(want and ENCRYPT.ON or ENCRYPT.NOT_SUP))
     local enc = M.parse_prelogin(c:recv())
-    if enc == ENCRYPT.REQ or enc == ENCRYPT.ON then
-      dberr.raise("tls", "the server requires encryption (Force Encryption), which needs TLS 1.2 (not available yet)")
+    if not strict then
+      if want then
+        if enc == ENCRYPT.NOT_SUP then
+          dberr.raise("tls", "the server does not support encryption")
+        end
+        -- TLS inside TDS 7.x packets is TLS 1.2 at most.
+        tls.from_info(sock, info, { io = tds_io(c), tls13 = false })
+      elseif enc == ENCRYPT.REQ or enc == ENCRYPT.ON then
+        dberr.raise("tls", "the server requires encryption; connect with ?tls=require (or pin / verify-full)")
+      end
     end
     c:send(PKT.LOGIN7, M.login7(info))
     local _, e, _, env = M.parse_tokens(c:recv(), 0)

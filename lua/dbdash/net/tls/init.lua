@@ -98,13 +98,15 @@ end
 ---@param sock dbdash.net.Socket
 ---@param opts { host: string, mode: "require"|"pin", fingerprint: string? }
 ---@return dbdash.tls.Session
-function M.starttls(sock, opts)
+---@param io table? transport for the handshake only (raw_write / raw_read_exact), e.g. TLS
+---records wrapped in TDS packets; application data then uses `sock` directly.
+function M.starttls(sock, opts, io)
   -- Bytes already moved to the plaintext buffer belong to the TLS stream.
-  if #sock.buf > 0 then
+  if not io and #sock.buf > 0 then
     sock.raw = sock.buf .. (sock.raw or "")
     sock.buf = ""
   end
-  local ok, session = pcall(handshake.run, sock, opts)
+  local ok, session = pcall(handshake.run, io or sock, opts)
   if not ok then
     local e = session
     if type(e) == "table" and e.phase == "connect" and not e.tls_closed then
@@ -125,14 +127,18 @@ end
 ---Upgrade using a parsed connection URL's tls/fingerprint settings.
 ---@param sock dbdash.net.Socket
 ---@param info dbdash.db.ConnInfo
-function M.from_info(sock, info)
+---@param extra { alpn: string[]?, io: table?, tls13: boolean? }?
+function M.from_info(sock, info, extra)
+  extra = extra or {}
   return M.starttls(sock, {
     host = info.params.tls_host or info.host,
     mode = info.tls,
     fingerprint = info.fingerprint,
     ca = info.params.ca,
     base_dir = info.base_dir,
-  })
+    alpn = extra.alpn,
+    tls13 = extra.tls13,
+  }, extra.io)
 end
 
 return M
