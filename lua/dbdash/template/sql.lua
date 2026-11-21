@@ -156,12 +156,18 @@ G.sql_concat = function(args, kw, env)
   return "CONCAT(" .. table.concat(parts, ", ") .. ")"
 end
 
+-- SQL filters and functions produce SQL, so their results are marked safe: autoescape
+-- must not quote them again.
 function M.install()
   for k, v in pairs(F) do
-    R.filters[k] = v
+    R.filters[k] = function(...)
+      return R.safe(v(...))
+    end
   end
   for k, v in pairs(G) do
-    R.globals[k] = v
+    R.globals[k] = function(...)
+      return R.safe(v(...))
+    end
   end
 end
 

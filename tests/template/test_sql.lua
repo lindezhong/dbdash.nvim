@@ -77,6 +77,8 @@ T["autoescape renders dialect literals"] = function()
   eq(render(src, ctx, "postgres", true), "WHERE name = 'it''s' AND id IN (1, 2, 3) AND x = NULL AND n = 10")
   eq(render("{{ 'col'|safe }} {{ ids|join(',')|safe }}", ctx, "postgres", true), "col 1,2,3")
   eq(render("{{ name }}", ctx, "postgres", false), "it's")
+  -- SQL filter output is SQL: not quoted again
+  eq(render("x IN {{ ids|sql_in }} AND y = {{ name|sql_quote }}", ctx, "postgres", true), "x IN (1, 2, 3) AND y = 'it''s'")
 end
 
 return T
