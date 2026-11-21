@@ -23,6 +23,10 @@ local M = {
 
 -- Runs in a worker thread: must not use upvalues. Arguments and result are strings.
 local function worker(path, sql, max_rows, timeout_ms, lib_path, readonly, create)
+  -- The progress handler is a Lua callback called from sqlite3_step. LuaJIT raises "bad
+  -- callback" (and Neovim aborts) when a callback runs inside a JIT-compiled FFI call, which
+  -- happens once the step loop gets hot in the reused thread VM. Keep this code interpreted.
+  jit.off(true, true)
   local ffi = require("ffi")
   pcall(
     ffi.cdef,

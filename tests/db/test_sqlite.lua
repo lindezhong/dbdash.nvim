@@ -102,4 +102,18 @@ T["bad lib_path is reported"] = function()
   eq({ r.err.phase, r.err.message:find("lib_path") ~= nil }, { "connect", true })
 end
 
+T["repeated queries that run the progress handler do not abort"] = function()
+  -- Regression: once the worker's step loop was JIT-compiled, the progress callback made
+  -- LuaJIT raise "bad callback" and Neovim abort. This sequence triggered it reliably.
+  local q = {
+    "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23) SELECT printf('%02d', n) AS hour, 50 + abs(random() % 100) AS visits FROM h",
+    "SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95",
+    "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 80) SELECT abs(random() % 100) AS score FROM n",
+  }
+  for _, i in ipairs({ 1, 1, 1, 2, 3, 2, 3, 1, 3, 1, 2, 3 }) do
+    local rs = require("tests.helpers").ok("sqlite:///:memory:", q[i])
+    eq(rs.row_count > 0, true)
+  end
+end
+
 return T
