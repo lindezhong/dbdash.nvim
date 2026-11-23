@@ -2,7 +2,7 @@
 #
 # lua:// - the query is Lua code that returns rows. It sees the arguments as `args` and
 # helpers such as dbdash.system() (run a command without blocking the editor) and
-# dbdash.query() (query another database). Neovim asks whether you trust this file before
+# dbdash.query() (query another database). dbdash asks whether you trust this file before
 # running it (once, and again after changes); see :help dbdash-lua.
 
 database:

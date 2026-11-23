@@ -3,7 +3,7 @@
 # query.transform - Lua that reshapes the query result before it is shown, for any
 # database (SQLite here). It gets rs (rs.columns, rs.types, rs.rows with nil for NULL)
 # and args, and returns rows like a lua:// query. Here: amounts in cents become dollars,
-# with a running total. Neovim asks whether you trust this file first (:help dbdash-lua).
+# with a running total. dbdash asks whether you trust this file first (:help dbdash-lua).
 
 database:
   url: "sqlite:///:memory:"
