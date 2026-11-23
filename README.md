@@ -269,10 +269,43 @@ make test                  # unit, golden and UI tests (clones mini.nvim into de
 make test FILE=tests/yaml/test_parse.lua
 UPDATE_GOLDEN=1 make test  # regenerate render reference outputs
 make it                    # also run integration tests against tests/docker/compose.yaml
-make it-down               # stop the integration databases
+make it-down               # stop the integration services
 DBDASH_NET=1 make test     # include a TLS handshake with a public server (system CAs)
 make fmt                   # format with stylua
 ```
+
+Integration tests run against the services in `tests/docker/compose.yaml`: Redis,
+PostgreSQL, MySQL, MongoDB, Cassandra, SQL Server and nginx (HTTP/HTTPS), all official
+images with the configs and test certificates (`tests/fixtures/`) mounted read-only. They
+need access to Docker (e.g. a user in the `docker` group, or `sg docker -c "make it-up"`).
+To run only some of them, start the services once and pick a file:
+
+```sh
+make it-up
+DBDASH_IT=1 make test FILE=tests/db/test_postgres.lua
+```
+
+With `DBDASH_IT=1` the examples test also runs `example/http.yaml`, which calls the public
+GitHub API (network access needed).
+
+The services listen on non-default ports (15432 PostgreSQL, 13306 MySQL, 16379/16380 Redis
+plain/TLS, 17017 MongoDB, 19042 Cassandra, 11433 SQL Server, 18080/18443 HTTP/HTTPS), so a
+local database is not hit by accident. To test on another machine (e.g. Windows) against
+the containers of a Docker host, forward these ports over SSH, here from PowerShell:
+
+```powershell
+ssh -N `
+  -L 15432:127.0.0.1:15432 -L 13306:127.0.0.1:13306 `
+  -L 16379:127.0.0.1:16379 -L 16380:127.0.0.1:16380 `
+  -L 17017:127.0.0.1:17017 -L 19042:127.0.0.1:19042 `
+  -L 11433:127.0.0.1:11433 `
+  -L 18080:127.0.0.1:18080 -L 18443:127.0.0.1:18443 `
+  user@docker-host
+```
+
+Keep it open and run `DBDASH_IT=1 make test` (or `$env:DBDASH_IT=1; make test`) in another
+terminal; the tests connect to `127.0.0.1` and `localhost`, which the test certificates
+cover.
 
 ## License
 
