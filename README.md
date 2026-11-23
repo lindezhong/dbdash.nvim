@@ -12,6 +12,8 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
   each with alternative styles (braille / block canvases, vertical bars, round pie, ...).
 - **Several panels** per dashboard in a grid, each refreshing on its own interval.
   Dashboards that are not on screen pause and catch up when shown again.
+- **Lua**: a `lua://` source whose query is Lua code, and `query.transform` to reshape any
+  result with Lua (trusted configs only, as with `exrc`).
 - **Query templates**: a Jinja2 subset with SQL-safe quoting filters, autoescape, macros
   and imports.
 - **Thresholds**: color values (stat cards, table cells) and notify when a value crosses a level.
@@ -146,6 +148,8 @@ Examples, all runnable as they are:
 | [`template_example.yaml`](example/template_example.yaml) | every argument type and the template syntax |
 | [`macros.yaml`](example/macros.yaml) | macros, imports, autoescape |
 | [`sqlite_file.yaml`](example/sqlite_file.yaml) | a SQLite file database |
+| [`lua.yaml`](example/lua.yaml) | a `lua://` data source (Lua code, a command's output) |
+| [`transform.yaml`](example/transform.yaml) | `query.transform` reshaping a query result with Lua |
 
 ### Connection URLs
 
@@ -188,6 +192,25 @@ LIMIT {{ limit | sql_limit }}
 
 The SQL filters quote for the dashboard's database (MySQL backslashes, SQL Server
 `N'...'` and `[ident]`, JSON for MongoDB, ...). See `:help dbdash-templates`.
+
+### Lua
+
+A `lua://` database runs its query as Lua, and `query.transform` reshapes the result of
+any database:
+
+```yaml
+query:
+  sql: SELECT day, amount FROM sales
+  transform: |
+    local out = {}
+    for _, r in ipairs(rs.rows) do out[#out + 1] = { r[1], r[2] / 100 } end
+    return { columns = { "day", "amount_usd" }, rows = out }
+```
+
+Scripts get `args`, `rs` (for transforms) and helpers such as `dbdash.system()` and
+`dbdash.query()` that wait without blocking the editor. Neovim asks before running a
+config with Lua (`vim.secure`, once per file and again after changes);
+`setup({ lua = { confirm = false } })` or `lua.trusted_dirs` skip that. See `:help dbdash-lua`.
 
 ## Coming from vim-dashboard
 

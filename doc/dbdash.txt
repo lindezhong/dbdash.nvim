@@ -312,8 +312,9 @@ Examples and schema                                          *dbdash-examples*
 The `example/` directory of the plugin has a runnable config (SQLite, no
 setup) for every chart type, the alternative styles (`styles.yaml`), several
 panels (`multi_panel.yaml`), arguments and templates
-(`template_example.yaml`), macros and autoescape (`macros.yaml`) and a SQLite
-file (`sqlite_file.yaml`).
+(`template_example.yaml`), macros and autoescape (`macros.yaml`), a SQLite
+file (`sqlite_file.yaml`), a Lua data source (`lua.yaml`) and a Lua transform
+(`transform.yaml`, both ask for trust, |dbdash-lua|).
 
 `example/dbdash.schema.yaml` is a JSON Schema for config files. It lists every
 field and the URL format of each database. Editors using yaml-language-server
@@ -738,7 +739,67 @@ SQL Server  `mssql://user:pass@host:1433/db`  SQL authentication. With
             (SQL Server 2022+: TLS first, may be TLS 1.3). SQL Server sends
             only its leaf certificate, so `ca=` should include intermediates.
 
+Lua         `lua://`  the query is Lua code, see |dbdash-lua|.
+
 Each refresh opens a connection, runs the query and closes it.
+
+Lua queries and transforms                                        *dbdash-lua*
+
+A `lua://` database runs `query.sql` as Lua, and `query.transform` reshapes
+the result of any database (including `lua://`) with Lua: >yaml
+  database: { url: "lua://" }
+  query:
+    args: [{ name: days, type: int, default: 7 }]
+    sql: |
+      local rows = {}
+      for i = 1, args.days do
+        rows[i] = { os.date("%m-%d", os.time() - i * 86400), i * i }
+      end
+      return { columns = { "day", "n" }, rows = rows }
+
+  # any database:
+  query:
+    sql: SELECT day, amount FROM sales
+    transform: |
+      local out = {}
+      for _, r in ipairs(rs.rows) do out[#out + 1] = { r[1], r[2] / 100 } end
+      return { columns = { "day", "amount_usd" }, rows = out }
+<
+Both go through the template like SQL (|dbdash-templates|; values are
+inserted as written, and `transform` never autoescapes), so reading the
+arguments from `args` is usually simpler. They run inside the
+refresh without blocking the editor and see the globals (`vim`, `io`, ...)
+plus:
+
+  args                  the dashboard arguments by name
+  rs                    (transform) the result: `rs.columns` (names),
+                        `rs.types`, `rs.rows` (lists, nil for NULL)
+  dbdash.system(cmd, opts)  run a command (a string through `sh -c` or
+                        `cmd /c`, or a list) and wait without blocking;
+                        returns { code, stdout, stderr }
+  dbdash.query(url, query, opts)  run a query on any database; returns a
+                        result set (`columns` with `name`, `rows`)
+  dbdash.sleep(ms)      wait without blocking
+  dbdash.checkpoint()   let the editor run during a long computation
+  dbdash.null           NULL in returned rows (nil works too)
+
+Return one of: >lua
+  { columns = { "a", "b" }, rows = { { 1, "x" }, { 2, "y" } } }
+  { columns = { "a", "b" }, rows = { { a = 1, b = "x" } } }  -- rows by name
+  { { a = 1, b = "x" }, { a = 2, b = "y" } }  -- records: columns sorted,
+                                             -- or give columns = { ... }
+<Column types follow the first non-NULL value; `query.max_rows` applies.
+Errors name the config file and line; a script still running at the query
+timeout is stopped (loops that never call a function may only stop then).
+Blocking calls such as `vim.fn.system()` freeze the editor: use
+`dbdash.system()`.
+
+Trust: Lua in a config runs with your permissions, so a dashboard with
+`lua://` or `transform` asks first through |vim.secure| (as 'exrc' does):
+once per file, and again after it changes; a denied file does not start.
+`setup({ lua = { confirm = false } })` turns the question off, and
+`lua = { trusted_dirs = { "~/dashboards" } }` skips it for configs under
+those directories. A config cannot skip it itself.
 
 TLS                                                               *dbdash-tls*
 

@@ -20,14 +20,34 @@ for _, f in ipairs(files) do
     local vars = args.resolve(cfg.args, args.new_state())
     for _, p in ipairs(cfg.panels) do
       local driver = db.driver(p.database.type)
-      eq(p.database.type, "sqlite") -- examples run anywhere
+      eq(p.database.type == "sqlite" or p.database.type == "lua", true) -- examples run anywhere
       local sql, terr = template.render(p.query.sql, vars, {
         env = template.env(driver.dialect, p.query.autoescape, cfg.dir),
       })
       if terr then
         error(tostring(terr))
       end
-      local rs = h.ok(p.database.url, sql, { options = p.database.options, base_dir = cfg.dir })
+      local rs = h.ok(p.database.url, sql, { options = p.database.options, base_dir = cfg.dir, args = vars })
+      if p.query.transform then
+        local code = assert(template.render(p.query.transform, vars, { env = template.env(driver.dialect, false, cfg.dir) }))
+        local res
+        require("dbdash.util.async").run(function()
+          return require("dbdash.db.lua_env").run(code, {
+            phase = "transform",
+            args = vars,
+            vars = { rs = require("dbdash.db.lua_result").to_lua(rs) },
+          })
+        end, function(e, out)
+          res = { e, out }
+        end)
+        vim.wait(10000, function()
+          return res ~= nil
+        end, 5)
+        if res[1] then
+          error(tostring(res[1]))
+        end
+        rs = res[2]
+      end
       eq(rs.row_count > 0, true)
       local out = render.render(rs, p.show, { width = 100, height = 30 })
       for _, hl in ipairs(out.hl) do

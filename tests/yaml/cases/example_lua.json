@@ -1,0 +1,22 @@
+{
+ "database": {
+  "url": "lua://"
+ },
+ "query": {
+  "args": [
+   {
+    "name": "days",
+    "type": "int",
+    "default": 14
+   }
+  ],
+  "sql": "-- A command's output: here just the host name.\nlocal host = vim.trim(dbdash.system(\"hostname\").stdout)\n\n-- Data computed in Lua; dbdash.query() could read it from a database instead.\nlocal rows = {}\nfor i = args.days - 1, 0, -1 do\n  local t = os.time() - i * 86400\n  rows[#rows + 1] = { os.date(\"%m-%d\", t), 50 + math.floor(30 * math.sin(i / 2)), host }\nend\nreturn { columns = { \"day\", \"load\", \"host\" }, rows = rows }\n"
+ },
+ "show": {
+  "type": "line",
+  "title": "Lua data source",
+  "x_column": "day",
+  "y_column": "load",
+  "interval": "60s"
+ }
+}

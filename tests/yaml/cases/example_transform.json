@@ -1,0 +1,34 @@
+{
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "query": {
+  "args": [
+   {
+    "name": "rate",
+    "type": "number",
+    "default": 1.0,
+    "description": "Exchange rate applied to the amounts"
+   }
+  ],
+  "sql": "WITH RECURSIVE d(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM d WHERE i < 10)\nSELECT date('now', '-' || (10 - i) || ' days') AS day, abs(random() % 50000) AS cents\nFROM d\n",
+  "transform": "local out, total = {}, 0\nfor _, r in ipairs(rs.rows) do\n  local amount = r[2] / 100 * args.rate\n  total = total + amount\n  out[#out + 1] = { day = r[1]:sub(6), amount = amount, total = total }\nend\nreturn { columns = { \"day\", \"amount\", \"total\" }, rows = out }\n"
+ },
+ "show": {
+  "type": "table",
+  "title": "Sales in dollars (transformed)",
+  "column_list": [
+   {
+    "column": "day"
+   },
+   {
+    "column": "amount",
+    "alias": "Amount"
+   },
+   {
+    "column": "total",
+    "alias": "Running total"
+   }
+  ]
+ }
+}

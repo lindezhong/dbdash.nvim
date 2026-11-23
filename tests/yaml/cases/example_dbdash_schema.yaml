@@ -70,7 +70,7 @@ definitions:
     properties:
       type:
         description: Database type; inferred from the URL scheme when omitted.
-        enum: [sqlite, sqlite3, postgres, postgresql, mysql, mariadb, redis, rediss, mongodb, cassandra, cql, mssql, sqlserver]
+        enum: [sqlite, sqlite3, postgres, postgresql, mysql, mariadb, redis, rediss, mongodb, cassandra, cql, mssql, sqlserver, lua]
       url:
         type: string
         description: |-
@@ -97,6 +97,7 @@ definitions:
                       (or cql://)
           SQL Server  mssql://user:pass@host:1433/db            (or sqlserver://)
                       with TLS: TLS negotiated inside TDS; &encrypt=strict for TDS 8
+          Lua         lua://   query.sql is Lua code returning rows (:help dbdash-lua)
 
           Common parameters:
             tls=disable|require|pin|verify-ca|verify-full   (default disable)
@@ -183,6 +184,16 @@ definitions:
                             "limit": 100, "flatten": 1}
                            operation: find | aggregate (pipeline) | count |
                            distinct (field) | command (command)
+            lua://         Lua code returning { columns, rows } or records; it sees
+                           args and dbdash.system/query/sleep (:help dbdash-lua)
+      transform:
+        type: string
+        description: |-
+          Lua code that reshapes the result of any database before it is shown (after the
+          template, without autoescape). It gets rs (rs.columns names, rs.types, rs.rows
+          with nil for NULL), args and the dbdash.* helpers, and returns rows like a lua://
+          query: { columns = {...}, rows = {...} } or a list of records. Configs with Lua
+          ask for trust first (:help dbdash-lua).
       args:
         type: array
         items: { $ref: "#/definitions/arg" }
