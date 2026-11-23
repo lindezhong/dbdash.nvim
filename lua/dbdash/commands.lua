@@ -317,7 +317,13 @@ function M.show_sql()
         return err(sched.format_error(e))
       end
     end
-    require("dbdash.view.popup").open(vim.split(sql, "\n", { plain = true }), {
+    local lines = vim.split(sql, "\n", { plain = true })
+    if p.transform_code then
+      lines[#lines + 1] = ""
+      lines[#lines + 1] = "-- query.transform"
+      vim.list_extend(lines, vim.split(p.transform_code, "\n", { plain = true }))
+    end
+    require("dbdash.view.popup").open(lines, {
       title = d.cfg.multi and ("DbDash query: " .. p:title()) or "DbDash query",
       filetype = ({ mongodb = "json", lua = "lua" })[p.cfg.database.type] or "sql",
     })

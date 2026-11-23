@@ -813,6 +813,23 @@ T["lua:// dashboards: template, args, chart; errors point at the YAML line"] = f
   eq(child.lua_get("_G.notes[#_G.notes].msg"):find("lua_err.yaml:5: attempt to index local 't'", 1, true) ~= nil, true)
 end
 
+T["query.transform: shown by :DbDashShowSQL, exported as transformed"] = function()
+  vim.fn.writefile({
+    "database: { url: 'sqlite:///:memory:' }",
+    "query:",
+    "  sql: SELECT 'a' AS k, 2 AS v",
+    "  transform: |",
+    "    return { { k = rs.rows[1][1], v = rs.rows[1][2] * 10 } }",
+    "show: { type: table }",
+  }, dir .. "/tf.yaml")
+  child.cmd("DbDashStart tf.yaml")
+  child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].rs ~= nil end)]])
+  child.cmd("DbDashExport csv")
+  eq(child.fn.getreg('"'), "k,v\na,20\n")
+  child.cmd("DbDashShowSQL")
+  eq(lines(), { "SELECT 'a' AS k, 2 AS v", "", "-- query.transform", "return { { k = rs.rows[1][1], v = rs.rows[1][2] * 10 } }" })
+end
+
 T[":DbDashStyle re-renders cached data with another style"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/line.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("┌") end)]])

@@ -216,11 +216,29 @@ function Panel:render_sql()
   end
   local vars = args.resolve(d.cfg.args, d.state)
   self.vars = vars -- for lua:// scripts and query.transform (args)
-  return template.render(q.sql, vars, {
+  local source = vim.fn.fnamemodify(d.path, ":~:.")
+  local sql, err = template.render(q.sql, vars, {
     env = template.env(driver.dialect, q.autoescape, d.cfg.dir),
-    source = vim.fn.fnamemodify(d.path, ":~:."),
+    source = source,
     line_offset = q.sql_line - 1,
   })
+  if not sql then
+    return nil, err
+  end
+  self.transform_code = nil
+  if q.transform then
+    -- Lua code: rendered like the query, without SQL escaping.
+    local code, terr = template.render(q.transform, vars, {
+      env = template.env(driver.dialect, false, d.cfg.dir),
+      source = source,
+      line_offset = q.transform_line - 1,
+    })
+    if not code then
+      return nil, terr
+    end
+    self.transform_code = code
+  end
+  return sql
 end
 
 ---Delay before the next try after `failures` consecutive failures: the interval doubled
@@ -297,34 +315,62 @@ function Panel:refresh(o)
     if gen ~= self.d.generation then
       return -- stopped meanwhile
     end
-    self.running = false
-    if self.rerun then
-      self.rerun = false
+    if qerr or not self.transform_code then
+      return self:finish_refresh(gen, qerr, rs)
+    end
+    -- query.transform: Lua that reshapes the result (any database), in its own task.
+    local code = self.transform_code
+    require("dbdash.util.async").run(function()
+      local out = require("dbdash.db.lua_env").run(code, {
+        phase = "transform",
+        source = vim.fn.fnamemodify(self.d.path, ":~:."),
+        line = q.transform_line,
+        args = self.vars,
+        vars = { rs = require("dbdash.db.lua_result").to_lua(rs) },
+        timeout = q.timeout or require("dbdash").default_ms("timeout"),
+        max_rows = q.max_rows,
+      })
+      out.elapsed_ms = rs.elapsed_ms
+      return out
+    end, function(terr, out)
       vim.schedule(function()
         if gen == self.d.generation then
-          self:refresh({ queue = true })
+          self:finish_refresh(gen, terr and require("dbdash.db.error").wrap(terr) or nil, out)
         end
       end)
-    end
-    if qerr then
-      self:push_history({ error = M.format_error(qerr) })
-      self:fail(qerr)
-      return
-    end
-    self:push_history({ elapsed_ms = rs.elapsed_ms, rows = rs.row_count })
-    self.rs = rs
-    if (self.failures or 0) > 0 then
-      local was_backing_off = self.retry_at ~= nil
-      self.failures, self.retry_at, self.backoff_mult = 0, nil, nil
-      if was_backing_off and not self.d.paused and not (self.d.gtimer and not self.cfg.show.own_interval) then
-        self:start_timer() -- back to the normal interval
-      end
-    end
-    self:track(rs)
-    self:check_thresholds(rs)
-    self.error = nil
-    self.d:redraw()
+    end)
   end)
+end
+
+---The end of a refresh: the query (and transform) result or error.
+function Panel:finish_refresh(gen, qerr, rs)
+  self.running = false
+  if self.rerun then
+    self.rerun = false
+    vim.schedule(function()
+      if gen == self.d.generation then
+        self:refresh({ queue = true })
+      end
+    end)
+  end
+  if qerr then
+    self:push_history({ error = M.format_error(qerr) })
+    self:fail(qerr)
+    return
+  end
+  self:push_history({ elapsed_ms = rs.elapsed_ms, rows = rs.row_count })
+  self.rs = rs
+  if (self.failures or 0) > 0 then
+    local was_backing_off = self.retry_at ~= nil
+    self.failures, self.retry_at, self.backoff_mult = 0, nil, nil
+    if was_backing_off and not self.d.paused and not (self.d.gtimer and not self.cfg.show.own_interval) then
+      self:start_timer() -- back to the normal interval
+    end
+  end
+  self:track(rs)
+  self:check_thresholds(rs)
+  self.error = nil
+  self.d:redraw()
 end
 
 ---(Re)start the panel's own timer. Panels that just follow the top-level interval of a

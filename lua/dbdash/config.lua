@@ -65,7 +65,7 @@ local DEFAULTS = setmetatable({}, {
 ---@field path string absolute path of the YAML file
 ---@field dir string directory containing the file
 ---@field database { type: string, url: string, options: table }
----@field query { sql: string, sql_line: integer, autoescape: boolean, max_rows: integer, timeout: integer?, args_show: boolean, args: dbdash.ArgSpec[] }
+---@field query { sql: string, sql_line: integer, transform: string?, transform_line: integer, autoescape: boolean, max_rows: integer, timeout: integer?, args_show: boolean, args: dbdash.ArgSpec[] }
 ---@field show table show section, with interval (ms), title, show_countdown, countdown_format
 ---@field positions table<string, {line: integer, col: integer}>
 
@@ -226,11 +226,15 @@ function Ctx:query(q, prefix)
   q = self:expect(prefix .. "query", q, "map")
   local sql = self:expect(prefix .. "query.sql", q.sql, "string")
   local p = self.pos[prefix .. "query.sql"]
+  local transform = self:expect(prefix .. "query.transform", q.transform, "string", true)
+  local tp = self.pos[prefix .. "query.transform"]
   local autoescape = self:expect(prefix .. "query.autoescape", q.autoescape, "boolean", true)
   local args_show = self:expect(prefix .. "query.args_show", q.args_show, "boolean", true)
   return {
     sql = sql,
     sql_line = p and p.line or 1,
+    transform = transform,
+    transform_line = tp and tp.line or 1,
     autoescape = autoescape == true,
     max_rows = self:expect(prefix .. "query.max_rows", q.max_rows, "integer", true) or DEFAULTS.max_rows,
     timeout = self:duration(prefix .. "query.timeout", q.timeout),
