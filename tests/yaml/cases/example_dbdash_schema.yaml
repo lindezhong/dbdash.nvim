@@ -7,6 +7,18 @@
 #
 # Defaults below marked "setup" can be changed for all configs with
 # require("dbdash").setup({ defaults = { ... } }); see :help dbdash-setup.
+#
+# Result format (:help dbdash-result) - referred to by query.sql (lua://, http(s)://) and
+# query.transform below. Every query goes: query -> query.transform (if any) -> a check
+# that the result is rows. SQL databases, Redis, MongoDB and Cassandra return rows; a
+# lua:// script, an HTTP response (decoded JSON) and a transform must return one of:
+#   { columns = { "a", "b" }, rows = { { 1, "x" } } }        rows by position
+#   { columns = { "a", "b" }, rows = { { a = 1, b = "x" } } } rows by name
+#   { { a = 1, b = "x" }, ... }                               records (columns sorted by
+#                                                             name, or a columns list)
+# In JSON: [{"a": 1}] or {"columns": ["a"], "rows": [[1]]}. nil / null is NULL; column
+# types follow the first non-NULL value; query.max_rows applies. Anything else (an
+# object such as {"data": [...]}, a number, text) is an error that suggests a transform.
 $schema: "http://json-schema.org/draft-07/schema#"
 $id: "dbdash.schema.yaml"
 title: dbdash.nvim dashboard
@@ -16,7 +28,7 @@ description: >-
 type: object
 oneOf:
   - title: single chart
-    required: [database, query]
+    required: [database] # query too, except for http(s):// (a GET of the URL)
     not: { required: [panels] }
   - title: several panels
     required: [panels]
@@ -120,6 +132,8 @@ definitions:
           - "mongodb+srv://reader:secret@cluster0.example.net/shop"
           - "cassandra://cassandra:cassandra@127.0.0.1:9042/metrics"
           - "mssql://sa:Secret1@sqlhost:1433/master?tls=pin&fingerprint=sha256:AB:..."
+          - "lua://"
+          - "https://api.example.com/v1?api_key=${API_KEY}"
       password_cmd:
         description: >-
           Command printing the password (first line), used when the URL has none. A string
@@ -171,7 +185,7 @@ definitions:
 
   query:
     type: object
-    required: [sql]
+    description: The query; sql is required except for http(s):// (an empty request GETs the URL).
     additionalProperties: false
     properties:
       sql:
@@ -187,23 +201,31 @@ definitions:
                             "limit": 100, "flatten": 1}
                            operation: find | aggregate (pipeline) | count |
                            distinct (field) | command (command)
-            lua://         Lua code returning { columns, rows } or records; it sees
-                           args and dbdash.system/query/sleep (:help dbdash-lua)
+            lua://         Lua code returning rows (see "Result format" at the top
+                           of this file, :help dbdash-result), or a value that
+                           query.transform turns into rows; it sees args and
+                           dbdash.system/query/sleep (:help dbdash-lua)
             http(s)://     a JSON request description (empty: GET the URL):
                            {"method": "POST", "path": "search", "query": {...},
                             "headers": {...}, "cookies": "a=1; b=2" | "cookies.txt",
                             "body": {...} | "text", "form": {...}, "redirects": 5}
-                           JSON responses become Lua data (:help dbdash-http)
+                           JSON responses are decoded, other bodies stay text; the
+                           result must be rows ("Result format", :help
+                           dbdash-result): a JSON list of objects or {"columns",
+                           "rows"} shows directly, anything else needs
+                           query.transform (:help dbdash-http)
       transform:
         type: string
         description: |-
           Lua code that reshapes the result of any database before it is shown (after the
-          template, without autoescape). Every query goes: query -> transform -> rows check.
-          It gets rs (rs.columns names, rs.types, rs.rows with nil for NULL; for lua:// and
-          http(s):// the raw value, e.g. the decoded response, plus `response` for http),
-          args and the dbdash.* helpers, and returns rows: { columns = {...},
-          rows = {...} } or a list of records. Configs with Lua ask for trust first
-          (:help dbdash-lua).
+          template, without autoescape; :help dbdash-transform). Every query goes:
+          query -> transform -> rows check. It gets
+            rs        SQL and other databases: { columns (names), types, rows (nil for
+                      NULL) }; lua://: the script's value; http(s)://: the decoded body
+            response  http(s)://: { status, reason, headers, body, url }
+            args      and the dbdash.* helpers
+          and returns rows (see "Result format" at the top of this file, :help
+          dbdash-result). Configs with Lua ask for trust first (:help dbdash-lua).
       args:
         type: array
         items: { $ref: "#/definitions/arg" }
@@ -226,7 +248,7 @@ definitions:
 
   panel:
     type: object
-    required: [query]
+    description: One chart; query is required except for http(s):// (a GET of the URL).
     additionalProperties: false
     properties:
       database:

@@ -8,8 +8,7 @@
   {
    "title": "single chart",
    "required": [
-    "database",
-    "query"
+    "database"
    ],
    "not": {
     "required": [
@@ -145,7 +144,9 @@
       "redis://:secret@cache:6379/0",
       "mongodb+srv://reader:secret@cluster0.example.net/shop",
       "cassandra://cassandra:cassandra@127.0.0.1:9042/metrics",
-      "mssql://sa:Secret1@sqlhost:1433/master?tls=pin&fingerprint=sha256:AB:..."
+      "mssql://sa:Secret1@sqlhost:1433/master?tls=pin&fingerprint=sha256:AB:...",
+      "lua://",
+      "https://api.example.com/v1?api_key=${API_KEY}"
      ]
     },
     "password_cmd": {
@@ -241,18 +242,16 @@
   },
   "query": {
    "type": "object",
-   "required": [
-    "sql"
-   ],
+   "description": "The query; sql is required except for http(s):// (an empty request GETs the URL).",
    "additionalProperties": false,
    "properties": {
     "sql": {
      "type": "string",
-     "description": "Query template (Jinja subset, see :help dbdash-templates). Its language depends on\nthe database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\": {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)\n  lua://         Lua code returning { columns, rows } or records; it sees\n                 args and dbdash.system/query/sleep (:help dbdash-lua)\n  http(s)://     a JSON request description (empty: GET the URL):\n                 {\"method\": \"POST\", \"path\": \"search\", \"query\": {...},\n                  \"headers\": {...}, \"cookies\": \"a=1; b=2\" | \"cookies.txt\",\n                  \"body\": {...} | \"text\", \"form\": {...}, \"redirects\": 5}\n                 JSON responses become Lua data (:help dbdash-http)"
+     "description": "Query template (Jinja subset, see :help dbdash-templates). Its language depends on\nthe database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\": {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)\n  lua://         Lua code returning rows (see \"Result format\" at the top\n                 of this file, :help dbdash-result), or a value that\n                 query.transform turns into rows; it sees args and\n                 dbdash.system/query/sleep (:help dbdash-lua)\n  http(s)://     a JSON request description (empty: GET the URL):\n                 {\"method\": \"POST\", \"path\": \"search\", \"query\": {...},\n                  \"headers\": {...}, \"cookies\": \"a=1; b=2\" | \"cookies.txt\",\n                  \"body\": {...} | \"text\", \"form\": {...}, \"redirects\": 5}\n                 JSON responses are decoded, other bodies stay text; the\n                 result must be rows (\"Result format\", :help\n                 dbdash-result): a JSON list of objects or {\"columns\",\n                 \"rows\"} shows directly, anything else needs\n                 query.transform (:help dbdash-http)"
     },
     "transform": {
      "type": "string",
-     "description": "Lua code that reshapes the result of any database before it is shown (after the\ntemplate, without autoescape). Every query goes: query -> transform -> rows check.\nIt gets rs (rs.columns names, rs.types, rs.rows with nil for NULL; for lua:// and\nhttp(s):// the raw value, e.g. the decoded response, plus `response` for http),\nargs and the dbdash.* helpers, and returns rows: { columns = {...},\nrows = {...} } or a list of records. Configs with Lua ask for trust first\n(:help dbdash-lua)."
+     "description": "Lua code that reshapes the result of any database before it is shown (after the\ntemplate, without autoescape; :help dbdash-transform). Every query goes:\nquery -> transform -> rows check. It gets\n  rs        SQL and other databases: { columns (names), types, rows (nil for\n            NULL) }; lua://: the script's value; http(s)://: the decoded body\n  response  http(s)://: { status, reason, headers, body, url }\n  args      and the dbdash.* helpers\nand returns rows (see \"Result format\" at the top of this file, :help\ndbdash-result). Configs with Lua ask for trust first (:help dbdash-lua)."
     },
     "args": {
      "type": "array",
@@ -284,9 +283,7 @@
   },
   "panel": {
    "type": "object",
-   "required": [
-    "query"
-   ],
+   "description": "One chart; query is required except for http(s):// (a GET of the URL).",
    "additionalProperties": false,
    "properties": {
     "database": {

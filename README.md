@@ -236,7 +236,9 @@ query:
     return out
 ```
 
-The transform gets the decoded JSON as `rs` and `response` (status, headers, body).
+The transform gets the decoded JSON as `rs` and `response` (status, headers, body). A JSON
+list of objects or `{"columns": [...], "rows": [...]}` shows without a transform; every
+result must end up in one of these row shapes (`:help dbdash-result`).
 `cookies` takes curl's `-b` forms (`"a=1; b=2"` or a Netscape cookie file); cookies the
 server sets are kept in memory for the dashboard and sent on the next refresh, without
 touching the config. `https` verifies certificates by default. See `:help dbdash-http`.

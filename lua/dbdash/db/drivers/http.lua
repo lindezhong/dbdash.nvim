@@ -53,6 +53,7 @@ function M.parse_url(info)
       keep[#keep + 1] = pair
     end
   end
+  info.port = info.port or (info.scheme == "https" and 443 or 80) -- as passwords.json keys expect
   info.base_path = path ~= "" and path or "/"
   info.base_query = #keep > 0 and table.concat(keep, "&") or nil
   return info

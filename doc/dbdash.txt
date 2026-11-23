@@ -79,7 +79,7 @@ defaults: >lua
       backoff = 8,         -- retry after at most interval x 8; 1 = off
     },
     lua = {                -- configs with Lua code, see |dbdash-lua|
-      confirm = true,      -- ask before running them (vim.secure, as exrc)
+      confirm = true,      -- ask before running them (dbdash's own question)
       trusted_dirs = {},   -- configs under these directories run unasked
     },
   })
@@ -107,7 +107,9 @@ A config file that does not load (invalid YAML or fields) is reported with
 its line and column, and the dashboard does not start. When a refresh
 fails, the error has a phase: template (the query template), connect,
 tls, auth, query (the database rejected the query, e.g. a SQL syntax
-error), timeout (`connect_timeout` + `timeout` elapsed) or decode. Then:
+error, or the result is not rows, |dbdash-result|), transform (the
+`query.transform` script failed or did not return rows), timeout
+(`connect_timeout` + `timeout` elapsed) or decode. Then:
 
 - the last good result stays on screen, with the error as a red `✗` line
   above it (with panels: in the panel's header);
@@ -205,16 +207,17 @@ its next refresh is due, and otherwise continues the countdown. Set
     Reset all arguments to their defaults.
 
 :DbDashShowSQL                                                *:DbDashShowSQL*
-    Show the rendered query in a floating window ("q"/<Esc> close, "y" yank).
+    Show the rendered query in a floating window ("q"/<Esc> close, "y" yank),
+    followed by the rendered `query.transform` when there is one.
 
 :DbDashExport[!] [{format}] [{file}]                          *:DbDashExport*
-    Export the result of the current dashboard (with panels: the one under
-    the cursor, or pick one) as `csv`, `tsv`, `json` or `markdown`; without
-    {format} pick one. Without {file} the text goes into the unnamed
-    register, or the one given before the command (`"x:DbDashExport csv`,
-    `"xe`). An existing {file} is only overwritten with [!]. The whole
-    result is exported (not the truncated cells): NULL is empty in csv, tsv
-    and markdown and `null` in json; binary values are `\x` hex.
+    Export the result of the current dashboard (with panels: the one under the
+    cursor, or pick one) as `csv`, `tsv`, `json` or `markdown`; without
+    {format} pick one. Without {file} the text goes into the unnamed register,
+    or the one given before the command (`"x:DbDashExport csv`, `"xe`). An
+    existing {file} is only overwritten with [!]. The whole result (after
+    `query.transform`) is exported (not the truncated cells): NULL is empty in
+    csv, tsv and markdown and `null` in json; binary values are `\x` hex.
 
 :DbDashStyle {type} {style}                                     *:DbDashStyle*
 :DbDashStyle canvas {name}
@@ -270,6 +273,8 @@ Sidebar (`sidebar.keys`: select, stop, refresh, close):
   query:
     sql: |
       SELECT ...
+    transform: |            # optional Lua reshaping the result
+      return rs             # (|dbdash-transform|)
     autoescape: false       # render {{ x }} as SQL literals
     max_rows: 10000
     timeout: 30s
@@ -389,8 +394,8 @@ its cells joined by `style.separator` (default a space), so a one-column
 query shows one line per row; strings are shown as they are, newlines in a
 cell start new lines, NULL is `style.null_text` (default empty). Lines wider
 than the window wrap (`style.wrap: false` cuts them). The result must still
-be rows: turn a string from `lua://` or HTTP into `{ { text = rs } }` with
-`query.transform` (|dbdash-transform|).
+be rows (|dbdash-result|): turn a string from `lua://` or HTTP into
+`{ { text = rs } }` with `query.transform` (|dbdash-transform|).
 
 `colors` is a list (by series index) or a mapping (by category name). `width`
 caps the chart width (default: the window), `height` sets the plot rows
@@ -752,8 +757,36 @@ SQL Server  `mssql://user:pass@host:1433/db`  SQL authentication. With
             only its leaf certificate, so `ca=` should include intermediates.
 
 Lua         `lua://`  the query is Lua code, see |dbdash-lua|.
+HTTP        `https://api.example.com/v1` (or `http://`)  the query is a
+            JSON request description, see |dbdash-http|.
 
 Each refresh opens a connection, runs the query and closes it.
+
+Result format                                                 *dbdash-result*
+
+Every query, of any database, ends with a check that its result is rows
+(after `query.transform`, |dbdash-transform|). SQL databases, Redis, MongoDB
+and Cassandra return rows already. A `lua://` script, an HTTP response (its
+decoded JSON) and a transform must have one of these shapes, written here
+in Lua (in JSON: arrays and objects): >lua
+  -- columns and rows by position
+  { columns = { "a", "b" }, rows = { { 1, "x" }, { 2, "y" } } }
+  -- columns and rows by name
+  { columns = { "a", "b" }, rows = { { a = 1, b = "x" } } }
+  -- records: a list of objects; columns sorted by name,
+  -- or in the order of a `columns` list next to them
+  { { a = 1, b = "x" }, { a = 2, b = "y" } }
+<Without `columns`, rows by position get the names c1, c2, ... A missing
+value, nil, `dbdash.null` or JSON null is NULL. Each column's type follows
+its first non-NULL value: integer, number, boolean, string, or json for a
+table (shown as JSON). `query.max_rows` keeps the first rows.
+
+Anything else is an error with what was found, e.g. "the result is not rows
+(got string)" or "the result is an object (data, total), not rows"; for a
+query without a transform it adds "add query.transform to reshape it". So
+in JSON `[{"a": 1}]` and `{"columns": ["a"], "rows": [[1]]}` show directly,
+while `{"data": [...]}`, a number or text need a transform, e.g.
+`return rs.data` or `return { { text = rs } }`.
 
 Lua queries and transforms                                        *dbdash-lua*
 
@@ -797,16 +830,11 @@ plus:
   dbdash.checkpoint()   let the editor run during a long computation
   dbdash.null           NULL in returned rows (nil works too)
 
-Return one of: >lua
-  { columns = { "a", "b" }, rows = { { 1, "x" }, { 2, "y" } } }
-  { columns = { "a", "b" }, rows = { { a = 1, b = "x" } } }  -- rows by name
-  { { a = 1, b = "x" }, { a = 2, b = "y" } }  -- records: columns sorted,
-                                             -- or give columns = { ... }
-<Column types follow the first non-NULL value; `query.max_rows` applies.
-Errors name the config file and line; a script still running at the query
-timeout is stopped (loops that never call a function may only stop then).
-Blocking calls such as `vim.fn.system()` freeze the editor: use
-`dbdash.system()`.
+A `lua://` query returns rows (|dbdash-result|), or any value that its
+`query.transform` turns into rows. Errors name the config file and line; a
+script still running at the query timeout is stopped (loops that never call a
+function may only stop then). Blocking calls such as `vim.fn.system()` freeze
+the editor: use `dbdash.system()`.
 
 Trust: Lua in a config runs with your permissions, so starting a dashboard
 with `lua://` or `transform` asks first: Allow, View, Deny or Not now. View
@@ -822,12 +850,11 @@ directories. A config cannot skip it itself.
 Transforms                                                  *dbdash-transform*
 
 Every query, of any database, goes the same way: the query, then
-`query.transform` if the config has one, then a check that the result is rows
-(the shapes above). SQL databases, Redis, MongoDB and Cassandra return rows
-already, so the check simply passes; a `lua://` script or an HTTP response
-may return anything, and then the transform makes rows of it. Without a
-transform such a result is checked directly; when it is not rows the error
-says so and suggests a transform. The transform sees:
+`query.transform` if the config has one, then the rows check
+(|dbdash-result|). Results of SQL databases pass as they are; a `lua://`
+script or an HTTP response may return anything, and the transform makes rows
+of it. The transform is Lua (|dbdash-lua|: template, globals, helpers,
+trust) and sees:
 
   rs         SQL and the other databases: the result as plain data,
              `rs.columns` (names), `rs.types`, `rs.rows` (lists, nil for
@@ -839,7 +866,8 @@ says so and suggests a transform. The transform sees:
              final URL after redirects
   args       the dashboard arguments; and the `dbdash.*` helpers
 
-The transform's value goes through the same rows check; its errors name the
+It returns rows in one of the shapes of |dbdash-result|; its errors (and a
+value that is not rows) are reported with the phase "transform" and the
 config file and line.
 
 HTTP                                                             *dbdash-http*
@@ -887,6 +915,12 @@ Parameters in the URL other than dbdash's own (`tls`, `fingerprint`, `ca`,
 verifies the certificate and host name by default (`tls=verify-full`, see
 |dbdash-tls|); `tls=require` or `pin` relax that.
 
+The response body is the query's result: JSON (by Content-Type, or text that
+starts with `[` or `{` when there is none) is decoded, anything else stays
+text. It is then checked as rows (|dbdash-result|): a JSON list of objects or
+`{"columns": [...], "rows": [...]}` shows directly; other JSON and text need
+`query.transform`, which also gets `response` (|dbdash-transform|).
+
 Cookies the server sets (Set-Cookie) are kept in memory for the running
 dashboard and sent on later refreshes and redirects, following their Domain,
 Path, Secure and expiry. They override configured cookies of the same name;
@@ -930,7 +964,8 @@ Get a server's fingerprint with:
 <
 PostgreSQL, MySQL and SQL Server negotiate TLS on their normal port; Redis,
 MongoDB and Cassandra start TLS right away (use the server's TLS port;
-`rediss://` and MongoDB's `tls=true` imply `require`).
+`rediss://` and MongoDB's `tls=true` imply `require`). `https://` starts TLS
+right away and defaults to `verify-full` (|dbdash-http|).
 
 Supported: TLS 1.3 (X25519 or secp256r1; AES-128-GCM or ChaCha20-Poly1305)
 and TLS 1.2 (ECDHE or RSA key exchange; AES-GCM, ChaCha20-Poly1305 or

@@ -227,6 +227,8 @@ T["http:// cannot use tls; https:// defaults to verify-full"] = function()
   eq({ info.tls, info.base_path, info.base_query }, { "require", "/v1", "key=1" })
   info = require("dbdash.db.drivers.http").parse_url(require("dbdash.db.url").parse("https://api.example.com"))
   eq({ info.tls, info.base_path, info.base_query }, { "verify-full", "/", nil })
+  eq(info.port, 443)
+  eq(require("dbdash.db.credentials").keys(info)[1], "https://api.example.com:443")
 end
 
 return T
