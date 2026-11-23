@@ -811,15 +811,10 @@ function M.start(path, o)
   if not cfg then
     return notify(err)
   end
-  local trusted, why = M.trusted(path, cfg)
+  local trusted, why, level = M.trusted(path, cfg)
   if not trusted then
-    return notify({
-      phase = "config",
-      message = ("%s runs Lua code and is not trusted: %s (:help dbdash-lua)"):format(
-        vim.fn.fnamemodify(path, ":~:."),
-        why or "denied"
-      ),
-    })
+    vim.notify("dbdash: " .. (why or "not trusted"), level or vim.log.levels.WARN)
+    return
   end
   local ok, cli = pcall(args.parse_cli, cfg.args, o.tokens or {})
   if not ok then

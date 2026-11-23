@@ -4,16 +4,17 @@ local trust = require("dbdash.trust")
 local dbdash = require("dbdash")
 local eq = MiniTest.expect.equality
 
-local dir, notes, asked, answer
+local dir, notes, levels, asked, answer
 local real_ask = trust.ask
 local T = MiniTest.new_set({
   hooks = {
     pre_case = function()
       dir = vim.fs.normalize(vim.fn.tempname())
       vim.fn.mkdir(dir, "p")
-      notes, asked, answer = {}, 0, "cancel"
-      vim.notify = function(msg)
+      notes, levels, asked, answer = {}, {}, 0, "cancel"
+      vim.notify = function(msg, level)
         notes[#notes + 1] = msg
+        levels[#levels + 1] = level
       end
       trust.ask = function()
         asked = asked + 1
@@ -77,7 +78,8 @@ T["Allow runs it and is remembered until the file changes"] = function()
   eq(trust.state(path), "unknown")
   eq(started(path), false)
   eq(asked, 3)
-  eq(notes[#notes]:find("lua.yaml runs Lua code and is not trusted: not trusted yet", 1, true) ~= nil, true)
+  eq(notes[#notes]:find("lua.yaml not started (not trusted yet)", 1, true) ~= nil, true)
+  eq(levels[#levels], vim.log.levels.INFO) -- "Not now" is not an error
 end
 
 T["Deny is remembered; View opens the file; Not now asks again"] = function()
@@ -85,7 +87,8 @@ T["Deny is remembered; View opens the file; Not now asks again"] = function()
   answer = "view"
   eq(started(path), false)
   eq(vim.fn.expand("%:t"), "lua.yaml") -- opened for review
-  eq(notes[#notes]:find("review it, then start it again", 1, true) ~= nil, true)
+  eq(notes[#notes]:find("lua.yaml opened for review; start it again to run it", 1, true) ~= nil, true)
+  eq(levels[#levels], vim.log.levels.INFO) -- viewing is not an error
   answer = "cancel"
   eq(started(path), false)
   answer = "deny"
@@ -93,7 +96,8 @@ T["Deny is remembered; View opens the file; Not now asks again"] = function()
   eq(trust.state(path), "denied")
   eq(started(path), false)
   eq(asked, 3) -- a denied file is not asked about again
-  eq(notes[#notes]:find("denied earlier (:trust to allow it)", 1, true) ~= nil, true)
+  eq(notes[#notes]:find("lua.yaml was denied (:trust", 1, true) ~= nil, true)
+  eq(levels[#levels], vim.log.levels.WARN)
 end
 
 T[":trust decisions count (shared trust database)"] = function()

@@ -53,14 +53,18 @@ function M.ask(path)
 end
 
 ---True when `path` may run. Asks when its trust is unknown; records Allow and Deny.
+---Otherwise returns false, a message for the user and its level (viewing the file or
+---answering "Not now" is not an error).
 ---@param path string
----@return boolean ok, string? why
+---@return boolean ok, string? message, integer? level
 function M.check(path)
+  local name = vim.fn.fnamemodify(path, ":~:.")
+  local hint = (":trust %s to allow it"):format(vim.fn.fnameescape(name))
   local state = M.state(path)
   if state == "allowed" then
     return true
   elseif state == "denied" then
-    return false, "denied earlier (:trust to allow it)"
+    return false, ("%s was denied (%s)"):format(name, hint), vim.log.levels.WARN
   end
   local answer = M.ask(path)
   if answer == "allow" then
@@ -68,12 +72,12 @@ function M.check(path)
     return true
   elseif answer == "deny" then
     vim.secure.trust({ action = "deny", path = path })
-    return false, "denied"
+    return false, ("%s denied; it will not run (%s)"):format(name, hint), vim.log.levels.WARN
   elseif answer == "view" then
     vim.cmd("sview " .. vim.fn.fnameescape(path))
-    return false, "review it, then start it again"
+    return false, ("%s opened for review; start it again to run it"):format(name), vim.log.levels.INFO
   end
-  return false, "not trusted yet"
+  return false, ("%s not started (not trusted yet)"):format(name), vim.log.levels.INFO
 end
 
 return M
