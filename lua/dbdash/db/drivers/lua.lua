@@ -1,6 +1,7 @@
 -- lua:// "database": query.sql is Lua code (after the template), run inside the query task.
--- It returns rows (see db/lua_result.lua) and can use args and the dbdash.* helpers (see
--- db/lua_env.lua). Configs with Lua need the user's trust (:help dbdash-lua).
+-- Its return value is the raw result: rows (see db/lua_result.lua), directly or after
+-- query.transform. It can use args and the dbdash.* helpers (see db/lua_env.lua). Configs
+-- with Lua need the user's trust (:help dbdash-lua).
 local M = {
   name = "lua",
   schemes = { "lua" },
@@ -17,7 +18,7 @@ end
 ---@param code string
 ---@param opts { max_rows: integer, timeout: integer, args: table?, source: string?, line: integer? }
 function Conn:execute(code, opts)
-  return require("dbdash.db.lua_env").run(code, {
+  local value = require("dbdash.db.lua_env").run(code, {
     phase = "query",
     source = opts.source,
     line = opts.line,
@@ -25,6 +26,7 @@ function Conn:execute(code, opts)
     timeout = opts.timeout,
     max_rows = opts.max_rows,
   })
+  return require("dbdash.db.lua_result").raw(value)
 end
 
 function Conn:close() end

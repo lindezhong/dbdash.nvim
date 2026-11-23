@@ -325,7 +325,7 @@ function M.show_sql()
     end
     require("dbdash.view.popup").open(lines, {
       title = d.cfg.multi and ("DbDash query: " .. p:title()) or "DbDash query",
-      filetype = ({ mongodb = "json", lua = "lua" })[p.cfg.database.type] or "sql",
+      filetype = ({ mongodb = "json", http = "json", lua = "lua" })[p.cfg.database.type] or "sql",
     })
   end)
 end

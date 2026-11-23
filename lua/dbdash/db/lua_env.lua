@@ -26,8 +26,14 @@ M.helpers = {
   ---@param url string
   ---@param query string
   ---@param opts table? max_rows, timeout, options
+  ---   raw = true: the raw result of lua:// / http(s):// instead of rows (value, response)
   query = function(url, query, opts)
-    return require("dbdash.db").query_async(url, query, opts)
+    local rs = require("dbdash.db").query_async(url, query, opts)
+    local lua_result = require("dbdash.db.lua_result")
+    if lua_result.is_raw(rs) then
+      return rs.value, rs.vars.response
+    end
+    return rs
   end,
 }
 
@@ -44,7 +50,7 @@ end
 ---@param code string
 ---@param o { phase: string, source: string?, line: integer?, args: table?, vars: table?, timeout: integer?, max_rows: integer? }
 ---   vars: extra globals (e.g. rs for transform); line: line of the code in the config file
----@return dbdash.db.ResultSet
+---@return any value what the script returned (checked as rows by db/lua_result.lua)
 function M.run(code, o)
   local name = o.source or "lua"
   -- Leading newlines make error line numbers match the config file.
@@ -82,7 +88,7 @@ function M.run(code, o)
     end
     dberr.raise(o.phase, message_of(ret))
   end
-  return require("dbdash.db.lua_result").normalize(ret, { max_rows = o.max_rows, phase = o.phase })
+  return ret
 end
 
 return M

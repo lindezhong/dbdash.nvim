@@ -2,7 +2,7 @@
 #   postgres and mysql negotiate it on the same port; redis has a separate TLS port.
 # PostgreSQL serves the test PKI chain (tests/fixtures/pki: leaf for localhost/127.0.0.1
 # signed by an intermediate under root.pem), Redis the self-signed tests/fixtures/ec_cert.pem
-# and MySQL its auto-generated RSA certificate.
+# MySQL its auto-generated RSA certificate and nginx (HTTPS) the PKI chain too.
 # Host ports avoid the defaults so a local database is not hit by accident.
 name: dbdash-it
 
@@ -110,3 +110,10 @@ services:
       - ./mssql.conf:/var/opt/mssql/mssql.conf:ro
       - ../fixtures:/certs:ro
     ports: ["11433:1433"]
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../fixtures:/certs:ro
+    ports: ["18080:80", "18443:443"]

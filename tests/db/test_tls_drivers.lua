@@ -70,4 +70,25 @@ T["it: redis over TLS"] = function()
   eq(r.err ~= nil, true) -- plain-text port: no TLS server
 end
 
+T["it: https with verify-full (the default), pin, redirects and cookies"] = function()
+  h.require_it()
+  local ca = "&ca=tests/fixtures/pki/root.pem"
+  local base = "https://localhost:18443"
+  eq(h.ok(base .. "/items?tls=verify-full" .. ca, "").rows, { { 1, "a" }, { 2, "b" } }) -- columns by name: n, name
+  eq(h.ok("https://127.0.0.1:18443/items?x=1" .. ca, "").rows[1][2], "a") -- verify-full by default
+  -- not trusted by the system store: verify-full fails without ca=
+  local r = h.query(base .. "/items", "")
+  eq(r.err.phase, "tls")
+  eq(h.ok(base .. "/items?tls=pin&fingerprint=" .. fingerprint("pki/leaf.pem"), "").rows[1][1], 1)
+  eq(h.ok(base .. "/old?tls=require", "").rows[1][1], 1) -- 301 followed
+  -- a dashboard's jar: the cookie from /login is sent to /whoami
+  local jar = require("dbdash.net.http_cookie").new()
+  h.ok(base .. "/login?tls=require", "", { cookie_jar = jar })
+  local who = h.ok(base .. "/whoami?tls=require", '{"cookies": "lang=zh"}', { cookie_jar = jar })
+  eq(who.rows[1][1], "session=s3cret; lang=zh")
+  -- plain http on the same routes; a raw (wrapped) result for the transform
+  local raw = h.ok("http://127.0.0.1:18080/wrapped", "", { raw = true })
+  eq({ raw.value.total, raw.value.data.items[1].name, raw.vars.response.status }, { 1, "a", 200 })
+end
+
 return T

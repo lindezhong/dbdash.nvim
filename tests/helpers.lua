@@ -148,4 +148,76 @@ function M.fake_dns(records)
 end
 
 
+local http_servers = {}
+
+---Start a local HTTP server. `handle(req)` gets { method, target, headers (lower-case),
+---body } and returns the raw response bytes (a string) or a list of chunks written with
+---a pause between them. Every request is recorded in the returned list.
+function M.http_server(handle)
+  local seen = {}
+  local srv = vim.uv.new_tcp()
+  srv:bind("127.0.0.1", 0)
+  srv:listen(8, function()
+    local c = vim.uv.new_tcp()
+    srv:accept(c)
+    local buf = ""
+    c:read_start(function(err, chunk)
+      if err or not chunk then
+        return c:is_closing() or c:close()
+      end
+      buf = buf .. chunk
+      local head_end = buf:find("\r\n\r\n", 1, true)
+      if not head_end then
+        return
+      end
+      local head = buf:sub(1, head_end - 1)
+      local lines = vim.split(head, "\r\n", { plain = true })
+      local method, target = lines[1]:match("^(%u+) (%S+) HTTP/1.1$")
+      local headers = {}
+      for i = 2, #lines do
+        local k, v = lines[i]:match("^([^:]+):%s*(.*)$")
+        headers[k:lower()] = v
+      end
+      local need = tonumber(headers["content-length"] or "0")
+      if #buf - head_end - 3 < need then
+        return
+      end
+      local req = { method = method, target = target, headers = headers, body = buf:sub(head_end + 4, head_end + 3 + need) }
+      seen[#seen + 1] = req
+      c:read_stop()
+      local out = handle(req, #seen)
+      local parts = type(out) == "table" and out or { out }
+      local function write(i)
+        if i > #parts then
+          return c:shutdown(function()
+            if not c:is_closing() then
+              c:close()
+            end
+          end)
+        end
+        c:write(parts[i], function()
+          vim.defer_fn(function()
+            write(i + 1)
+          end, 5)
+        end)
+      end
+      vim.schedule(function()
+        write(1)
+      end)
+    end)
+  end)
+  http_servers[#http_servers + 1] = srv
+  return "http://127.0.0.1:" .. srv:getsockname().port, seen
+end
+
+---Close the servers started by http_server (post_case hook).
+function M.close_http_servers()
+  for _, s in ipairs(http_servers) do
+    if not s:is_closing() then
+      s:close()
+    end
+  end
+  http_servers = {}
+end
+
 return M

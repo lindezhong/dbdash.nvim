@@ -49,6 +49,7 @@ Panel.__index = Panel
 ---@field regions table[]? buffer regions of the panels (multi-panel)
 ---@field last_size integer[]?
 ---@field generation integer incremented on stop, to drop late query results
+---@field cookie_jar dbdash.http.Jar cookies servers set for http(s):// panels (in memory)
 local Dashboard = {}
 Dashboard.__index = Dashboard
 
@@ -311,6 +312,8 @@ function Panel:refresh(o)
     args = self.vars,
     source = vim.fn.fnamemodify(self.d.path, ":~:."),
     line = q.sql_line,
+    raw = self.transform_code ~= nil, -- the transform gets the raw result; checked after it
+    cookie_jar = self.d.cookie_jar,
   }, function(qerr, rs)
     if gen ~= self.d.generation then
       return -- stopped meanwhile
@@ -318,17 +321,15 @@ function Panel:refresh(o)
     if qerr or not self.transform_code then
       return self:finish_refresh(gen, qerr, rs)
     end
-    -- query.transform: Lua that reshapes the result (any database), in its own task.
+    -- Every source: query -> query.transform -> rows check, the last two in their own task.
     local code = self.transform_code
     require("dbdash.util.async").run(function()
-      local out = require("dbdash.db.lua_env").run(code, {
-        phase = "transform",
+      local out = M.transform(code, rs, {
         source = vim.fn.fnamemodify(self.d.path, ":~:."),
         line = q.transform_line,
         args = self.vars,
-        vars = { rs = require("dbdash.db.lua_result").to_lua(rs) },
         timeout = q.timeout or require("dbdash").default_ms("timeout"),
-        max_rows = q.max_rows,
+        max_rows = q.max_rows or require("dbdash").options.defaults.max_rows,
       })
       out.elapsed_ms = rs.elapsed_ms
       return out
@@ -340,6 +341,29 @@ function Panel:refresh(o)
       end)
     end)
   end)
+end
+
+---Run query.transform on a query result and check its value as rows. `rs` is a result set
+---(given to the script as plain data) or a driver's raw result (given as is, with the
+---driver's extra variables such as http's `response`). Inside a util.async task.
+---@return dbdash.db.ResultSet
+function M.transform(code, rs, o)
+  local lua_result = require("dbdash.db.lua_result")
+  local vars
+  if lua_result.is_raw(rs) then
+    vars = vim.tbl_extend("force", {}, rs.vars, { rs = rs.value })
+  else
+    vars = { rs = lua_result.to_lua(rs) }
+  end
+  local value = require("dbdash.db.lua_env").run(code, {
+    phase = "transform",
+    source = o.source,
+    line = o.line,
+    args = o.args,
+    vars = vars,
+    timeout = o.timeout,
+  })
+  return lua_result.normalize(value, { max_rows = o.max_rows, phase = "transform" })
 end
 
 ---The end of a refresh: the query (and transform) result or error.
@@ -844,6 +868,7 @@ function M.start(path, o)
       state = state,
       panels = {},
       generation = 0,
+      cookie_jar = require("dbdash.net.http_cookie").new(),
     }, Dashboard)
     for i, pc in ipairs(cfg.panels) do
       d.panels[i] = setmetatable({

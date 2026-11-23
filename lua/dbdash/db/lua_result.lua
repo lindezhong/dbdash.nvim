@@ -1,4 +1,7 @@
--- What Lua scripts (lua:// queries and query.transform) return, turned into a result set:
+-- Every query goes: driver -> query.transform (if any) -> rows check (normalize). Drivers
+-- of SQL-like databases return result sets, which pass the check as they are; lua:// and
+-- http(s):// return raw values (M.raw) that must have one of these shapes, directly or
+-- after the transform:
 --   { columns = { "a", "b" }, rows = { { 1, "x" }, ... } }   rows by position
 --   { columns = { "a", "b" }, rows = { { a = 1, b = "x" } } } rows by name
 --   { { a = 1, b = "x" }, ... }                                 records (columns sorted by
@@ -12,8 +15,24 @@ local M = {}
 
 local NULL = resultset.NULL
 
-local function fail(phase, msg, ...)
-  dberr.raise(phase, msg:format(...))
+local HINT = "; add query.transform to reshape it (:help dbdash-transform)"
+
+local function fail(o, msg, ...)
+  dberr.raise(o.phase or "query", msg:format(...) .. (o.hint and HINT or ""))
+end
+
+local RawMT = {}
+
+---A driver's raw result (a script's return value, a decoded HTTP body) with the extra
+---variables query.transform gets besides `rs` (e.g. `response`).
+---@param value any
+---@param vars table?
+function M.raw(value, vars)
+  return setmetatable({ value = value, vars = vars or {} }, RawMT)
+end
+
+function M.is_raw(v)
+  return getmetatable(v) == RawMT
 end
 
 local function logical(v)
@@ -35,28 +54,40 @@ local function is_record(row)
 end
 
 ---@param v any the script's return value
----@param o { max_rows: integer?, phase: string?, columns: string[]? }?
+---@param o { max_rows: integer?, phase: string?, hint: boolean? }? hint: suggest query.transform
 ---@return dbdash.db.ResultSet
 function M.normalize(v, o)
   o = o or {}
-  local phase = o.phase or "query"
+  if M.is_raw(v) then
+    v = v.value
+  end
   if resultset.is(v) then
     return v
   end
   if type(v) ~= "table" then
-    fail(phase, "the script must return a table of rows (got %s)", type(v))
+    fail(o, "the result is not rows (got %s)", v == vim.NIL and "null" or type(v))
   end
   local names, rows
   if v.rows ~= nil then
     if type(v.rows) ~= "table" then
-      fail(phase, "rows must be a list")
+      fail(o, "rows must be a list")
     end
     names, rows = v.columns, v.rows
   else
     names, rows = v.columns, v -- records, optionally with columns = { ... } for the order
+    local keys = {}
+    for k in pairs(v) do
+      if type(k) ~= "number" and k ~= "columns" then
+        keys[#keys + 1] = tostring(k)
+      end
+    end
+    if #keys > 0 then
+      table.sort(keys)
+      fail(o, "the result is an object (%s), not rows", table.concat(vim.list_slice(keys, 1, 5), ", "))
+    end
   end
   if names ~= nil and type(names) ~= "table" then
-    fail(phase, "columns must be a list of names")
+    fail(o, "columns must be a list of names")
   end
   local first = rows[1]
   if names == nil then
@@ -85,7 +116,7 @@ function M.normalize(v, o)
       break
     end
     if type(row) ~= "table" then
-      fail(phase, "row %d is a %s, not a table", r, type(row))
+      fail(o, "row %d is a %s, not a table", r, type(row))
     end
     local by_name = is_record(row)
     local cells = {}

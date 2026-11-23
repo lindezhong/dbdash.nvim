@@ -279,6 +279,26 @@ function Socket:read_until(delim)
   end
 end
 
+---Read everything until the peer closes the connection (or sends TLS close_notify).
+---@param limit integer? raise when more bytes than this arrive
+---@return string
+function Socket:read_to_eof(limit)
+  while true do
+    async.checkpoint()
+    if limit and #self.buf - self.bpos + 1 > limit then
+      dberr.raise("query", ("response larger than %d bytes"):format(limit))
+    end
+    local ok, err = pcall(self.fill, self)
+    if not ok then
+      if self.eof or (type(err) == "table" and err.tls_closed) then
+        break
+      end
+      error(err, 0)
+    end
+  end
+  return self:take_buffered()
+end
+
 function Socket:close()
   if self.closed then
     return

@@ -47,6 +47,8 @@ local BUILTIN = {
   cql = "dbdash.db.drivers.cassandra",
   mongodb = "dbdash.db.drivers.mongodb",
   lua = "dbdash.db.drivers.lua",
+  http = "dbdash.db.drivers.http",
+  https = "dbdash.db.drivers.http",
   mssql = "dbdash.db.drivers.mssql",
   sqlserver = "dbdash.db.drivers.mssql",
 }
@@ -112,6 +114,9 @@ end
 ---@field args table? dashboard arguments (lua:// scripts get them as `args`)
 ---@field source string? config file name for messages (lua:// error locations)
 ---@field line integer? line of the query in the config file (lua:// error locations)
+---@field raw boolean? return a raw driver result (lua://, http) as is, for query.transform;
+---   otherwise it is checked and turned into a result set
+---@field cookie_jar dbdash.http.Jar? cookies kept between http(s):// queries (one per dashboard)
 
 ---Run a query. `callback(err, rs)` is invoked exactly once, on the main loop.
 ---@param raw_url string
@@ -167,6 +172,7 @@ function M.query(raw_url, query, opts, callback)
     args = opts.args,
     source = opts.source,
     line = opts.line,
+    cookie_jar = opts.cookie_jar,
   }
 
   timer = vim.uv.new_timer()
@@ -197,6 +203,10 @@ function M.query(raw_url, query, opts, callback)
     pcall(conn.close, conn)
     if not ok2 then
       error(rs, 0)
+    end
+    local lua_result = require("dbdash.db.lua_result")
+    if lua_result.is_raw(rs) and not opts.raw then
+      rs = lua_result.normalize(rs, { max_rows = exec_opts.max_rows, phase = "query", hint = true })
     end
     rs.elapsed_ms = (vim.uv.hrtime() - started) / 1e6
     return rs

@@ -13,6 +13,7 @@ M.DB_TYPES = {
   mongodb = true,
   mssql = true,
   lua = true,
+  http = true,
 }
 -- Alternative URL schemes and type names (keep in sync with the drivers' `schemes`).
 local SCHEME_ALIASES = {
@@ -22,6 +23,7 @@ local SCHEME_ALIASES = {
   mariadb = "mysql",
   cql = "cassandra",
   sqlite3 = "sqlite",
+  https = "http",
 }
 M.SCHEME_ALIASES = SCHEME_ALIASES
 
@@ -221,10 +223,15 @@ function Ctx:args_list(list, base)
   return out
 end
 
-function Ctx:query(q, prefix)
+---@param db table the panel's database (http(s):// may leave out the request: a GET of the URL)
+function Ctx:query(q, prefix, db)
   prefix = prefix or ""
+  local optional = db and db.type == "http"
+  if optional and nn(q) == nil then
+    q = map.new()
+  end
   q = self:expect(prefix .. "query", q, "map")
-  local sql = self:expect(prefix .. "query.sql", q.sql, "string")
+  local sql = self:expect(prefix .. "query.sql", q.sql, "string", optional) or ""
   local p = self.pos[prefix .. "query.sql"]
   local transform = self:expect(prefix .. "query.transform", q.transform, "string", true)
   local tp = self.pos[prefix .. "query.transform"]
@@ -349,10 +356,11 @@ function M.validate(data, file, positions)
   }
   local panels_raw = nn(data.panels)
   if panels_raw == nil then
+    local database = ctx:database(data.database)
     local panel = {
       index = 1,
-      database = ctx:database(data.database),
-      query = ctx:query(data.query),
+      database = database,
+      query = ctx:query(data.query, nil, database),
       show = ctx:show(data.show, nn(data.interval)),
     }
     cfg.multi = false
@@ -386,7 +394,7 @@ function M.validate(data, file, positions)
     local panel = {
       index = i,
       database = db,
-      query = ctx:query(raw.query, prefix),
+      query = ctx:query(raw.query, prefix, db),
       show = ctx:show(raw.show, nn(data.interval), prefix),
     }
     lists[#lists + 1] = panel.query.args
