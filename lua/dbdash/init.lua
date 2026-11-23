@@ -38,6 +38,11 @@ local M = {}
 ---@field backoff integer consecutive failures wait the interval x 2^(n-1), up to the
 ---  interval x backoff; 1 disables backing off (default 8)
 
+---@class dbdash.LuaOptions
+---@field confirm boolean ask (vim.secure, like exrc) before running a config with Lua
+---  (lua:// or query.transform); false runs them without asking (default true)
+---@field trusted_dirs string[] configs under these directories run without asking
+
 ---@class dbdash.Options
 ---@field mappings boolean|table<"start"|"refresh"|"stop"|"list"|"sidebar", string|false>
 ---@field countdown_interval integer ms between countdown updates (default 10000)
@@ -50,6 +55,7 @@ local M = {}
 ---@field popup dbdash.PopupOptions
 ---@field defaults dbdash.DefaultsOptions
 ---@field errors dbdash.ErrorsOptions
+---@field lua dbdash.LuaOptions
 local defaults = {
   mappings = true,
   countdown_interval = 10000,
@@ -84,6 +90,10 @@ local defaults = {
   errors = {
     notify = "once",
     backoff = 8,
+  },
+  lua = {
+    confirm = true,
+    trusted_dirs = {},
   },
 }
 M.DEFAULTS = defaults
@@ -224,6 +234,10 @@ local SPEC = {
     notify = enum("once", "always", "never"),
     backoff = int(1),
   },
+  lua = {
+    confirm = of_type("boolean"),
+    trusted_dirs = string_list,
+  },
 }
 
 ---Check `opts` against SPEC; invalid or unknown entries are reported and replaced by the
@@ -321,7 +335,7 @@ function M.setup(opts)
   end
   -- Lists replace the default instead of merging by index.
   M.options = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts)
-  for _, path in ipairs({ { "sidebar", "pattern" }, { "sidebar", "exclude" } }) do
+  for _, path in ipairs({ { "sidebar", "pattern" }, { "sidebar", "exclude" }, { "lua", "trusted_dirs" } }) do
     local v = opts[path[1]] and opts[path[1]][path[2]]
     if v then
       M.options[path[1]][path[2]] = v

@@ -78,6 +78,10 @@ defaults: >lua
       notify = "once",     -- "once" | "always" | "never"
       backoff = 8,         -- retry after at most interval x 8; 1 = off
     },
+    lua = {                -- configs with Lua code, see |dbdash-lua|
+      confirm = true,      -- ask before running them (vim.secure, as exrc)
+      trusted_dirs = {},   -- configs under these directories run unasked
+    },
   })
 <
 Only the options you pass change; nested tables merge with the defaults, while

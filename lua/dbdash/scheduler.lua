@@ -811,6 +811,12 @@ function M.start(path, o)
   if not cfg then
     return notify(err)
   end
+  if not M.trusted(path, cfg) then
+    return notify({
+      phase = "config",
+      message = vim.fn.fnamemodify(path, ":~:.") .. " runs Lua code and is not trusted (:help dbdash-lua)",
+    })
+  end
   local ok, cli = pcall(args.parse_cli, cfg.args, o.tokens or {})
   if not ok then
     return notify(cli)
@@ -911,6 +917,34 @@ function M.stop(path, o)
   end
   require("dbdash.view.sidebar").refresh()
   return true
+end
+
+---True when the config may run: it has no Lua (lua:// or query.transform), or the user
+---trusts it. Trust uses vim.secure (the exrc mechanism: asks once, and again after the file
+---changes) unless setup({ lua = { confirm = false } }) or the file is in lua.trusted_dirs.
+---@param path string normalized config path
+---@param cfg dbdash.Config
+function M.trusted(path, cfg)
+  local has_lua = false
+  for _, p in ipairs(cfg.panels) do
+    if p.database.type == "lua" or p.query.transform then
+      has_lua = true
+    end
+  end
+  if not has_lua then
+    return true
+  end
+  local o = opts().lua
+  if o.confirm == false then
+    return true
+  end
+  for _, d in ipairs(o.trusted_dirs or {}) do
+    local dir = vim.fs.normalize(vim.fn.fnamemodify(vim.fn.expand(d), ":p")):gsub("/$", "")
+    if path:sub(1, #dir + 1) == dir .. "/" then
+      return true
+    end
+  end
+  return vim.secure.read(path) ~= nil
 end
 
 ---On exit: stop timers and ignore queries still running, but keep the dashboards and

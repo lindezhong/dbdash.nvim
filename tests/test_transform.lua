@@ -9,8 +9,10 @@ local T = MiniTest.new_set({
     pre_case = function()
       dir = vim.fn.tempname()
       vim.fn.mkdir(dir, "p")
+      require("dbdash").setup({ lua = { confirm = false } }) -- trust is tested in test_trust.lua
     end,
     post_case = function()
+      require("dbdash").setup({})
       for _, d in ipairs(sched.list()) do
         sched.stop(d.path)
       end

@@ -790,6 +790,7 @@ T["lua:// dashboards: template, args, chart; errors point at the YAML line"] = f
     "    return { columns = { 'k', 'v' }, rows = rows }",
     "show: { type: table, title: Lua board }",
   }, dir .. "/lua.yaml")
+  child.lua([[require("dbdash").setup({ lua = { confirm = false } })]]) -- trust: test_trust.lua
   child.cmd("DbDashStart lua.yaml")
   child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].rs ~= nil end)]])
   eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1].rs.rows"), { { "k1", 3 }, { "k2", 6 }, { "k3", 9 } })
@@ -822,6 +823,7 @@ T["query.transform: shown by :DbDashShowSQL, exported as transformed"] = functio
     "    return { { k = rs.rows[1][1], v = rs.rows[1][2] * 10 } }",
     "show: { type: table }",
   }, dir .. "/tf.yaml")
+  child.lua([[require("dbdash").setup({ lua = { confirm = false } })]]) -- trust: test_trust.lua
   child.cmd("DbDashStart tf.yaml")
   child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].rs ~= nil end)]])
   child.cmd("DbDashExport csv")
