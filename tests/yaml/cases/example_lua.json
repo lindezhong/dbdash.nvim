@@ -3,14 +3,26 @@
   "url": "lua://"
  },
  "query": {
+  "args_show": true,
   "args": [
    {
     "name": "days",
     "type": "int",
     "default": 14
+   },
+   {
+    "name": "base",
+    "type": "number",
+    "default": 50
+   },
+   {
+    "name": "wave",
+    "type": "boolean",
+    "default": true,
+    "description": "Add a sine wave to the load"
    }
   ],
-  "sql": "-- A command's output: here just the host name.\nlocal host = vim.trim(dbdash.system(\"hostname\").stdout)\n\n-- Data computed in Lua; dbdash.query() could read it from a database instead.\nlocal rows = {}\nfor i = args.days - 1, 0, -1 do\n  local t = os.time() - i * 86400\n  rows[#rows + 1] = { os.date(\"%m-%d\", t), 50 + math.floor(30 * math.sin(i / 2)), host }\nend\nreturn { columns = { \"day\", \"load\", \"host\" }, rows = rows }\n"
+  "sql": "-- A command's output: here just the host name.\nlocal host = vim.trim(dbdash.system(\"hostname\").stdout)\n\n-- Data computed in Lua; dbdash.query() could read it from a database instead.\nlocal rows = {}\nfor i = {{ days }} - 1, 0, -1 do            -- template: the value is written into the code\n  local t = os.time() - i * 86400\n  local load = args.base                    -- args: the value as a Lua number\n{% if wave %}\n  load = load + math.floor(30 * math.sin(i / 2))\n{% endif %}\n  rows[#rows + 1] = { os.date(\"%m-%d\", t), load, host }\nend\nreturn { columns = { \"day\", \"load\", \"host\" }, rows = rows }\n"
  },
  "show": {
   "type": "line",
