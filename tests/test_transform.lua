@@ -4,15 +4,21 @@ local sched = require("dbdash.scheduler")
 local h = require("tests.helpers")
 local eq = MiniTest.expect.equality
 
-local dir
+local dir, notes
+local real_notify = vim.notify
 local T = MiniTest.new_set({
   hooks = {
     pre_case = function()
       dir = vim.fn.tempname()
       vim.fn.mkdir(dir, "p")
       require("dbdash").setup({ lua = { confirm = false } }) -- trust is tested in test_trust.lua
+      notes = {} -- failed refreshes notify (errors.notify = "once"); checked below
+      vim.notify = function(msg, level)
+        notes[#notes + 1] = { msg = msg, level = level }
+      end
     end,
     post_case = function()
+      vim.notify = real_notify
       h.close_http_servers()
       require("dbdash").setup({})
       for _, d in ipairs(sched.list()) do
@@ -71,6 +77,7 @@ T["template in the transform; errors point at the YAML line"] = function()
     "    return { { n = rs.rows[1][1] * {{ f }} } }",
   })
   eq(p.rs.rows, { { 15 } })
+  eq(notes, {}) -- a successful refresh does not notify
   p = run("bad", {
     "database: { url: 'sqlite:///:memory:' }",
     "query:",
@@ -81,6 +88,9 @@ T["template in the transform; errors point at the YAML line"] = function()
   })
   eq(p.error.phase, "transform")
   eq(p.error.message:find("bad.yaml:6: attempt to index local 'x'", 1, true) ~= nil, true)
+  eq(#notes, 1)
+  eq(notes[1].level, vim.log.levels.ERROR)
+  eq(notes[1].msg:find("^dbdash: transform error: .*bad%.yaml:6: attempt to index local 'x'") ~= nil, true)
 end
 
 T["rs gives names, types and rows with nil for NULL"] = function()
@@ -133,10 +143,16 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
   })
   eq(p.error.phase, "transform")
   eq(p.error.message, "the result is not rows (got string)")
+  eq(notes[#notes], { msg = "dbdash: transform error: the result is not rows (got string)", level = vim.log.levels.ERROR })
   -- without a transform the response itself is checked, with a hint
   p = run("http_plain", { ("database: { url: %q }"):format(base) })
   eq(p.error.phase, "query")
   eq(p.error.message:find("the result is an object (items), not rows; add query.transform", 1, true) ~= nil, true)
+  eq(notes[#notes], {
+    msg = "dbdash: http query error: the result is an object (items), not rows; add query.transform to reshape it (:help dbdash-transform)",
+    level = vim.log.levels.ERROR,
+  })
+  eq(#notes, 2) -- one per failing dashboard; the successful ones did not notify
 end
 
 T["http: cookies set by the server are sent on the next refresh, the config is unchanged"] = function()
