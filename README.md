@@ -221,12 +221,7 @@ make it                    # also run integration tests against tests/docker/com
 make it-down               # stop the integration databases
 DBDASH_NET=1 make test     # include a TLS handshake with a public server (system CAs)
 make fmt                   # format with stylua
-python3 tests/examples_schema.py   # validate example/*.yaml against the schema
 ```
-
-Test expectations for the template engine and YAML parser come from real Jinja2 and
-PyYAML (`tests/template/gen.py`, `tests/yaml/gen.py`); they are only needed to regenerate
-cases. The schema test needs Python `jsonschema` and is skipped without it.
 
 ## License
 
