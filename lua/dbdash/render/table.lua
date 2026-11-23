@@ -164,7 +164,10 @@ function M.render(rs, show, ctx)
   for r, row in ipairs(rs.rows) do
     cells[r] = {}
     for c, col in ipairs(cols) do
-      local v = col.index and row[col.index] or nil
+      local v
+      if col.index then
+        v = row[col.index] -- not `and ... or nil`: that turned false into NULL
+      end
       local text, is_null = M.format_value(v, col.ltype, null_text)
       local group
       if col.thresholds and not is_null then

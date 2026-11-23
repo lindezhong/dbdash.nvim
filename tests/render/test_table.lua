@@ -45,6 +45,14 @@ T["golden: empty and truncated results"] = function()
   helpers.golden("table/box/truncated", out(rs, {}))
 end
 
+T["false is shown as false, not NULL"] = function()
+  local rs = resultset.new({ { name = "b", type = "boolean" } }, { { false }, { true }, { vim.NIL } })
+  local text = table.concat(out(rs, {}).lines, "\n")
+  eq({ text:find("false", 1, true) ~= nil, text:find("true", 1, true) ~= nil }, { true, true })
+  local _, nulls = text:gsub("NULL", "")
+  eq(nulls, 1)
+end
+
 T["every line fits the width and has the same display width"] = function()
   local o = out(fx.departments(), {}, 40)
   local W = require("dbdash.util.width")
