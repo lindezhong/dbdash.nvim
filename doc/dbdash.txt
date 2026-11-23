@@ -313,8 +313,9 @@ The `example/` directory of the plugin has a runnable config (SQLite, no
 setup) for every chart type, the alternative styles (`styles.yaml`), several
 panels (`multi_panel.yaml`), arguments and templates
 (`template_example.yaml`), macros and autoescape (`macros.yaml`), a SQLite
-file (`sqlite_file.yaml`), a Lua data source (`lua.yaml`) and a Lua transform
-(`transform.yaml`, both ask for trust, |dbdash-lua|).
+file (`sqlite_file.yaml`), a Lua data source (`lua.yaml`), a Lua transform
+(`transform.yaml`) and an HTTPS API (`http.yaml`, GitHub releases, needs
+network); the last three ask for trust (|dbdash-lua|).
 
 `example/dbdash.schema.yaml` is a JSON Schema for config files. It lists every
 field and the URL format of each database. Editors using yaml-language-server
@@ -656,8 +657,9 @@ URL: `<scheme>://[user[:password]@]host[:port][/database][?param=value]`
   sqlite:///:memory:
 
 Schemes also accepted: `sqlite3`, `postgresql`, `mariadb`, `rediss` (Redis
-with TLS), `mongodb+srv`, `cql`, `sqlserver`. `database.type` is inferred from
-the scheme.
+with TLS), `mongodb+srv`, `cql`, `sqlserver`. `lua://` runs Lua
+(|dbdash-lua|) and `http://` / `https://` call an HTTP API (|dbdash-http|).
+`database.type` is inferred from the scheme.
 
 Common parameters: `tls` (disable | require | pin | verify-ca |
 verify-full), `fingerprint` (sha256:AB:CD:..., required for pin), `ca`
@@ -772,13 +774,15 @@ refresh without blocking the editor and see the globals (`vim`, `io`, ...)
 plus:
 
   args                  the dashboard arguments by name
-  rs                    (transform) the result: `rs.columns` (names),
-                        `rs.types`, `rs.rows` (lists, nil for NULL)
+  rs, response          (transform) the query result, see
+                        |dbdash-transform|
   dbdash.system(cmd, opts)  run a command (a string through `sh -c` or
                         `cmd /c`, or a list) and wait without blocking;
                         returns { code, stdout, stderr }
   dbdash.query(url, query, opts)  run a query on any database; returns a
-                        result set (`columns` with `name`, `rows`)
+                        result set (`columns` with `name`, `rows`); with
+                        `opts.raw = true` a `lua://` or `http(s)://` query
+                        returns its raw value and the HTTP response
   dbdash.sleep(ms)      wait without blocking
   dbdash.checkpoint()   let the editor run during a long computation
   dbdash.null           NULL in returned rows (nil works too)
@@ -804,6 +808,84 @@ edit you are asked again, and `:trust` / `:trust ++deny` decide as well;
 `setup({ lua = { confirm = false } })` turns the question off, and
 `lua = { trusted_dirs = { "~/dashboards" } }` skips it for configs under those
 directories. A config cannot skip it itself.
+
+Transforms                                                  *dbdash-transform*
+
+Every query, of any database, goes the same way: the query, then
+`query.transform` if the config has one, then a check that the result is rows
+(the shapes above). SQL databases, Redis, MongoDB and Cassandra return rows
+already, so the check simply passes; a `lua://` script or an HTTP response
+may return anything, and then the transform makes rows of it. Without a
+transform such a result is checked directly; when it is not rows the error
+says so and suggests a transform. The transform sees:
+
+  rs         SQL and the other databases: the result as plain data,
+             `rs.columns` (names), `rs.types`, `rs.rows` (lists, nil for
+             NULL); `lua://`: what the script returned; `http(s)://`: the
+             response body, decoded when it is JSON (null becomes nil in
+             objects and `dbdash.null` in lists), else the text
+  response   (`http(s)://`) `{ status, reason, headers, body, url }`:
+             header names in lower case, `body` the raw text, `url` the
+             final URL after redirects
+  args       the dashboard arguments; and the `dbdash.*` helpers
+
+The transform's value goes through the same rows check; its errors name the
+config file and line.
+
+HTTP                                                             *dbdash-http*
+
+`http://` and `https://` URLs call an HTTP API. The URL is the base
+address; `user:password@` sends Basic authentication (|dbdash-passwords|
+works too). `query.sql` (after the template) is a JSON object describing the
+request; an empty or missing `query.sql` GETs the URL: >yaml
+  database:
+    url: https://api.example.com/v1?api_key=${API_KEY}
+  query:
+    sql: |
+      {
+        "method": "POST",
+        "path": "search",
+        "query": {"limit": {{ limit }}},
+        "headers": {"Authorization": "Bearer {{ token }}"},
+        "cookies": "session=abc; lang=en",
+        "body": {"q": "{{ keyword }}"}
+      }
+    transform: |
+      local out = {}
+      for _, it in ipairs(rs.data.items) do
+        out[#out + 1] = { name = it.name, n = it.count }
+      end
+      return out
+<
+Fields (all optional):
+
+  method     default POST when there is a body or form, else GET
+  path       appended to the URL's path; `/path` replaces it; a full URL
+             goes elsewhere; may carry `?a=1`
+  query      parameters added to the URL (encoded; lists repeat the name)
+  headers    request headers
+  cookies    like curl's `-b`: "a=1; b=2", a file name without "=" (a
+             Netscape cookie file as written by `curl -c` or browser
+             add-ons, relative to the config file), or an object
+  body       an object or list is sent as JSON (Content-Type
+             application/json unless given), a string as is
+  form       an object sent as application/x-www-form-urlencoded
+  redirects  how many redirects to follow (default 5, 0: none)
+
+Parameters in the URL other than dbdash's own (`tls`, `fingerprint`, `ca`,
+`tls_host`, `connect_timeout`, `timeout`) are sent to the server. `https`
+verifies the certificate and host name by default (`tls=verify-full`, see
+|dbdash-tls|); `tls=require` or `pin` relax that.
+
+Cookies the server sets (Set-Cookie) are kept in memory for the running
+dashboard and sent on later refreshes and redirects, following their Domain,
+Path, Secure and expiry. They override configured cookies of the same name;
+the config and cookie files are never written. Stopping the dashboard forgets
+them.
+
+A response other than 2xx is an error showing the status and the start of the
+body (401 and 403 count as authentication errors). Compressed responses are
+not requested and not supported; bodies are limited to 64 MB.
 
 TLS                                                               *dbdash-tls*
 

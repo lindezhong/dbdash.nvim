@@ -6,14 +6,14 @@ Python, no database command-line tools. Wire protocols, TLS 1.2/1.3 and the cryp
 are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite3`.
 
 - **Databases**: SQLite, PostgreSQL, MySQL/MariaDB, Redis, MongoDB (including
-  `mongodb+srv://`), Cassandra, SQL Server.
+  `mongodb+srv://`), Cassandra, SQL Server, and HTTP APIs (`https://`, with cookies).
 - **Charts**: table, line, area, bar, histogram, boxplot, heatmap, scatter, bubble, pie,
   stat (a KPI value in large digits with its change and a sparkline),
   each with alternative styles (braille / block canvases, vertical bars, round pie, ...).
 - **Several panels** per dashboard in a grid, each refreshing on its own interval.
   Dashboards that are not on screen pause and catch up when shown again.
 - **Lua**: a `lua://` source whose query is Lua code, and `query.transform` to reshape any
-  result with Lua (trusted configs only, as with `exrc`).
+  result with Lua before it is checked as rows (trusted configs only, as with `exrc`).
 - **Query templates**: a Jinja2 subset with SQL-safe quoting filters, autoescape, macros
   and imports.
 - **Thresholds**: color values (stat cards, table cells) and notify when a value crosses a level.
@@ -150,6 +150,7 @@ Examples, all runnable as they are:
 | [`sqlite_file.yaml`](example/sqlite_file.yaml) | a SQLite file database |
 | [`lua.yaml`](example/lua.yaml) | a `lua://` data source (Lua code, a command's output) |
 | [`transform.yaml`](example/transform.yaml) | `query.transform` reshaping a query result with Lua |
+| [`http.yaml`](example/http.yaml) | an HTTPS API (GitHub releases) turned into rows by a transform (needs network) |
 
 ### Connection URLs
 
@@ -211,6 +212,33 @@ Scripts get `args`, `rs` (for transforms) and helpers such as `dbdash.system()` 
 `dbdash.query()` that wait without blocking the editor. dbdash asks before running a
 config with Lua (once per file and again after changes, stored in Neovim's trust database);
 `setup({ lua = { confirm = false } })` or `lua.trusted_dirs` skip that. See `:help dbdash-lua`.
+
+Every query goes the same way: query, then `query.transform` if there is one, then a check
+that the result is rows. SQL results pass as they are; a `lua://` value or an HTTP response
+usually needs the transform (`:help dbdash-transform`).
+
+### HTTP
+
+`http://` and `https://` URLs call an API; `query.sql` is a JSON request description:
+
+```yaml
+database:
+  url: https://api.example.com/v1
+query:
+  sql: |
+    {"method": "POST", "path": "search", "query": {"limit": {{ limit }}},
+     "headers": {"Authorization": "Bearer {{ token }}"},
+     "cookies": "session=abc", "body": {"q": "{{ keyword }}"}}
+  transform: |
+    local out = {}
+    for _, it in ipairs(rs.data.items) do out[#out + 1] = { name = it.name, n = it.count } end
+    return out
+```
+
+The transform gets the decoded JSON as `rs` and `response` (status, headers, body).
+`cookies` takes curl's `-b` forms (`"a=1; b=2"` or a Netscape cookie file); cookies the
+server sets are kept in memory for the dashboard and sent on the next refresh, without
+touching the config. `https` verifies certificates by default. See `:help dbdash-http`.
 
 ## Coming from vim-dashboard
 

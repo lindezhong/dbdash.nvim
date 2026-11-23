@@ -70,7 +70,7 @@ definitions:
     properties:
       type:
         description: Database type; inferred from the URL scheme when omitted.
-        enum: [sqlite, sqlite3, postgres, postgresql, mysql, mariadb, redis, rediss, mongodb, cassandra, cql, mssql, sqlserver, lua]
+        enum: [sqlite, sqlite3, postgres, postgresql, mysql, mariadb, redis, rediss, mongodb, cassandra, cql, mssql, sqlserver, lua, http, https]
       url:
         type: string
         description: |-
@@ -98,6 +98,9 @@ definitions:
           SQL Server  mssql://user:pass@host:1433/db            (or sqlserver://)
                       with TLS: TLS negotiated inside TDS; &encrypt=strict for TDS 8
           Lua         lua://   query.sql is Lua code returning rows (:help dbdash-lua)
+          HTTP        https://user:pass@api.example.com/v1?key=value   (or http://)
+                      query.sql describes the request (:help dbdash-http); https
+                      defaults to tls=verify-full; other ?parameters go to the server
 
           Common parameters:
             tls=disable|require|pin|verify-ca|verify-full   (default disable)
@@ -186,14 +189,21 @@ definitions:
                            distinct (field) | command (command)
             lua://         Lua code returning { columns, rows } or records; it sees
                            args and dbdash.system/query/sleep (:help dbdash-lua)
+            http(s)://     a JSON request description (empty: GET the URL):
+                           {"method": "POST", "path": "search", "query": {...},
+                            "headers": {...}, "cookies": "a=1; b=2" | "cookies.txt",
+                            "body": {...} | "text", "form": {...}, "redirects": 5}
+                           JSON responses become Lua data (:help dbdash-http)
       transform:
         type: string
         description: |-
           Lua code that reshapes the result of any database before it is shown (after the
-          template, without autoescape). It gets rs (rs.columns names, rs.types, rs.rows
-          with nil for NULL), args and the dbdash.* helpers, and returns rows like a lua://
-          query: { columns = {...}, rows = {...} } or a list of records. Configs with Lua
-          ask for trust first (:help dbdash-lua).
+          template, without autoescape). Every query goes: query -> transform -> rows check.
+          It gets rs (rs.columns names, rs.types, rs.rows with nil for NULL; for lua:// and
+          http(s):// the raw value, e.g. the decoded response, plus `response` for http),
+          args and the dbdash.* helpers, and returns rows: { columns = {...},
+          rows = {...} } or a list of records. Configs with Lua ask for trust first
+          (:help dbdash-lua).
       args:
         type: array
         items: { $ref: "#/definitions/arg" }

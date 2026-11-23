@@ -1,0 +1,43 @@
+{
+ "database": {
+  "url": "https://api.github.com"
+ },
+ "query": {
+  "args_show": true,
+  "args": [
+   {
+    "name": "repo",
+    "type": "string",
+    "default": "neovim/neovim"
+   },
+   {
+    "name": "count",
+    "type": "int",
+    "default": 10
+   }
+  ],
+  "sql": "{\n  \"path\": \"/repos/{{ repo }}/releases\",\n  \"query\": {\"per_page\": {{ count }}},\n  \"headers\": {\"Accept\": \"application/vnd.github+json\"}\n}\n",
+  "transform": "local out = {}\nfor _, r in ipairs(rs) do\n  local downloads = 0\n  for _, a in ipairs(r.assets or {}) do\n    downloads = downloads + (a.download_count or 0)\n  end\n  out[#out + 1] = {\n    release = r.tag_name,\n    published = (r.published_at or \"\"):sub(1, 10),\n    downloads = downloads,\n    prerelease = r.prerelease,\n  }\nend\nreturn { columns = { \"release\", \"published\", \"downloads\", \"prerelease\" }, rows = out }\n"
+ },
+ "show": {
+  "type": "table",
+  "title": "GitHub releases",
+  "interval": "10m",
+  "column_list": [
+   {
+    "column": "release"
+   },
+   {
+    "column": "published"
+   },
+   {
+    "column": "downloads",
+    "alias": "Downloads"
+   },
+   {
+    "column": "prerelease",
+    "alias": "Pre"
+   }
+  ]
+ }
+}
