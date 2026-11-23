@@ -12,6 +12,7 @@ M.DB_TYPES = {
   cassandra = true,
   mongodb = true,
   mssql = true,
+  lua = true,
 }
 -- Alternative URL schemes and type names (keep in sync with the drivers' `schemes`).
 local SCHEME_ALIASES = {

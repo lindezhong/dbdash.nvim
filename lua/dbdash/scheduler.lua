@@ -215,6 +215,7 @@ function Panel:render_sql()
     return nil, db.Error.wrap(driver)
   end
   local vars = args.resolve(d.cfg.args, d.state)
+  self.vars = vars -- for lua:// scripts and query.transform (args)
   return template.render(q.sql, vars, {
     env = template.env(driver.dialect, q.autoescape, d.cfg.dir),
     source = vim.fn.fnamemodify(d.path, ":~:."),
@@ -289,6 +290,9 @@ function Panel:refresh(o)
     options = self.cfg.database.options,
     base_dir = self.d.cfg.dir,
     password_cmd = self.cfg.database.password_cmd,
+    args = self.vars,
+    source = vim.fn.fnamemodify(self.d.path, ":~:."),
+    line = q.sql_line,
   }, function(qerr, rs)
     if gen ~= self.d.generation then
       return -- stopped meanwhile

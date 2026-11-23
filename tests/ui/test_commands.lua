@@ -779,6 +779,40 @@ T["backoff with panels: the global interval skips a panel that is backing off"] 
   eq(broken < fine, true) -- 1s, 2s, 4s apart instead of every second
 end
 
+T["lua:// dashboards: template, args, chart; errors point at the YAML line"] = function()
+  vim.fn.writefile({
+    "database: { url: 'lua://' }",
+    "query:",
+    "  args: [{ name: n, type: int, default: 3 }]",
+    "  sql: |",
+    "    local rows = {}",
+    "    for i = 1, {{ n }} do rows[i] = { 'k' .. i, i * args.n } end",
+    "    return { columns = { 'k', 'v' }, rows = rows }",
+    "show: { type: table, title: Lua board }",
+  }, dir .. "/lua.yaml")
+  child.cmd("DbDashStart lua.yaml")
+  child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].rs ~= nil end)]])
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1].rs.rows"), { { "k1", 3 }, { "k2", 6 }, { "k3", 9 } })
+  child.cmd("DbDashUpdateVariable n 2")
+  child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].rs.row_count == 2 end)]])
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1].rs.rows[2]"), { "k2", 4 })
+  -- a runtime error is reported with the line of the YAML file
+  vim.fn.writefile({
+    "database: { url: 'lua://' }",
+    "query:",
+    "  sql: |",
+    "    local t = nil",
+    "    return t.rows",
+  }, dir .. "/lua_err.yaml")
+  child.cmd("DbDashStart lua_err.yaml")
+  child.lua([[_G.wait_for(function()
+    for _, d in ipairs(require("dbdash.scheduler").list()) do
+      if d.path:find("lua_err") and d.panels[1].error then return true end
+    end
+  end)]])
+  eq(child.lua_get("_G.notes[#_G.notes].msg"):find("lua_err.yaml:5: attempt to index local 't'", 1, true) ~= nil, true)
+end
+
 T[":DbDashStyle re-renders cached data with another style"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/line.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("┌") end)]])

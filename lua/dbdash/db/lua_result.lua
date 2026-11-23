@@ -1,0 +1,136 @@
+-- What Lua scripts (lua:// queries and query.transform) return, turned into a result set:
+--   { columns = { "a", "b" }, rows = { { 1, "x" }, ... } }   rows by position
+--   { columns = { "a", "b" }, rows = { { a = 1, b = "x" } } } rows by name
+--   { { a = 1, b = "x" }, ... }                                 records (columns sorted by
+--                                                               name unless `columns` is given)
+--   a result set (e.g. from dbdash.query)                       used as is
+-- nil values are NULL; column types follow the first non-NULL value.
+local resultset = require("dbdash.db.resultset")
+local dberr = require("dbdash.db.error")
+
+local M = {}
+
+local NULL = resultset.NULL
+
+local function fail(phase, msg, ...)
+  dberr.raise(phase, msg:format(...))
+end
+
+local function logical(v)
+  local t = type(v)
+  if t == "number" then
+    return v == math.floor(v) and "integer" or "number"
+  elseif t == "boolean" then
+    return "boolean"
+  elseif t == "string" then
+    return "string"
+  elseif t == "table" then
+    return "json"
+  end
+  return "unknown"
+end
+
+local function is_record(row)
+  return type(row) == "table" and not vim.islist(row) and next(row) ~= nil
+end
+
+---@param v any the script's return value
+---@param o { max_rows: integer?, phase: string?, columns: string[]? }?
+---@return dbdash.db.ResultSet
+function M.normalize(v, o)
+  o = o or {}
+  local phase = o.phase or "query"
+  if resultset.is(v) then
+    return v
+  end
+  if type(v) ~= "table" then
+    fail(phase, "the script must return a table of rows (got %s)", type(v))
+  end
+  local names, rows
+  if v.rows ~= nil then
+    if type(v.rows) ~= "table" then
+      fail(phase, "rows must be a list")
+    end
+    names, rows = v.columns, v.rows
+  else
+    names, rows = v.columns, v -- records, optionally with columns = { ... } for the order
+  end
+  if names ~= nil and type(names) ~= "table" then
+    fail(phase, "columns must be a list of names")
+  end
+  local first = rows[1]
+  if names == nil then
+    if is_record(first) then
+      names = vim.tbl_keys(first)
+      table.sort(names, function(a, b)
+        return tostring(a) < tostring(b)
+      end)
+    elseif type(first) == "table" then
+      names = {}
+      for i = 1, #first do
+        names[i] = "c" .. i
+      end
+    else
+      names = {}
+    end
+  end
+  for i, n in ipairs(names) do
+    names[i] = tostring(n)
+  end
+  local max = o.max_rows or math.huge
+  local out, truncated = {}, false
+  for r, row in ipairs(rows) do
+    if r > max then
+      truncated = true
+      break
+    end
+    if type(row) ~= "table" then
+      fail(phase, "row %d is a %s, not a table", r, type(row))
+    end
+    local by_name = is_record(row)
+    local cells = {}
+    for i, n in ipairs(names) do
+      local x
+      if by_name then
+        x = row[n]
+      else
+        x = row[i]
+      end
+      cells[i] = x == nil and NULL or x
+    end
+    out[r] = cells
+  end
+  local columns = {}
+  for i, n in ipairs(names) do
+    local t = "unknown"
+    for _, row in ipairs(out) do
+      if row[i] ~= NULL then
+        t = logical(row[i])
+        break
+      end
+    end
+    columns[i] = { name = n, type = t }
+  end
+  return resultset.new(columns, out, { truncated = truncated })
+end
+
+---A result set as plain Lua data for a script: { columns, types, rows } with nil for NULL.
+function M.to_lua(rs)
+  local names, types, rows = {}, {}, {}
+  for i, c in ipairs(rs.columns) do
+    names[i], types[i] = c.name, c.type
+  end
+  for r, row in ipairs(rs.rows) do
+    local copy = {}
+    for i = 1, #names do
+      local x = row[i]
+      if x ~= NULL then
+        copy[i] = x
+      end
+    end
+    rows[r] = copy
+  end
+  return { columns = names, types = types, rows = rows }
+end
+
+return M

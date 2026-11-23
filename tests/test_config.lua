@@ -157,7 +157,7 @@ T["multi-panel errors point at the panel"] = function()
 end
 
 T["every driver URL scheme is accepted, with drivers not loaded yet"] = function()
-  local mods = { "sqlite", "redis", "postgres", "mysql", "cassandra", "mongodb", "mssql" }
+  local mods = { "sqlite", "redis", "postgres", "mysql", "cassandra", "mongodb", "mssql", "lua" }
   for _, m in ipairs(mods) do
     local drv = require("dbdash.db.drivers." .. m)
     for _, scheme in ipairs(drv.schemes) do

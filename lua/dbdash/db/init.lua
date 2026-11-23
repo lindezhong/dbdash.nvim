@@ -46,6 +46,7 @@ local BUILTIN = {
   cassandra = "dbdash.db.drivers.cassandra",
   cql = "dbdash.db.drivers.cassandra",
   mongodb = "dbdash.db.drivers.mongodb",
+  lua = "dbdash.db.drivers.lua",
   mssql = "dbdash.db.drivers.mssql",
   sqlserver = "dbdash.db.drivers.mssql",
 }
@@ -108,6 +109,9 @@ end
 ---@field options table? driver options (database.options)
 ---@field base_dir string?
 ---@field password_cmd string|string[]? command printing the password (database.password_cmd)
+---@field args table? dashboard arguments (lua:// scripts get them as `args`)
+---@field source string? config file name for messages (lua:// error locations)
+---@field line integer? line of the query in the config file (lua:// error locations)
 
 ---Run a query. `callback(err, rs)` is invoked exactly once, on the main loop.
 ---@param raw_url string
@@ -157,7 +161,13 @@ function M.query(raw_url, query, opts, callback)
   end
   local driver, info = prep.driver, prep.info
   local q_timeout = opts.timeout or info.timeout
-  local exec_opts = { max_rows = opts.max_rows or require("dbdash").options.defaults.max_rows, timeout = q_timeout }
+  local exec_opts = {
+    max_rows = opts.max_rows or require("dbdash").options.defaults.max_rows,
+    timeout = q_timeout,
+    args = opts.args,
+    source = opts.source,
+    line = opts.line,
+  }
 
   timer = vim.uv.new_timer()
   timer:start(info.connect_timeout + q_timeout, 0, function()

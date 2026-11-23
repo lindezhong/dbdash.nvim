@@ -130,16 +130,6 @@ function M.forget(cmd, info)
   cmd_cache[cmd_key(cmd, info)] = nil
 end
 
----Shell command for a password_cmd string.
-local function argv(cmd)
-  if type(cmd) == "table" then
-    return cmd
-  end
-  if jit.os == "Windows" then
-    return { "cmd.exe", "/d", "/s", "/c", cmd }
-  end
-  return { "sh", "-c", cmd }
-end
 
 ---Run password_cmd inside a util.async task; the first line of its output is the password.
 ---@param cmd string|string[]
@@ -151,7 +141,7 @@ function M.from_cmd(cmd, info)
     return cmd_cache[key]
   end
   local ok, res = pcall(async.await, function(cb)
-    vim.system(argv(cmd), { text = true, timeout = info.connect_timeout }, function(r)
+    vim.system(require("dbdash.util.shell").argv(cmd), { text = true, timeout = info.connect_timeout }, function(r)
       cb(r)
     end)
   end)

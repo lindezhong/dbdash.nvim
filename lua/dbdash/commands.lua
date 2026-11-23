@@ -319,7 +319,7 @@ function M.show_sql()
     end
     require("dbdash.view.popup").open(vim.split(sql, "\n", { plain = true }), {
       title = d.cfg.multi and ("DbDash query: " .. p:title()) or "DbDash query",
-      filetype = p.cfg.database.type == "mongodb" and "json" or "sql",
+      filetype = ({ mongodb = "json", lua = "lua" })[p.cfg.database.type] or "sql",
     })
   end)
 end
