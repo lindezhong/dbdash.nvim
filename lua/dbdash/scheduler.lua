@@ -811,9 +811,21 @@ function M.start(path, o)
   if not cfg then
     return notify(err)
   end
-  local trusted, why, level = M.trusted(path, cfg)
+  local trusted, why, level = M.trusted(path, cfg, function(answer)
+    -- The decision made in the View float.
+    local name = vim.fn.fnamemodify(path, ":~:.")
+    if answer == "allow" then
+      M.start(path, o)
+    elseif answer == "deny" then
+      vim.notify(("dbdash: %s denied; it will not run (:trust %s to allow it)"):format(name, name), vim.log.levels.WARN)
+    else
+      vim.notify(("dbdash: %s not started (not trusted yet)"):format(name), vim.log.levels.INFO)
+    end
+  end)
   if not trusted then
-    vim.notify("dbdash: " .. (why or "not trusted"), level or vim.log.levels.WARN)
+    if why then
+      vim.notify("dbdash: " .. why, level or vim.log.levels.WARN)
+    end
     return
   end
   local ok, cli = pcall(args.parse_cli, cfg.args, o.tokens or {})
@@ -924,7 +936,8 @@ end
 ---lua.trusted_dirs. Returns false and the reason otherwise.
 ---@param path string normalized config path
 ---@param cfg dbdash.Config
-function M.trusted(path, cfg)
+---@param on_viewed fun(answer: string)? the decision made after viewing the file
+function M.trusted(path, cfg, on_viewed)
   local has_lua = false
   for _, p in ipairs(cfg.panels) do
     if p.database.type == "lua" or p.query.transform then
@@ -944,7 +957,7 @@ function M.trusted(path, cfg)
       return true
     end
   end
-  return require("dbdash.trust").check(path)
+  return require("dbdash.trust").check(path, on_viewed)
 end
 
 ---On exit: stop timers and ignore queries still running, but keep the dashboards and

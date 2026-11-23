@@ -795,14 +795,15 @@ Blocking calls such as `vim.fn.system()` freeze the editor: use
 `dbdash.system()`.
 
 Trust: Lua in a config runs with your permissions, so starting a dashboard
-with `lua://` or `transform` asks first: Allow, View (open the file, then
-start it again), Deny or Not now. Allow and Deny are stored in Neovim's trust
+with `lua://` or `transform` asks first: Allow, View, Deny or Not now. View
+shows the config in a floating window: `a` allows (and starts it), `d` denies,
+`q` closes without deciding. Allow and Deny are stored in Neovim's trust
 database (the one of |:trust| and 'exrc'), for that file content: after an
 edit you are asked again, and `:trust` / `:trust ++deny` decide as well;
 `:trust ++remove {file}` forgets the decision so the question comes back.
 `setup({ lua = { confirm = false } })` turns the question off, and
-`lua = { trusted_dirs = { "~/dashboards" } }` skips it for configs under
-those directories. A config cannot skip it itself.
+`lua = { trusted_dirs = { "~/dashboards" } }` skips it for configs under those
+directories. A config cannot skip it itself.
 
 TLS                                                               *dbdash-tls*
 
