@@ -208,8 +208,8 @@ query:
 ```
 
 Scripts get `args`, `rs` (for transforms) and helpers such as `dbdash.system()` and
-`dbdash.query()` that wait without blocking the editor. Neovim asks before running a
-config with Lua (`vim.secure`, once per file and again after changes);
+`dbdash.query()` that wait without blocking the editor. dbdash asks before running a
+config with Lua (once per file and again after changes, stored in Neovim's trust database);
 `setup({ lua = { confirm = false } })` or `lua.trusted_dirs` skip that. See `:help dbdash-lua`.
 
 ## Coming from vim-dashboard
