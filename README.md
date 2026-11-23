@@ -271,44 +271,70 @@ same. Existing configs mostly work. Differences:
 make test                  # unit, golden and UI tests (clones mini.nvim into deps/)
 make test FILE=tests/yaml/test_parse.lua
 UPDATE_GOLDEN=1 make test  # regenerate render reference outputs
-make it                    # also run integration tests against tests/docker/compose.yaml
-make it-down               # stop the integration services
+make it-up                 # start the integration services (docker compose, waits until ready)
+make it                    # make it-up, then all tests including the integration tests
+make it-down               # stop and remove the integration services
 DBDASH_NET=1 make test     # include a TLS handshake with a public server (system CAs)
 make fmt                   # format with stylua
 ```
 
+### Integration tests
+
 Integration tests run against the services in `tests/docker/compose.yaml`: Redis,
 PostgreSQL, MySQL, MongoDB, Cassandra, SQL Server and nginx (HTTP/HTTPS), all official
 images with the configs and test certificates (`tests/fixtures/`) mounted read-only. They
-need access to Docker (e.g. a user in the `docker` group, or `sg docker -c "make it-up"`).
-To run only some of them, start the services once and pick a file:
+are skipped unless `DBDASH_IT=1` is set. With `DBDASH_IT=1` the examples test also runs
+`example/http.yaml`, which calls the public GitHub API (network access needed).
+
+**On one machine** with Docker (your user needs access to it, e.g. in the `docker` group,
+or prefix the command with `sg docker -c "..."`):
 
 ```sh
-make it-up
-DBDASH_IT=1 make test FILE=tests/db/test_postgres.lua
+make it                                               # start the services, run everything
+DBDASH_IT=1 make test FILE=tests/db/test_postgres.lua # later: one file, services still up
+make it-down                                          # when done
 ```
 
-With `DBDASH_IT=1` the examples test also runs `example/http.yaml`, which calls the public
-GitHub API (network access needed).
+`COMPOSE` replaces the compose command, e.g.
+`make it-up COMPOSE="podman compose -f tests/docker/compose.yaml"`.
 
-The services listen on non-default ports (15432 PostgreSQL, 13306 MySQL, 16379/16380 Redis
-plain/TLS, 17017 MongoDB, 19042 Cassandra, 11433 SQL Server, 18080/18443 HTTP/HTTPS), so a
-local database is not hit by accident. To test on another machine (e.g. Windows) against
-the containers of a Docker host, forward these ports over SSH, here from PowerShell:
+**On two machines**: the containers run on a Docker host and the tests on another
+machine (e.g. Windows without Docker). The services listen on these ports of the Docker
+host:
 
-```powershell
-ssh -N `
-  -L 15432:127.0.0.1:15432 -L 13306:127.0.0.1:13306 `
-  -L 16379:127.0.0.1:16379 -L 16380:127.0.0.1:16380 `
-  -L 17017:127.0.0.1:17017 -L 19042:127.0.0.1:19042 `
-  -L 11433:127.0.0.1:11433 `
-  -L 18080:127.0.0.1:18080 -L 18443:127.0.0.1:18443 `
-  user@docker-host
-```
+| Service | Port | Service | Port |
+|---|---|---|---|
+| PostgreSQL | 15432 | Cassandra | 19042 |
+| MySQL | 13306 | SQL Server | 11433 |
+| Redis (plain / TLS) | 16379 / 16380 | nginx (HTTP / HTTPS) | 18080 / 18443 |
+| MongoDB | 17017 | | |
 
-Keep it open and run `DBDASH_IT=1 make test` (or `$env:DBDASH_IT=1; make test`) in another
-terminal; the tests connect to `127.0.0.1` and `localhost`, which the test certificates
-cover.
+They avoid the default ports so a local database is not hit by accident. The tests
+always connect to `127.0.0.1` / `localhost` (the names the test certificates are issued
+for), so forward these ports to the test machine over SSH instead of pointing the tests
+at the host's address.
+
+1. On the Docker host, start the services and leave them running:
+
+   ```sh
+   make it-up
+   ```
+
+2. On the test machine, open the tunnel and keep it running (`user@docker-host` is your
+   SSH login on the Docker host):
+
+   ```sh
+   ssh -N -L 15432:127.0.0.1:15432 -L 13306:127.0.0.1:13306 -L 16379:127.0.0.1:16379 -L 16380:127.0.0.1:16380 -L 17017:127.0.0.1:17017 -L 19042:127.0.0.1:19042 -L 11433:127.0.0.1:11433 -L 18080:127.0.0.1:18080 -L 18443:127.0.0.1:18443 user@docker-host
+   ```
+
+3. On the test machine, in another terminal, set the environment variable `DBDASH_IT=1`
+   and run `make test` (not `make it`, which would try to start Docker there):
+
+   ```sh
+   DBDASH_IT=1 make test
+   ```
+
+4. When done: stop the tunnel (Ctrl-C) and run `make it-down` on the Docker host.
 
 ## License
 
