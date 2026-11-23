@@ -26,6 +26,7 @@ M.DEFAULTS = {
   heatmap = { renderer = "halfblock" },
   pie = { renderer = "bar" },
   stat = { renderer = "big" },
+  text = { renderer = "plain" },
 }
 
 -- Built-in names, for completion and documentation.
@@ -42,6 +43,7 @@ M.BUILTIN = {
     heatmap = { "halfblock", "block" },
     pie = { "bar", "circle" },
     stat = { "big" },
+    text = { "plain" },
   },
   canvas = { "braille", "quadrant", "block", "halfblock", "ascii" },
   ticks = { "nice", "linear" },

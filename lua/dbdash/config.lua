@@ -39,6 +39,7 @@ M.CHART_TYPES = {
   pie = true,
   scatter = true,
   stat = true,
+  text = true,
 }
 
 M.ARG_TYPES = { string = true, number = true, int = true, boolean = true, list = true, map = true }

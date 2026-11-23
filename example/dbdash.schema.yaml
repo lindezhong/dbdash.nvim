@@ -255,7 +255,7 @@ definitions:
     type: object
     properties:
       type:
-        enum: [table, line, area, bar, histogram, boxplot, heatmap, bubble, pie, scatter, stat]
+        enum: [table, line, area, bar, histogram, boxplot, heatmap, bubble, pie, scatter, stat, text]
         default: table
       title: { type: string }
       interval:
@@ -275,7 +275,7 @@ definitions:
             table: box          line: canvas, asciichart     scatter/area/bubble: canvas
             bar: horizontal, vertical    histogram: horizontal, vertical
             boxplot: boxdraw    heatmap: halfblock, block    pie: bar, circle
-            stat: big
+            stat: big           text: plain
           Custom styles registered with setup({ register = ... }) are accepted too.
       canvas:
         type: string
@@ -297,6 +297,8 @@ definitions:
             boxplot    show_outliers, show_means
             heatmap    show_values (block renderer)
             pie        show_labels, show_values, show_percentages
+            text       separator (" "), null_text (""), wrap (true; false cuts long lines),
+                       title_style
       colors:
         description: Series / slice colors, by position (list) or by category name (mapping).
         oneOf:
@@ -346,7 +348,7 @@ definitions:
       thresholds_below: { type: boolean, default: false, description: "Thresholds apply at or below their value (lower is worse)." }
       column_list:
         type: array
-        description: Table columns to show, in order (all columns when omitted).
+        description: Table (and text) columns to show, in order (all columns when omitted).
         items:
           oneOf:
             - type: string

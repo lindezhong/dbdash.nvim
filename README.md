@@ -8,7 +8,8 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
 - **Databases**: SQLite, PostgreSQL, MySQL/MariaDB, Redis, MongoDB (including
   `mongodb+srv://`), Cassandra, SQL Server, and HTTP APIs (`https://`, with cookies).
 - **Charts**: table, line, area, bar, histogram, boxplot, heatmap, scatter, bubble, pie,
-  stat (a KPI value in large digits with its change and a sparkline),
+  stat (a KPI value in large digits with its change and a sparkline), text (the result as
+  plain text, e.g. log lines or a command's output),
   each with alternative styles (braille / block canvases, vertical bars, round pie, ...).
 - **Several panels** per dashboard in a grid, each refreshing on its own interval.
   Dashboards that are not on screen pause and catch up when shown again.
@@ -142,7 +143,7 @@ Examples, all runnable as they are:
 | File | Shows |
 | --- | --- |
 | [`table.yaml`](example/table.yaml) | table columns, aliases, widths, styles |
-| [`line.yaml`](example/line.yaml), [`area.yaml`](example/area.yaml), [`bar.yaml`](example/bar.yaml), [`histogram.yaml`](example/histogram.yaml), [`boxplot.yaml`](example/boxplot.yaml), [`heatmap.yaml`](example/heatmap.yaml), [`scatter.yaml`](example/scatter.yaml), [`bubble.yaml`](example/bubble.yaml), [`pie.yaml`](example/pie.yaml), [`stat.yaml`](example/stat.yaml) | one chart type each |
+| [`line.yaml`](example/line.yaml), [`area.yaml`](example/area.yaml), [`bar.yaml`](example/bar.yaml), [`histogram.yaml`](example/histogram.yaml), [`boxplot.yaml`](example/boxplot.yaml), [`heatmap.yaml`](example/heatmap.yaml), [`scatter.yaml`](example/scatter.yaml), [`bubble.yaml`](example/bubble.yaml), [`pie.yaml`](example/pie.yaml), [`stat.yaml`](example/stat.yaml), [`text.yaml`](example/text.yaml) | one chart type each |
 | [`styles.yaml`](example/styles.yaml) | the alternative styles and canvases |
 | [`multi_panel.yaml`](example/multi_panel.yaml) | several panels, grid layout, per-panel intervals |
 | [`template_example.yaml`](example/template_example.yaml) | every argument type and the template syntax |

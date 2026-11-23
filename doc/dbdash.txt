@@ -285,7 +285,7 @@ Sidebar (`sidebar.keys`: select, stop, refresh, close):
   show:
     type: table             # table | line | area | bar | histogram |
                             # boxplot | heatmap | bubble | pie | scatter |
-                            # stat
+                            # stat | text
     title: "Users"
     interval: 60s           # s, m, h or ms
     show_countdown: true
@@ -363,6 +363,7 @@ Chart fields:                                                  *dbdash-charts*
              style.{show_percentages, show_values, show_labels}, colors
   stat       value_column (default: the first numeric column; first row),
              format (Python format), unit, delta, sparkline, thresholds
+  text       column_list, style.{separator, null_text, wrap, title_style}
 
 Thresholds                                                 *dbdash-thresholds*
 
@@ -383,6 +384,14 @@ too narrow), its change since the previous refresh (↑ 4.7%, ↓ 3.0%) and a
 sparkline of the last 20 refreshes; the history starts when the dashboard
 starts. `delta: false` and `sparkline: false` hide them.
 
+A text chart shows the result as plain text, without a table: each row is
+its cells joined by `style.separator` (default a space), so a one-column
+query shows one line per row; strings are shown as they are, newlines in a
+cell start new lines, NULL is `style.null_text` (default empty). Lines wider
+than the window wrap (`style.wrap: false` cuts them). The result must still
+be rows: turn a string from `lua://` or HTTP into `{ { text = rs } }` with
+`query.transform` (|dbdash-transform|).
+
 `colors` is a list (by series index) or a mapping (by category name). `width`
 caps the chart width (default: the window), `height` sets the plot rows
 (default: `defaults.height`, else 15). `axes.y_axis.format` takes a Python
@@ -402,6 +411,7 @@ Styles                                                         *dbdash-styles*
   pie        bar, circle                        (circle: canvas)
   table      box
   stat       big
+  text       plain
 
 Pick per config with `show.renderer` / `show.canvas`, or set defaults:  >lua
 
