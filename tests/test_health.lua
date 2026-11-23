@@ -2,6 +2,7 @@
 local dbdash = require("dbdash")
 local cred = require("dbdash.db.credentials")
 local eq = MiniTest.expect.equality
+local real_notify = vim.notify -- restored after each case (nvim_notify needs 3 arguments)
 
 local function remove_file()
   if vim.uv.fs_stat(cred.file()) then
@@ -16,7 +17,7 @@ local T = MiniTest.new_set({
       remove_file()
     end,
     post_case = function()
-      vim.notify = vim.api.nvim_notify
+      vim.notify = real_notify
       dbdash.setup({})
       remove_file()
     end,

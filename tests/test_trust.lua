@@ -3,6 +3,7 @@ local sched = require("dbdash.scheduler")
 local trust = require("dbdash.trust")
 local dbdash = require("dbdash")
 local eq = MiniTest.expect.equality
+local real_notify = vim.notify -- restored after each case (nvim_notify needs 3 arguments)
 
 local dir, notes, levels, asked, answer
 local real_ask = trust.ask
@@ -22,7 +23,7 @@ local T = MiniTest.new_set({
       end
     end,
     post_case = function()
-      vim.notify = vim.api.nvim_notify
+      vim.notify = real_notify
       trust.ask = real_ask
       dbdash.setup({})
       for _, d in ipairs(sched.list()) do

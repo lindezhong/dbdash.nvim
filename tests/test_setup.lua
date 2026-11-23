@@ -1,6 +1,7 @@
 -- setup(): option validation, defaults and global mappings.
 local dbdash = require("dbdash")
 local eq = MiniTest.expect.equality
+local real_notify = vim.notify -- restored after each case (nvim_notify needs 3 arguments)
 
 local notes
 local T = MiniTest.new_set({
@@ -12,7 +13,7 @@ local T = MiniTest.new_set({
       end
     end,
     post_case = function()
-      vim.notify = vim.api.nvim_notify
+      vim.notify = real_notify
       dbdash.setup({})
     end,
   },
