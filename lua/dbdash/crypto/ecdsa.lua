@@ -1,6 +1,7 @@
 -- NIST curves P-256 and P-384 (FIPS 186-4, a = -3): ECDSA verification for TLS and
 -- certificates, and ECDH for key shares. Jacobian coordinates over a Montgomery field;
 -- u1*G + u2*Q with Shamir's trick. Not constant-time (accepted risk, see :h dbdash-tls).
+local checkpoint = require("dbdash.util.async").checkpoint -- yields inside tasks only
 local bn = require("dbdash.crypto.bignum")
 local asn1 = require("dbdash.net.tls.asn1")
 
@@ -164,6 +165,7 @@ function Curve:verify(key, digest, sig_der)
   local GQ = add(F, G, Q)
   local acc = { F.one, F.one, F.zero }
   for i = self.bits - 1, 0, -1 do
+    checkpoint()
     acc = dbl(F, acc)
     local a, b = bit_of(u1, i), bit_of(u2, i)
     if a == 1 and b == 1 then
@@ -189,6 +191,7 @@ end
 local function scalar_mul(F, k, pt)
   local acc = { F.one, F.one, F.zero }
   for i = bn.bitlen(k) - 1, 0, -1 do
+    checkpoint()
     acc = dbl(F, acc)
     if bit_of(k, i) == 1 then
       acc = add(F, acc, pt)

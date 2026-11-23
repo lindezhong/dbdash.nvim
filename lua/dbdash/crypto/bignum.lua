@@ -3,6 +3,7 @@
 -- Little-endian arrays of 24-bit limbs (products stay exact in doubles). Modular
 -- exponentiation uses Montgomery multiplication (CIOS); only public operations are
 -- needed, so there is no constant-time requirement beyond what the design allows.
+local checkpoint = require("dbdash.util.async").checkpoint -- yields inside tasks only
 local M = {}
 
 local BITS = 24
@@ -201,6 +202,7 @@ function M.modexp(base, exp, n)
   local xm = mont_mul(ctx, base, ctx.r2)
   local acc = mont_mul(ctx, { 1 }, ctx.r2)
   for bit_i = M.bitlen(exp) - 1, 0, -1 do
+    checkpoint()
     acc = mont_mul(ctx, acc, acc)
     if floor(exp[floor(bit_i / BITS) + 1] / 2 ^ (bit_i % BITS)) % 2 == 1 then
       acc = mont_mul(ctx, acc, xm)
@@ -276,6 +278,7 @@ end
 function Field:pow(a, e)
   local acc = self.one
   for bit_i = M.bitlen(e) - 1, 0, -1 do
+    checkpoint()
     acc = mont_mul(self.ctx, acc, acc)
     if floor(e[floor(bit_i / BITS) + 1] / 2 ^ (bit_i % BITS)) % 2 == 1 then
       acc = mont_mul(self.ctx, acc, a)

@@ -68,7 +68,12 @@ function M.connect(host, port, opts)
         host = host,
         port = port,
         timeout = opts.timeout or 30000,
-        buf = "",
+        buf = "", -- plaintext; unread from bpos (see consume)
+        bpos = 1,
+        raw = "", -- bytes from the network; unread from rpos, then the chunks of rawq
+        rpos = 1,
+        rawq = {}, -- chunks received since, kept apart until read (no copying on arrival)
+        rawq_bytes = 0,
         eof = false,
         closed = false,
       }, Socket)
@@ -119,7 +124,7 @@ function Socket:start_reading()
     if err then
       self.err = err
     elseif chunk then
-      self.raw = (self.raw or "") .. chunk
+      self:append_raw(chunk)
     else
       self.eof = true
     end
@@ -143,16 +148,48 @@ function Socket:wait_raw()
   end
 end
 
+-- Buffers are read through a position instead of cutting the string on every read, which
+-- copied the rest of a large buffer for each small message (quadratic on big results).
+local COMPACT = 65536
+
+-- Called from the libuv read callback: only queue the chunk. Concatenating it to the
+-- unread bytes here copied megabytes per chunk on large results, outside any task.
+function Socket:append_raw(chunk)
+  self.rawq[#self.rawq + 1] = chunk
+  self.rawq_bytes = self.rawq_bytes + #chunk
+end
+
+---Unread raw bytes.
+function Socket:raw_available()
+  return #self.raw - self.rpos + 1 + self.rawq_bytes
+end
+
+---Move the queued chunks behind the unread raw bytes (one concatenation).
+function Socket:merge_raw()
+  if #self.rawq > 0 then
+    self.raw = self.raw:sub(self.rpos) .. table.concat(self.rawq)
+    self.rpos, self.rawq, self.rawq_bytes = 1, {}, 0
+  end
+end
+
+---Put bytes back in front of the unread raw bytes (plaintext read before TLS started).
+function Socket:unshift_raw(data)
+  self:merge_raw()
+  self.raw, self.rpos = data .. self.raw:sub(self.rpos), 1
+end
+
 ---Raw bytes received but not yet consumed (used by the TLS filter).
 function Socket:take_raw()
-  local r = self.raw or ""
-  self.raw = nil
+  self:merge_raw()
+  local r = self.raw:sub(self.rpos)
+  self.raw, self.rpos = "", 1
   return r
 end
 
 ---Read at least `n` raw (unfiltered) bytes.
 function Socket:raw_read_exact(n)
-  while #(self.raw or "") < n do
+  async.checkpoint()
+  while self:raw_available() < n do
     if self.err then
       dberr.raise("connect", "read failed: " .. tostring(self.err))
     elseif self.eof then
@@ -160,8 +197,29 @@ function Socket:raw_read_exact(n)
     end
     self:wait_raw()
   end
-  local s = self.raw:sub(1, n)
-  self.raw = self.raw:sub(n + 1)
+  if #self.raw - self.rpos + 1 < n then
+    self:merge_raw()
+  end
+  local s = self.raw:sub(self.rpos, self.rpos + n - 1)
+  self.rpos = self.rpos + n
+  if self.rpos > COMPACT and self.rpos * 2 > #self.raw then -- amortized: linear in total
+    self.raw, self.rpos = self.raw:sub(self.rpos), 1
+  end
+  return s
+end
+
+---Append plaintext to the read buffer.
+function Socket:append_buf(data)
+  if self.bpos > 1 then
+    self.buf, self.bpos = self.buf:sub(self.bpos), 1
+  end
+  self.buf = self.buf .. data
+end
+
+---Unread plaintext, removed from the buffer (handed to TLS by starttls).
+function Socket:take_buffered()
+  local s = self.buf:sub(self.bpos)
+  self.buf, self.bpos = "", 1
   return s
 end
 
@@ -170,12 +228,12 @@ function Socket:fill()
   if self.filter then
     local got = self.filter:unwrap(self)
     if got and #got > 0 then
-      self.buf = self.buf .. got
+      self:append_buf(got)
       return
     end
     return
   end
-  if #(self.raw or "") == 0 then
+  if self:raw_available() <= 0 then
     if self.err then
       dberr.raise("connect", "read failed: " .. tostring(self.err))
     elseif self.eof then
@@ -183,18 +241,22 @@ function Socket:fill()
     end
     self:wait_raw()
   end
-  self.buf = self.buf .. self:take_raw()
+  self:append_buf(self:take_raw())
 end
 
 ---Read exactly `n` bytes.
 ---@param n integer
 ---@return string
 function Socket:read_exact(n)
-  while #self.buf < n do
+  async.checkpoint()
+  while #self.buf - self.bpos + 1 < n do
     self:fill()
   end
-  local s = self.buf:sub(1, n)
-  self.buf = self.buf:sub(n + 1)
+  local s = self.buf:sub(self.bpos, self.bpos + n - 1)
+  self.bpos = self.bpos + n
+  if self.bpos > COMPACT and self.bpos * 2 > #self.buf then
+    self.buf, self.bpos = self.buf:sub(self.bpos), 1
+  end
   return s
 end
 
@@ -202,11 +264,15 @@ end
 ---@param delim string
 ---@return string
 function Socket:read_until(delim)
+  async.checkpoint()
   while true do
-    local i = self.buf:find(delim, 1, true)
+    local i = self.buf:find(delim, self.bpos, true)
     if i then
-      local s = self.buf:sub(1, i + #delim - 1)
-      self.buf = self.buf:sub(i + #delim)
+      local s = self.buf:sub(self.bpos, i + #delim - 1)
+      self.bpos = i + #delim
+      if self.bpos > COMPACT and self.bpos * 2 > #self.buf then
+        self.buf, self.bpos = self.buf:sub(self.bpos), 1
+      end
       return s
     end
     self:fill()

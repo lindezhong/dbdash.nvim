@@ -1,4 +1,5 @@
 -- PBKDF2 (RFC 8018) with HMAC.
+local checkpoint = require("dbdash.util.async").checkpoint -- yields inside tasks only
 local bit = require("bit")
 local hmac = require("dbdash.crypto.hmac")
 local util = require("dbdash.crypto.util")
@@ -28,6 +29,7 @@ function M.derive(hash, password, salt, iterations, dklen)
     for _ = 2, iterations do
       u = prf(u)
       xor_into(acc, u)
+      checkpoint() -- SCRAM uses thousands of iterations: let the editor breathe
     end
     out[#out + 1] = string.char(unpack(acc))
     block = block + 1

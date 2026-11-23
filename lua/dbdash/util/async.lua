@@ -5,6 +5,11 @@ local unpack = unpack or table.unpack
 
 -- Maps a running coroutine to the function that resumes it.
 local resumers = setmetatable({}, { __mode = "k" })
+-- When each task last got the CPU (hrtime), for checkpoint().
+local slice_start = setmetatable({}, { __mode = "k" })
+
+---Longest stretch (ns) a task runs before checkpoint() gives the main loop a turn.
+M.SLICE_NS = 8e6
 
 local function pack(...)
   return { n = select("#", ...), ... }
@@ -17,6 +22,7 @@ end
 function M.run(fn, cb)
   local co = coroutine.create(fn)
   local function step(...)
+    slice_start[co] = vim.uv.hrtime()
     local res = pack(coroutine.resume(co, ...))
     if not res[1] then
       resumers[co] = nil
@@ -92,6 +98,21 @@ end
 function M.main()
   if vim.in_fast_event() then
     M.await(vim.schedule)
+  end
+end
+
+---Give the main loop a turn when the current task has run longer than SLICE_NS, so long
+---computations (crypto, decoding rows) do not freeze the editor. Outside a task (tests,
+---synchronous callers) it does nothing.
+function M.checkpoint()
+  local co = coroutine.running()
+  local started = co and slice_start[co]
+  if started and resumers[co] and vim.uv.hrtime() - started > M.SLICE_NS then
+    -- A timer, not vim.schedule: scheduled callbacks queued while the event queue is being
+    -- processed run in the same pass, so input, timers and I/O would still wait.
+    M.await(function(cb)
+      vim.defer_fn(cb, 0)
+    end)
   end
 end
 

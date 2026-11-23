@@ -1,5 +1,6 @@
 -- X25519 (RFC 7748), after TweetNaCl: field elements are 16 limbs of 16 bits held in Lua
 -- numbers (all intermediate sums stay below 2^53).
+local checkpoint = require("dbdash.util.async").checkpoint -- yields inside tasks only
 local M = {}
 
 local floor = math.floor
@@ -130,6 +131,7 @@ function M.scalarmult(k, u)
   local a, b, c, d, e, f = gf(), gf(x), gf(), gf(), gf(), gf()
   a[1], d[1] = 1, 1
   for i = 254, 0, -1 do
+    checkpoint()
     local r = floor(z[floor(i / 8) + 1] / 2 ^ (i % 8)) % 2
     sel(a, b, r)
     sel(c, d, r)

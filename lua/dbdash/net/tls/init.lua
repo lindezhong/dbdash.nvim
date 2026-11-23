@@ -102,9 +102,11 @@ end
 ---records wrapped in TDS packets; application data then uses `sock` directly.
 function M.starttls(sock, opts, io)
   -- Bytes already moved to the plaintext buffer belong to the TLS stream.
-  if not io and #sock.buf > 0 then
-    sock.raw = sock.buf .. (sock.raw or "")
-    sock.buf = ""
+  if not io then
+    local pending = sock:take_buffered()
+    if #pending > 0 then
+      sock:unshift_raw(pending)
+    end
   end
   local ok, session = pcall(handshake.run, io or sock, opts)
   if not ok then
