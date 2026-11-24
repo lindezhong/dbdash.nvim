@@ -25,6 +25,9 @@ M.NAMES = {
   "max_rows",
   "timeout",
   "refresh_count",
+  "prev_query",
+  "prev_result",
+  "prev_error",
   "now",
   "today",
   "hostname",
@@ -102,6 +105,11 @@ function M.values(panel, run)
   out.max_rows = q.max_rows or dbdash.options.defaults.max_rows
   out.timeout = q.timeout or dbdash.default_ms("timeout")
   out.refresh_count = panel.refresh_count or 0
+  -- The previous refresh: its query's own result and the final rows (the last success),
+  -- and its error when it failed.
+  out.prev_query = panel.prev_query
+  out.prev_result = panel.prev_result
+  out.prev_error = panel.prev_error
   return out
 end
 
@@ -135,12 +143,39 @@ function M.dashboard_values(d, dbcfg)
   }
 end
 
+---A metadata value for templates: result tables keep NULL cells as none (their rows may
+---have holes), other tables are converted as Lua data.
+local function template_value(x)
+  if type(x) ~= "table" then
+    return x
+  end
+  local R = require("dbdash.template.runtime")
+  if type(x.columns) == "table" and type(x.rows) == "table" then
+    local rows = {}
+    for r, row in ipairs(x.rows) do
+      local out = {}
+      for i = 1, #x.columns do
+        out[i] = R.from_lua(row[i])
+      end
+      rows[r] = out
+    end
+    local m = map.new()
+    map.set(m, "columns", R.from_lua(x.columns))
+    if x.types then
+      map.set(m, "types", R.from_lua(x.types))
+    end
+    map.set(m, "rows", rows)
+    return m
+  end
+  return R.from_lua(x)
+end
+
 ---The values as a template mapping (missing values are none).
 function M.for_template(values)
   local m = map.new()
   for _, name in ipairs(M.NAMES) do
     local x = values[name]
-    map.set(m, name, x == nil and vim.NIL or x)
+    map.set(m, name, x == nil and vim.NIL or template_value(x))
   end
   return m
 end

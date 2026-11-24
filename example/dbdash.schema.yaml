@@ -342,6 +342,12 @@ definitions:
           Refresh interval of this chart (default the top-level show.interval, then the
           top-level interval, else 30s from setup defaults.interval). At least 1s.
       show_countdown: { type: boolean, default: false, description: "This chart's own countdown to its next refresh." }
+      refresh_hidden:
+        type: boolean
+        default: false
+        description: >-
+          Keep refreshing this chart while the dashboard is not visible (paused, see
+          dashboard.pause_hidden in setup): thresholds and errors still notify.
       countdown_format:
         type: string
         default: "Next update: {time}s"

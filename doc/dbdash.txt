@@ -193,7 +193,10 @@ window to another buffer, or it is only in another tab page) pauses: no
 queries, no countdown. A window that shows it counts even when the cursor
 is in another window. When it is shown again, it refreshes right away if
 its next refresh is due, and otherwise continues the countdown. Set
-`dashboard.pause_hidden = false` to keep hidden dashboards refreshing.
+`dashboard.pause_hidden = false` to keep hidden dashboards refreshing, or
+`show.refresh_hidden: true` for some panels: they keep refreshing on their
+interval (and with the top-level `interval`) while the dashboard is paused,
+and still notify thresholds and errors.
 
 :DbDashClose                                                    *:DbDashClose*
     Close the sidebar.
@@ -333,8 +336,8 @@ Where a field is written says what it applies to, with one chart or many:
   per panel, with a    the top-level `database`, `query` and `show`
   top-level default    sections: `database`; `query.timeout`, `max_rows`,
                        `autoescape`; `show.interval`, `show_countdown`,
-                       `countdown_format`, `args_show`, `style`, `renderer`,
-                       `canvas`, `thresholds`, ...
+                       `countdown_format`, `args_show`, `refresh_hidden`,
+                       `style`, `renderer`, `canvas`, `thresholds`, ...
   one panel only       `query.sql`, `transform`, `args`; `show.type`,
                        `title`, `description`, `span`, `column_list`, the
                        `*_column` fields, `x_label`, `y_label`
@@ -619,6 +622,13 @@ there is no value):
   max_rows       `query.max_rows`
   timeout        the query timeout in ms
   refresh_count  how many times this panel has refreshed (from 1)
+  prev_query     the previous successful refresh's query result, before
+                 `query.transform`: { columns, types, rows } (for `lua://`
+                 and `http(s)://` with a transform: the raw value)
+  prev_result    its final rows (after `query.transform`, as shown):
+                 { columns, types, rows }; NULL cells are none / nil
+  prev_error     the previous refresh's error when it failed (prev_query
+                 and prev_result then keep the last success), else none
   now            render time, ISO 8601 with the UTC offset
                  (2026-11-24T10:00:00+08:00)
   today          the date (2026-11-24)

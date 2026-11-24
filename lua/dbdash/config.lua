@@ -321,6 +321,7 @@ function Ctx:show(s, top_interval, prefix)
     end
   end
   out.args_show = as or false
+  out.refresh_hidden = self:expect(prefix .. "show.refresh_hidden", s.refresh_hidden, "boolean", true) == true
   out.span = self:expect(prefix .. "show.span", s.span, "integer", true) or 1
   if out.span < 1 then
     self:fail(prefix .. "show.span", "span must be at least 1")

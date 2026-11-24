@@ -357,6 +357,12 @@ T["arg_refs finds the argument names a template or Lua code reads"] = function()
   eq(refs("{{ args.filters.items() }}"), { { "filters" }, false })
 end
 
+T["show.refresh_hidden is a boolean, with a top-level default"] = function()
+  eq(err_of(MINIMAL .. "show: { refresh_hidden: 1 }\n"):find("'show.refresh_hidden' must be a boolean") ~= nil, true)
+  local cfg = assert(load("database: { url: 'sqlite:///:memory:' }\nshow: { refresh_hidden: true }\npanels:\n  - query: { sql: x }\n  - query: { sql: y }\n    show: { refresh_hidden: false }\n"))
+  eq({ cfg.panels[1].show.refresh_hidden, cfg.panels[2].show.refresh_hidden }, { true, false })
+end
+
 T["layout needs panels"] = function()
   eq(err_of(MINIMAL .. "layout: { columns: 3 }\n"):find("layout only applies with panels") ~= nil, true)
 end

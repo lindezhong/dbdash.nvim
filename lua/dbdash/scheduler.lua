@@ -466,7 +466,7 @@ function Panel:fail(err)
   self.failures = (self.failures or 0) + 1
   local interval = self.cfg.show.interval
   local delay = M.backoff_delay(interval, self.failures, opts().errors.backoff)
-  if delay > interval and not self.d.paused then
+  if delay > interval and self:active() then
     self.retry_at = now() + delay
     self.backoff_mult = math.floor(delay / interval + 0.5)
     if self.d.gtimer and self.cfg.follows_global then
@@ -502,11 +502,12 @@ function Panel:refresh(o)
   local gen = self.d.generation
   -- One task: the whole pipeline (callbacks of dbdash.run() run inside it too).
   require("dbdash.util.async").run(function()
-    return self:pipeline(self:new_run())
-  end, function(err, rs)
+    local run = self:new_run()
+    return self:pipeline(run), run
+  end, function(err, rs, run)
     vim.schedule(function()
       if gen == self.d.generation then
-        self:finish_refresh(gen, err and as_error(err) or nil, rs)
+        self:finish_refresh(gen, err and as_error(err) or nil, rs, run)
       end
     end)
   end)
@@ -538,7 +539,7 @@ function M.transform(code, rs, o)
 end
 
 ---The end of a refresh: the query (and transform) result or error.
-function Panel:finish_refresh(gen, qerr, rs)
+function Panel:finish_refresh(gen, qerr, rs, run)
   self.running = false
   if self.rerun then
     self.rerun = false
@@ -548,17 +549,27 @@ function Panel:finish_refresh(gen, qerr, rs)
       end
     end)
   end
+  local lua_result = require("dbdash.db.lua_result")
   if qerr then
+    -- meta.prev_error; meta.prev_query / prev_result keep the last success.
+    self.prev_error = M.format_error(qerr)
     self:push_history({ error = M.format_error(qerr) })
     self:fail(qerr)
     return
   end
+  -- meta.prev_query (the query's own result, before query.transform) and prev_result.
+  local raw = run and run.query_result
+  if raw ~= nil then
+    self.prev_query = lua_result.is_raw(raw) and raw.value or lua_result.to_lua(raw)
+  end
+  self.prev_result = lua_result.to_lua(rs)
+  self.prev_error = nil
   self:push_history({ elapsed_ms = rs.elapsed_ms, rows = rs.row_count })
   self.rs = rs
   if (self.failures or 0) > 0 then
     local was_backing_off = self.retry_at ~= nil
     self.failures, self.retry_at, self.backoff_mult = 0, nil, nil
-    if was_backing_off and not self.d.paused and not (self.d.gtimer and self.cfg.follows_global) then
+    if was_backing_off and self:active() and not (self.d.gtimer and self.cfg.follows_global) then
       self:start_timer() -- back to the normal interval
     end
   end
@@ -576,7 +587,7 @@ function Panel:start_timer(first)
   first = first or interval
   self.next_at = now() + first
   local d = self.d
-  if d.gtimer and self.cfg.follows_global then
+  if (d.gtimer and self.cfg.follows_global) or not self:active() then
     return
   end
   self.timer = self.timer or vim.uv.new_timer()
@@ -589,6 +600,11 @@ function Panel:start_timer(first)
       end
     end)
   end)
+end
+
+---Refreshing on its timers: the dashboard is visible, or show.refresh_hidden.
+function Panel:active()
+  return not self.d.paused or self.cfg.show.refresh_hidden
 end
 
 function Panel:stop_timer()
@@ -891,31 +907,38 @@ end
 ---arguments) queue a refresh behind a running query; timer ticks (`o.timer`) skip it.
 ---@param o { timer: boolean? }?
 function Dashboard:restart(o)
-  local ro = { queue = not (o and o.timer) }
-  if self.paused then
-    -- Not visible (setup({ dashboard = { pause_hidden = true } })): refresh once, no timers.
+  local tick = o and o.timer
+  local ro = { queue = not tick }
+  if self.paused and not tick then
+    -- Not visible (setup({ dashboard = { pause_hidden = true } })): refresh once; only the
+    -- show.refresh_hidden panels keep their timers.
     for _, p in ipairs(self.panels) do
+      p:start_timer()
       p:refresh(ro)
     end
     return
   end
+  -- Visible, or a global tick while paused (it is kept for show.refresh_hidden panels).
   if self.gtimer then
     self:start_global_timer()
-    if o and o.timer then
+    if tick and not self.paused then
       self.refreshing_all = true -- "…" in the header until every panel is done
     end
   end
   local t = now()
-  for _, p in ipairs(self.panels) do
+  local panels = vim.tbl_filter(function(p)
+    return p:active()
+  end, self.panels)
+  for _, p in ipairs(panels) do
     -- A timer tick leaves panels that are backing off after failures alone.
-    local backing_off = o and o.timer and p.retry_at and t < p.retry_at
+    local backing_off = tick and p.retry_at and t < p.retry_at
     if backing_off then
       p.skip_tick = true
     else
       p:start_timer()
     end
   end
-  for _, p in ipairs(self.panels) do
+  for _, p in ipairs(panels) do
     if p.skip_tick then
       p.skip_tick = nil
       p.next_at = p.retry_at
@@ -980,7 +1003,22 @@ function Dashboard:pause()
     return
   end
   self.paused = true
-  self:stop_timers()
+  -- show.refresh_hidden panels keep refreshing: their own timers, and the global one when
+  -- one of them follows it.
+  close_timer(self.ctimer)
+  self.ctimer = nil
+  local keep_global = false
+  for _, p in ipairs(self.panels) do
+    if p.cfg.show.refresh_hidden then
+      keep_global = keep_global or p.cfg.follows_global
+    else
+      p:stop_timer()
+    end
+  end
+  if not keep_global then
+    close_timer(self.gtimer)
+    self.gtimer = nil
+  end
   require("dbdash.view.sidebar").refresh()
 end
 
@@ -1001,7 +1039,7 @@ function Dashboard:resume()
     end)
   end)
   if self.cfg.refresh_all then
-    self.gtimer = vim.uv.new_timer()
+    self.gtimer = self.gtimer or vim.uv.new_timer() -- kept while paused for refresh_hidden
     local left = (self.gnext_at or t) - t
     if left <= 0 then
       self:restart({ timer = true }) -- the global interval elapsed: refresh every panel
