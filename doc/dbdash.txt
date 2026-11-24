@@ -340,7 +340,7 @@ The sidebar does not list `*.schema.yaml` files (the default
 Multiple panels                                                *dbdash-panels*
 
 One config can hold several charts in a grid: >yaml
-  database: { url: "postgres://..." }   # shared; a panel may set its own
+  database: { url: "postgres://..." }   # default; a panel may set its own
   interval: 5m      # default panel interval; also refreshes every panel
   args:             # shared arguments (merged with each panel's query.args)
     - name: region
@@ -358,6 +358,20 @@ top-level `interval`); when the top-level interval elapses every panel
 refreshes and their timers restart. Arguments with the same name must be
 declared identically. In the dashboard, `s` and |:DbDashStyle| act on the
 panel under the cursor (or ask which one); `r` refreshes all panels.
+
+Each panel queries its own database: `panels[].database` if it sets one,
+else the top-level `database`, which is only a default (a one-chart config is
+the same rule with the top level as its only panel). The top-level `database`
+can be left out when every panel sets one; a panel with neither is an error.
+Panels of different database types can share a dashboard: >yaml
+  database: { url: "postgres://..." }   # default
+  panels:
+    - query: { sql: "SELECT ..." }      # postgres
+    - database: { url: "redis://cache" }
+      query: { sql: "INFO memory" }     # redis
+<
+The SQL filters, autoescape and the `meta.db_*` values follow the panel's
+database.
 
 Chart fields:                                                  *dbdash-charts*
 
@@ -488,7 +502,8 @@ there is no value):
   config_file    the config file (absolute path)
   config_dir     its directory
   config_name    its name without the extension
-  db_type        the database type (postgres, http, lua, ...)
+  db_type        the panel's database type (postgres, http, lua, ...): its
+                 own `database`, else the top-level one (|dbdash-panels|)
   db_host        host, port, database (SQLite file, HTTP path) and user of the
   db_port        URL as written in the config, with the driver's default port
   db_name
@@ -581,7 +596,7 @@ Filters                                              *dbdash-template-filters*
   tojson(indent)         JSON text (use it to put values into MongoDB queries)
   safe                   mark as SQL so autoescape leaves it alone
 
-SQL filters, quoted for the dashboard's database (|dbdash-template-dialects|):
+SQL filters, quoted for the panel's database (|dbdash-template-dialects|):
 
   sql_quote              a literal: 'it''s', 42, TRUE, NULL
   sql_escape             string content without the quotes: it''s

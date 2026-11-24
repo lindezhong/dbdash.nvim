@@ -31,13 +31,17 @@ oneOf:
     required: [database] # query too, except for http(s):// (a GET of the URL)
     not: { required: [panels] }
   - title: several panels
-    required: [panels]
+    required: [panels] # each panel needs its own database or the top-level one
     not:
       anyOf:
         - required: [query]
         - required: [show]
 properties:
-  database: { $ref: "#/definitions/database" }
+  database:
+    $ref: "#/definitions/database"
+    description: >-
+      The database of a single chart; with panels, the default of every panel that does not
+      set its own (then optional when every panel sets one).
   query: { $ref: "#/definitions/query" }
   show: { $ref: "#/definitions/show" }
   interval:
@@ -258,7 +262,9 @@ definitions:
     properties:
       database:
         $ref: "#/definitions/database"
-        description: Overrides the top-level database for this panel.
+        description: >-
+          This panel's database; default the top-level database. A panel needs one of the
+          two.
       query: { $ref: "#/definitions/query" }
       show: { $ref: "#/definitions/show" }
 

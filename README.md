@@ -130,7 +130,8 @@ require("dbdash").load_session(session_file .. ".dbdash") -- after sourcing the 
 ## Configuration
 
 A config file describes one dashboard: `database`, `query` and `show`, or `panels` and
-`layout` for several charts. [`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a
+`layout` for several charts. Each panel may set its own `database`; the top-level one is the
+default for panels that do not. [`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a
 JSON Schema of the whole format; editors with yaml-language-server validate and complete a
 config that starts with:
 
@@ -209,7 +210,7 @@ SELECT * FROM visits WHERE day >= {{ h.since(args.days) }}
 `{% lua %}` blocks output what their code returns; imported `.lua` modules return a table
 of functions to call (`:help dbdash-template-lua`).
 
-The SQL filters quote for the dashboard's database (MySQL backslashes, SQL Server
+The SQL filters quote for the panel's database (MySQL backslashes, SQL Server
 `N'...'` and `[ident]`, JSON for MongoDB, ...). See `:help dbdash-templates`.
 
 ### Lua

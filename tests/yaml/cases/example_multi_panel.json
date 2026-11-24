@@ -55,6 +55,9 @@
    }
   },
   {
+   "database": {
+    "url": "sqlite:///:memory:"
+   },
    "query": {
     "sql": "SELECT abs(random() % 5000) AS orders\n"
    },

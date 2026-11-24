@@ -83,6 +83,30 @@ T["db_*: from the URL as written, without the password or expanded ${NAME}"] = f
   eq({ l.meta.db_type, l.meta.db_host, l.meta.db_port }, { "lua", nil, nil })
 end
 
+T["db_*: each panel's own database, else the top-level default"] = function()
+  local _, d = run("mixed", {
+    "database: { url: 'postgres://app@db.internal/shop' }",
+    "panels:",
+    "  - database: { url: 'sqlite:///:memory:' }",
+    "    query: { sql: 'SELECT {{ meta.db_type | sql_quote }} AS t' }",
+    "  - database: { url: 'lua://' }",
+    "    query: { sql: 'return { { t = meta.db_type, url = meta.db_url } }' }",
+  })
+  local p1, p2 = d.panels[1], d.panels[2]
+  eq({ p1.meta.db_type, p1.meta.db_name, p1.rs.rows[1][1] }, { "sqlite", ":memory:", "sqlite" })
+  eq({ p2.meta.db_type, p2.meta.db_url, p2.meta.db_host }, { "lua", "lua://", nil })
+  eq(p2.rs.rows[1][1], "lua")
+  -- A panel without its own database reports the top-level one.
+  local _, d2 = run("shared", {
+    "database: { url: 'sqlite:///:memory:' }",
+    "panels:",
+    "  - query: { sql: SELECT 1 }",
+    "  - database: { url: 'lua://' }",
+    "    query: { sql: 'return { { x = 1 } }' }",
+  })
+  eq({ d2.panels[1].meta.db_type, d2.panels[2].meta.db_type }, { "sqlite", "lua" })
+end
+
 T["args and meta in query.sql, query.transform, lua:// and imported templates"] = function()
   vim.fn.writefile({
     "{% macro where_dir() %}{{ meta.config_name | sql_quote }} AS cfg, {{ args.n }} AS n2{% endmacro %}",

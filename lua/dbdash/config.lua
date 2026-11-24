@@ -67,7 +67,8 @@ local DEFAULTS = setmetatable({}, {
 ---@class dbdash.Config
 ---@field path string absolute path of the YAML file
 ---@field dir string directory containing the file
----@field database { type: string, url: string, options: table }
+---@field database { type: string, url: string, options: table }? top-level database: the default of every panel
+---@field panels dbdash.PanelConfig[]
 ---@field query { sql: string, sql_line: integer, transform: string?, transform_line: integer, autoescape: boolean, max_rows: integer, timeout: integer?, args_show: boolean, args: dbdash.ArgSpec[] }
 ---@field show table show section, with interval (ms), title, show_countdown, countdown_format
 ---@field positions table<string, {line: integer, col: integer}>
@@ -335,10 +336,12 @@ end
 
 ---Validate parsed YAML data.
 ---
----Single-chart configs (database/query/show) become one panel; `cfg.database`, `cfg.query`
----and `cfg.show` then refer to it. Multi-panel configs use `panels:` with a shared
----`database`, `interval` (default interval and forced refresh of every panel), `args`
----and `layout: {columns, gap}`.
+---Single-chart configs (query/show at the top level) and multi-panel configs (`panels:`)
+---go through the same steps: each panel uses its own `database` if it sets one, else the
+---top-level `database` (only a default); a panel with neither is an error. A single-chart
+---config is one panel whose `cfg.database`, `cfg.query` and `cfg.show` refer to it.
+---Multi-panel configs add `layout: {columns, gap}`; the top-level `interval` is the default
+---panel interval (and, with panels, a forced refresh of every panel) and `args` are shared.
 ---@param data any
 ---@param file string used in error messages
 ---@param positions table<string, {line: integer, col: integer}>?
@@ -356,41 +359,36 @@ function M.validate(data, file, positions)
     interval = top_interval,
   }
   local panels_raw = nn(data.panels)
-  if panels_raw == nil then
-    local database = ctx:database(data.database)
-    local panel = {
-      index = 1,
-      database = database,
-      query = ctx:query(data.query, nil, database),
-      show = ctx:show(data.show, nn(data.interval)),
-    }
-    cfg.multi = false
-    cfg.panels = { panel }
-    cfg.database, cfg.query, cfg.show = panel.database, panel.query, panel.show
-    cfg.args = ctx:merge_args({ ctx:args_list(data.args, "args"), panel.query.args })
-    cfg.args_show = panel.query.args_show or nn(data.args_show) == true
-    cfg.layout = { columns = 1, gap = 2 }
-    return cfg
+  cfg.multi = panels_raw ~= nil
+  if cfg.multi then
+    ctx:expect("panels", panels_raw, "list")
+    if #panels_raw == 0 then
+      ctx:fail("panels", "panels must not be empty")
+    end
+    if nn(data.query) ~= nil or nn(data.show) ~= nil then
+      ctx:fail("panels", "use either query/show or panels, not both")
+    end
+  else
+    -- The top level is the only panel: its database is the top-level one.
+    panels_raw = { { query = data.query, show = data.show } }
   end
-
-  ctx:expect("panels", panels_raw, "list")
-  if #panels_raw == 0 then
-    ctx:fail("panels", "panels must not be empty")
-  end
-  if nn(data.query) ~= nil or nn(data.show) ~= nil then
-    ctx:fail("panels", "use either query/show or panels, not both")
-  end
-  local shared_db = nn(data.database) ~= nil and ctx:database(data.database) or nil
+  local default_db = nn(data.database) ~= nil and ctx:database(data.database) or nil
   local lists = { ctx:args_list(data.args, "args") }
   local args_show = nn(data.args_show) == true
-  cfg.multi = true
   cfg.panels = {}
   for i, raw in ipairs(panels_raw) do
-    local prefix = ("panels[%d]."):format(i)
-    ctx:expect(("panels[%d]"):format(i), raw, "map")
-    local db = nn(raw.database) ~= nil and ctx:database(raw.database, prefix) or shared_db
+    local prefix = cfg.multi and ("panels[%d]."):format(i) or ""
+    if cfg.multi then
+      ctx:expect(("panels[%d]"):format(i), raw, "map")
+    end
+    local db = nn(raw.database) ~= nil and ctx:database(raw.database, prefix) or default_db
     if not db then
-      ctx:fail(prefix .. "database", "%sdatabase: missing database (set it at the top level or in the panel)", prefix)
+      ctx:fail(
+        prefix .. "database",
+        cfg.multi and "missing required field '%sdatabase' (set it in the panel or at the top level)"
+          or "missing required field '%sdatabase'",
+        prefix
+      )
     end
     local panel = {
       index = i,
@@ -404,6 +402,13 @@ function M.validate(data, file, positions)
   end
   cfg.args = ctx:merge_args(lists)
   cfg.args_show = args_show
+  -- The top-level database, a default for the panels (nil when every panel sets its own).
+  cfg.database = default_db
+  if not cfg.multi then
+    cfg.query, cfg.show = cfg.panels[1].query, cfg.panels[1].show
+    cfg.layout = { columns = 1, gap = 2 }
+    return cfg
+  end
   local layout = ctx:expect("layout", data.layout, "map", true) or map.new()
   cfg.layout = {
     columns = ctx:expect("layout.columns", layout.columns, "integer", true) or 1,
@@ -412,7 +417,6 @@ function M.validate(data, file, positions)
   if cfg.layout.columns < 1 then
     ctx:fail("layout.columns", "columns must be at least 1")
   end
-  cfg.database = shared_db or cfg.panels[1].database
   return cfg
 end
 

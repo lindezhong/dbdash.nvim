@@ -3,6 +3,8 @@
 # Several panels in one dashboard (layout.columns per row; show.span to widen a panel).
 # Each panel refreshes on its own show.interval; the top-level interval is the default
 # and also refreshes every panel.
+# The top-level database is the default of every panel; a panel may set its own
+# (panels[].database), and a panel without one needs the top-level default.
 database:
   url: "sqlite:///:memory:"
 
@@ -55,7 +57,9 @@ panels:
       show_countdown: true
       countdown_format: "{time}s"
 
-  - query:
+  - database:                       # this panel's own database (e.g. another server)
+      url: "sqlite:///:memory:"
+    query:
       sql: |
         SELECT abs(random() % 5000) AS orders
     show:

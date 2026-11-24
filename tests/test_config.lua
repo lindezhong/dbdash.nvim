@@ -148,10 +148,31 @@ T["multi-panel configs"] = function()
   eq({ p2.show.interval, p2.show.own_interval, p2.database.type, p2.query.sql_line }, { 300000, false, "redis", 24 })
 end
 
+T["the top-level database is only a default: a panel's own wins, either is enough"] = function()
+  -- Every panel sets its own: no top-level database needed.
+  local cfg = assert(load([[
+panels:
+  - database: { url: "sqlite:///:memory:" }
+    query: { sql: SELECT 1 }
+  - database: { url: "lua://" }
+    query: { sql: "return {}" }
+]]))
+  eq({ cfg.database, cfg.panels[1].database.type, cfg.panels[2].database.type }, { nil, "sqlite", "lua" })
+  -- Panels without one use the top-level default; cfg.database is that default.
+  cfg = assert(load(MULTI))
+  eq({ cfg.database.type, cfg.panels[1].database == cfg.database, cfg.panels[2].database.type }, { "sqlite", true, "redis" })
+  -- Single-chart configs: the top-level database is the panel's.
+  cfg = assert(load(MINIMAL))
+  eq(cfg.panels[1].database == cfg.database, true)
+  -- Only a panel with neither is an error, pointing at that panel.
+  local msg = err_of("panels:\n  - database: { url: 'lua://' }\n    query: { sql: x }\n  - query: { sql: y }\n")
+  eq(msg:find("missing required field 'panels%[2%]%.database' %(set it in the panel or at the top level%)") ~= nil, true)
+end
+
 T["multi-panel errors point at the panel"] = function()
   local msg = err_of(MULTI:gsub("        %- name: region\n          default: Asia\n", "        - name: region\n          default: EU\n"))
   eq(msg:find("argument 'region' is declared differently at args%[1%]%.name") ~= nil, true)
-  eq(err_of("panels:\n  - query:\n      sql: x\n"):find("panels%[1%]%.database: missing database") ~= nil, true)
+  eq(err_of("panels:\n  - query:\n      sql: x\n"):find("missing required field 'panels%[1%]%.database'") ~= nil, true)
   eq(err_of("database:\n  url: sqlite:///:memory:\nquery:\n  sql: x\npanels:\n  - query:\n      sql: y\n"):find("not both") ~= nil, true)
   eq(err_of(MULTI .. "    show:\n      type: radar\n"):find(":%d+:%d+: unknown chart type 'radar'") ~= nil, true)
 end
