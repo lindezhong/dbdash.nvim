@@ -38,7 +38,6 @@ M.BASE = {
   DbDashDown = { link = "DiagnosticError" },
   -- Sidebar: directories (name and arrow), running and idle dashboards.
   DbDashSidebarDir = { link = "Directory" },
-  DbDashSidebarTitle = { link = "Comment" }, -- a config's title: after its file name
   DbDashTrustFile = { link = "Title" }, -- file separators in the trust View float
   -- Sidebar cursor line: the window's CursorLine (empty) and the underline of the cursor
   -- line's name, which leaves the ●/◐/○ marker in its own color.

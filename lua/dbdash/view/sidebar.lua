@@ -104,22 +104,6 @@ M.HEADER = {
   "",
 }
 
-local title_cache = {}
-
----The `title:` of a config file (cached by mtime); nil without one or when it does not load.
-function M.title_of(path)
-  local st = vim.uv.fs_stat(path)
-  local mtime = st and st.mtime.sec
-  local c = title_cache[path]
-  if c and c.mtime == mtime then
-    return c.title
-  end
-  local cfg = require("dbdash.config").load(path)
-  local title = cfg and cfg.title
-  title_cache[path] = { mtime = mtime, title = title }
-  return title
-end
-
 ---Fill the sidebar buffer with the tree; b:dbdash_sidebar_nodes maps line numbers to
 ---{ path, dir } nodes.
 function M.render(buf)
@@ -134,7 +118,6 @@ function M.render(buf)
     { row = 3, col_s = #"● = Running  ◐ = Paused  ", col_e = #"● = Running  ◐ = Paused  ○", group = "DbDashSidebarIdle" },
   }
   local nodes = {}
-  local titles = {}
 
   local function walk(dir, depth)
     local e = M.entries(dir)
@@ -150,10 +133,6 @@ function M.render(buf)
       end
       lines[#lines + 1] = indent .. mark .. " " .. f
       hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #indent + #mark, group = group }
-      local title = M.title_of(path)
-      if title then
-        titles[#titles + 1] = { row = #lines - 1, text = title }
-      end
       nodes[tostring(#lines)] = { path = path, name_col = #indent + #mark + 1 }
     end
     for _, d in ipairs(e.dirs) do
@@ -180,9 +159,6 @@ function M.render(buf)
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
   for _, h in ipairs(hl) do
     vim.api.nvim_buf_set_extmark(buf, ns, h.row, h.col_s, { end_col = h.col_e, hl_group = h.group })
-  end
-  for _, t in ipairs(titles) do
-    vim.api.nvim_buf_set_extmark(buf, ns, t.row, 0, { virt_text = { { " " .. t.text, "DbDashSidebarTitle" } } })
   end
   vim.b[buf].dbdash_sidebar_nodes = nodes
   M.update_cursor(buf)

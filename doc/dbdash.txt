@@ -386,8 +386,8 @@ time as m:ss (h:mm:ss from an hour): >yaml
   countdown_format: "all in {clock}"
 <
 The title also names the dashboard in threshold notifications (for a chart
-without `show.title`), the panel picker, |:DbDashStatus|, the sidebar (after
-the file name) and `meta.dashboard_title`.
+without `show.title`), the panel picker, |:DbDashStatus| and
+`meta.dashboard_title`.
 
 Descriptions                                              *dbdash-description*
 
@@ -1250,8 +1250,7 @@ All groups link to standard groups by default:
 Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
 `Directory`), `DbDashSidebarRunning` (● of running dashboards, links to
 `DiagnosticOk`), `DbDashSidebarPaused` (◐ of paused ones, links to
-`DiagnosticWarn`), `DbDashSidebarIdle` (○, links to `Normal`),
-`DbDashSidebarTitle` (a config's title, links to `Comment`). With
+`DiagnosticWarn`), `DbDashSidebarIdle` (○, links to `Normal`). With
 `sidebar.cursorline = "name"` the sidebar window's cursor line uses
 `DbDashSidebarCursorLine` (empty) instead of `CursorLine`, and
 `DbDashSidebarCursor` (underline) marks the name on the cursor line without

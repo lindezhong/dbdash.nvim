@@ -68,8 +68,8 @@ properties:
   title:
     type: string
     description: >-
-      The dashboard's title: on the header line above the charts, in notifications, the
-      sidebar and :DbDashStatus, and meta.dashboard_title.
+      The dashboard's title: on the header line above the charts, in notifications and
+      :DbDashStatus, and meta.dashboard_title.
   description:
     type: string
     description: >-

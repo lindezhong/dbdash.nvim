@@ -1,5 +1,5 @@
 -- The dashboard header: the title and the countdown to the global refresh, and the uses of
--- the title elsewhere (notifications, meta.dashboard_title, the sidebar).
+-- the title elsewhere (notifications, meta.dashboard_title).
 local sched = require("dbdash.scheduler")
 local buffer = require("dbdash.view.buffer")
 local eq = MiniTest.expect.equality
@@ -118,11 +118,20 @@ show:
   eq(found, true)
 end
 
-T["the sidebar shows each config's title after its name"] = function()
+T["the sidebar lists file names only, not titles"] = function()
   vim.fn.writefile({ "title: My board", "database: { url: 'sqlite:///:memory:' }", "query: { sql: x }" }, dir .. "/a.yaml")
-  eq(require("dbdash.view.sidebar").title_of(dir .. "/a.yaml"), "My board")
-  vim.fn.writefile({ "database: { url: 'sqlite:///:memory:' }", "query: { sql: x }" }, dir .. "/b.yaml")
-  eq(require("dbdash.view.sidebar").title_of(dir .. "/b.yaml"), nil)
+  local sidebar = require("dbdash.view.sidebar")
+  local buf = vim.api.nvim_create_buf(false, true)
+  local cwd = vim.fn.getcwd()
+  vim.cmd.cd(dir)
+  sidebar.render(buf)
+  vim.cmd.cd(cwd)
+  local text = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
+  eq(text:find("a.yaml", 1, true) ~= nil, true)
+  eq(text:find("My board", 1, true), nil)
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(buf, -1, 0, -1, { details = true })) do
+    eq(m[4].virt_text, nil)
+  end
 end
 
 return T
