@@ -274,21 +274,6 @@ result must end up in one of these row shapes (`:help dbdash-result`).
 server sets are kept in memory for the dashboard and sent on the next refresh, without
 touching the config. `https` verifies certificates by default. See `:help dbdash-http`.
 
-## Coming from vim-dashboard
-
-No Python, venv or pynvim any more. Commands are renamed from `:Dashboard…` to
-`:DbDash…` one to one (`:Dashboard` → `:DbDash`, `:DashboardStart` → `:DbDashStart`,
-`:DashboardMksession` → `:DbDashMksession`, ...); the buffer and sidebar keys are the
-same. Existing configs mostly work. Differences:
-
-- Arguments use `name:`; the old `key:` is rejected with a hint.
-- `query.args_show` is now `show.args_show` (rejected with a hint), and shows the
-  arguments the query reads.
-- Fields only meaningful for matplotlib are ignored.
-- `sql_id` quotes with the database's identifier quotes instead of always backticks,
-  `sql_in` of an empty list gives `(NULL)`, and booleans become SQL literals rather than
-  `True` / `False`.
-
 ## Limitations
 
 - Each refresh opens a new connection; there is no connection pool.

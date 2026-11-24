@@ -349,10 +349,9 @@ panel's `database` replaces the top-level one as a whole (its `options` and
 `query.max_rows` caps the rows read; `query.timeout` defaults to the URL's
 `timeout`. Values a config leaves out (interval 30s, max_rows 10000, timeout
 30s, countdown_format, chart height) come from `defaults` in |dbdash-setup|.
-Fields the plugin does not use are ignored (the legacy configs have many
-matplotlib-only ones); invalid values of known fields are reported with their
-line and column. The full list of fields is in `example/dbdash.schema.yaml`
-(|dbdash-examples|).
+Fields the plugin does not use are ignored; invalid values of known fields
+are reported with their line and column. The full list of fields is in
+`example/dbdash.schema.yaml` (|dbdash-examples|).
 
 Table options: `column_list: [{column, alias, width, thresholds}]`,
 `style.border`, `style.header_style`, `style.border_style`,
@@ -856,7 +855,8 @@ follows the same rule (its `query.args` win over top-level `args`). >yaml
       description: "Departments to include"
 <
 An argument without a default and without a value is `none` in templates
-(|dbdash-template-vars|). The legacy `key:` field is rejected; use `name:`.
+(|dbdash-template-vars|). An argument is named with `name:` (`key:` is
+rejected).
 
 A local argument has its own value, set as `<panel>.name`, where `<panel>`
 is the panel's `id` (default its number): >vim
