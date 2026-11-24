@@ -43,6 +43,35 @@ function M.restart()
 end
 
 ---:DbDashStop [config]
+---:DbDashTrust [allow|deny|remove] [config]: decide for a config (default: the current
+---dashboard's) without being asked; remove forgets the decision.
+function M.trust(fargs)
+  local action = fargs[1] or "allow"
+  if not ({ allow = true, deny = true, remove = true })[action] then
+    return err("usage: DbDashTrust [allow|deny|remove] [config.yaml]")
+  end
+  local path = fargs[2]
+  if not path then
+    local d = current()
+    if not d then
+      return
+    end
+    path = d.path
+  end
+  path = sched.normalize(path)
+  local cfg, e = require("dbdash.config").load(path)
+  if not cfg then
+    return err(sched.format_error(e))
+  end
+  local trust = require("dbdash.trust")
+  local files = trust.collect(path, cfg)
+  trust.record(path, action, files)
+  vim.notify(("dbdash: %s %s"):format(
+    vim.fn.fnamemodify(path, ":~:."),
+    ({ allow = "trusted", deny = "denied", remove = "will be asked about again" })[action]
+  ))
+end
+
 function M.stop(path)
   if path and path ~= "" then
     if not sched.stop(sched.normalize(path)) then

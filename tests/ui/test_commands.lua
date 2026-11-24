@@ -779,6 +779,31 @@ T["backoff with panels: the global interval skips a panel that is backing off"] 
   eq(broken < fine, true) -- 1s, 2s, 4s apart instead of every second
 end
 
+T[":DbDashTrust allows, denies and forgets a config without the question"] = function()
+  setup_child()
+  vim.fn.writefile({ "database: { url: 'lua://' }", "query: { sql: 'return { { x = 1 } }' }" }, dir .. "/l.yaml")
+  child.lua([[
+    local trust = require("dbdash.trust")
+    os.remove(trust.file())
+    _G.asked = 0
+    trust.ask = function() _G.asked = _G.asked + 1 return "cancel" end
+    _G.state = function()
+      local cfg = require("dbdash.config").load("l.yaml")
+      return trust.state("l.yaml", trust.collect("l.yaml", cfg))
+    end
+  ]])
+  child.cmd("DbDashTrust allow l.yaml")
+  eq(child.lua_get("_G.state()"), "allowed")
+  child.cmd("DbDashStart l.yaml")
+  eq(child.lua_get("_G.asked"), 0)
+  child.cmd("DbDashTrust deny") -- the current dashboard's config
+  eq(child.lua_get("_G.state()"), "denied")
+  child.cmd("DbDashTrust remove l.yaml")
+  eq(child.lua_get("_G.state()"), "unknown")
+  eq(child.lua_get("vim.fn.getcompletion('DbDashTrust re', 'cmdline')"), { "remove" })
+  child.lua("os.remove(require('dbdash.trust').file())")
+end
+
 T["lua:// dashboards: template, args, chart; errors point at the YAML line"] = function()
   vim.fn.writefile({
     "database: { url: 'lua://' }",

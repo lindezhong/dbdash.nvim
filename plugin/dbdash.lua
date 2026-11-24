@@ -90,6 +90,20 @@ end, {
   end,
   desc = "Switch the chart style: DbDashStyle <type> <style> | canvas <name> | reset",
 })
+command("DbDashTrust", function(o)
+  cmds().trust(o.fargs)
+end, {
+  nargs = "*",
+  complete = function(a, l)
+    if #vim.split(l, "%s+", { trimempty = true }) <= (a == "" and 1 or 2) then
+      return vim.tbl_filter(function(x)
+        return vim.startswith(x, a)
+      end, { "allow", "deny", "remove" })
+    end
+    return vim.fn.getcompletion(a, "file")
+  end,
+  desc = "Trust a config with Lua code: DbDashTrust [allow|deny|remove] [config]",
+})
 for _, name in ipairs({ "DbDashMksession", "Mksession" }) do
   command(name, function(o)
     cmds().mksession(o.bang, o.args)

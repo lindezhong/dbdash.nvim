@@ -79,7 +79,7 @@ defaults: >lua
       backoff = 8,         -- retry after at most interval x 8; 1 = off
     },
     lua = {                -- configs with Lua code, see |dbdash-lua|
-      confirm = true,      -- ask before running them (dbdash's own question)
+      confirm = true,      -- ask once per config before running them
       trusted_dirs = {},   -- configs under these directories run unasked
     },
   })
@@ -225,6 +225,12 @@ its next refresh is due, and otherwise continues the countdown. Set
     Re-render the current dashboard's cached data with another style without
     querying again, e.g. `:DbDashStyle line quadrant`, `:DbDashStyle bar
     vertical`, `:DbDashStyle canvas block`. Lasts until the dashboard stops.
+
+:DbDashTrust [allow|deny|remove] [{config}]                    *:DbDashTrust*
+    Decide about a config that runs Lua (default: the current dashboard's)
+    without the question: `allow` (default) trusts it with its current
+    files, `deny` refuses it, `remove` forgets the decision so the question
+    comes back. See |dbdash-lua|.
 
 :DbDashMksession[!] [{file}]                                *:DbDashMksession*
 :Mksession[!] [{file}]                                            *:Mksession*
@@ -881,13 +887,20 @@ script still running at the query timeout is stopped (loops that never call a
 function may only stop then). Blocking calls such as `vim.fn.system()` freeze
 the editor: use `dbdash.system()`.
 
-Trust: Lua in a config runs with your permissions, so starting a dashboard
-with `lua://` or `transform` asks first: Allow, View, Deny or Not now. View
-shows the config in a floating window: `a` allows (and starts it), `d` denies,
-`q` closes without deciding. Allow and Deny are stored in Neovim's trust
-database (the one of |:trust| and 'exrc'), for that file content: after an
-edit you are asked again, and `:trust` / `:trust ++deny` decide as well;
-`:trust ++remove {file}` forgets the decision so the question comes back.
+Trust: Lua runs with your permissions, so a config that runs Lua is trusted
+before it starts. The unit is the config: one question covers all the Lua it
+runs, its own (`lua://`, `transform`, `{% lua %}` blocks) and the files it
+imports (`.lua` modules and templates with `{% lua %}` blocks, found through
+imports whose target is a quoted name). The question lists those files:
+Allow, View, Deny or Not now. View shows them in one floating window, each
+after a separator line with its path; `a` allows (and starts it), `d` denies,
+`q` closes without deciding. Decisions are kept in
+`stdpath("state")/dbdash/trust.json` for that config and those contents: when
+the config or any of the files changes, it is asked about again, and two
+configs sharing a `.lua` file are asked about separately. A file loaded at run
+time that the decision does not cover (an import with a computed path, or a
+file changed since) stops the refresh with an error until the config is
+trusted again (start it again, or |:DbDashTrust|).
 `setup({ lua = { confirm = false } })` turns the question off, and
 `lua = { trusted_dirs = { "~/dashboards" } }` skips it for configs under those
 directories. A config cannot skip it itself.

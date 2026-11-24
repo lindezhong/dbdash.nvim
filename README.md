@@ -215,7 +215,8 @@ query:
 
 Scripts get `args`, `rs` (for transforms) and helpers such as `dbdash.system()` and
 `dbdash.query()` that wait without blocking the editor. dbdash asks before running a
-config with Lua (once per file and again after changes, stored in Neovim's trust database);
+config with Lua: one question per config, covering the config and the `.lua` files it imports,
+asked again when any of them changes;
 `setup({ lua = { confirm = false } })` or `lua.trusted_dirs` skip that. See `:help dbdash-lua`.
 
 Every query goes the same way: query, then `query.transform` if there is one, then a check
