@@ -309,24 +309,27 @@ function M.show_sql()
     return
   end
   with_panel(d, function(p)
-    local sql = p.sql
-    if not sql then
-      local e
-      sql, e = p:render_sql()
-      if not sql then
+    local function show(sql, code)
+      local lines = vim.split(sql, "\n", { plain = true })
+      if code then
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = "-- query.transform"
+        vim.list_extend(lines, vim.split(code, "\n", { plain = true }))
+      end
+      require("dbdash.view.popup").open(lines, {
+        title = d.cfg.multi and ("DbDash query: " .. p:title()) or "DbDash query",
+        filetype = ({ mongodb = "json", http = "json", lua = "lua" })[p.cfg.database.type] or "sql",
+      })
+    end
+    if p.sql then
+      return show(p.sql, p.transform_code)
+    end
+    p:render_async(function(e, sql, code)
+      if e then
         return err(sched.format_error(e))
       end
-    end
-    local lines = vim.split(sql, "\n", { plain = true })
-    if p.transform_code then
-      lines[#lines + 1] = ""
-      lines[#lines + 1] = "-- query.transform"
-      vim.list_extend(lines, vim.split(p.transform_code, "\n", { plain = true }))
-    end
-    require("dbdash.view.popup").open(lines, {
-      title = d.cfg.multi and ("DbDash query: " .. p:title()) or "DbDash query",
-      filetype = ({ mongodb = "json", http = "json", lua = "lua" })[p.cfg.database.type] or "sql",
-    })
+      show(sql, code)
+    end)
   end)
 end
 

@@ -207,39 +207,53 @@ function Panel:show_config()
   return show
 end
 
----Render the query template for the current arguments.
----@return string? sql, table? err
-function Panel:render_sql()
+---Render query.sql and query.transform for the current arguments: one template path for
+---both (same variables, imports and helpers); the transform is Lua, so never autoescaped.
+---Runs inside a util.async task (template Lua may wait on dbdash.* helpers); raises a
+---template or database error.
+---@return string sql, string? transform_code
+function Panel:render_templates()
   local q, d = self.cfg.query, self.d
-  local ok, driver = pcall(db.driver, self.cfg.database.type)
-  if not ok then
-    return nil, db.Error.wrap(driver)
-  end
+  local driver = db.driver(self.cfg.database.type)
   local vars = args.resolve(d.cfg.args, d.state)
   self.vars = vars -- for lua:// scripts and query.transform (args)
   local source = vim.fn.fnamemodify(d.path, ":~:.")
-  local sql, err = template.render(q.sql, vars, {
-    env = template.env(driver.dialect, q.autoescape, d.cfg.dir),
-    source = source,
-    line_offset = q.sql_line - 1,
-  })
-  if not sql then
-    return nil, err
-  end
-  self.transform_code = nil
-  if q.transform then
-    -- Lua code: rendered like the query, without SQL escaping.
-    local code, terr = template.render(q.transform, vars, {
-      env = template.env(driver.dialect, false, d.cfg.dir),
+  local function render(text, line, autoescape)
+    local out, err = template.render(text, vars, {
+      env = template.env(driver.dialect, autoescape, d.cfg.dir),
       source = source,
-      line_offset = q.transform_line - 1,
+      line_offset = line - 1,
     })
-    if not code then
-      return nil, terr
+    if not out then
+      error(err, 0)
     end
-    self.transform_code = code
+    return out
   end
-  return sql
+  local sql = render(q.sql, q.sql_line, q.autoescape)
+  local code = q.transform and render(q.transform, q.transform_line, false) or nil
+  return sql, code
+end
+
+---Render the templates in a task; `cb(err, sql, transform_code)` on the main loop.
+function Panel:render_async(cb)
+  require("dbdash.util.async").run(function()
+    return self:render_templates()
+  end, function(err, sql, code)
+    vim.schedule(function()
+      if not err then
+        self.sql, self.transform_code = sql, code
+      end
+      cb(err, sql, code)
+    end)
+  end)
+end
+
+---Template errors keep their own shape (file and line); others become database errors.
+local function as_error(err)
+  if type(err) == "table" and err.phase == "template" then
+    return err
+  end
+  return require("dbdash.db.error").wrap(err)
 end
 
 ---Delay before the next try after `failures` consecutive failures: the interval doubled
@@ -292,53 +306,45 @@ function Panel:refresh(o)
     end
     return
   end
-  local sql, err = self:render_sql()
-  if not sql then
-    self:push_history({ error = M.format_error(err) })
-    self:fail(err)
-    return
-  end
-  self.sql = sql
   self.running = true
   self.d:update_status()
   local gen = self.d.generation
   local q = self.cfg.query
-  db.query(self.cfg.database.url, sql, {
-    max_rows = q.max_rows,
-    timeout = q.timeout,
-    options = self.cfg.database.options,
-    base_dir = self.d.cfg.dir,
-    password_cmd = self.cfg.database.password_cmd,
-    args = self.vars,
-    source = vim.fn.fnamemodify(self.d.path, ":~:."),
-    line = q.sql_line,
-    raw = self.transform_code ~= nil, -- the transform gets the raw result; checked after it
-    cookie_jar = self.d.cookie_jar,
-  }, function(qerr, rs)
-    if gen ~= self.d.generation then
-      return -- stopped meanwhile
-    end
-    if qerr or not self.transform_code then
-      return self:finish_refresh(gen, qerr, rs)
-    end
-    -- Every source: query -> query.transform -> rows check, the last two in their own task.
-    local code = self.transform_code
-    require("dbdash.util.async").run(function()
+  local source = vim.fn.fnamemodify(self.d.path, ":~:.")
+  -- One task: render the templates, query, then query.transform and the rows check (every
+  -- source goes query -> transform -> rows check).
+  require("dbdash.util.async").run(function()
+    local sql, code = self:render_templates()
+    self.sql, self.transform_code = sql, code
+    local rs = db.query_async(self.cfg.database.url, sql, {
+      max_rows = q.max_rows,
+      timeout = q.timeout,
+      options = self.cfg.database.options,
+      base_dir = self.d.cfg.dir,
+      password_cmd = self.cfg.database.password_cmd,
+      args = self.vars,
+      source = source,
+      line = q.sql_line,
+      raw = code ~= nil, -- the transform gets the raw result; checked after it
+      cookie_jar = self.d.cookie_jar,
+    })
+    if code then
       local out = M.transform(code, rs, {
-        source = vim.fn.fnamemodify(self.d.path, ":~:."),
+        source = source,
         line = q.transform_line,
         args = self.vars,
         timeout = q.timeout or require("dbdash").default_ms("timeout"),
         max_rows = q.max_rows or require("dbdash").options.defaults.max_rows,
       })
       out.elapsed_ms = rs.elapsed_ms
-      return out
-    end, function(terr, out)
-      vim.schedule(function()
-        if gen == self.d.generation then
-          self:finish_refresh(gen, terr and require("dbdash.db.error").wrap(terr) or nil, out)
-        end
-      end)
+      rs = out
+    end
+    return rs
+  end, function(err, rs)
+    vim.schedule(function()
+      if gen == self.d.generation then
+        self:finish_refresh(gen, err and as_error(err) or nil, rs)
+      end
     end)
   end)
 end
