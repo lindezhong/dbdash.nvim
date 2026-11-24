@@ -18,7 +18,7 @@
     ]
    }
   ],
-  "sql": "{% from 'macros/sql_helpers.sql' import in_list, bucket %}\n{% import 'macros/sql_helpers.sql' as h %}\n{% macro pct(part, total) -%}\n  round(100.0 * {{ part | safe }} / {{ total | safe }}, 1)\n{%- endmacro %}\nWITH RECURSIVE players(id, team, score) AS (\n  SELECT 1, 'red', abs(random() % 100)\n  UNION ALL\n  SELECT id + 1, CASE id % 3 WHEN 0 THEN 'red' WHEN 1 THEN 'blue' ELSE 'green' END,\n         abs(random() % 100)\n  FROM players WHERE id < 60\n)\nSELECT team,\n       {{ bucket('score', size=25) }} AS score_bucket,\n       count(*) AS players,\n       {{ pct('count(*)', '(SELECT count(*) FROM players)') }} AS pct,\n       {{ args.label }} AS label\nFROM players\nWHERE {{ in_list('team', args.teams) }}\n  AND {{ h.between('score', 0, 100) }}\nGROUP BY team, score_bucket\nORDER BY team, score_bucket\n"
+  "sql": "{% from 'macros/sql_helpers.sql' import in_list, bucket %}\n{% import 'macros/sql_helpers.sql' as h %}\n{% macro pct(part, total) -%}\n  round(100.0 * {{ part | safe }} / {{ total | safe }}, 1)\n{%- endmacro %}\nWITH RECURSIVE players(id, team, score) AS (\n  SELECT 1, 'red', abs(random() % 100)\n  UNION ALL\n  SELECT id + 1, CASE id % 3 WHEN 0 THEN 'red' WHEN 1 THEN 'blue' ELSE 'green' END,\n         abs(random() % 100)\n  FROM players WHERE id < 60\n)\nSELECT team,\n       {{ bucket('score', size=25) }} AS score_bucket,\n       count(*) AS players,\n       {{ pct('count(*)', '(SELECT count(*) FROM players)') }} AS pct,\n       {{ h.labelled('team') }} AS label  -- macro using team, args.label, meta\nFROM players\nWHERE {{ in_list('team', args.teams) }}\n  AND {{ h.between('score', 0, 100) }}\nGROUP BY team, score_bucket\nORDER BY team, score_bucket\n"
  },
  "show": {
   "type": "table",

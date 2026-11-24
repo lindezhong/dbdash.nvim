@@ -11,8 +11,8 @@
     "default": 7
    }
   ],
-  "sql": "{% import 'lua/helpers.lua' as h %}\nWITH data(day, visits) AS (VALUES {{ h.sample_values(args.days) }})\nSELECT day, visits,\n       {% lua %}\n         -- weekend flag computed by SQLite, written by Lua\n         return \"strftime('%w', day) IN ('0', '6')\"\n       {% endlua %} AS weekend\nFROM data\nWHERE day >= {{ h.since(args.days) }}\n",
-  "transform": "{% import 'lua/helpers.lua' as h %}\n-- Lua: mark weekends and add a running total; the source column comes from the same\n-- helper module, rendered into this code by the template.\nlocal source, out, total = \"{{ h.label() }}\", {}, 0\nfor _, r in ipairs(rs.rows) do\n  total = total + r[2]\n  out[#out + 1] = { day = r[1]:sub(6), visits = r[2], total = total,\n                    note = r[3] == 1 and \"weekend\" or \"\", source = source }\nend\nout.columns = { \"day\", \"visits\", \"total\", \"note\", \"source\" }\nreturn out\n"
+  "sql": "{% import 'lua/helpers.lua' as h %}\nWITH data(day, visits) AS (VALUES {{ h.sample_values(args.days) }})\nSELECT day, visits,\n       {% lua %}\n         -- weekend flag computed by SQLite, written by Lua\n         return \"strftime('%w', day) IN ('0', '6')\"\n       {% endlua %} AS weekend\nFROM data\nWHERE {{ h.recent('day') }}\n",
+  "transform": "{% import 'lua/helpers.lua' as h %}\n-- Lua: mark weekends and add a running total; the source column comes from the same\n-- helper module, rendered into this code by the template.\nlocal source, out, total = \"{{ h.label('visits') }}\", {}, 0\nfor _, r in ipairs(rs.rows) do\n  total = total + r[2]\n  out[#out + 1] = { day = r[1]:sub(6), visits = r[2], total = total,\n                    note = r[3] == 1 and \"weekend\" or \"\", source = source }\nend\nout.columns = { \"day\", \"visits\", \"total\", \"note\", \"source\" }\nreturn out\n"
  },
  "show": {
   "type": "table",

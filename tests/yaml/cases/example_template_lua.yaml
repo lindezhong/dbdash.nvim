@@ -2,7 +2,9 @@
 #
 # Lua in templates, the same in query.sql and query.transform:
 # - {% import 'lua/helpers.lua' as h %} imports a Lua module (a file returning a table);
-#   {{ h.since(args.days) }} calls one of its functions.
+#   {{ h.since(args.days) }} calls one of its functions. The module's functions see args
+#   and meta too: h.recent('day') and h.label('visits') use what is passed, args.days and
+#   meta.
 # - {% lua %} ... {% endlua %} runs Lua where it stands and outputs what it returns; it
 #   sees args, meta, vars (the template variables visible there) and dbdash.*.
 # - args.<name> are the arguments, meta.<name> the metadata (:help dbdash-meta).
@@ -27,12 +29,12 @@ query:
              return "strftime('%w', day) IN ('0', '6')"
            {% endlua %} AS weekend
     FROM data
-    WHERE day >= {{ h.since(args.days) }}
+    WHERE {{ h.recent('day') }}
   transform: |
     {% import 'lua/helpers.lua' as h %}
     -- Lua: mark weekends and add a running total; the source column comes from the same
     -- helper module, rendered into this code by the template.
-    local source, out, total = "{{ h.label() }}", {}, 0
+    local source, out, total = "{{ h.label('visits') }}", {}, 0
     for _, r in ipairs(rs.rows) do
       total = total + r[2]
       out[#out + 1] = { day = r[1]:sub(6), visits = r[2], total = total,

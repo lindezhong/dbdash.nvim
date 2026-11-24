@@ -5,6 +5,7 @@
 # - {% import %} / {% from ... import %} load macros from files next to this config.
 # - query.autoescape renders {{ value }} as a SQL literal of the database's dialect
 #   (strings quoted and escaped, lists as (a, b), none as NULL); | safe opts out.
+# - Imported macros see args and meta: h.labelled('team') uses args.label and meta.
 
 database:
   url: "sqlite:///:memory:"
@@ -34,7 +35,7 @@ query:
            {{ bucket('score', size=25) }} AS score_bucket,
            count(*) AS players,
            {{ pct('count(*)', '(SELECT count(*) FROM players)') }} AS pct,
-           {{ args.label }} AS label
+           {{ h.labelled('team') }} AS label  -- macro using team, args.label, meta
     FROM players
     WHERE {{ in_list('team', args.teams) }}
       AND {{ h.between('score', 0, 100) }}

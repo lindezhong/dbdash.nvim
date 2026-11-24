@@ -19,9 +19,15 @@ function M.sample_values(days)
   return table.concat(rows, ", ")
 end
 
----A label for the panel, from the metadata.
-function M.label()
-  return ("%s on %s"):format(meta.config_name, meta.os)
+---A condition on `column` (passed in) for the last args.days days (an argument of the
+---dashboard), with a comment naming the database type (metadata).
+function M.recent(column)
+  return ("%s >= %s /* last %d days, %s */"):format(column, M.since(args.days), args.days, meta.db_type)
+end
+
+---A label: `prefix` (passed in), the number of days (args) and the config and OS (meta).
+function M.label(prefix)
+  return ("%s: %d days, %s on %s"):format(prefix, args.days, meta.config_name, meta.os)
 end
 
 return M
