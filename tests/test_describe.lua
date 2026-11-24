@@ -95,13 +95,9 @@ T["K on the header shows the dashboard's, on a panel the panel's, rendered as Ma
   eq(lines, { "# Sales overview", "Last **24 hours** from sqlite." })
   local buf = vim.api.nvim_win_get_buf(win)
   eq({ vim.bo[buf].filetype, vim.wo[win].wrap, vim.wo[win].linebreak, vim.wo[win].conceallevel }, { "markdown", true, true, 2 })
-  -- Treesitter when Neovim has the markdown parser, else the markdown syntax.
-  local ok, has_parser = pcall(vim.treesitter.language.add, "markdown")
-  if ok and has_parser then
-    eq(vim.treesitter.highlighter.active[buf] ~= nil, true)
-  else
-    eq(vim.bo[buf].syntax, "markdown")
-  end
+  -- Highlighted by treesitter, or by the markdown syntax when treesitter cannot start
+  -- (Neovim without the markdown parser, as on some Windows installs).
+  eq(vim.treesitter.highlighter.active[buf] ~= nil or vim.bo[buf].syntax == "markdown", true)
   vim.cmd("close")
   lines = describe(d, 4)
   eq(lines, { "Panel 1 (table), 24h, `sqlite`." })
