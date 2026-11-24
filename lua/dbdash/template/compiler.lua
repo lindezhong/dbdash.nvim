@@ -275,6 +275,24 @@ function C:stmt(st)
   local k = st.k
   if k == "Data" then
     self:emit(("o[#o + 1] = %s"):format(const(st.v)))
+  elseif k == "Lua" then
+    self:line(st)
+    -- The template variables visible here (set, for, macro arguments), for `vars`.
+    local fields, seen = {}, {}
+    for i = #self.scopes, 1, -1 do
+      for name, b in pairs(self.scopes[i]) do
+        if not seen[name] then
+          seen[name] = true
+          fields[#fields + 1] = ("[%q] = %s"):format(name, b.lua)
+        end
+      end
+    end
+    table.sort(fields)
+    self:emit(("o[#o + 1] = rt.lua_block(env, %q, %d, function() return { %s } end)"):format(
+      st.code,
+      st.line,
+      table.concat(fields, ", ")
+    ))
   elseif k == "Output" then
     self:line(st)
     self:emit(("o[#o + 1] = rt.out(env, %s)"):format(self:expr(st.expr)))

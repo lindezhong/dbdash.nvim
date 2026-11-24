@@ -6,7 +6,7 @@ local errors = require("dbdash.template.errors")
 local M = {}
 
 ---@class dbdash.template.Token
----@field t "data"|"var_begin"|"var_end"|"block_begin"|"block_end"|"name"|"int"|"float"|"string"|"op"|"eof"
+---@field t "data"|"var_begin"|"var_end"|"block_begin"|"block_end"|"name"|"int"|"float"|"string"|"op"|"lua"|"eof"
 ---@field v any
 ---@field line integer
 ---@field col integer
@@ -246,7 +246,7 @@ function M.tokenize(src)
         end
         local es, ee, m1, m2 = src:find("{%%([-+]?)%s*endraw%s*([-+]?)%%}", pos)
         if not es then
-          fail(s, "missing {%% endraw %%}")
+          fail(s, "missing {% endraw %}") -- no format arguments: % stays literal
         end
         strip_next = endmod == "-"
         local content = src:sub(pos, es - 1)
@@ -260,6 +260,18 @@ function M.tokenize(src)
           end
         end
         push_data(content, pos)
+        pos = ee + 1
+        endmod = m2 ~= "" and m2 or nil
+      elseif #toks == first + 2 and t.t == "name" and t.v == "lua" then
+        -- {% lua %}: everything up to {% endlua %} is Lua code (its {{ and {% are Lua).
+        for k = #toks, first, -1 do
+          toks[k] = nil
+        end
+        local es, ee, _, m2 = src:find("{%%([-+]?)%s*endlua%s*([-+]?)%%}", pos)
+        if not es then
+          fail(s, "missing {% endlua %}")
+        end
+        push("lua", src:sub(pos, es - 1), pos)
         pos = ee + 1
         endmod = m2 ~= "" and m2 or nil
       end

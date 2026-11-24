@@ -70,8 +70,10 @@ end
 ---@return string? out, dbdash.template.Error? err
 function M.render(src, vars, opts)
   opts = opts or {}
+  local env = opts.env or {}
+  env.source = env.source or opts.source -- the chunk name of {% lua %} code
   local ok, res = pcall(function()
-    return M.compile(src):render(vars, opts.env)
+    return M.compile(src):render(vars, env)
   end)
   if ok then
     return res
@@ -79,7 +81,10 @@ function M.render(src, vars, opts)
   if not errors.is(res) then
     res = errors.new("internal", tostring(res))
   end
-  res.source = opts.source or res.source
+  if res.source then
+    return nil, res -- raised in an imported file: its own name and line
+  end
+  res.source = opts.source
   if res.line and opts.line_offset then
     res.line = res.line + opts.line_offset
   end

@@ -111,6 +111,9 @@ function P:subparse(ends, ends_desc)
       end
       self:next()
       body[#body + 1] = { k = "Output", expr = e, line = t.line }
+    elseif t.t == "lua" then
+      self:next()
+      body[#body + 1] = { k = "Lua", code = t.v, line = t.line }
     elseif t.t == "block_begin" then
       local nt = self:peek(1)
       if nt.t ~= "name" then

@@ -495,6 +495,127 @@ function R.call(env, fn, args, kwargs)
   return fn(args, kwargs, env)
 end
 
+-- Lua in templates ------------------------------------------------------------------------
+
+---A template value as Lua data: none / undefined / missing -> nil, safe -> its string,
+---lists and mappings element by element (mappings stay util.map tables).
+function R.to_lua(v)
+  if v == R.NONE or v == R.MISSING or R.is_undef(v) then
+    return nil
+  elseif R.is_safe(v) then
+    return v.s
+  elseif map.is_map(v) then
+    local out = map.new()
+    for k, x in map.pairs(v) do
+      map.set(out, k, R.to_lua(x))
+    end
+    return out
+  elseif type(v) == "table" and getmetatable(v) == nil then
+    local out = {}
+    for i = 1, #v do
+      out[i] = R.to_lua(v[i])
+    end
+    return out
+  end
+  return v
+end
+
+---Lua data as a template value: nil -> none, arrays -> lists, other tables -> mappings
+---(keys sorted), safe strings and callables kept.
+function R.from_lua(v)
+  if v == nil then
+    return R.NONE
+  elseif type(v) ~= "table" or getmetatable(v) ~= nil and not map.is_map(v) then
+    return v -- strings, numbers, booleans, functions, safe strings, macros
+  elseif map.is_map(v) then
+    local out = map.new()
+    for k, x in map.pairs(v) do
+      map.set(out, k, R.from_lua(x))
+    end
+    return out
+  elseif vim.islist(v) then
+    local out = {}
+    for i = 1, #v do
+      out[i] = R.from_lua(v[i])
+    end
+    return out
+  end
+  local keys = vim.tbl_keys(v)
+  table.sort(keys, function(a, b)
+    return tostring(a) < tostring(b)
+  end)
+  local out = map.new()
+  for _, k in ipairs(keys) do
+    map.set(out, k, R.from_lua(v[k]))
+  end
+  return out
+end
+
+---The Lua environment of template code: the globals plus args, meta and the dbdash
+---helpers (env.lua: { args, meta } from the dashboard), and `extra` names.
+function R.lua_env(env, extra)
+  local g = env.lua or {}
+  local t = setmetatable({
+    args = g.args or {},
+    meta = g.meta or require("dbdash.metadata").for_lua({}),
+    dbdash = require("dbdash.db.lua_env").helpers,
+  }, { __index = _G })
+  for k, v in pairs(extra or {}) do
+    t[k] = v
+  end
+  return t
+end
+
+---Run Lua with env.timeout; Lua errors become template errors at their own line when they
+---come from this template's code (chunk `chunk_name`), else at the current line.
+function R.run_lua(env, fn, chunk_name)
+  local ok, ret = require("dbdash.db.lua_env").guard(fn, env.timeout)
+  if ok then
+    return ret
+  end
+  if type(ret) == "table" then
+    if errors.is(ret) or (ret.phase and ret.message and not ret.timeout) then
+      error(ret, 0) -- a template error from nested code, or a DbError from dbdash.query
+    end
+    raise("lua", ret.message or vim.inspect(ret))
+  end
+  local msg = tostring(ret)
+  local file, line, rest = msg:match("^(.-):(%d+): (.*)$")
+  if file and file == chunk_name then
+    error(errors.new("lua", rest, tonumber(line)), 0)
+  end
+  raise("lua", msg)
+end
+
+---{% lua %} ... {% endlua %}: run the code; its return value is output like {{ }}.
+---@param line integer template line where the code starts
+---@param vars_fn fun(): table the template variables visible here (set, for, macro args)
+function R.lua_block(env, code, line, vars_fn)
+  local name = env.source or "template"
+  local vars = {}
+  for k, v in pairs(vars_fn()) do
+    vars[k] = R.to_lua(v)
+  end
+  local view = setmetatable({}, {
+    __index = vars,
+    __newindex = function(_, k)
+      error(("vars is read-only (vars.%s)"):format(tostring(k)), 2)
+    end,
+  })
+  -- Compiled for each run with its own environment: two renders may run the same block
+  -- at once (each waiting inside it on a dbdash helper).
+  local chunk, err = load(string.rep("\n", line - 1) .. code, "=" .. name, "t", R.lua_env(env, { vars = view }))
+  if not chunk then
+    local l, rest = tostring(err):match(":(%d+): (.*)$")
+    error(errors.new("lua", "syntax error: " .. (rest or tostring(err)), tonumber(l) or line), 0)
+  end
+  local ret = R.run_lua(env, chunk, name)
+  if ret == nil then
+    return ""
+  end
+  return R.out(env, R.from_lua(ret))
+end
+
 -- Macros and imports ------------------------------------------------------------------------
 
 Macro.__index = Macro
@@ -553,10 +674,13 @@ function R.import(env, target)
   env._importing[target] = true
   local tpl, path = env.load_template(target)
   local L = { l = nil }
+  local outer_source = env.source
+  env.source = path or target -- Lua in the imported file reports its own name
   -- Imported templates do not see the caller's variables, only env.context (dashboards:
   -- args and meta).
   local ok, out, exports = pcall(tpl.fn, env.context or {}, env, L)
   env._importing[target] = nil
+  env.source = outer_source
   if not ok then
     if errors.is(out) then
       out.line = out.line or L.l

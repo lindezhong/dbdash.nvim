@@ -5,6 +5,7 @@
 --   dbdash.system()   run a command without blocking the editor -> { code, stdout, stderr }
 --   dbdash.query()    run a query on any database -> result set (columns, rows)
 --   dbdash.sleep(ms), dbdash.checkpoint(), dbdash.null (NULL in results)
+--   dbdash.safe(s)    (templates) output s as is, even with autoescape
 local async = require("dbdash.util.async")
 local dberr = require("dbdash.db.error")
 
@@ -13,6 +14,9 @@ local M = {}
 ---The helpers given to scripts as `dbdash`.
 M.helpers = {
   null = vim.NIL,
+  safe = function(s)
+    return require("dbdash.template.runtime").safe(tostring(s))
+  end,
   checkpoint = async.checkpoint,
   sleep = async.sleep,
   ---@param cmd string|string[] a string runs through the shell (sh -c / cmd /c)
@@ -47,6 +51,29 @@ local function message_of(e)
   return tostring(e)
 end
 
+---Call fn() and stop it when it runs longer than `timeout` ms: an instruction-count hook
+---raises { timeout = true, message } (pure Lua loops included). Returns pcall's results.
+---@return boolean ok, any result_or_error
+function M.guard(fn, timeout)
+  -- Interpreted code so the count hook can stop a runaway loop after the timeout.
+  jit.off(fn, true)
+  local co = coroutine.running()
+  local deadline = timeout and co and (vim.uv.hrtime() + timeout * 1e6) or nil
+  if deadline then
+    debug.sethook(co, function()
+      if vim.uv.hrtime() > deadline then
+        debug.sethook(co)
+        error({ message = ("script did not finish within %.1fs"):format(timeout / 1000), timeout = true }, 0)
+      end
+    end, "", 10000)
+  end
+  local ok, ret = pcall(fn)
+  if deadline then
+    debug.sethook(co)
+  end
+  return ok, ret
+end
+
 ---Compile and run `code`. Must be called inside a util.async task.
 ---@param code string
 ---@param o { phase: string, source: string?, line: integer?, args: table?, meta: table?, vars: table?, timeout: integer?, max_rows: integer? }
@@ -68,22 +95,7 @@ function M.run(code, o)
   if not fn then
     dberr.raise(o.phase, "syntax error: " .. tostring(cerr))
   end
-  -- Interpreted code so the count hook can stop a runaway loop after the timeout.
-  jit.off(fn, true)
-  local deadline = o.timeout and (vim.uv.hrtime() + o.timeout * 1e6) or nil
-  local co = coroutine.running()
-  if deadline then
-    debug.sethook(co, function()
-      if vim.uv.hrtime() > deadline then
-        debug.sethook(co)
-        error({ message = ("script did not finish within %.1fs"):format(o.timeout / 1000), timeout = true }, 0)
-      end
-    end, "", 10000)
-  end
-  local ok, ret = pcall(fn)
-  if deadline then
-    debug.sethook(co)
-  end
+  local ok, ret = M.guard(fn, o.timeout)
   if not ok then
     if type(ret) == "table" and ret.timeout then
       dberr.raise("timeout", ret.message)

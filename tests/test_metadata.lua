@@ -118,6 +118,33 @@ T["args and meta in query.sql, query.transform, lua:// and imported templates"] 
   eq(l.rs.rows[1], { "x", "y", "pq", metadata.os_name(), os.date("%Y-%m-%d") })
 end
 
+T["{% lua %} blocks in query.sql and query.transform see the same args and meta"] = function()
+  local p = run("blocks", {
+    "database: { url: 'sqlite:///:memory:' }",
+    "query:",
+    "  args: [{ name: n, type: int, default: 6 }]",
+    "  sql: |",
+    "    SELECT {% lua %}return args.n * 2{% endlua %} AS n,",
+    "           '{% lua %}return meta.config_name{% endlua %}' AS cfg",
+    "  transform: |",
+    "    return { { n = rs.rows[1][1], cfg = rs.rows[1][2],",
+    "               t = '{% lua %}return meta.config_name .. args.n{% endlua %}' } }",
+  })
+  eq(p.error, nil)
+  eq(p.rs.rows, { { "blocks", 12, "blocks6" } })
+  -- an error in a block points at the YAML line
+  p = run("blockerr", {
+    "database: { url: 'sqlite:///:memory:' }",
+    "query:",
+    "  sql: |",
+    "    SELECT 1",
+    "    {% lua %}",
+    "    return nil + 1",
+    "    {% endlua %}",
+  })
+  eq(sched.format_error(p.error):find("blockerr.yaml:6: attempt to perform arithmetic on a nil value", 1, true) ~= nil, true)
+end
+
 T["meta.refresh_count and meta.now change per refresh"] = function()
   local p = run("count", {
     "database: { url: 'sqlite:///:memory:' }",

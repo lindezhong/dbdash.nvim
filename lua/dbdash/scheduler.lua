@@ -229,6 +229,9 @@ function Panel:render_templates()
   local function render(text, line, autoescape)
     local env = template.env(driver.dialect, autoescape, d.cfg.dir)
     env.context = vars
+    -- Lua in templates ({% lua %}, imported .lua): args, meta and the query timeout.
+    env.lua = { args = values, meta = metadata.for_lua(self.meta) }
+    env.timeout = q.timeout or require("dbdash").default_ms("timeout")
     local out, err = template.render(text, vars, {
       env = env,
       source = source,
