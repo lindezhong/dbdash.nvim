@@ -23,6 +23,7 @@ function Conn:execute(code, opts)
     source = opts.source,
     line = opts.line,
     args = opts.args,
+    meta = opts.meta,
     timeout = opts.timeout,
     max_rows = opts.max_rows,
   })

@@ -215,12 +215,22 @@ end
 function Panel:render_templates()
   local q, d = self.cfg.query, self.d
   local driver = db.driver(self.cfg.database.type)
-  local vars = args.resolve(d.cfg.args, d.state)
-  self.vars = vars -- for lua:// scripts and query.transform (args)
+  local values = args.resolve(d.cfg.args, d.state)
+  self.vars = values -- `args` of lua:// scripts and query.transform
+  local metadata = require("dbdash.metadata")
+  self.meta = metadata.values(self) -- `meta` of the Lua code
+  -- Templates see exactly two names: args.<name> and meta.<name>; imported templates too.
+  local args_map = require("dbdash.util.map").new()
+  for _, spec in ipairs(d.cfg.args) do
+    require("dbdash.util.map").set(args_map, spec.name, values[spec.name])
+  end
+  local vars = { args = args_map, meta = metadata.for_template(self.meta) }
   local source = vim.fn.fnamemodify(d.path, ":~:.")
   local function render(text, line, autoescape)
+    local env = template.env(driver.dialect, autoescape, d.cfg.dir)
+    env.context = vars
     local out, err = template.render(text, vars, {
-      env = template.env(driver.dialect, autoescape, d.cfg.dir),
+      env = env,
       source = source,
       line_offset = line - 1,
     })
@@ -307,6 +317,7 @@ function Panel:refresh(o)
     return
   end
   self.running = true
+  self.refresh_count = (self.refresh_count or 0) + 1 -- meta.refresh_count
   self.d:update_status()
   local gen = self.d.generation
   local q = self.cfg.query
@@ -323,6 +334,7 @@ function Panel:refresh(o)
       base_dir = self.d.cfg.dir,
       password_cmd = self.cfg.database.password_cmd,
       args = self.vars,
+      meta = self.meta,
       source = source,
       line = q.sql_line,
       raw = code ~= nil, -- the transform gets the raw result; checked after it
@@ -333,6 +345,7 @@ function Panel:refresh(o)
         source = source,
         line = q.transform_line,
         args = self.vars,
+        meta = self.meta,
         timeout = q.timeout or require("dbdash").default_ms("timeout"),
         max_rows = q.max_rows or require("dbdash").options.defaults.max_rows,
       })
@@ -366,6 +379,7 @@ function M.transform(code, rs, o)
     source = o.source,
     line = o.line,
     args = o.args,
+    meta = o.meta,
     vars = vars,
     timeout = o.timeout,
   })

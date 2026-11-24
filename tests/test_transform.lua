@@ -74,7 +74,7 @@ T["template in the transform; errors point at the YAML line"] = function()
     "  args: [{ name: f, type: int, default: 3 }]",
     "  sql: SELECT 5 AS n",
     "  transform: |",
-    "    return { { n = rs.rows[1][1] * {{ f }} } }",
+    "    return { { n = rs.rows[1][1] * {{ args.f }} } }",
   })
   eq(p.rs.rows, { { 15 } })
   eq(notes, {}) -- a successful refresh does not notify

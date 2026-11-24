@@ -204,7 +204,7 @@
     "name": {
      "type": "string",
      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-     "description": "Variable name in the query template."
+     "description": "Argument name, used as args.<name> in templates and Lua code."
     },
     "type": {
      "enum": [
@@ -247,7 +247,7 @@
    "properties": {
     "sql": {
      "type": "string",
-     "description": "Query template (Jinja subset, see :help dbdash-templates). Its language depends on\nthe database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\": {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)\n  lua://         Lua code returning rows (see \"Result format\" at the top\n                 of this file, :help dbdash-result), or a value that\n                 query.transform turns into rows; it sees args and\n                 dbdash.system/query/sleep (:help dbdash-lua)\n  http(s)://     a JSON request description (empty: GET the URL):\n                 {\"method\": \"POST\", \"path\": \"search\", \"query\": {...},\n                  \"headers\": {...}, \"cookies\": \"a=1; b=2\" | \"cookies.txt\",\n                  \"body\": {...} | \"text\", \"form\": {...}, \"redirects\": 5}\n                 JSON responses are decoded, other bodies stay text; the\n                 result must be rows (\"Result format\", :help\n                 dbdash-result): a JSON list of objects or {\"columns\",\n                 \"rows\"} shows directly, anything else needs\n                 query.transform (:help dbdash-http)"
+     "description": "Query template (Jinja subset, see :help dbdash-templates): arguments are\n{{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta). Its language\ndepends on the database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\": {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)\n  lua://         Lua code returning rows (see \"Result format\" at the top\n                 of this file, :help dbdash-result), or a value that\n                 query.transform turns into rows; it sees args and\n                 dbdash.system/query/sleep (:help dbdash-lua)\n  http(s)://     a JSON request description (empty: GET the URL):\n                 {\"method\": \"POST\", \"path\": \"search\", \"query\": {...},\n                  \"headers\": {...}, \"cookies\": \"a=1; b=2\" | \"cookies.txt\",\n                  \"body\": {...} | \"text\", \"form\": {...}, \"redirects\": 5}\n                 JSON responses are decoded, other bodies stay text; the\n                 result must be rows (\"Result format\", :help\n                 dbdash-result): a JSON list of objects or {\"columns\",\n                 \"rows\"} shows directly, anything else needs\n                 query.transform (:help dbdash-http)"
     },
     "transform": {
      "type": "string",

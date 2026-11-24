@@ -83,7 +83,7 @@ T["config: lua:// is a database type; the template renders the script"] = functi
     "  args: [{ name: n, type: int, default: 3 }]",
     "  sql: |",
     "    local rows = {}",
-    "    for i = 1, {{ n }} do rows[i] = { i, i * args.n } end",
+    "    for i = 1, {{ args.n }} do rows[i] = { i, i * args.n } end",
     "    return { columns = { 'i', 'x' }, rows = rows }",
     "show: { type: bar, x_column: i, y_column: x }",
   }, f)

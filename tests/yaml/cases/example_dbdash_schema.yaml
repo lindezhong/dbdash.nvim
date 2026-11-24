@@ -161,7 +161,7 @@ definitions:
       name:
         type: string
         pattern: "^[A-Za-z_][A-Za-z0-9_]*$"
-        description: Variable name in the query template.
+        description: Argument name, used as args.<name> in templates and Lua code.
       type:
         enum: [string, number, int, boolean, list, map]
         default: string
@@ -191,8 +191,9 @@ definitions:
       sql:
         type: string
         description: |-
-          Query template (Jinja subset, see :help dbdash-templates). Its language depends on
-          the database:
+          Query template (Jinja subset, see :help dbdash-templates): arguments are
+          {{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta). Its language
+          depends on the database:
             SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)
             Redis          one command, e.g. HGETALL "user:1001"
             MongoDB        a JSON document:

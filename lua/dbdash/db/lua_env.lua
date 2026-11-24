@@ -1,6 +1,7 @@
 -- Running Lua from a config (lua:// queries and query.transform) inside a util.async task.
 -- Scripts see the globals (vim, io, ...) plus:
 --   args              the dashboard arguments
+--   meta              the dashboard metadata (read-only; see dbdash/metadata.lua)
 --   dbdash.system()   run a command without blocking the editor -> { code, stdout, stderr }
 --   dbdash.query()    run a query on any database -> result set (columns, rows)
 --   dbdash.sleep(ms), dbdash.checkpoint(), dbdash.null (NULL in results)
@@ -48,14 +49,18 @@ end
 
 ---Compile and run `code`. Must be called inside a util.async task.
 ---@param code string
----@param o { phase: string, source: string?, line: integer?, args: table?, vars: table?, timeout: integer?, max_rows: integer? }
+---@param o { phase: string, source: string?, line: integer?, args: table?, meta: table?, vars: table?, timeout: integer?, max_rows: integer? }
 ---   vars: extra globals (e.g. rs for transform); line: line of the code in the config file
 ---@return any value what the script returned (checked as rows by db/lua_result.lua)
 function M.run(code, o)
   local name = o.source or "lua"
   -- Leading newlines make error line numbers match the config file.
   local prefix = string.rep("\n", math.max((o.line or 1) - 1, 0))
-  local env = setmetatable({ args = o.args or {}, dbdash = M.helpers }, { __index = _G })
+  local env = setmetatable({
+    args = o.args or {},
+    meta = require("dbdash.metadata").for_lua(o.meta or {}),
+    dbdash = M.helpers,
+  }, { __index = _G })
   for k, v in pairs(o.vars or {}) do
     env[k] = v
   end

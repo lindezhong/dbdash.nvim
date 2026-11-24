@@ -31,10 +31,10 @@ query:
 
     -- Data computed in Lua; dbdash.query() could read it from a database instead.
     local rows = {}
-    for i = {{ days }} - 1, 0, -1 do            -- template: the value is written into the code
+    for i = {{ args.days }} - 1, 0, -1 do            -- template: the value is written into the code
       local t = os.time() - i * 86400
       local load = args.base                    -- args: the value as a Lua number
-    {% if wave %}
+    {% if args.wave %}
       load = load + math.floor(30 * math.sin(i / 2))
     {% endif %}
       rows[#rows + 1] = { os.date("%m-%d", t), load, host }

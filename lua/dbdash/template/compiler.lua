@@ -173,6 +173,43 @@ function C:expr(n)
   error("unknown expression node " .. tostring(k))
 end
 
+-- Names a template cannot assign: dashboards provide them (args.<name>, meta.<name>).
+local RESERVED = { args = true, meta = true }
+
+---Reject reserved names as set/for targets, macro names and parameters or import aliases.
+local function check_reserved(body)
+  local function bad(node, name)
+    if RESERVED[name] then
+      errors.syntax(node.line, node.col, "'%s' is reserved (dashboard %s) and cannot be assigned", name, name == "args" and "arguments" or "metadata")
+    end
+  end
+  for _, st in ipairs(body) do
+    for _, name in ipairs(st.targets or {}) do
+      bad(st, name)
+    end
+    if st.k == "Macro" then
+      bad(st, st.name)
+      for _, p in ipairs(st.params) do
+        bad(st, p.name)
+      end
+    elseif st.k == "Import" then
+      bad(st, st.alias)
+    elseif st.k == "FromImport" then
+      for _, n in ipairs(st.names) do
+        bad(st, n.alias)
+      end
+    end
+    for _, key in ipairs({ "body", "else_" }) do
+      if type(st[key]) == "table" then
+        check_reserved(st[key])
+      end
+    end
+    for _, br in ipairs(st.branches or {}) do
+      check_reserved(br.body)
+    end
+  end
+end
+
 ---Names assigned by `set` in this scope (descends into if/else and for-else, not loop bodies).
 local function collect_sets(body, out, seen)
   out, seen = out or {}, seen or {}
@@ -375,6 +412,7 @@ end
 ---@param body table[]
 ---@return string
 function M.compile(body)
+  check_reserved(body)
   local c = setmetatable({ buf = {}, depth = 0, n = 0, scopes = {}, exports = {} }, C)
   c:emit("local rt = ...")
   c:emit("return function(ctx, env, L)")

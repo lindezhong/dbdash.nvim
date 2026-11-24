@@ -10,7 +10,7 @@ database:
   url: "sqlite:///:memory:"
 query:
   sql: |
-    SELECT {{ n }} AS n, '{{ label }}' AS label, {{ ids|sql_in|sql_quote }} AS ids_sql
+    SELECT {{ args.n }} AS n, '{{ args.label }}' AS label, {{ args.ids|sql_in|sql_quote }} AS ids_sql
   args_show: true
   args:
     - name: n
@@ -521,8 +521,8 @@ T["changing an argument while a query runs re-runs it with the new value"] = fun
   -- Regression: the refresh for the new value was skipped because the previous query
   -- was still running, so the dashboard showed the old value until the next interval.
   local slow = CFG:gsub(
-    "SELECT {{ n }} AS n,",
-    "SELECT {{ n }} AS n, (WITH RECURSIVE c(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM c WHERE i < 1500000) SELECT count(*) FROM c) AS big,"
+    "SELECT {{ args.n }} AS n,",
+    "SELECT {{ args.n }} AS n, (WITH RECURSIVE c(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM c WHERE i < 1500000) SELECT count(*) FROM c) AS big,"
   )
   vim.fn.writefile(vim.split(slow, "\n"), dir .. "/slow.yaml")
   child.cmd("DbDashStart slow.yaml")
@@ -675,7 +675,7 @@ T["thresholds notify once when a value rises to a notify step"] = function()
   vim.fn.writefile({
     "database: { url: 'sqlite:///:memory:' }",
     "query:",
-    "  sql: SELECT {{ v }} AS errors",
+    "  sql: SELECT {{ args.v }} AS errors",
     "  args: [{ name: v, type: int, default: 5 }]",
     "show:",
     "  type: stat",
@@ -708,7 +708,7 @@ end
 local BROKEN = {
   "database: { url: 'sqlite:///:memory:' }",
   "query:",
-  "  sql: SELECT {{ v }} AS n",
+  "  sql: SELECT {{ args.v }} AS n",
   "  args: [{ name: v, default: oops }]", -- SELECT oops: no such column
   "show: { type: table, title: Broken, interval: 1s }",
 }
@@ -786,7 +786,7 @@ T["lua:// dashboards: template, args, chart; errors point at the YAML line"] = f
     "  args: [{ name: n, type: int, default: 3 }]",
     "  sql: |",
     "    local rows = {}",
-    "    for i = 1, {{ n }} do rows[i] = { 'k' .. i, i * args.n } end",
+    "    for i = 1, {{ args.n }} do rows[i] = { 'k' .. i, i * args.n } end",
     "    return { columns = { 'k', 'v' }, rows = rows }",
     "show: { type: table, title: Lua board }",
   }, dir .. "/lua.yaml")
@@ -860,7 +860,7 @@ end
 
 T["query templates import macros from files next to the config"] = function()
   vim.fn.writefile({ "{% macro ids(xs) %}{{ xs|sql_in }}{% endmacro %}" }, dir .. "/macros.sql")
-  local cfg = CFG:gsub("SELECT {{ n }} AS n", "{%% from 'macros.sql' import ids %%}SELECT {{ n }} AS n, {{ ids([7, 8])|sql_quote }} AS m")
+  local cfg = CFG:gsub("SELECT {{ args.n }} AS n", "{%% from 'macros.sql' import ids %%}SELECT {{ args.n }} AS n, {{ ids([7, 8])|sql_quote }} AS m")
   vim.fn.writefile(vim.split(cfg, "\n"), dir .. "/imports.yaml")
   child.cmd("DbDashStart imports.yaml")
   wait_loaded()

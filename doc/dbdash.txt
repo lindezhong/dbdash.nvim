@@ -443,25 +443,66 @@ are rejected with a line and column.
 ==============================================================================
 6. TEMPLATES                                                *dbdash-templates*
 
-`query.sql` is a template rendered before every run. The language is a subset
-of Jinja2 with `trim_blocks` and `lstrip_blocks` enabled, and behaves like
-Jinja2 (Python semantics) for everything it supports. The rendered text is
-what |:DbDashShowSQL| (`s`) shows.
+`query.sql` and `query.transform` are templates rendered before every run,
+both the same way (the transform is never autoescaped). The language is a
+subset of Jinja2 with `trim_blocks` and `lstrip_blocks` enabled, and behaves
+like Jinja2 (Python semantics) for everything it supports. The rendered text
+is what |:DbDashShowSQL| (`s`) shows.
 
 Variables                                              *dbdash-template-vars*
 
-The variables are the query arguments (|dbdash-arguments|), with these
-types:
+A template sees two names, the same in every template (query.sql,
+query.transform, imported templates) and in all Lua code (|dbdash-lua|):
+
+  args    the query arguments (|dbdash-arguments|): `args.min_age`
+  meta    metadata about the dashboard (|dbdash-meta|): `meta.config_dir`
+
+Argument values have these types:
 
   string          text
   number, int     a number
   boolean         true / false
-  list            a list: `departments[0]`, `for d in departments`
-  map             a mapping: `filters.region`, `filters.items()`
+  list            a list: `args.departments[0]`, `for d in args.departments`
+  map             a mapping: `args.filters.region`, `args.filters.items()`
   no value        `none` (prints "None"; test with `is none`)
 
-Using a name that is not an argument is an error ("'x' is undefined"), as in
-Jinja's StrictUndefined; test optional names with `is defined`.
+Any other name is an error ("'x' is undefined"), as in Jinja's
+StrictUndefined; a bare argument name says how to write it ("'days' is
+undefined; arguments are written args.days"). Test optional names with `is
+defined`. `args` and `meta` cannot be assigned (`set`, `for`, macro names).
+
+Metadata                                                        *dbdash-meta*
+
+`meta.<name>` holds read-only values computed for each render (none / nil when
+there is no value):
+
+  cwd            Neovim's current directory
+  config_file    the config file (absolute path)
+  config_dir     its directory
+  config_name    its name without the extension
+  db_type        the database type (postgres, http, lua, ...)
+  db_host        host, port, database (SQLite file, HTTP path) and user of the
+  db_port        URL as written in the config, with the driver's default port
+  db_name
+  db_user
+  db_url         the URL as written, password masked, ${NAME} not expanded
+  panel_index    the panel's number (from 1)
+  panel_title    `show.title`
+  chart_type     `show.type`
+  interval       the refresh interval in ms
+  max_rows       `query.max_rows`
+  timeout        the query timeout in ms
+  refresh_count  how many times this panel has refreshed (from 1)
+  now            render time, ISO 8601 with the UTC offset
+                 (2026-11-24T10:00:00+08:00)
+  today          the date (2026-11-24)
+  hostname       this machine's name
+  user           the operating system user
+  nvim_version   e.g. 0.12.0
+  os             linux, windows, macos or bsd
+  arch           x64, arm64, ...
+
+No password and no expanded environment variable is part of the metadata.
 
 Syntax                                                *dbdash-template-syntax*
 
@@ -476,8 +517,8 @@ With `trim_blocks` the newline after a statement tag is removed, and with
 removed, so statements on their own lines leave no blank lines: >jinja
   SELECT * FROM users
   WHERE 1 = 1
-  {% if min_age %}
-    AND age >= {{ min_age }}
+  {% if args.min_age %}
+    AND age >= {{ args.min_age }}
   {% endif %}
 <
 Statements:
@@ -559,13 +600,13 @@ upper(), lower(), strip(chars), startswith(prefix), endswith(suffix)
 (prefix/suffix may be a tuple). Other method calls are errors.
 
 Examples: >jinja
-  WHERE status = {{ status | sql_quote }}
-    AND dept IN {{ departments | sql_in }}
-    {% if search is not none and search | trim %}
-    AND name LIKE {{ ('%' ~ search ~ '%') | sql_quote }}
+  WHERE status = {{ args.status | sql_quote }}
+    AND dept IN {{ args.departments | sql_in }}
+    {% if args.search is not none and args.search | trim %}
+    AND name LIKE {{ ('%' ~ args.search ~ '%') | sql_quote }}
     {% endif %}
-  ORDER BY {{ sort_column | sql_id }}
-  LIMIT {{ limit | sql_limit }}
+  ORDER BY {{ args.sort_column | sql_id }}
+  LIMIT {{ args.limit | sql_limit }}
 <
 Autoescape                                        *dbdash-template-autoescape*
 
@@ -574,7 +615,7 @@ the database's dialect, as if `| sql_quote` were applied: strings are quoted
 and escaped, lists become (a, b), none becomes NULL, numbers and booleans
 stay literals. Output of the SQL filters and functions and of `| safe` is
 inserted as is, so use `| safe` for SQL fragments such as column names: >jinja
-  SELECT {{ column | safe }} FROM t WHERE name = {{ name }}
+  SELECT {{ args.column | safe }} FROM t WHERE name = {{ args.name }}
 <A mapping cannot be autoescaped (use `| tojson` or pick a key). Values
 inside `{% %}` statements are never escaped.
 
@@ -591,8 +632,9 @@ The SQL filters and autoescape follow the database type:
 Imports                                              *dbdash-template-imports*
 
 Paths in import and from-import are relative to the config file's
-directory. An imported file only exports its macros; it does not see the
-importing template's variables, so pass values as macro arguments: >jinja
+directory. An imported file only exports its macros; it sees `args` and
+`meta` but not the importing template's own variables (`set`, `for`), so pass
+those as macro arguments: >jinja
   {# macros/filters.sql #}
   {% macro in_list(column, values) -%}
   {{ column | safe }} IN {{ values | sql_in }}
@@ -600,7 +642,7 @@ importing template's variables, so pass values as macro arguments: >jinja
 
   {# query.sql #}
   {% from 'macros/filters.sql' import in_list %}
-  SELECT * FROM users WHERE {{ in_list('dept', departments) }}
+  SELECT * FROM users WHERE {{ in_list('dept', args.departments) }}
 <
 Errors                                                *dbdash-template-errors*
 
@@ -619,9 +661,10 @@ print without ".0" (`{{ 4 / 2 }}` is `2`, Jinja prints `2.0`).
 7. ARGUMENTS                                                *dbdash-arguments*
 
 Arguments are the variables of the query template, declared in `query.args`
-(and in the top-level `args` for |dbdash-panels|): >yaml
+(and in the top-level `args` for |dbdash-panels|), and written `args.<name>`
+in templates and Lua code: >yaml
   args:
-    - name: departments     # template variable name (letters, digits, _)
+    - name: departments     # used as args.departments (letters, digits, _)
       type: list            # string (default) | number | int | boolean |
                             # list | map
       default: [IT, HR]     # value when nothing else sets it
@@ -630,7 +673,7 @@ Arguments are the variables of the query template, declared in `query.args`
       choices: [IT, HR, Finance]   # completion and picker candidates
       description: "Departments to include"
 <
-An argument without a default and without a value is `none` in the template
+An argument without a default and without a value is `none` in templates
 (|dbdash-template-vars|). The legacy `key:` field is rejected; use `name:`.
 
 Where values come from (highest first):
@@ -816,7 +859,9 @@ arguments from `args` is usually simpler. They run inside the
 refresh without blocking the editor and see the globals (`vim`, `io`, ...)
 plus:
 
-  args                  the dashboard arguments by name
+  args                  the dashboard arguments by name (`args.days`)
+  meta                  the metadata (`meta.config_dir`, |dbdash-meta|),
+                        read-only
   rs, response          (transform) the query result, see
                         |dbdash-transform|
   dbdash.system(cmd, opts)  run a command (a string through `sh -c` or
@@ -864,7 +909,8 @@ trust) and sees:
   response   (`http(s)://`) `{ status, reason, headers, body, url }`:
              header names in lower case, `body` the raw text, `url` the
              final URL after redirects
-  args       the dashboard arguments; and the `dbdash.*` helpers
+  args, meta the dashboard arguments and metadata; and the `dbdash.*`
+             helpers
 
 It returns rows in one of the shapes of |dbdash-result|; its errors (and a
 value that is not rows) are reported with the phase "transform" and the
@@ -883,10 +929,10 @@ request; an empty or missing `query.sql` GETs the URL: >yaml
       {
         "method": "POST",
         "path": "search",
-        "query": {"limit": {{ limit }}},
-        "headers": {"Authorization": "Bearer {{ token }}"},
+        "query": {"limit": {{ args.limit }}},
+        "headers": {"Authorization": "Bearer {{ args.token }}"},
         "cookies": "session=abc; lang=en",
-        "body": {"q": "{{ keyword }}"}
+        "body": {"q": "{{ args.keyword }}"}
       }
     transform: |
       local out = {}

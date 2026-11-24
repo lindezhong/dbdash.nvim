@@ -34,9 +34,9 @@ query:
            {{ bucket('score', size=25) }} AS score_bucket,
            count(*) AS players,
            {{ pct('count(*)', '(SELECT count(*) FROM players)') }} AS pct,
-           {{ label }} AS label
+           {{ args.label }} AS label
     FROM players
-    WHERE {{ in_list('team', teams) }}
+    WHERE {{ in_list('team', args.teams) }}
       AND {{ h.between('score', 0, 100) }}
     GROUP BY team, score_bucket
     ORDER BY team, score_bucket

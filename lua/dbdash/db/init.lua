@@ -112,6 +112,7 @@ end
 ---@field base_dir string?
 ---@field password_cmd string|string[]? command printing the password (database.password_cmd)
 ---@field args table? dashboard arguments (lua:// scripts get them as `args`)
+---@field meta table? dashboard metadata (lua:// scripts get it as `meta`)
 ---@field source string? config file name for messages (lua:// error locations)
 ---@field line integer? line of the query in the config file (lua:// error locations)
 ---@field raw boolean? return a raw driver result (lua://, http) as is, for query.transform;
@@ -170,6 +171,7 @@ function M.query(raw_url, query, opts, callback)
     max_rows = opts.max_rows or require("dbdash").options.defaults.max_rows,
     timeout = q_timeout,
     args = opts.args,
+    meta = opts.meta,
     source = opts.source,
     line = opts.line,
     cookie_jar = opts.cookie_jar,

@@ -8,7 +8,7 @@ database:
   url: "sqlite:///:memory:"          # in-memory database, no file needed
 
 query:
-  # Generated data, no tables required. {{ key1 }} / {{ key2 }} come from args below.
+  # Generated data, no tables required. {{ args.key1 }} / {{ args.key2 }} come from args below.
   sql: |
     SELECT
       datetime('now', 'localtime') AS current_time,
@@ -20,8 +20,8 @@ query:
         ELSE 'Inactive'
       END AS status,
       'User' || (abs(random() % 10) + 1) AS username,
-      {{ key1 | sql_quote }} AS k1,
-      {{ key2 | sql_quote }} AS k2
+      {{ args.key1 | sql_quote }} AS k1,
+      {{ args.key2 | sql_quote }} AS k2
   args:
     - name: key1
       default: value1

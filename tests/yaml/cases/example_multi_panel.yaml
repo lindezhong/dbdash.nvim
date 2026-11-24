@@ -21,7 +21,7 @@ layout:
 panels:
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < {{ hours }} - 1)
+        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < {{ args.hours }} - 1)
         SELECT printf('%02d:00', n % 24) AS hour,
                50 + abs(random() % 100) AS visits
         FROM h

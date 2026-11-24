@@ -3,7 +3,7 @@
   "url": "sqlite:///:memory:"
  },
  "query": {
-  "sql": "SELECT\n  datetime('now', 'localtime') AS current_time,\n  abs(random() % 100) AS random_number,\n  abs(random() % 1000) AS sales_amount,\n  CASE abs(random() % 3)\n    WHEN 0 THEN 'Active'\n    WHEN 1 THEN 'Pending'\n    ELSE 'Inactive'\n  END AS status,\n  'User' || (abs(random() % 10) + 1) AS username,\n  {{ key1 | sql_quote }} AS k1,\n  {{ key2 | sql_quote }} AS k2\n",
+  "sql": "SELECT\n  datetime('now', 'localtime') AS current_time,\n  abs(random() % 100) AS random_number,\n  abs(random() % 1000) AS sales_amount,\n  CASE abs(random() % 3)\n    WHEN 0 THEN 'Active'\n    WHEN 1 THEN 'Pending'\n    ELSE 'Inactive'\n  END AS status,\n  'User' || (abs(random() % 10) + 1) AS username,\n  {{ args.key1 | sql_quote }} AS k1,\n  {{ args.key2 | sql_quote }} AS k2\n",
   "args": [
    {
     "name": "key1",

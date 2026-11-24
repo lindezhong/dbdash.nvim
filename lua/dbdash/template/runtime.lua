@@ -280,6 +280,11 @@ function R.lookup(ctx, name)
   if v ~= nil then
     return v
   end
+  local args = ctx.args
+  if map.is_map(args) and args[name] ~= nil then
+    -- Dashboards pass their arguments as args.<name> (and metadata as meta.<name>).
+    return R.undef(("'%s' is undefined; arguments are written args.%s"):format(name, name))
+  end
   return R.undef(("'%s' is undefined"):format(name))
 end
 
@@ -548,7 +553,9 @@ function R.import(env, target)
   env._importing[target] = true
   local tpl, path = env.load_template(target)
   local L = { l = nil }
-  local ok, out, exports = pcall(tpl.fn, {}, env, L)
+  -- Imported templates do not see the caller's variables, only env.context (dashboards:
+  -- args and meta).
+  local ok, out, exports = pcall(tpl.fn, env.context or {}, env, L)
   env._importing[target] = nil
   if not ok then
     if errors.is(out) then

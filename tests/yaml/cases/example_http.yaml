@@ -21,8 +21,8 @@ query:
       default: 10
   sql: |
     {
-      "path": "/repos/{{ repo }}/releases",
-      "query": {"per_page": {{ count }}},
+      "path": "/repos/{{ args.repo }}/releases",
+      "query": {"per_page": {{ args.count }}},
       "headers": {"Accept": "application/vnd.github+json"}
     }
   transform: |

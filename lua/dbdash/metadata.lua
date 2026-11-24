@@ -1,0 +1,149 @@
+-- Metadata: read-only values dbdash provides to every template and every piece of Lua code
+-- as `meta` (meta.config_dir, meta.os, ...), next to the dashboard arguments in `args`.
+-- They are computed for each render, so meta.now and meta.refresh_count are current.
+local map = require("dbdash.util.map")
+
+local M = {}
+
+-- Every name, in documentation order.
+M.NAMES = {
+  "cwd",
+  "config_file",
+  "config_dir",
+  "config_name",
+  "db_type",
+  "db_host",
+  "db_port",
+  "db_name",
+  "db_user",
+  "db_url",
+  "panel_index",
+  "panel_title",
+  "chart_type",
+  "interval",
+  "max_rows",
+  "timeout",
+  "refresh_count",
+  "now",
+  "today",
+  "hostname",
+  "user",
+  "nvim_version",
+  "os",
+  "arch",
+}
+
+---"linux" | "windows" | "macos" | "bsd" | the lower-case system name.
+function M.os_name()
+  local sys = vim.uv.os_uname().sysname
+  if sys == "Windows_NT" then
+    return "windows"
+  elseif sys == "Darwin" then
+    return "macos"
+  elseif sys:find("BSD$") then
+    return "bsd"
+  end
+  return sys:lower()
+end
+
+---Local time as ISO 8601 with the UTC offset, e.g. 2026-11-24T10:00:00+08:00 (os.date's
+---%z is not portable: Windows prints the zone name).
+function M.iso_now(t)
+  t = t or os.time()
+  local offset = os.difftime(t, os.time(os.date("!*t", t)))
+  if os.date("*t", t).isdst then
+    offset = offset + 3600
+  end
+  local sign = offset < 0 and "-" or "+"
+  offset = math.abs(offset)
+  return os.date("%Y-%m-%dT%H:%M:%S", t) .. ("%s%02d:%02d"):format(sign, math.floor(offset / 3600), math.floor(offset % 3600 / 60))
+end
+
+local function user_name()
+  local ok, pw = pcall(vim.uv.os_get_passwd)
+  if ok and pw and pw.username then
+    return pw.username
+  end
+  return vim.env.USER or vim.env.USERNAME
+end
+
+---Host, port, database and user of a URL as written in the config (no password, ${NAME}
+---not expanded); each nil when the URL does not say and the driver has no default.
+local function url_parts(raw, typ)
+  local ok, u = pcall(require("dbdash.db.url").parse, raw)
+  if not ok then
+    return {}
+  end
+  local okd, driver = pcall(require("dbdash.db").driver, typ)
+  if okd and driver.parse_url then
+    u.options = {}
+    local okp, parsed = pcall(driver.parse_url, u)
+    if okp and parsed then
+      u = parsed
+    end
+  end
+  return { host = u.host, port = u.port, name = u.database, user = u.user ~= "" and u.user or nil }
+end
+
+---The metadata of a panel for one render.
+---@param panel table scheduler Panel (cfg, d, index, refresh_count)
+---@return table values by name (nil where there is no value)
+function M.values(panel)
+  local cfg, d = panel.cfg, panel.d
+  local q, show = cfg.query, cfg.show
+  local dbcfg = cfg.database
+  local parts = url_parts(dbcfg.url, dbcfg.type)
+  local dbdash = require("dbdash")
+  local v = vim.version()
+  return {
+    cwd = vim.fs.normalize(vim.fn.getcwd()),
+    config_file = d.path,
+    config_dir = d.cfg.dir,
+    config_name = vim.fn.fnamemodify(d.path, ":t:r"),
+    db_type = dbcfg.type,
+    db_host = parts.host,
+    db_port = parts.port,
+    db_name = parts.name,
+    db_user = parts.user,
+    db_url = require("dbdash.db.url").redact(dbcfg.url),
+    panel_index = panel.index,
+    panel_title = show.title ~= "" and show.title or nil,
+    chart_type = show.type,
+    interval = show.interval,
+    max_rows = q.max_rows or dbdash.options.defaults.max_rows,
+    timeout = q.timeout or dbdash.default_ms("timeout"),
+    refresh_count = panel.refresh_count or 0,
+    now = M.iso_now(),
+    today = os.date("%Y-%m-%d"),
+    hostname = vim.uv.os_gethostname(),
+    user = user_name(),
+    nvim_version = ("%d.%d.%d"):format(v.major, v.minor, v.patch),
+    os = M.os_name(),
+    arch = jit and jit.arch or nil,
+  }
+end
+
+---The values as a template mapping (missing values are none).
+function M.for_template(values)
+  local m = map.new()
+  for _, name in ipairs(M.NAMES) do
+    local x = values[name]
+    map.set(m, name, x == nil and vim.NIL or x)
+  end
+  return m
+end
+
+---The values as a read-only table for Lua code (missing values are nil).
+function M.for_lua(values)
+  return setmetatable({}, {
+    __index = values,
+    __newindex = function(_, k)
+      error(("meta is read-only (meta.%s)"):format(tostring(k)), 2)
+    end,
+    __pairs = function()
+      return next, values, nil
+    end,
+  })
+end
+
+return M

@@ -70,7 +70,7 @@ query:
   sql: |
     SELECT date_trunc('hour', created_at) AS hour, count(*) AS signups
     FROM users
-    WHERE created_at > now() - make_interval(hours => {{ hours }})
+    WHERE created_at > now() - make_interval(hours => {{ args.hours }})
     GROUP BY 1 ORDER BY 1
   args:
     - name: hours
@@ -183,14 +183,18 @@ Details: `:help dbdash-databases` and `:help dbdash-tls`.
 
 ```sql
 SELECT * FROM orders
-WHERE status = {{ status | sql_quote }}
-  AND region IN {{ regions | sql_in }}
-{% if since %}
-  AND created_at >= {{ since | sql_quote }}
+WHERE status = {{ args.status | sql_quote }}
+  AND region IN {{ args.regions | sql_in }}
+{% if args.since %}
+  AND created_at >= {{ args.since | sql_quote }}
 {% endif %}
-ORDER BY {{ sort | sql_id }}
-LIMIT {{ limit | sql_limit }}
+  AND source = {{ meta.config_name | sql_quote }}
+ORDER BY {{ args.sort | sql_id }}
+LIMIT {{ args.limit | sql_limit }}
 ```
+
+Arguments are `args.<name>` and metadata (config file and directory, database, panel,
+time, OS, ...) `meta.<name>`, in templates and in Lua code alike.
 
 The SQL filters quote for the dashboard's database (MySQL backslashes, SQL Server
 `N'...'` and `[ident]`, JSON for MongoDB, ...). See `:help dbdash-templates`.
@@ -227,9 +231,9 @@ database:
   url: https://api.example.com/v1
 query:
   sql: |
-    {"method": "POST", "path": "search", "query": {"limit": {{ limit }}},
-     "headers": {"Authorization": "Bearer {{ token }}"},
-     "cookies": "session=abc", "body": {"q": "{{ keyword }}"}}
+    {"method": "POST", "path": "search", "query": {"limit": {{ args.limit }}},
+     "headers": {"Authorization": "Bearer {{ args.token }}"},
+     "cookies": "session=abc", "body": {"q": "{{ args.keyword }}"}}
   transform: |
     local out = {}
     for _, it in ipairs(rs.data.items) do out[#out + 1] = { name = it.name, n = it.count } end
