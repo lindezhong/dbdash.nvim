@@ -232,6 +232,9 @@ function Panel:render_templates()
     -- Lua in templates ({% lua %}, imported .lua): args, meta and the query timeout.
     env.lua = { args = values, meta = metadata.for_lua(self.meta) }
     env.timeout = q.timeout or require("dbdash").default_ms("timeout")
+    env.check_file = function(path, text, kind)
+      self:check_file(path, text, kind)
+    end
     local out, err = template.render(text, vars, {
       env = env,
       source = source,
@@ -245,6 +248,44 @@ function Panel:render_templates()
   local sql = render(q.sql, q.sql_line, q.autoescape)
   local code = q.transform and render(q.transform, q.transform_line, false) or nil
   return sql, code
+end
+
+---A file with Lua loaded while rendering (an imported .lua module or template with a
+---{% lua %} block) must be covered by the config's trust. One that is not (imported
+---through a computed path, or changed since the dashboard started) asks again, with all
+---the config's files; allowing it from the View float refreshes the panel.
+function Panel:check_file(path, text, kind)
+  local trust = require("dbdash.trust")
+  local d = self.d
+  if kind == "template" and not trust.has_lua_block(text) then
+    return
+  end
+  if not M.trust_required(d.path) or trust.covers(d.path, path, text) then
+    return
+  end
+  local files = trust.collect(d.path, d.cfg)
+  local real = trust.real(path)
+  local listed = false
+  for _, f in ipairs(files) do
+    listed = listed or f.path == real
+  end
+  if not listed then
+    files[#files + 1] = { path = real, kind = kind, text = text }
+  end
+  local ok, why = trust.check(d.path, files, function(answer)
+    if answer == "allow" then
+      self:refresh({ queue = true })
+    end
+  end)
+  if not ok then
+    error(require("dbdash.template.errors").new(
+      "trust",
+      why or ("%s runs Lua that is not trusted yet: %s"):format(
+        vim.fn.fnamemodify(d.path, ":~:."),
+        vim.fn.fnamemodify(path, ":~:.")
+      )
+    ), 0)
+  end
 end
 
 ---Render the templates in a task; `cb(err, sql, transform_code)` on the main loop.
@@ -988,21 +1029,27 @@ end
 ---@param path string normalized config path
 ---@param cfg dbdash.Config
 ---@param on_viewed fun(answer: string)? the decision made after viewing the file
-function M.trusted(path, cfg, on_viewed)
-  local trust = require("dbdash.trust")
-  local files, has_lua = trust.collect(path, cfg)
-  if not has_lua then
-    return true
-  end
+---False when setup turns the trust question off for this config (lua.confirm = false, or
+---the config is under one of lua.trusted_dirs).
+function M.trust_required(path)
   local o = opts().lua
   if o.confirm == false then
-    return true
+    return false
   end
   for _, d in ipairs(o.trusted_dirs or {}) do
     local dir = vim.fs.normalize(vim.fn.fnamemodify(vim.fn.expand(d), ":p")):gsub("/$", "")
     if path:sub(1, #dir + 1) == dir .. "/" then
-      return true
+      return false
     end
+  end
+  return true
+end
+
+function M.trusted(path, cfg, on_viewed)
+  local trust = require("dbdash.trust")
+  local files, has_lua = trust.collect(path, cfg)
+  if not has_lua or not M.trust_required(path) then
+    return true
   end
   return trust.check(path, files, on_viewed)
 end

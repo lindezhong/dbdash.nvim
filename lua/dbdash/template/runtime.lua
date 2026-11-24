@@ -468,8 +468,8 @@ end
 ---obj.name(args): a macro exported by an imported template, or a whitelisted method.
 function R.call_attr(env, obj, name, args, kwargs)
   check(obj)
-  if map.is_map(obj) and getmetatable(obj[name]) == Macro then
-    return R.call(env, obj[name], args, kwargs)
+  if map.is_map(obj) and (getmetatable(obj[name]) == Macro or type(obj[name]) == "function") then
+    return R.call(env, obj[name], args, kwargs) -- a macro, or a function of a .lua module
   end
   if not METHOD_SET[name] then
     raise("type", "calling '.%s()' is not supported (allowed methods: %s)", name, table.concat(R.METHOD_NAMES, ", "))
@@ -497,11 +497,15 @@ end
 
 -- Lua in templates ------------------------------------------------------------------------
 
+local module_raw = setmetatable({}, { __mode = "k" }) -- template mapping -> Lua table
+
 ---A template value as Lua data: none / undefined / missing -> nil, safe -> its string,
 ---lists and mappings element by element (mappings stay util.map tables).
 function R.to_lua(v)
   if v == R.NONE or v == R.MISSING or R.is_undef(v) then
     return nil
+  elseif module_raw[v] then
+    return module_raw[v] -- an imported .lua module: its own table
   elseif R.is_safe(v) then
     return v.s
   elseif map.is_map(v) then
@@ -568,7 +572,7 @@ end
 
 ---Run Lua with env.timeout; Lua errors become template errors at their own line when they
 ---come from this template's code (chunk `chunk_name`), else at the current line.
-function R.run_lua(env, fn, chunk_name)
+function R.run_lua(env, fn, chunk_name, source)
   local ok, ret = require("dbdash.db.lua_env").guard(fn, env.timeout)
   if ok then
     return ret
@@ -582,9 +586,59 @@ function R.run_lua(env, fn, chunk_name)
   local msg = tostring(ret)
   local file, line, rest = msg:match("^(.-):(%d+): (.*)$")
   if file and file == chunk_name then
-    error(errors.new("lua", rest, tonumber(line)), 0)
+    local e = errors.new("lua", rest, tonumber(line))
+    e.source = source -- a .lua module: its own file (the template's lines do not apply)
+    error(e, 0)
   end
   raise("lua", msg)
+end
+
+---Run a .lua module (once per render, so its functions see this render's args and meta)
+---and export its table: functions become callable from expressions (h.f(x)), other
+---values template values. In {% lua %} blocks vars.h is the module's own table.
+function R.lua_module(env, path, text)
+  local name = vim.fn.fnamemodify(path, ":~:.")
+  local chunk, err = load(text, "=" .. name, "t", R.lua_env(env))
+  if not chunk then
+    local l, rest = tostring(err):match(":(%d+): (.*)$")
+    local e = errors.new("lua", "syntax error: " .. (rest or tostring(err)), tonumber(l))
+    e.source = name
+    error(e, 0)
+  end
+  local t = R.run_lua(env, chunk, name, name)
+  if type(t) ~= "table" then
+    local e = errors.new("lua", ("a module must return a table (got %s)"):format(type(t)))
+    e.source = name
+    error(e, 0)
+  end
+  local mod = map.new()
+  local keys = vim.tbl_keys(t)
+  table.sort(keys, function(a, b)
+    return tostring(a) < tostring(b)
+  end)
+  for _, k in ipairs(keys) do
+    local v = t[k]
+    if type(v) == "function" then
+      local fn = v
+      map.set(mod, k, function(args, kwargs, call_env)
+        if next(kwargs) then
+          raise("type", "%s.%s() takes no keyword arguments (a Lua function)", name, tostring(k))
+        end
+        local lua_args = {}
+        for i = 1, #args do
+          lua_args[i] = R.to_lua(args[i])
+        end
+        local n = #args
+        return R.from_lua(R.run_lua(call_env, function()
+          return fn(unpack(lua_args, 1, n))
+        end, name, name))
+      end)
+    else
+      map.set(mod, k, R.from_lua(v))
+    end
+  end
+  module_raw[mod] = t
+  return mod
 end
 
 ---{% lua %} ... {% endlua %}: run the code; its return value is output like {{ }}.
@@ -672,7 +726,18 @@ function R.import(env, target)
     raise("value", "circular import of '%s'", target)
   end
   env._importing[target] = true
-  local tpl, path = env.load_template(target)
+  local tpl, path, text = env.load_template(target)
+  if env.check_file then
+    -- Dashboards: a file with Lua must be covered by the config's trust.
+    env.check_file(path or target, text or "", tpl.lua and "lua" or "template")
+  end
+  if tpl.lua then
+    local mod = R.lua_module(env, path or target, text or "")
+    env._importing[target] = nil
+    module_names[mod] = target
+    env._modules[target] = mod
+    return mod
+  end
   local L = { l = nil }
   local outer_source = env.source
   env.source = path or target -- Lua in the imported file reports its own name

@@ -24,6 +24,7 @@ end
 local function real(path)
   return vim.fs.normalize(vim.uv.fs_realpath(path) or path)
 end
+M.real = real
 
 ---True when template text contains a {% lua %} block.
 function M.has_lua_block(text)
@@ -159,7 +160,8 @@ function M.record(config_path, action, files)
   save_db(db)
 end
 
----"allowed" | "denied" | "unknown" (never asked, or a file changed since).
+---"allowed" | "denied" | "unknown" (never asked, or one of the files is new or changed).
+---The decision may cover more files than `files` (ones imported through a computed path).
 function M.state(config_path, files)
   local e = load_db()[real(config_path)]
   if not e then
@@ -167,7 +169,12 @@ function M.state(config_path, files)
   elseif e.denied then
     return "denied"
   end
-  return e.hash == M.fingerprint(files) and "allowed" or "unknown"
+  for _, f in ipairs(files) do
+    if not e.files or e.files[f.path] ~= vim.fn.sha256(f.text) then
+      return "unknown"
+    end
+  end
+  return "allowed"
 end
 
 ---True when `path` (a .lua module or a template loaded while rendering) is part of the

@@ -229,6 +229,80 @@ T["View: d denies, q closes without deciding (no split window either way)"] = fu
   eq(#vim.api.nvim_list_wins(), wins)
 end
 
+---Start and wait for the first refresh; returns the panel.
+local function run(path)
+  sched.start(path, { no_show = true })
+  local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
+  local p = d.panels[1]
+  vim.wait(5000, function()
+    return (p.rs or p.error) and not p.running
+  end, 10)
+  return p
+end
+
+T["the same .lua helper works in query.sql and query.transform"] = function()
+  write("h.lua", { "return { twice = function(x) return x * 2 end, tag = function() return 'v' .. args.n end }" })
+  local path = write("both.yaml", {
+    "database: { url: 'sqlite:///:memory:' }",
+    "query:",
+    "  args: [{ name: n, type: int, default: 4 }]",
+    "  sql: |",
+    "    {% import 'h.lua' as h %}",
+    "    SELECT {{ h.twice(args.n) }} AS n, '{{ h.tag() }}' AS tag",
+    "  transform: |",
+    "    {% import 'h.lua' as h %}",
+    "    return { { sql_n = rs.rows[1][1], sql_tag = rs.rows[1][2], lua_n = {{ h.twice(args.n) }}, lua_tag = '{{ h.tag() }}' } }",
+  })
+  answer = "allow"
+  local p = run(path)
+  eq(p.error, nil)
+  eq(p.rs.rows, { { 8, "v4", 8, "v4" } })
+  eq(asked_files, { "both.yaml:config", "h.lua:lua" })
+end
+
+T["a file loaded through a computed path, or changed while running, asks again"] = function()
+  write("dyn.lua", { "return { v = function() return 7 end }" })
+  local path = write("dyn.yaml", {
+    "database: { url: 'sqlite:///:memory:' }",
+    "query:",
+    "  args: [{ name: mod, default: dyn.lua }]",
+    "  sql: |",
+    "    {% import args.mod as m %}",
+    "    SELECT {{ m.v() }} AS v",
+  })
+  -- no literal import: nothing to ask about at start; the render asks for dyn.lua
+  answer = "deny"
+  local p = run(path)
+  eq(asked_files, { "dyn.yaml:config", "dyn.lua:lua" })
+  eq(sched.format_error(p.error):find("dyn.yaml denied; it will not run", 1, true) ~= nil, true)
+  sched.stop(sched.normalize(path))
+  require("dbdash.commands").trust({ "remove", path })
+  answer = "allow"
+  p = run(path)
+  eq(p.error, nil)
+  eq(p.rs.rows, { { 7 } })
+  eq(asked, 2)
+  -- trusted with dyn.lua now: a restart does not ask
+  sched.stop(sched.normalize(path))
+  p = run(path)
+  eq(asked, 2)
+  -- dyn.lua changes while the dashboard runs: the next refresh asks again
+  write("dyn.lua", { "return { v = function() return 8 end }" })
+  answer = "cancel"
+  p:refresh()
+  vim.wait(5000, function()
+    return not p.running
+  end, 10)
+  eq(asked, 3)
+  eq(sched.format_error(p.error):find("dyn.yaml not started (not trusted yet)", 1, true) ~= nil, true)
+  answer = "allow"
+  p:refresh()
+  vim.wait(5000, function()
+    return not p.running and p.error == nil
+  end, 10)
+  eq(p.rs.rows, { { 8 } })
+end
+
 T["confirm = false and trusted_dirs skip the question"] = function()
   local path = write("lua.yaml", LUA)
   trust.record(path, "deny")

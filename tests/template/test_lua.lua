@@ -88,4 +88,59 @@ T["args and meta come from env.lua"] = function()
   eq(render("{% lua %}return args.n .. meta.os{% endlua %}", { env = env }), "3linux")
 end
 
+---Render with an in-memory loader of `files`.
+local function with_files(src, files, env)
+  env = env or {}
+  env.load_template = require("dbdash.template.loader").dict(files)
+  return template.render(src, {}, { env = env, source = "b.yaml" })
+end
+
+local HELPERS = [[
+local M = {}
+function M.twice(x) return x * 2 end
+function M.join(list, sep) return table.concat(list, sep) end
+function M.pair() return { b = 2, a = 1 } end
+function M.nothing() end
+M.answer = 42
+M.items = { "x", "y" }
+return M
+]]
+
+T["import a .lua module and call its functions"] = function()
+  local files = { ["h.lua"] = HELPERS }
+  eq(with_files("{% import 'h.lua' as h %}{{ h.twice(21) }} {{ h.answer }} {{ h.items | join('-') }}", files), "42 42 x-y")
+  eq(with_files("{% from 'h.lua' import twice, join %}{{ twice(2) }} {{ join(['a', 'b'], '+') }}", files), "4 a+b")
+  -- Lua tables come back as lists / mappings (keys sorted); nil as none
+  eq(with_files("{% import 'h.lua' as h %}{{ h.pair().keys() | join(',') }} {{ h.nothing() is none }}", files), "a,b True")
+  -- in a {% lua %} block the module is its own table
+  eq(with_files("{% import 'h.lua' as h %}{% lua %}return vars.h.twice(5) + #vars.h.items{% endlua %}", files), "12")
+end
+
+T["module errors name the .lua file and line"] = function()
+  local files = {
+    ["bad.lua"] = "local M = {}\nfunction M.f(x)\n  return x.y\nend\nreturn M\n",
+    ["notable.lua"] = "return 1",
+    ["syntax.lua"] = "return {",
+  }
+  local _, err = with_files("{% import 'bad.lua' as b %}\n{{ b.f(none) }}", files)
+  eq({ err.source, err.line, err.message }, { "bad.lua", 3, "attempt to index local 'x' (a nil value)" })
+  _, err = with_files("{% import 'bad.lua' as b %}{{ b.f(x=1) }}", files)
+  eq(err.message, "bad.lua.f() takes no keyword arguments (a Lua function)")
+  _, err = with_files("{% import 'notable.lua' as n %}", files)
+  eq({ err.source, err.message }, { "notable.lua", "a module must return a table (got number)" })
+  _, err = with_files("{% import 'syntax.lua' as s %}", files)
+  eq({ err.source, err.message:find("^syntax error:") ~= nil }, { "syntax.lua", true })
+end
+
+T["a module runs once per render and sees that render's args and meta"] = function()
+  local files = { ["c.lua"] = "_G.dbdash_test_runs = (_G.dbdash_test_runs or 0) + 1\nreturn { n = function() return args.n .. meta.os end }" }
+  _G.dbdash_test_runs = 0
+  local env = function(n)
+    return { lua = { args = { n = n }, meta = require("dbdash.metadata").for_lua({ os = "linux" }) } }
+  end
+  eq(with_files("{% import 'c.lua' as a %}{% import 'c.lua' as b %}{{ a.n() }}{{ b.n() }}", files, env(1)), "1linux1linux")
+  eq(with_files("{% import 'c.lua' as a %}{{ a.n() }}", files, env(2)), "2linux")
+  eq(_G.dbdash_test_runs, 2)
+end
+
 return T
