@@ -311,6 +311,32 @@ function M.resolve(specs, state)
   return vars
 end
 
+---Check a value set from Lua or a template for an argument's declared type (nil is none);
+---returns an error message or nil. Lists and mappings are checked as tables.
+function M.check_value(spec, v)
+  if v == nil or v == vim.NIL then
+    return nil
+  end
+  local t, ok = spec.type, true
+  if t == "string" then
+    ok = type(v) == "string"
+  elseif t == "number" then
+    ok = type(v) == "number"
+  elseif t == "int" then
+    ok = type(v) == "number" and v == math.floor(v)
+  elseif t == "boolean" then
+    ok = type(v) == "boolean"
+  elseif t == "list" then
+    ok = type(v) == "table" and (vim.islist(v) or next(v) == nil)
+  elseif t == "map" then
+    ok = type(v) == "table" and (require("dbdash.util.map").is_map(v) or not vim.islist(v) or next(v) == nil)
+  end
+  if not ok then
+    local what = type(v) == "table" and (vim.islist(v) and "a list" or "a mapping") or ("a " .. type(v))
+    return ("argument '%s' is %s, got %s"):format(spec.name, t == "int" and "an int" or ("a " .. t), what)
+  end
+end
+
 ---Template variables of one panel: its visible arguments (shared ones, each shadowed by
 ---a local one of the same name), by name.
 ---@param panel dbdash.PanelConfig

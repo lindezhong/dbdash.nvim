@@ -28,6 +28,7 @@ M.NAMES = {
   "prev_query",
   "prev_result",
   "prev_error",
+  "callback",
   "now",
   "today",
   "hostname",
@@ -110,6 +111,8 @@ function M.values(panel, run)
   out.prev_query = panel.prev_query
   out.prev_result = panel.prev_result
   out.prev_error = panel.prev_error
+  -- 0 in a refresh, n in a dbdash.run() callback n levels deep.
+  out.callback = run and run.depth or 0
   return out
 end
 

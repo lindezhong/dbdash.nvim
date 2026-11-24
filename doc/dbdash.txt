@@ -83,6 +83,8 @@ defaults: >lua
     lua = {                -- configs with Lua code, see |dbdash-lua|
       confirm = true,      -- ask once per config before running them
       trusted_dirs = {},   -- configs under these directories run unasked
+      max_callbacks = 100, -- dbdash.run() calls in one refresh, all levels
+      max_callback_depth = 10,  -- dbdash.run() nesting, |dbdash-callback|
     },
   })
 <
@@ -629,6 +631,8 @@ there is no value):
                  { columns, types, rows }; NULL cells are none / nil
   prev_error     the previous refresh's error when it failed (prev_query
                  and prev_result then keep the last success), else none
+  callback       0 in a refresh, n in a dbdash.run() callback n levels deep
+                 (|dbdash-callback|)
   now            render time, ISO 8601 with the UTC offset
                  (2026-11-24T10:00:00+08:00)
   today          the date (2026-11-24)
@@ -1086,6 +1090,8 @@ plus:
                         returns its raw value and the HTTP response
   dbdash.sleep(ms)      wait without blocking
   dbdash.checkpoint()   let the editor run during a long computation
+  dbdash.run(args)      run this panel's query again with other arguments
+                        and return its rows (|dbdash-callback|)
   dbdash.null           NULL in returned rows (nil works too)
   dbdash.safe(s)        (templates) output s as is, even with autoescape
 
@@ -1097,6 +1103,26 @@ refreshes and argument changes. Panels do not share it, and it starts empty
 when the dashboard is started again (it is not saved in sessions): >lua
   store.runs = (store.runs or 0) + 1
 <
+                                                             *dbdash-callback*
+`dbdash.run(args)` runs the panel's whole pipeline again (`query.sql`
+template, query, `query.transform`, rows check) with `args` merged over the
+current arguments, and returns the rows as `{ columns, types, rows }`; every
+Lua of the panel can call it. In that run `meta.callback` is 1, in a
+callback of a callback 2, and so on (0 in a refresh), so a template can stop
+the recursion: >jinja
+  {% lua %}
+    if meta.callback == 0 then
+      store.last_week = dbdash.run({ days = 14 }).rows[1][1]
+    end
+  {% endlua %}
+<
+A callback is not a refresh: no new rows on screen, no history, and
+`refresh_count` and `meta.prev_*` do not change. It runs inside the
+refresh, within the query timeout, and its errors fail the refresh. More
+than `lua.max_callbacks` calls in one refresh (all levels together; each
+refresh counts from 0) or nesting deeper than `lua.max_callback_depth`
+(|dbdash-setup|) fails the refresh too.
+
 A `lua://` query returns rows (|dbdash-result|), or any value that its
 `query.transform` turns into rows. Errors name the config file and line; a
 script still running at the query timeout is stopped (loops that never call a

@@ -265,7 +265,9 @@ definitions:
             rs        SQL and other databases: { columns (names), types, rows (nil for
                       NULL) }; lua://: the script's value; http(s)://: the decoded body
             response  http(s)://: { status, reason, headers, body, url }
-            args      the arguments, meta the metadata, and the dbdash.* helpers
+            args      the arguments, meta the metadata, store the panel's table kept while
+                      the dashboard runs, and the dbdash.* helpers (dbdash.run(args)
+                      runs this panel's query again with other arguments)
           and returns rows (see "Result format" at the top of this file, :help
           dbdash-result). Configs with Lua ask for trust first (:help dbdash-lua).
       args:

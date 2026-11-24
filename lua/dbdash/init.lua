@@ -43,6 +43,8 @@ local M = {}
 ---@field confirm boolean ask (vim.secure, like exrc) before running a config with Lua
 ---  (lua:// or query.transform); false runs them without asking (default true)
 ---@field trusted_dirs string[] configs under these directories run without asking
+---@field max_callbacks integer dbdash.run() calls in one refresh, all levels together (default 100)
+---@field max_callback_depth integer dbdash.run() nesting (meta.callback), default 10
 
 ---@class dbdash.Options
 ---@field mappings boolean|table<"start"|"refresh"|"stop"|"list"|"sidebar", string|false>
@@ -104,6 +106,8 @@ local defaults = {
   lua = {
     confirm = true,
     trusted_dirs = {},
+    max_callbacks = 100,
+    max_callback_depth = 10,
   },
 }
 M.DEFAULTS = defaults
@@ -254,6 +258,8 @@ local SPEC = {
   lua = {
     confirm = of_type("boolean"),
     trusted_dirs = string_list,
+    max_callbacks = int(1),
+    max_callback_depth = int(1),
   },
 }
 

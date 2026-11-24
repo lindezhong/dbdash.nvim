@@ -194,4 +194,150 @@ panels:
   d:resume()
 end
 
+T["dbdash.run(): the panel's pipeline with other arguments; meta.callback is the depth"] = function()
+  local d = start("cb", [[
+database: { url: "sqlite:///:memory:" }
+query:
+  args: [{ name: n, type: int, default: 1 }]
+  sql: |
+    SELECT {{ args.n }} AS n, {{ meta.callback }} AS depth,
+    {% lua %}
+      if meta.callback < 2 then
+        local r = dbdash.run({ n = args.n * 10 }).rows[1]
+        return "'" .. r[1] .. ":" .. r[2] .. "," .. r[3] .. "'"
+      end
+      return "'-'"
+    {% endlua %} AS chain
+  transform: |
+    return { columns = { "n", "depth", "chain" }, rows = { rs.rows[1] } }
+]])
+  local p = d.panels[1]
+  assert(p.rs, p.error and sched.format_error(p.error))
+  -- the refresh: n = 1, depth 0; its callback: n = 10, depth 1; that one's: n = 100, depth 2
+  eq(p.rs.rows[1], { 1, 0, "10:1,100:2,-" })
+  eq(p.refresh_count, 1) -- callbacks are not refreshes
+end
+
+T["dbdash.run(): from imported modules, transforms and lua://; returns the transformed rows"] = function()
+  vim.fn.writefile({ "local M = {}", "function M.twice() return dbdash.run({ k = 2 }).rows[1][1] end", "return M" }, dir .. "/m.lua")
+  local d = start("cbs", [[
+database: { url: "lua://" }
+panels:
+  - query:
+      args: [{ name: k, type: int, default: 1 }]
+      sql: |
+        {% import 'm.lua' as m %}
+        return { { v = {{ args.k }} * 7, via_module = {{ m.twice() if meta.callback == 0 else 0 }} } }
+      transform: |
+        local via_transform = meta.callback == 0 and dbdash.run({ k = 3 }).rows[1][1] or 0
+        return { { v = rs[1].v, via_module = rs[1].via_module, via_transform = via_transform } }
+  - query:
+      args: [{ name: k, type: int, default: 1 }]
+      sql: |
+        if meta.callback == 0 then return { { v = dbdash.run({ k = 5 }).rows[1][1] } } end
+        return { { v = args.k * 11 } }
+]])
+  local p1, p2 = d.panels[1], d.panels[2]
+  assert(p1.rs, p1.error and sched.format_error(p1.error))
+  -- columns sorted: v, via_module, via_transform
+  eq(p1.rs.rows[1], { 7, 14, 21 })
+  eq(p2.rs.rows[1][1], 55)
+end
+
+T["dbdash.run(): the depth and total limits fail the refresh"] = function()
+  local d = start("loop", [[
+database: { url: "lua://" }
+query: { sql: "dbdash.run(); return {}" }
+]])
+  local p = d.panels[1]
+  eq(sched.format_error(p.error):find("dbdash.run: callbacks nested deeper than 10 (lua.max_callback_depth)", 1, true) ~= nil, true)
+  -- shallow but wide: 3 calls per level, 5 levels = 3 + 9 + 27 + 81 + 243 calls
+  require("dbdash").setup({ lua = { confirm = false, max_callbacks = 50, max_callback_depth = 5 } })
+  d = start("wide", [[
+database: { url: "lua://" }
+query: { sql: "if meta.callback < 5 then for _ = 1, 3 do dbdash.run() end end; return { { c = meta.callback } }" }
+]])
+  p = d.panels[1]
+  eq(sched.format_error(p.error):find("dbdash.run: more than 50 callbacks in one refresh (lua.max_callbacks)", 1, true) ~= nil, true)
+  -- each refresh counts from 0: 3 + 9 = 12 calls per refresh fit 50 every time
+  require("dbdash").setup({ lua = { confirm = false, max_callbacks = 12 } })
+  d = start("fits", [[
+database: { url: "lua://" }
+query: { sql: "if meta.callback < 2 then for _ = 1, 3 do dbdash.run() end end; return { { c = 1 } }" }
+]])
+  p = d.panels[1]
+  eq(p.error, nil)
+  again(p)
+  again(p)
+  eq({ p.error, p.refresh_count }, { nil, 3 })
+end
+
+T["dbdash.run(): unknown arguments and wrong types are errors"] = function()
+  local d = start("badrun", [[
+database: { url: "lua://" }
+query:
+  args: [{ name: n, type: int }]
+  sql: "if meta.callback == 0 then dbdash.run({ {{ 'nope' if true }} = 1 }) end; return {}"
+]])
+  eq(sched.format_error(d.panels[1].error):find("'nope' is not an argument of this panel", 1, true) ~= nil, true)
+  d = start("badtype", [[
+database: { url: "lua://" }
+query:
+  args: [{ name: n, type: int }]
+  sql: "if meta.callback == 0 then dbdash.run({ n = 'x' }) end; return {}"
+]])
+  eq(sched.format_error(d.panels[1].error):find("argument 'n' is an int, got a string", 1, true) ~= nil, true)
+end
+
+T["dbdash.run(): the outer script keeps its timeout after a callback"] = function()
+  local d = start("timeout", [[
+database: { url: "lua://" }
+query:
+  timeout: 1s
+  sql: |
+    if meta.callback > 0 then return { { x = 1 } } end
+    dbdash.run()
+    while true do end
+]])
+  local e = d.panels[1].error
+  eq(e ~= nil and sched.format_error(e):find("did not finish within 1.0s", 1, true) ~= nil, true)
+end
+
+T["timeouts: a waiting script's deadline does not fire in other code"] = function()
+  local d = start("waiting", [[
+database: { url: "lua://" }
+query:
+  timeout: 1s
+  sql: |
+    dbdash.sleep(300)
+    return { { x = 1 } }
+]])
+  -- Another task waits in guarded code past its deadline while this (interpreted) code
+  -- runs: LuaJIT's hook is global, but only the running coroutine's deadlines count.
+  local task_done = false
+  require("dbdash.util.async").run(function()
+    require("dbdash.db.lua_env").guard(function()
+      require("dbdash.util.async").sleep(400)
+    end, 100)
+  end, function()
+    task_done = true
+  end)
+  local busy = function()
+    local n = 0
+    for i = 1, 200000 do
+      n = n + i
+    end
+    return n
+  end
+  jit.off(busy)
+  local ok, err = pcall(function()
+    vim.wait(800, function()
+      busy()
+      return task_done
+    end, 5)
+  end)
+  eq({ ok, err }, { true, nil })
+  eq(d.panels[1].error, nil)
+end
+
 return T

@@ -258,9 +258,52 @@ function Panel:new_run(values, parent)
   return run
 end
 
----The `dbdash` table of a run's Lua code: the shared helpers plus the run's own.
+---A visible argument of the panel by name (a local one shadows a shared one).
+function Panel:arg_spec(name)
+  for _, spec in ipairs(self.cfg.visible_args) do
+    if spec.name == name then
+      return spec
+    end
+  end
+end
+
+---The `dbdash` table of a run's Lua code: the shared helpers plus the run's own:
+---dbdash.run(args) runs the panel's pipeline again with `args` merged over the run's
+---arguments (a callback: meta.callback is its depth) and returns its rows as Lua data.
 function Panel:helpers(run)
-  return setmetatable({}, { __index = require("dbdash.db.lua_env").helpers })
+  local own = {
+    run = function(over)
+      if over ~= nil and type(over) ~= "table" then
+        error(("dbdash.run: expected a table of arguments, got %s"):format(type(over)), 2)
+      end
+      local limits = opts().lua
+      if run.counter.n + 1 > limits.max_callbacks then
+        error(("dbdash.run: more than %d callbacks in one refresh (lua.max_callbacks)"):format(limits.max_callbacks), 2)
+      end
+      if run.depth + 1 > limits.max_callback_depth then
+        error(("dbdash.run: callbacks nested deeper than %d (lua.max_callback_depth)"):format(limits.max_callback_depth), 2)
+      end
+      local values = {}
+      for k, v in pairs(run.values) do
+        values[k] = v
+      end
+      for name, v in pairs(over or {}) do
+        local spec = type(name) == "string" and self:arg_spec(name)
+        if not spec then
+          error(("dbdash.run: '%s' is not an argument of this panel"):format(tostring(name)), 2)
+        end
+        local bad = args.check_value(spec, v)
+        if bad then
+          error("dbdash.run: " .. bad, 2)
+        end
+        values[name] = v
+      end
+      run.counter.n = run.counter.n + 1
+      local rs = self:pipeline(self:new_run(values, run))
+      return require("dbdash.db.lua_result").to_lua(rs)
+    end,
+  }
+  return setmetatable(own, { __index = require("dbdash.db.lua_env").helpers })
 end
 
 ---Render the templates, query, then query.transform and the rows check (every source goes
