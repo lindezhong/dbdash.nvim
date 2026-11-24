@@ -95,9 +95,16 @@ T["K on the header shows the dashboard's, on a panel the panel's, rendered as Ma
   eq(lines, { "# Sales overview", "Last **24 hours** from sqlite." })
   local buf = vim.api.nvim_win_get_buf(win)
   eq({ vim.bo[buf].filetype, vim.wo[win].wrap, vim.wo[win].linebreak, vim.wo[win].conceallevel }, { "markdown", true, true, 2 })
-  -- Highlighted by treesitter, or by the markdown syntax when treesitter cannot start
-  -- (Neovim without the markdown parser, as on some Windows installs).
-  eq(vim.treesitter.highlighter.active[buf] ~= nil or vim.bo[buf].syntax == "markdown", true)
+  -- With the markdown parser, treesitter must highlight the float; without it (some
+  -- Windows installs) the markdown syntax does, and no filetype plugin error is printed.
+  -- language.add returns nil (it does not throw) when there is no parser.
+  local ok, has_parser = pcall(vim.treesitter.language.add, "markdown")
+  if ok and has_parser then
+    eq({ vim.treesitter.highlighter.active[buf] ~= nil, vim.bo[buf].syntax }, { true, "" })
+  else
+    eq({ vim.treesitter.highlighter.active[buf] ~= nil, vim.bo[buf].syntax }, { false, "markdown" })
+    eq(vim.v.errmsg:find("Parser could not be created", 1, true), nil)
+  end
   vim.cmd("close")
   lines = describe(d, 4)
   eq(lines, { "Panel 1 (table), 24h, `sqlite`." })
