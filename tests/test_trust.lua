@@ -196,7 +196,7 @@ T["View shows every file after a separator naming it; a allows and starts"] = fu
   local path = write("board.yaml", importing("helpers.lua"))
   local shown = view_then(path, "a")
   eq(shown.floating, true)
-  eq(vim.inspect(shown.title):find("a allow, d deny, q close", 1, true) ~= nil, true)
+  eq(vim.inspect(shown.title):find("board.yaml: Lua code - a allow, d deny, q close", 1, true) ~= nil, true)
   local l = shown.lines
   ---A line of ━ with " ... label " centered (the two sides differ by at most one).
   local function separator(line, label)
@@ -211,12 +211,12 @@ T["View shows every file after a separator naming it; a allows and starts"] = fu
     local middle = table.concat(chars, "", lw + 1, #chars - rw)
     return vim.startswith(middle, " ") and vim.endswith(middle, label) and lw >= 4 and math.abs(lw - rw) <= 1
   end
-  eq(separator(l[1], "board.yaml (config) "), true)
-  eq(vim.list_slice(l, 2, 7), importing("helpers.lua"))
-  eq(l[8], "")
-  eq(separator(l[9], "helpers.lua (Lua) "), true)
-  eq(vim.list_slice(l, 10, 11), { "return {}", "-- helper" })
-  eq(shown.separators, { { 0, "DbDashTrustFile" }, { 8, "DbDashTrustFile" } })
+  -- the config first, without a separator (the title names it); then each imported file
+  eq(vim.list_slice(l, 1, 6), importing("helpers.lua"))
+  eq(l[7], "")
+  eq(separator(l[8], "helpers.lua (Lua) "), true)
+  eq(vim.list_slice(l, 9, 10), { "return {}", "-- helper" })
+  eq(shown.separators, { { 7, "DbDashTrustFile" } })
   eq(trust.state(path, trust.collect(path, require("dbdash.config").load(path))), "allowed")
   eq(sched.get(sched.normalize(path)) ~= nil, true) -- started after allowing
   eq(asked, 1)

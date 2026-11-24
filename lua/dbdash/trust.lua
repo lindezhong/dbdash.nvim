@@ -214,20 +214,23 @@ end
 
 local KIND = { config = "config", lua = "Lua", template = "template with Lua" }
 
----The lines of the View float: every file after a separator line naming it; the
----separators' row numbers (0-based) for highlighting.
+---The lines of the View float: the config first (the float's title names it), then every
+---imported file after a separator line naming it; the separators' row numbers (0-based)
+---for highlighting.
 function M.view_lines(files, width)
   local lines, seps = {}, {}
   for _, f in ipairs(files) do
     if #lines > 0 then
       lines[#lines + 1] = ""
     end
-    -- The file name centered in a line of ━ as wide as the float.
-    local label = (" %s (%s) "):format(vim.fn.fnamemodify(f.path, ":~:."), KIND[f.kind])
-    local fill = math.max(width - vim.fn.strdisplaywidth(label), 8)
-    local left = math.floor(fill / 2)
-    seps[#seps + 1] = #lines
-    lines[#lines + 1] = ("━"):rep(left) .. label .. ("━"):rep(fill - left)
+    if f.kind ~= "config" then
+      -- The file name centered in a line of ━ as wide as the float.
+      local label = (" %s (%s) "):format(vim.fn.fnamemodify(f.path, ":~:."), KIND[f.kind])
+      local fill = math.max(width - vim.fn.strdisplaywidth(label), 8)
+      local left = math.floor(fill / 2)
+      seps[#seps + 1] = #lines
+      lines[#lines + 1] = ("━"):rep(left) .. label .. ("━"):rep(fill - left)
+    end
     for _, l in ipairs(vim.split(f.text:gsub("\n$", ""), "\n", { plain = true })) do
       lines[#lines + 1] = l
     end

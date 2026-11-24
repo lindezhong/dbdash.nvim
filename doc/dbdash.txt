@@ -941,9 +941,10 @@ before it starts. The unit is the config: one question covers all the Lua it
 runs, its own (`lua://`, `transform`, `{% lua %}` blocks) and the files it
 imports (`.lua` modules and templates with `{% lua %}` blocks, found through
 imports whose target is a quoted name). The question lists those files:
-Allow, View, Deny or Not now. View shows them in one floating window, each
-after a separator line with its path; `a` allows (and starts it), `d` denies,
-`q` closes without deciding. Decisions are kept in
+Allow, View, Deny or Not now. View shows them in one floating window: the
+config (named in the title), then each imported file after a separator line
+with its path; `a` allows (and starts it), `d` denies, `q` closes without
+deciding. Decisions are kept in
 `stdpath("state")/dbdash/trust.json` for that config and those contents: when
 the config or any of the files changes, it is asked about again, and two
 configs sharing a `.lua` file are asked about separately. A file loaded at run
