@@ -194,8 +194,9 @@ definitions:
           Query template (Jinja subset, see :help dbdash-templates): arguments are
           {{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta). Lua runs in
           {% lua %} ... {% endlua %} blocks and in modules imported with
-          {% import 'x.lua' as h %} (:help dbdash-template-lua). Its language depends on
-          the database:
+          {% import 'x.lua' as h %} (:help dbdash-template-lua); a config with Lua is
+          trusted once, with the files it imports (:help dbdash-lua). Its language depends
+          on the database:
             SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)
             Redis          one command, e.g. HGETALL "user:1001"
             MongoDB        a JSON document:
@@ -206,8 +207,8 @@ definitions:
                            distinct (field) | command (command)
             lua://         Lua code returning rows (see "Result format" at the top
                            of this file, :help dbdash-result), or a value that
-                           query.transform turns into rows; it sees args and
-                           dbdash.system/query/sleep (:help dbdash-lua)
+                           query.transform turns into rows; it sees args, meta
+                           and dbdash.system/query/sleep (:help dbdash-lua)
             http(s)://     a JSON request description (empty: GET the URL):
                            {"method": "POST", "path": "search", "query": {...},
                             "headers": {...}, "cookies": "a=1; b=2" | "cookies.txt",
@@ -227,7 +228,7 @@ definitions:
             rs        SQL and other databases: { columns (names), types, rows (nil for
                       NULL) }; lua://: the script's value; http(s)://: the decoded body
             response  http(s)://: { status, reason, headers, body, url }
-            args      and the dbdash.* helpers
+            args      the arguments, meta the metadata, and the dbdash.* helpers
           and returns rows (see "Result format" at the top of this file, :help
           dbdash-result). Configs with Lua ask for trust first (:help dbdash-lua).
       args:

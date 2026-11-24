@@ -476,7 +476,8 @@ Argument values have these types:
 Any other name is an error ("'x' is undefined"), as in Jinja's
 StrictUndefined; a bare argument name says how to write it ("'days' is
 undefined; arguments are written args.days"). Test optional names with `is
-defined`. `args` and `meta` cannot be assigned (`set`, `for`, macro names).
+defined`. `args` and `meta` cannot be assigned: not as `set` or `for`
+targets, macro names or parameters, or `import ... as` names.
 
 Metadata                                                        *dbdash-meta*
 
@@ -687,12 +688,13 @@ Lua code sees the globals (`vim`, `os`, ...) plus:
   dbdash.*     the helpers of |dbdash-lua| (system, query, sleep, ...) and
                `dbdash.safe(s)`: output s as is, even with autoescape
 
-Values cross over as: none / undefined -> nil, lists -> Lua lists, mappings
--> tables; back: nil -> none, Lua lists -> lists, other tables -> mappings
-(keys sorted). The code runs while the dashboard refreshes, without blocking
-the editor (the dbdash.* helpers wait), and is stopped at the query timeout.
-Errors name the file and line: the config's line for a block, the .lua
-file's for a module.
+Values cross over as: none -> nil, lists -> Lua lists, mappings -> tables (in
+`vars`, undefined names are nil too; passing an undefined value to a module
+function is an error); back: nil -> none, Lua lists -> lists, other tables ->
+mappings (keys sorted). The code runs while the dashboard refreshes, without
+blocking the editor (the dbdash.* helpers wait), and is stopped at the query
+timeout. Errors name the file and line: the config's line for a block, the
+.lua file's for a module.
 
 A config with Lua in its templates or imports is trusted before it runs,
 together with the files it imports (|dbdash-lua|).
@@ -700,7 +702,10 @@ together with the files it imports (|dbdash-lua|).
 Errors                                                *dbdash-template-errors*
 
 Syntax and runtime errors stop the refresh and are shown in the dashboard
-with the config file and line, e.g. "board.yaml:12: 'region' is undefined".
+with the file and line: the config's for query.sql and query.transform, e.g.
+"board.yaml:12: 'region' is undefined", the imported file's own for an error
+in an imported template or `.lua` module. A bare argument name says how to
+write it: "'days' is undefined; arguments are written args.days".
 
 Not supported (error with the reason): extends, block, include, call/caller,
 filter blocks, with, block set, namespace(), break/continue, loop filtering
@@ -947,10 +952,11 @@ with its path; `a` allows (and starts it), `d` denies, `q` closes without
 deciding. Decisions are kept in
 `stdpath("state")/dbdash/trust.json` for that config and those contents: when
 the config or any of the files changes, it is asked about again, and two
-configs sharing a `.lua` file are asked about separately. A file loaded at run
-time that the decision does not cover (an import with a computed path, or a
-file changed since) stops the refresh with an error until the config is
-trusted again (start it again, or |:DbDashTrust|).
+configs sharing a `.lua` file are asked about separately. A file with Lua
+loaded while rendering that the decision does not cover (an import with a
+computed path, or a file changed since the dashboard started) asks again right
+away, listing all the files; until it is allowed that refresh fails, and
+allowing it from the View float refreshes the panel.
 `setup({ lua = { confirm = false } })` turns the question off, and
 `lua = { trusted_dirs = { "~/dashboards" } }` skips it for configs under those
 directories. A config cannot skip it itself.
@@ -1110,6 +1116,9 @@ Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
 `DbDashSidebarCursor` (underline) marks the name on the cursor line without
 the ●/◐/○ marker: a terminal draws an underline in the text color, so with an
 underlined CursorLine the green ● leaves a green piece in the line.
+
+`DbDashTrustFile` (links to `Title`) is the separator line before each
+imported file in the View float of the trust question (|dbdash-lua|).
 
 Colors in configs may be hex ("#3498db"), names ("blue", "bold blue"),
 or existing highlight groups ("DiagnosticOk").
