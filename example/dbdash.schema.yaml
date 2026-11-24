@@ -42,6 +42,8 @@ then:
 else:
   required: [database] # query too, except for http(s):// (a GET of the URL)
   not: { required: [layout] } # layout only applies with panels
+dependencies:
+  show_countdown: [interval] # it counts down to the global refresh
 properties:
   database:
     $ref: "#/definitions/database"
@@ -62,6 +64,7 @@ properties:
     description: >-
       Global refresh: when it elapses every panel refreshes and the panels' own timers
       restart. Also the last default of show.interval (after the top-level show.interval).
+      At least 1s.
   title:
     type: string
     description: >-
@@ -70,8 +73,9 @@ properties:
   description:
     type: string
     description: >-
-      The dashboard's description: a template (args, meta) whose result is Markdown, shown
-      by K / :DbDashDescribe; ⓘ after the title says there is one.
+      The dashboard's description: a template (the shared args; meta without panel fields)
+      whose result is Markdown, shown by K / :DbDashDescribe; ⓘ in the header says there is
+      one.
   show_countdown:
     type: boolean
     default: false
@@ -84,7 +88,8 @@ properties:
     description: >-
       Shared arguments: every panel can use them. A panel's query.args are its own (only that
       panel sees them) and shadow a shared argument of the same name there. On the command
-      line name=value sets every argument of that name, <panel id>.name=value one panel's.
+      line name=value sets every argument of that name, <panel id>.name=value one panel's
+      own (a local name nothing else has is plain name too).
     items: { $ref: "#/definitions/arg" }
   layout:
     type: object
@@ -327,14 +332,16 @@ definitions:
       description:
         type: string
         description: >-
-          This chart's description: a template (args, meta) whose result is Markdown, shown
-          by K / :DbDashDescribe; ⓘ after the title says there is one.
+          This chart's description: a template (args, meta, as its query sees them) whose
+          result is Markdown, shown by K / :DbDashDescribe; ⓘ after the panel's title (in a
+          one-chart dashboard: in the header) says there is one. With panels, it belongs in
+          each panel.
       interval:
         $ref: "#/definitions/duration"
         description: >-
           Refresh interval of this chart (default the top-level show.interval, then the
           top-level interval, else 30s from setup defaults.interval). At least 1s.
-      show_countdown: { type: boolean, default: false }
+      show_countdown: { type: boolean, default: false, description: "This chart's own countdown to its next refresh." }
       countdown_format:
         type: string
         default: "Next update: {time}s"

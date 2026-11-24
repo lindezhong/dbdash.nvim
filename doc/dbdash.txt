@@ -121,8 +121,8 @@ error, or the result is not rows, |dbdash-result|), transform (the
 - consecutive failures back off: after the n-th the next try waits
   interval x 2^(n-1), at most interval x `errors.backoff` (1x, 2x, 4x,
   8x, 8x...). The status shows "retrying" and |:DbDashStatus| the count
-  and the next try; with panels, the top-level interval skips a panel that
-  is backing off;
+  and the next try; the top-level interval (|dbdash-interval|) skips a panel
+  that is backing off;
 - `r` / |:DbDashRestart| tries again right away;
 - the first successful refresh clears the error and returns to the normal
   interval.
@@ -153,8 +153,9 @@ database:
     running. It opens in the current window, or in a split or tab with
     `dashboard.open` (|dbdash-setup|); a dashboard already visible is jumped
     to. Arguments after the file set query arguments for this session
-    (|dbdash-arguments|). With [!], every argument is asked for
-    interactively; without it only `required` arguments without a value.
+    (|dbdash-arguments|): `name=value` every argument of that name,
+    `<panel>.name=value` one panel's own. With [!], every argument is asked
+    for interactively; without it only `required` arguments without a value.
 
 :DbDashRestart                                                *:DbDashRestart*
     Run the current dashboard's query now and restart its countdown. If a
@@ -169,9 +170,10 @@ database:
     List running dashboards.
 
 :DbDashStatus                                                  *:DbDashStatus*
-    Show the current dashboard's config, database, next refresh and the last
-    queries (duration, rows, errors, skipped refreshes; `defaults.history`
-    of them, 20 by default).
+    Show the current dashboard's title, config, global refresh (the
+    top-level `interval`) and, for each panel, its database, next refresh
+    and last queries (duration, rows, errors, skipped refreshes;
+    `defaults.history` of them, 20 by default).
 
 :DbDash                                                              *:DbDash*
     Open the sidebar: the *.yaml / *.yml files of the current directory and
@@ -197,13 +199,15 @@ its next refresh is due, and otherwise continues the countdown. Set
     Close the sidebar.
 
 :DbDashShowVariables                                    *:DbDashShowVariables*
-    Show the current dashboard's arguments and values.
+    Show the current dashboard's arguments and values (a panel's own
+    argument whose name another argument has too as `<panel>.name`).
 
 :DbDashModifyVariable                                  *:DbDashModifyVariable*
     Pick an argument and enter a new value.
 
 :DbDashUpdateVariable {name} {value}                   *:DbDashUpdateVariable*
-    Set an argument directly.
+    Set an argument directly: {name} sets every argument of that name (the
+    shared one and each panel's own), `<panel>.name` only that panel's.
 
 :DbDashResetVariables                                  *:DbDashResetVariables*
     Reset all arguments to their defaults.
@@ -324,7 +328,7 @@ are numbers of seconds or strings with a unit: "500ms", "30s", "5m", "1h".
 Where a field is written says what it applies to, with one chart or many:
 
   dashboard-wide       top-level bare fields: `interval`, `args`, `layout`,
-                       `panels`, `title`, `show_countdown`,
+                       `panels`, `title`, `description`, `show_countdown`,
                        `countdown_format`
   per panel, with a    the top-level `database`, `query` and `show`
   top-level default    sections: `database`; `query.timeout`, `max_rows`,
@@ -332,8 +336,8 @@ Where a field is written says what it applies to, with one chart or many:
                        `countdown_format`, `args_show`, `style`, `renderer`,
                        `canvas`, `thresholds`, ...
   one panel only       `query.sql`, `transform`, `args`; `show.type`,
-                       `title`, `span`, `column_list`, the `*_column`
-                       fields, `x_label`, `y_label`
+                       `title`, `description`, `span`, `column_list`, the
+                       `*_column` fields, `x_label`, `y_label`
 
 Without `panels` the top level is the only panel, so every field is written
 there. With `panels` each panel is its top-level `query` and `show` with its
@@ -341,6 +345,18 @@ own fields over them (mappings such as `style` merge key by key, lists are
 replaced), and fields of one panel only are an error at the top level. A
 panel's `database` replaces the top-level one as a whole (its `options` and
 `password_cmd` too). Both kinds of config validate each panel the same way.
+
+`query.max_rows` caps the rows read; `query.timeout` defaults to the URL's
+`timeout`. Values a config leaves out (interval 30s, max_rows 10000, timeout
+30s, countdown_format, chart height) come from `defaults` in |dbdash-setup|.
+Fields the plugin does not use are ignored (the legacy configs have many
+matplotlib-only ones); invalid values of known fields are reported with their
+line and column. The full list of fields is in `example/dbdash.schema.yaml`
+(|dbdash-examples|).
+
+Table options: `column_list: [{column, alias, width, thresholds}]`,
+`style.border`, `style.header_style`, `style.border_style`,
+`style.title_style`, `style.show_lines`, `style.null_text`.
 
 Refresh intervals                                            *dbdash-interval*
 
@@ -359,7 +375,8 @@ simply refreshes with everything else. >yaml
 Header                                                         *dbdash-header*
 
 `title` and `show_countdown` (with `countdown_format`) at the top level put a
-header line above the charts: the title on the left, the countdown to the
+header line above the charts (so does a description's `ⓘ`,
+|dbdash-description|): the title on the left, the countdown to the
 next refresh of every panel (the top-level `interval`, which it needs) on the
 right, "…" while that refresh runs. `show.show_countdown` is each chart's own
 countdown. In both formats `{time}` is the seconds left and `{clock}` the
@@ -387,25 +404,17 @@ rendered when shown, and their result is Markdown: >yaml
     |----------------|-------|
     | orders replica | 5 min |
 <
-They are not drawn in the dashboard: `ⓘ` after a title (the header's for the
-dashboard, or the panel's) says there is one, and `K` (|:DbDashDescribe|)
+They are not drawn in the dashboard: `ⓘ` after a title says there is one
+(the header's for the dashboard's; a panel's own title for a panel's; in a
+one-chart dashboard the header's for either), and `K` (|:DbDashDescribe|)
 shows it in a float with Markdown highlighting (treesitter), concealed markup
 and wrapped lines. A chart's description sees what its query sees: `args`
 with its own arguments and `meta` with its panel and database. The
 dashboard's sees the shared arguments and `meta` without the panel fields
 (`db_*` of the top-level database). Imports and Lua work as in queries, and
-Lua in a description asks for trust like any other (|dbdash-lua|).
-`query.max_rows` caps the rows read; `query.timeout` defaults to the URL's
-`timeout`. Values a config leaves out (interval 30s, max_rows 10000, timeout
-30s, countdown_format, chart height) come from `defaults` in |dbdash-setup|.
-Fields the plugin does not use are ignored (the legacy configs have many
-matplotlib-only ones); invalid values of known fields are reported with their
-line and column. The full list of fields is in `example/dbdash.schema.yaml`
-(|dbdash-examples|).
-
-Table options: `column_list: [{column, alias, width, thresholds}]`,
-`style.border`, `style.header_style`, `style.border_style`,
-`style.title_style`, `style.show_lines`, `style.null_text`.
+Lua in a description asks for trust like any other (|dbdash-lua|). The SQL
+filters quote for the panel's database, in the dashboard's description for
+the top-level one (SQLite's quoting without one).
 
 Examples and schema                                          *dbdash-examples*
 
@@ -556,7 +565,8 @@ are rejected with a line and column.
 6. TEMPLATES                                                *dbdash-templates*
 
 `query.sql` and `query.transform` are templates rendered before every run,
-both the same way (the transform is never autoescaped). The language is a
+both the same way (the transform is never autoescaped); descriptions
+(|dbdash-description|) are rendered the same way when shown. The language is a
 subset of Jinja2 with `trim_blocks` and `lstrip_blocks` enabled, and behaves
 like Jinja2 (Python semantics) for everything it supports. The rendered text
 is what |:DbDashShowSQL| (`s`) shows.
@@ -564,7 +574,8 @@ is what |:DbDashShowSQL| (`s`) shows.
 Variables                                              *dbdash-template-vars*
 
 A template sees two names, the same in every template (query.sql,
-query.transform, imported templates) and in all Lua code (|dbdash-lua|):
+query.transform, descriptions, imported templates) and in all Lua code
+(|dbdash-lua|):
 
   args    the query arguments (|dbdash-arguments|): `args.min_age`
   meta    metadata about the dashboard (|dbdash-meta|): `meta.config_dir`
@@ -812,7 +823,8 @@ together with the files it imports (|dbdash-lua|).
 Errors                                                *dbdash-template-errors*
 
 Syntax and runtime errors stop the refresh and are shown in the dashboard
-with the file and line: the config's for query.sql and query.transform, e.g.
+with the file and line: the config's for query.sql, query.transform and
+descriptions (a description's error is notified when it is shown), e.g.
 "board.yaml:12: 'region' is undefined", the imported file's own for an error
 in an imported template or `.lua` module. A bare argument name says how to
 write it: "'days' is undefined; arguments are written args.days".
@@ -852,8 +864,9 @@ is the panel's `id` (default its number): >vim
 <
 `name=value` sets every argument of that name (the shared one and each
 panel's own); `<panel>.name=value` only that panel's and wins over `name=`.
-The argument list (`A`) and editor (`a`) show local arguments as
-`<panel>.name`.
+A panel's own argument whose name no other argument has is also just
+`name`: the argument list (`A`), the editor (`a`) and saved sessions write
+`<panel>.name` only for names that clash.
 
 Where values come from (highest first):
 
