@@ -37,6 +37,7 @@ local ACTIONS = {
   reset = { "reset_variables", "Reset arguments to defaults" },
   show_sql = { "show_sql", "Show the rendered query" },
   export = { "export", "Export the result" },
+  describe = { "describe", "Show the description" },
 }
 
 ---(Re)define the buffer keys from setup({ dashboard = { keys = ... } }).

@@ -108,6 +108,15 @@ function M.collect(path, cfg)
     end
     visit(q.sql or "")
     visit(q.transform or "")
+    local desc = p.show.description
+    if desc then
+      has_lua = has_lua or M.has_lua_block(desc)
+      visit(desc)
+    end
+  end
+  if cfg.description then
+    has_lua = has_lua or M.has_lua_block(cfg.description)
+    visit(cfg.description)
   end
   table.sort(files, function(a, b)
     if (a.kind == "config") ~= (b.kind == "config") then

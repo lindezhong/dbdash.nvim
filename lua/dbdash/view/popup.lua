@@ -3,7 +3,8 @@ local M = {}
 
 ---Open a centered floating window.
 ---@param lines string[]
----@param opts { title: string?, filetype: string?, hl: table[]? }?
+---@param opts { title: string?, filetype: string?, hl: table[]?, markdown: boolean? }?
+---  markdown: wrapped text at most 80 columns wide, highlighted (treesitter) and concealed
 ---@return integer win, integer buf
 function M.open(lines, opts)
   opts = opts or {}
@@ -18,13 +19,23 @@ function M.open(lines, opts)
   local max_w = math.min(size.resolve(o.max_width, vim.o.columns), vim.o.columns - 4)
   local max_h = math.min(size.resolve(o.max_height, vim.o.lines), vim.o.lines - 6)
   local width = math.max(1, math.min(math.max(60, longest + 4), max_w))
-  local height = math.max(1, math.min(#lines, max_h))
+  local rows = #lines
+  if opts.markdown then
+    width = math.max(1, math.min(80, max_w))
+    rows = 0
+    for _, l in ipairs(lines) do
+      rows = rows + math.max(1, math.ceil(W.width(l) / width))
+    end
+  end
+  local height = math.max(1, math.min(rows, max_h))
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modifiable = false
   vim.bo[buf].bufhidden = "wipe"
-  if opts.filetype then
+  if opts.markdown then
+    vim.bo[buf].filetype = "markdown"
+  elseif opts.filetype then
     vim.bo[buf].filetype = opts.filetype
   end
   local ns = require("dbdash.view.buffer").ns
@@ -45,6 +56,16 @@ function M.open(lines, opts)
   })
   vim.wo[win].wrap = false
   vim.wo[win].cursorline = true
+  if opts.markdown then
+    local wo = vim.wo[win]
+    wo.wrap, wo.linebreak, wo.breakindent = true, true, true
+    wo.conceallevel, wo.concealcursor = 2, "n"
+    wo.cursorline = false
+    -- Neovim ships the markdown parsers; the markdown syntax is the fallback.
+    if not pcall(vim.treesitter.start, buf, "markdown") then
+      vim.bo[buf].syntax = "markdown"
+    end
+  end
 
   local function close()
     if vim.api.nvim_win_is_valid(win) then

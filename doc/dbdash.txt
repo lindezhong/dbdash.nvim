@@ -58,7 +58,9 @@ defaults: >lua
                            -- "current" | "vsplit" | "split" | "tab"
       pause_hidden = true, -- no queries while not on screen, see below
       keys = { modify = "a", show_args = "A", refresh = "r",
-               reset = "R", show_sql = "s", export = "e" },
+               reset = "R", show_sql = "s", export = "e",
+               describe = "K" },
+      icons = { description = "ⓘ" },  -- after a title with a description
     },
     popup = {              -- :DbDashShowSQL and the other floats
       border = "rounded",  -- any 'winborder' value or a list of chars
@@ -210,6 +212,12 @@ its next refresh is due, and otherwise continues the countdown. Set
     Show the rendered query in a floating window ("q"/<Esc> close, "y" yank),
     followed by the rendered `query.transform` when there is one.
 
+:DbDashDescribe                                              *:DbDashDescribe*
+    Show a description (|dbdash-description|) in a floating window, as
+    Markdown: the dashboard's with the cursor on the header line, the
+    panel's with the cursor on a panel, both in a one-chart dashboard;
+    elsewhere pick one. "q"/<Esc> close, "y" yank. `K` in a dashboard.
+
 :DbDashExport[!] [{format}] [{file}]                          *:DbDashExport*
     Export the result of the current dashboard (with panels: the one under the
     cursor, or pick one) as `csv`, `tsv`, `json` or `markdown`; without
@@ -255,11 +263,17 @@ Global:
   <leader>dd   :DbDash
 
 Dashboard buffer (`dashboard.keys`: modify, show_args, refresh, reset,
-show_sql, export):
+show_sql, export, describe):
 
   a   modify an argument          A   show arguments
   r   refresh now                 R   reset arguments
   s   show the rendered query     e   export the result
+  K   show the description (|:DbDashDescribe|)
+
+Set a key to false to leave it unmapped, and map the command yourself: >lua
+  require("dbdash").setup({ dashboard = { keys = { describe = false } } })
+  vim.keymap.set("n", "<leader>dk", "<Cmd>DbDashDescribe<CR>")
+<
 
 Sidebar (`sidebar.keys`: select, stop, refresh, close):
 
@@ -358,6 +372,29 @@ time as m:ss (h:mm:ss from an hour): >yaml
 The title also names the dashboard in threshold notifications (for a chart
 without `show.title`), the panel picker, |:DbDashStatus|, the sidebar (after
 the file name) and `meta.dashboard_title`.
+
+Descriptions                                              *dbdash-description*
+
+The top-level `description` describes the dashboard, `show.description` one
+chart (it belongs to one panel). Both are templates (|dbdash-templates|),
+rendered when shown, and their result is Markdown: >yaml
+  description: |
+    # Sales overview
+    The last **{{ args.hours }} hours**{% if args.region %}, region
+    `{{ args.region }}`{% endif %}.
+
+    | Source         | Lag   |
+    |----------------|-------|
+    | orders replica | 5 min |
+<
+They are not drawn in the dashboard: `ⓘ` after a title (the header's for the
+dashboard, or the panel's) says there is one, and `K` (|:DbDashDescribe|)
+shows it in a float with Markdown highlighting (treesitter), concealed markup
+and wrapped lines. A chart's description sees what its query sees: `args`
+with its own arguments and `meta` with its panel and database. The
+dashboard's sees the shared arguments and `meta` without the panel fields
+(`db_*` of the top-level database). Imports and Lua work as in queries, and
+Lua in a description asks for trust like any other (|dbdash-lua|).
 `query.max_rows` caps the rows read; `query.timeout` defaults to the URL's
 `timeout`. Values a config leaves out (interval 30s, max_rows 10000, timeout
 30s, countdown_format, chart height) come from `defaults` in |dbdash-setup|.
@@ -581,6 +618,9 @@ there is no value):
   arch           x64, arm64, ...
 
 No password and no expanded environment variable is part of the metadata.
+In the dashboard's description (|dbdash-description|) the panel fields
+(`panel_*`, `chart_type`, `interval`, `max_rows`, `timeout`,
+`refresh_count`) are none and `db_*` describe the top-level database.
 
 Syntax                                                *dbdash-template-syntax*
 
@@ -1188,7 +1228,7 @@ All groups link to standard groups by default:
 
   DbDashTitle DbDashBorder DbDashHeader DbDashNull DbDashMuted DbDashNumber
   DbDashAxis DbDashLabel DbDashError DbDashWarn DbDashCountdown
-  DbDashArgName DbDashArgValue DbDashArgLocal
+  DbDashArgName DbDashArgValue DbDashArgLocal DbDashDescIcon
   DbDashSeries1 ... DbDashSeries8   chart series colors (palette "theme")
   DbDashStatValue (Number), DbDashUp (DiagnosticOk), DbDashDown
   (DiagnosticError)                 stat value and its change

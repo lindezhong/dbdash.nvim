@@ -11,6 +11,18 @@
 # - args are shared; a panel's query.args are its own. args_show shows, on each panel, the
 #   arguments its query reads.
 title: "Overview"
+# Descriptions are templates shown as Markdown: ⓘ marks them, K shows the one under the
+# cursor (on this title line: the dashboard's).
+description: |
+  # Overview
+  Sample data from an in-memory SQLite database, plus the GitHub API.
+
+  | Panel           | Source             | Refresh |
+  |-----------------|--------------------|---------|
+  | Visits per hour | SQLite, generated  | 10s     |
+  | Contributors    | api.github.com     | 10m     |
+
+  History shown: **{{ args.hours }} hours** (`:DbDashUpdateVariable hours 48`).
 
 database:
   url: "sqlite:///:memory:"
@@ -45,6 +57,9 @@ panels:
     show:
       type: line
       title: "Visits per hour"
+      description: |
+        Random visits for each of the last **{{ args.hours }}** hours, from
+        `{{ meta.db_type }}` (panel {{ meta.panel_index }}, every {{ meta.interval // 1000 }}s).
       x_column: hour
       y_column: visits
       interval: 10s
@@ -93,6 +108,10 @@ panels:
     show:
       type: bar
       title: "Top Neovim contributors"
+      description: |
+        Commits of the top 8 contributors to
+        [neovim/neovim](https://github.com/neovim/neovim), from `{{ meta.db_url }}`.
+        Unauthenticated API calls are limited to 60 an hour, hence the 10m interval.
       x_column: login
       y_column: contributions
       span: 2

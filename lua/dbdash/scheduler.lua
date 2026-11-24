@@ -215,40 +215,91 @@ end
 ---@return string sql, string? transform_code
 function Panel:render_templates()
   local q, d = self.cfg.query, self.d
-  local driver = db.driver(self.cfg.database.type)
   local values = args.resolve_panel(self.cfg, d.state)
   self.vars = values -- `args` of lua:// scripts and query.transform
-  local metadata = require("dbdash.metadata")
-  self.meta = metadata.values(self) -- `meta` of the Lua code
-  -- Templates see exactly two names: args.<name> and meta.<name>; imported templates too.
-  local args_map = require("dbdash.util.map").new()
-  for _, spec in ipairs(self.cfg.visible_args) do
-    require("dbdash.util.map").set(args_map, spec.name, values[spec.name])
-  end
-  local vars = { args = args_map, meta = metadata.for_template(self.meta) }
-  local source = vim.fn.fnamemodify(d.path, ":~:.")
-  local function render(text, line, autoescape)
-    local env = template.env(driver.dialect, autoescape, d.cfg.dir)
-    env.context = vars
-    -- Lua in templates ({% lua %}, imported .lua): args, meta and the query timeout.
-    env.lua = { args = values, meta = metadata.for_lua(self.meta) }
-    env.timeout = q.timeout or require("dbdash").default_ms("timeout")
-    env.check_file = function(path, text, kind)
-      self:check_file(path, text, kind)
-    end
-    local out, err = template.render(text, vars, {
-      env = env,
-      source = source,
-      line_offset = line - 1,
-    })
-    if not out then
-      error(err, 0)
-    end
-    return out
-  end
-  local sql = render(q.sql, q.sql_line, q.autoescape)
-  local code = q.transform and render(q.transform, q.transform_line, false) or nil
+  self.meta = require("dbdash.metadata").values(self) -- `meta` of the Lua code
+  local o = {
+    dialect = db.driver(self.cfg.database.type).dialect,
+    specs = self.cfg.visible_args,
+    values = values,
+    meta = self.meta,
+    timeout = q.timeout,
+    on_allow = function()
+      self:refresh({ queue = true })
+    end,
+  }
+  local sql = M.render_text(d, q.sql, q.sql_line, vim.tbl_extend("force", o, { autoescape = q.autoescape }))
+  local code = q.transform and M.render_text(d, q.transform, q.transform_line, o) or nil
   return sql, code
+end
+
+---Render template `text` (at `line` of the config) of dashboard `d`. Templates see exactly
+---two names: args.<name> (o.specs with o.values) and meta.<name> (o.meta); imported
+---templates and Lua in templates too. Inside a util.async task; raises template errors.
+---@param o { dialect: table?, autoescape: boolean?, specs: dbdash.ArgSpec[], values: table, meta: table, timeout: integer?, on_allow: fun()? }
+function M.render_text(d, text, line, o)
+  local metadata = require("dbdash.metadata")
+  local map = require("dbdash.util.map")
+  local args_map = map.new()
+  for _, spec in ipairs(o.specs) do
+    map.set(args_map, spec.name, o.values[spec.name])
+  end
+  local vars = { args = args_map, meta = metadata.for_template(o.meta) }
+  local env = template.env(o.dialect, o.autoescape == true, d.cfg.dir)
+  env.context = vars
+  -- Lua in templates ({% lua %}, imported .lua): args, meta and the query timeout.
+  env.lua = { args = o.values, meta = metadata.for_lua(o.meta) }
+  env.timeout = o.timeout or require("dbdash").default_ms("timeout")
+  env.check_file = function(path, t, kind)
+    M.check_file(d, path, t, kind, o.on_allow)
+  end
+  local out, err = template.render(text, vars, {
+    env = env,
+    source = vim.fn.fnamemodify(d.path, ":~:."),
+    line_offset = line - 1,
+  })
+  if not out then
+    error(err, 0)
+  end
+  return out
+end
+
+---Render a description (a template) in a task; `cb(err, text)` on the main loop.
+local function describe_async(fn, cb)
+  require("dbdash.util.async").run(fn, function(err, text)
+    vim.schedule(function()
+      cb(err, text)
+    end)
+  end)
+end
+
+---The panel's show.description rendered with its arguments and metadata (Markdown).
+function Panel:describe_async(cb)
+  local show = self.cfg.show
+  describe_async(function()
+    local meta = require("dbdash.metadata").values(self)
+    return M.render_text(self.d, show.description, show.description_line, {
+      dialect = db.driver(self.cfg.database.type).dialect,
+      specs = self.cfg.visible_args,
+      values = args.resolve_panel(self.cfg, self.d.state),
+      meta = meta,
+      timeout = self.cfg.query.timeout,
+    })
+  end, cb)
+end
+
+---The dashboard's description rendered with the shared arguments and the metadata
+---outside any panel (db_* of the top-level database).
+function Dashboard:describe_async(cb)
+  local cfg = self.cfg
+  describe_async(function()
+    return M.render_text(self, cfg.description, cfg.description_line, {
+      dialect = cfg.database and db.driver(cfg.database.type).dialect or nil,
+      specs = cfg.shared_args,
+      values = args.resolve(cfg.shared_args, self.state),
+      meta = require("dbdash.metadata").dashboard_values(self),
+    })
+  end, cb)
 end
 
 ---A file with Lua loaded while rendering (an imported .lua module or template with a
@@ -256,8 +307,14 @@ end
 ---through a computed path, or changed since the dashboard started) asks again, with all
 ---the config's files; allowing it from the View float refreshes the panel.
 function Panel:check_file(path, text, kind)
+  M.check_file(self.d, path, text, kind, function()
+    self:refresh({ queue = true })
+  end)
+end
+
+---check_file for any template of dashboard `d`; `on_allow` runs when it is allowed then.
+function M.check_file(d, path, text, kind, on_allow)
   local trust = require("dbdash.trust")
-  local d = self.d
   if kind == "template" and not trust.has_lua_block(text) then
     return
   end
@@ -274,8 +331,8 @@ function Panel:check_file(path, text, kind)
     files[#files + 1] = { path = real, kind = kind, text = text }
   end
   local ok, why = trust.check(d.path, files, function(answer)
-    if answer == "allow" then
-      self:refresh({ queue = true })
+    if answer == "allow" and on_allow then
+      on_allow()
     end
   end)
   if not ok then
@@ -513,13 +570,34 @@ end
 
 ---The header above the panels: the dashboard title (and the global countdown, an extmark
 ---on its line), then an empty line; none without a title or countdown.
+---ⓘ (dashboard.icons.description): there is a description to read with K.
+local function desc_icon()
+  return require("dbdash").options.dashboard.icons.description
+end
+
+---The header shows ⓘ for the dashboard's description, and in a one-chart dashboard for the
+---chart's too (the chart has no title line of its own).
+function Dashboard:header_icon()
+  local cfg = self.cfg
+  return cfg.description ~= nil or (not cfg.grid and self.panels[1].cfg.show.description ~= nil)
+end
+
+---The header above the panels: the dashboard title and ⓘ (and the global countdown, an
+---extmark on its line), then an empty line; none without any of them.
 function Dashboard:header()
   local cfg = self.cfg
-  if not (cfg.title or cfg.show_countdown) then
+  local icon = self:header_icon()
+  if not (cfg.title or cfg.show_countdown or icon) then
     return {}, {}
   end
   local title = cfg.title or ""
-  return { title, "" }, { { row = 0, col_s = 0, col_e = #title, group = "DbDashTitle" } }
+  local line, hl = title, { { row = 0, col_s = 0, col_e = #title, group = "DbDashTitle" } }
+  if icon then
+    line = title ~= "" and (title .. " ") or ""
+    hl[#hl + 1] = { row = 0, col_s = #line, col_e = #line + #desc_icon(), group = "DbDashDescIcon" }
+    line = line .. desc_icon()
+  end
+  return { line, "" }, hl
 end
 
 ---The args_show line of a panel (its shown_args with their current values; local ones
@@ -593,8 +671,16 @@ end
 local function panel_cell(p, width, height)
   local show = vim.deepcopy(p:show_config())
   show.title = nil -- shown in the header line instead
-  local title = W.truncate(p:title(), width)
+  local name = p:title()
+  if p.cfg.show.description then
+    name = name .. " " .. desc_icon()
+  end
+  local title = W.truncate(name, width)
   local head, spans = title, { { 0, #title, "DbDashTitle" } }
+  if p.cfg.show.description and title == name then
+    local icon = desc_icon()
+    spans = { { 0, #title - #icon - 1, "DbDashTitle" }, { #title - #icon, #title, "DbDashDescIcon" } }
+  end
   if p.error then
     local room = width - W.width(head) - 3
     if room > 5 then

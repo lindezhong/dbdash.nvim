@@ -71,6 +71,9 @@ end, { desc = "Reset dashboard arguments to their defaults" })
 command("DbDashShowSQL", function()
   cmds().show_sql()
 end, { desc = "Show the rendered query" })
+command("DbDashDescribe", function()
+  cmds().describe()
+end, { desc = "Show the description of the dashboard or the panel under the cursor" })
 command("DbDashExport", function(o)
   cmds().export(o.fargs, o.bang, vim.v.register) -- "x:DbDashExport picks register x
 end, {

@@ -75,6 +75,8 @@ local DEFAULTS = setmetatable({}, {
 ---@field grid boolean `panels:` (a grid, even of one panel)
 ---@field refresh_all integer? ms: the top-level interval, a refresh of every panel
 ---@field title string? the dashboard's title (top-level `title`)
+---@field description string? the dashboard's description (a template, shown as Markdown)
+---@field description_line integer
 ---@field show_countdown boolean countdown to the next refresh_all in the header
 ---@field countdown_format string
 ---@field shared_args dbdash.ArgSpec[] top-level args
@@ -276,6 +278,8 @@ function Ctx:show(s, top_interval, prefix)
   end
   out.type = typ
   out.title = self:expect(prefix .. "show.title", s.title, "string", true) or ""
+  out.description = self:expect(prefix .. "show.description", s.description, "string", true)
+  out.description_line = (self.pos[prefix .. "show.description"] or {}).line or 1
   -- show.interval (the panel's, else the top-level show.interval), else the top-level
   -- interval, else setup's default.
   out.interval = self:duration(prefix .. "show.interval", nn(s.interval))
@@ -440,6 +444,9 @@ function M.validate(data, file, positions)
   end
   -- Dashboard-wide: the title and the countdown to the global refresh.
   cfg.title = ctx:expect("title", data.title, "string", true)
+  -- The dashboard's description: a template rendered as Markdown (:DbDashDescribe).
+  cfg.description = ctx:expect("description", data.description, "string", true)
+  cfg.description_line = (ctx.pos["description"] or {}).line or 1
   cfg.show_countdown = ctx:expect("show_countdown", data.show_countdown, "boolean", true) == true
   cfg.countdown_format = ctx:expect("countdown_format", data.countdown_format, "string", true)
     or DEFAULTS.countdown_format

@@ -369,6 +369,100 @@ function M.show_sql()
   end)
 end
 
+---:DbDashDescribe: the description (template, shown as Markdown) of the dashboard (cursor
+---on the header) or of the panel under the cursor; a one-chart dashboard shows both. Outside
+---the dashboard window, a picker among those with one.
+function M.describe()
+  local d = current()
+  if not d then
+    return
+  end
+  local cfg = d.cfg
+  local function show(parts)
+    if #parts == 0 then
+      return vim.notify("dbdash: no description", vim.log.levels.WARN)
+    end
+    local texts, i = {}, 0
+    local function next_part()
+      i = i + 1
+      local part = parts[i]
+      if not part then
+        local title = #parts == 1 and parts[1].name or (cfg.title or vim.fn.fnamemodify(d.path, ":t"))
+        local text = table.concat(texts, "\n\n")
+        return require("dbdash.view.popup").open(vim.split(text, "\n", { plain = true }), {
+          title = "DbDash: " .. title,
+          markdown = true,
+        })
+      end
+      part.render(function(e, text)
+        if e then
+          return err(sched.format_error(e))
+        end
+        text = text:gsub("%s+$", "")
+        texts[#texts + 1] = #parts > 1 and ("## " .. part.name .. "\n\n" .. text) or text
+        next_part()
+      end)
+    end
+    next_part()
+  end
+  local function dashboard_part()
+    return cfg.description
+        and {
+          name = cfg.title or "Dashboard",
+          render = function(cb)
+            d:describe_async(cb)
+          end,
+        }
+      or nil
+  end
+  local function panel_part(p)
+    return p.cfg.show.description
+        and {
+          name = p:title(),
+          render = function(cb)
+            p:describe_async(cb)
+          end,
+        }
+      or nil
+  end
+  if not cfg.grid then
+    return show(vim.tbl_filter(function(x)
+      return x ~= nil
+    end, { dashboard_part(), panel_part(d.panels[1]) }))
+  end
+  if vim.api.nvim_get_current_buf() == d.buf then
+    local cur = vim.api.nvim_win_get_cursor(0)
+    if cur[1] <= (d.header_rows or 0) then
+      return show({ dashboard_part() })
+    end
+    local line = vim.api.nvim_get_current_line()
+    local p = d:panel_at(cur[1], vim.fn.strdisplaywidth(line:sub(1, cur[2])))
+    if p then
+      return show({ panel_part(p) })
+    end
+  end
+  local items = {}
+  if cfg.description then
+    items[#items + 1] = dashboard_part()
+  end
+  for _, p in ipairs(d.panels) do
+    items[#items + 1] = panel_part(p)
+  end
+  if #items == 0 then
+    return show({})
+  end
+  vim.ui.select(items, {
+    prompt = "Description of",
+    format_item = function(x)
+      return x.name
+    end,
+  }, function(x)
+    if x then
+      show({ x })
+    end
+  end)
+end
+
 ---:DbDashMksession[!] [file] / :Mksession: sessions record dbdash:// buffers by name.
 function M.mksession(bang, file)
   vim.cmd("mksession" .. (bang and "!" or "") .. (file ~= "" and (" " .. vim.fn.fnameescape(file)) or ""))

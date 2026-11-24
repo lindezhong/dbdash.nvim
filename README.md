@@ -102,12 +102,13 @@ an in-memory SQLite database.
 | `:DbDash` / `:DbDashClose` | Open / close the sidebar |
 | `:DbDashShowVariables`, `:DbDashModifyVariable`, `:DbDashUpdateVariable {name} {value}`, `:DbDashResetVariables` | Show and change arguments |
 | `:DbDashShowSQL` | Show the rendered query |
+| `:DbDashDescribe` | Show the description of the dashboard or the panel under the cursor (Markdown) |
 | `:DbDashExport[!] [csv\|tsv\|json\|markdown] [{file}]` | Export the result to a register or a file |
 | `:DbDashStyle {type} {style}` | Re-render with another style, e.g. `:DbDashStyle line asciichart` |
 | `:DbDashMksession[!] [{file}]` | Write a session (any `:mksession` restores dashboards) |
 
 In a dashboard: `r` refresh, `a` modify an argument, `A` show arguments, `R` reset
-arguments, `s` show the query, `e` export the result. Global mappings: `<leader>ds` start, `<leader>dr` refresh,
+arguments, `s` show the query, `e` export the result, `K` show the description. Global mappings: `<leader>ds` start, `<leader>dr` refresh,
 `<leader>dt` stop, `<leader>dl` list, `<leader>dd` sidebar.
 
 Every key, the sidebar (width, position, directory, file globs, cursor line), where dashboards open,

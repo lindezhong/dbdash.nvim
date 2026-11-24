@@ -67,6 +67,11 @@ properties:
     description: >-
       The dashboard's title: on the header line above the charts, in notifications, the
       sidebar and :DbDashStatus, and meta.dashboard_title.
+  description:
+    type: string
+    description: >-
+      The dashboard's description: a template (args, meta) whose result is Markdown, shown
+      by K / :DbDashDescribe; ⓘ after the title says there is one.
   show_countdown:
     type: boolean
     default: false
@@ -319,6 +324,11 @@ definitions:
         enum: [table, line, area, bar, histogram, boxplot, heatmap, bubble, pie, scatter, stat, text]
         default: table
       title: { type: string }
+      description:
+        type: string
+        description: >-
+          This chart's description: a template (args, meta) whose result is Markdown, shown
+          by K / :DbDashDescribe; ⓘ after the title says there is one.
       interval:
         $ref: "#/definitions/duration"
         description: >-

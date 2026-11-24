@@ -90,11 +90,27 @@ end
 ---@param panel table scheduler Panel (cfg, d, index, refresh_count)
 ---@return table values by name (nil where there is no value)
 function M.values(panel)
-  local cfg, d = panel.cfg, panel.d
+  local cfg = panel.cfg
   local q, show = cfg.query, cfg.show
-  local dbcfg = cfg.database
-  local parts = url_parts(dbcfg.url, dbcfg.type)
   local dbdash = require("dbdash")
+  local out = M.dashboard_values(panel.d, cfg.database)
+  out.panel_index = panel.index
+  out.panel_title = show.title ~= "" and show.title or nil
+  out.chart_type = show.type
+  out.interval = show.interval
+  out.max_rows = q.max_rows or dbdash.options.defaults.max_rows
+  out.timeout = q.timeout or dbdash.default_ms("timeout")
+  out.refresh_count = panel.refresh_count or 0
+  return out
+end
+
+---The metadata outside any panel (the dashboard's description): no panel_*, chart_type,
+---interval, ...; db_* of `dbcfg` (default: the top-level database, none without one).
+---@param d table scheduler Dashboard (path, cfg)
+---@param dbcfg table?
+function M.dashboard_values(d, dbcfg)
+  dbcfg = dbcfg or d.cfg.database
+  local parts = dbcfg and url_parts(dbcfg.url, dbcfg.type) or {}
   local v = vim.version()
   return {
     cwd = vim.fs.normalize(vim.fn.getcwd()),
@@ -102,19 +118,12 @@ function M.values(panel)
     config_dir = d.cfg.dir,
     config_name = vim.fn.fnamemodify(d.path, ":t:r"),
     dashboard_title = d.cfg.title,
-    db_type = dbcfg.type,
+    db_type = dbcfg and dbcfg.type,
     db_host = parts.host,
     db_port = parts.port,
     db_name = parts.name,
     db_user = parts.user,
-    db_url = require("dbdash.db.url").redact(dbcfg.url),
-    panel_index = panel.index,
-    panel_title = show.title ~= "" and show.title or nil,
-    chart_type = show.type,
-    interval = show.interval,
-    max_rows = q.max_rows or dbdash.options.defaults.max_rows,
-    timeout = q.timeout or dbdash.default_ms("timeout"),
-    refresh_count = panel.refresh_count or 0,
+    db_url = dbcfg and require("dbdash.db.url").redact(dbcfg.url),
     now = M.iso_now(),
     today = os.date("%Y-%m-%d"),
     hostname = vim.uv.os_gethostname(),
