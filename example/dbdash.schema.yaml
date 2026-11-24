@@ -58,7 +58,8 @@ properties:
     $ref: "#/definitions/show"
     description: >-
       The single chart's show; with panels, defaults of every panel's show (interval,
-      show_countdown, countdown_format, args_show, style, ...), merged key by key.
+      show_countdown, countdown_format, args_show, refresh_hidden, style, ...), merged
+      key by key.
   interval:
     $ref: "#/definitions/duration"
     description: >-
@@ -73,8 +74,8 @@ properties:
   description:
     type: string
     description: >-
-      The dashboard's description: a template (the shared args; meta without panel fields)
-      whose result is Markdown, shown by K / :DbDashDescribe; ⓘ in the header says there is
+      The dashboard's description: a template (the shared args; meta without panel fields;
+      it cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe; ⓘ in the header says there is
       one.
   show_countdown:
     type: boolean
@@ -229,11 +230,14 @@ definitions:
         type: string
         description: |-
           Query template (Jinja subset, see :help dbdash-templates): arguments are
-          {{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta). Lua runs in
-          {% lua %} ... {% endlua %} blocks and in modules imported with
-          {% import 'x.lua' as h %} (:help dbdash-template-lua); a config with Lua is
-          trusted once, with the files it imports (:help dbdash-lua). Its language depends
-          on the database:
+          {{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta, e.g.
+          meta.prev_result: the previous refresh's rows; meta.callback), and
+          {% set args.<name> = value %} sets an argument (:help dbdash-assign-args). Lua
+          runs in {% lua %} ... {% endlua %} blocks and in modules imported with
+          {% import 'x.lua' as h %} (:help dbdash-template-lua), with args, meta, store and
+          the dbdash.* helpers (dbdash.run(args): this query again with other arguments);
+          a config with Lua is trusted once, with the files it imports (:help dbdash-lua).
+          Its language depends on the database:
             SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)
             Redis          one command, e.g. HGETALL "user:1001"
             MongoDB        a JSON document:
@@ -244,8 +248,9 @@ definitions:
                            distinct (field) | command (command)
             lua://         Lua code returning rows (see "Result format" at the top
                            of this file, :help dbdash-result), or a value that
-                           query.transform turns into rows; it sees args, meta
-                           and dbdash.system/query/sleep (:help dbdash-lua)
+                           query.transform turns into rows; it sees args, meta,
+                           store and dbdash.system/query/sleep/run (:help
+                           dbdash-lua)
             http(s)://     a JSON request description (empty: GET the URL):
                            {"method": "POST", "path": "search", "query": {...},
                             "headers": {...}, "cookies": "a=1; b=2" | "cookies.txt",
@@ -334,8 +339,8 @@ definitions:
       description:
         type: string
         description: >-
-          This chart's description: a template (args, meta, as its query sees them) whose
-          result is Markdown, shown by K / :DbDashDescribe; ⓘ after the panel's title (in a
+          This chart's description: a template (args, meta, as its query sees them; it
+          cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe; ⓘ after the panel's title (in a
           one-chart dashboard: in the header) says there is one. With panels, it belongs in
           each panel.
       interval:

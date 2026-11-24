@@ -288,6 +288,21 @@ function R.lookup(ctx, name)
   return R.undef(("'%s' is undefined"):format(name))
 end
 
+---{% set args.name = value %}: assign a dashboard argument through env.set_arg (the
+---dashboard checks it, updates `args` and keeps the value).
+function R.set_arg(env, name, value)
+  if not env.set_arg then
+    raise("value", "args can only be assigned in a dashboard (args.%s)", name)
+  end
+  local ok, err = pcall(env.set_arg, name, R.to_lua(value))
+  if not ok then
+    if type(err) == "table" then
+      error(err, 0)
+    end
+    raise("value", "%s", tostring(err))
+  end
+end
+
 ---Read a template-local variable, falling back to the context when it was never assigned.
 function R.v(val, ctx, name)
   if val == R.MISSING then
@@ -576,6 +591,17 @@ end
 function R.run_lua(env, fn, chunk_name, source)
   local ok, ret = require("dbdash.db.lua_env").guard(fn, env.timeout)
   if ok then
+    -- Arguments the code assigned (args.x = v) apply now: later template text sees them.
+    local after = env.lua and env.lua.after
+    if after then
+      local aok, aerr = pcall(after)
+      if not aok then
+        if type(aerr) == "table" then
+          error(aerr, 0)
+        end
+        raise("lua", "%s", tostring(aerr))
+      end
+    end
     return ret
   end
   if type(ret) == "table" then

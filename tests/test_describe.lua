@@ -189,4 +189,29 @@ T["floats work without treesitter parsers (filetype plugins would fail)"] = func
   eq(vim.v.errmsg, "") -- no filetype plugin ran into the missing parser
 end
 
+T["descriptions cannot assign arguments"] = function()
+  local d = run("assign", [[
+database: { url: "sqlite:///:memory:" }
+args: [{ name: n, type: int, default: 1 }]
+description: "{% lua %}args.n = 5{% endlua %}x"
+query: { sql: SELECT 1 AS x }
+show: { title: Chart, description: "{% set args.n = 6 %}y" }
+]])
+  local errs = {}
+  d:describe_async(function(e)
+    errs[#errs + 1] = e
+  end)
+  d.panels[1]:describe_async(function(e)
+    errs[#errs + 1] = e
+  end)
+  vim.wait(3000, function()
+    return #errs == 2
+  end, 10)
+  for _, e in ipairs(errs) do
+    eq(sched.format_error(e):find("arguments cannot be assigned in a description", 1, true) ~= nil, true)
+  end
+  local a = require("dbdash.args")
+  eq(a.value(a.find(d.cfg.args, "n"), d.state), 1)
+end
+
 return T

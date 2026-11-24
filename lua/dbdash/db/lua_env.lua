@@ -150,6 +150,13 @@ function M.run(code, o)
     end
     dberr.raise(o.phase, message_of(ret))
   end
+  -- Arguments the script assigned (args.x = v) apply now (see scheduler Panel:sync_args).
+  if g.after then
+    local aok, aerr = pcall(g.after)
+    if not aok then
+      dberr.raise(o.phase, message_of(aerr))
+    end
+  end
   return ret
 end
 

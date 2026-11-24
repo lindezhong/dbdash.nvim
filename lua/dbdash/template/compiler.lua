@@ -340,6 +340,9 @@ function C:stmt(st)
     self:emit("end")
     self.depth = self.depth - 1
     self:emit("end")
+  elseif k == "SetArg" then
+    self:line(st)
+    self:emit(("rt.set_arg(env, %q, %s)"):format(st.name, self:expr(st.expr)))
   elseif k == "Set" then
     self:line(st)
     local lhs = {}

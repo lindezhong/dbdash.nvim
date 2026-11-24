@@ -235,6 +235,18 @@ function P:parse_for(tok)
 end
 
 function P:parse_set(tok)
+  -- {% set args.name = expr %}: assigns a dashboard argument ({% set meta.x %} cannot).
+  local t, dot, attr = self:peek(), self:peek(1), self:peek(2)
+  if t.t == "name" and (t.v == "args" or t.v == "meta") and dot.t == "op" and dot.v == "."
+    and attr.t == "name" and self:is_op("=", 3) then
+    if t.v == "meta" then
+      self:fail(t, "'meta' is read-only (dashboard metadata)")
+    end
+    self.i = self.i + 4
+    local e = self:expression()
+    self:expect_block_end()
+    return { k = "SetArg", name = attr.v, expr = e, line = tok.line }
+  end
   local targets = self:targets()
   if not self:skip_op("=") then
     self:fail(tok, "block set ({%% set x %%}...{%% endset %%}) is not supported")

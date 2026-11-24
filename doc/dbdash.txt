@@ -423,7 +423,9 @@ chart's description sees what its query sees: `args` with its own arguments
 and `meta` with its panel and database. The
 dashboard's sees the shared arguments and `meta` without the panel fields
 (`db_*` of the top-level database). Imports and Lua work as in queries, and
-Lua in a description asks for trust like any other (|dbdash-lua|). The SQL
+Lua in a description asks for trust like any other (|dbdash-lua|), but a
+description cannot assign arguments (|dbdash-assign-args|): showing it
+changes nothing. The SQL
 filters quote for the panel's database, in the dashboard's description for
 the top-level one (SQLite's quoting without one).
 
@@ -436,8 +438,12 @@ API, needs network), arguments and templates
 (`template_example.yaml`), macros and autoescape (`macros.yaml`), a SQLite
 file (`sqlite_file.yaml`), a Lua data source (`lua.yaml`), a Lua transform
 (`transform.yaml`), Lua in templates with an imported module
-(`template_lua.yaml` and `lua/helpers.lua`) and an HTTPS API (`http.yaml`,
-GitHub releases, needs network); the last four ask for trust (|dbdash-lua|).
+(`template_lua.yaml` and `lua/helpers.lua`), panel state in Lua (`store`,
+`meta.prev_result`, `dbdash.run()` from `query.transform`, `{% lua %}` and
+an imported module, assigned arguments: `callback.yaml` and
+`lua/callbacks.lua`) and
+an HTTPS API (`http.yaml`, GitHub releases, needs network); the last five
+ask for trust (|dbdash-lua|).
 
 `example/dbdash.schema.yaml` is a JSON Schema for config files. It lists every
 field and the URL format of each database. Editors using yaml-language-server
@@ -603,8 +609,70 @@ Argument values have these types:
 Any other name is an error ("'x' is undefined"), as in Jinja's
 StrictUndefined; a bare argument name says how to write it ("'days' is
 undefined; arguments are written args.days"). Test optional names with `is
-defined`. `args` and `meta` cannot be assigned: not as `set` or `for`
-targets, macro names or parameters, or `import ... as` names.
+defined`. `args` and `meta` themselves cannot be assigned: not as `set` or
+`for` targets, macro names or parameters, or `import ... as` names. One
+argument can (|dbdash-assign-args|).
+
+Assigning arguments                                     *dbdash-assign-args*
+
+`{% set args.days = 30 %}` in a template, or `args.days = 30` in any Lua of
+the panel (`{% lua %}`, imported `.lua`, `query.transform`, `lua://`; not in
+descriptions, where it is an error), sets an argument:
+
+- the rest of the run sees it: later template text (macros and imported
+  templates too), `query.transform`, `lua://` (in Lua, the same code sees
+  `args` change at once, the rest of the run once that code returns: a
+  block, a module function, the script);
+- it is kept like an edit in the dashboard (`a`): shown by `A` and the
+  `args_show` line, used from the next refresh on, saved in sessions, and
+  reset by `R`; the config file is not changed;
+- the name must be an argument the panel sees (a panel's own argument
+  shadows a shared one, which other panels see from their next refresh)
+  and the value must fit its `type` (none / nil clears it);
+- in a `dbdash.run()` callback (|dbdash-callback|) it changes that run and
+  is kept too; the run that called it keeps its own values.
+
+`{% set args = ... %}`, `{% set args['x'] = ... %}` and `{% set meta.x %}`
+are errors.
+
+Three tables hold arguments: the dashboard's values (`a`, the command line,
+sessions, defaults), a copy of them for each refresh (`args` in its code),
+and for a callback a new table: the caller's `args` with the table given to
+`dbdash.run()` over them (that table itself is only read). An assignment
+changes the `args` of the run it is in, and the dashboard's values when that
+code returns. With `days` 0 and a callback that assigns 10: >lua
+  local copy = vim.deepcopy(args)  -- copy.days = 0
+  copy.days = 14                   -- args.days is still 0
+  local r = dbdash.run(copy)       -- the callback runs `args.days = 10`
+<
+  - the callback starts with `days` 14 (from `copy`); after its assignment,
+    the rest of the callback sees 10: its query uses 10 when the assignment
+    comes before `{{ args.days }}` in `query.sql`, but 14 when it is made in
+    its `query.transform` (the query already ran);
+  - the dashboard's `days` becomes 10 when the callback's code returns;
+  - the caller's `args.days` stays 0 for the rest of this refresh, and
+    `copy.days` stays 14;
+  - the next refresh starts with 10 (`R` goes back to 0).
+
+When the caller assigns the same argument too, the last one to be applied
+wins: the caller's, applied when its own code returns (after the callback).
+So with `local copy = args` (the same table, no copy), `copy.days = 14`
+assigns the caller's `days`, and the next refresh starts with 14, not 10.
+
+More cases:
+  - a callback that does not assign keeps nothing: the values given to
+    `dbdash.run()` are only that run's;
+  - the caller assigns, then calls `dbdash.run()` in the same code: the
+    callback starts from the caller's new value (unless given another);
+  - two callbacks in one refresh: each starts from the caller's values, not
+    from what the other one assigned;
+  - nested callbacks: each level has its own table; when the innermost one
+    assigns, the levels above keep their values and the dashboard gets the
+    innermost value (unless a level above assigns it later);
+  - an assignment is applied when its code returns: when that code fails it
+    is not applied, but one applied before a later failure in the refresh
+    is kept;
+  - assigning the value the run already has changes nothing.
 
 Metadata                                                        *dbdash-meta*
 
@@ -676,6 +744,7 @@ Statements:
   {% for x in xs %} ... {% else %} (empty) ... {% endfor %}
   {% for k, v in m.items() %} ... {% endfor %}
   {% set name = expr %}       {% set a, b = pair %}
+  {% set args.name = expr %}  assign an argument (|dbdash-assign-args|)
   {% raw %} {{ not rendered }} {% endraw %}
   {% macro name(a, b=default) %} ... {% endmacro %}
   {% import 'file.sql' as lib %}         then {{ lib.name(...) }}
@@ -822,7 +891,8 @@ so its functions see that render's `args` and `meta`. In a `{% lua %}` block,
 
 Lua code sees the globals (`vim`, `os`, ...) plus:
 
-  args         the dashboard arguments (|dbdash-arguments|)
+  args         the dashboard arguments (|dbdash-arguments|); assigning one
+               sets it (|dbdash-assign-args|)
   meta         the metadata (|dbdash-meta|), read-only
   store        the panel's own table, kept while the dashboard runs
                (|dbdash-store|)
@@ -895,13 +965,16 @@ Where values come from (highest first):
 
   1. the command line: `:DbDashStart board.yaml min_age=30 ids=1,2,3`
   2. edits in the dashboard: `a` / |:DbDashModifyVariable|,
-     |:DbDashUpdateVariable|
+     |:DbDashUpdateVariable|, and assignments from templates and Lua
+     (|dbdash-assign-args|)
   3. interactive input at start: `required` arguments without a value, or
      every argument with `:DbDashStart!`
   4. `default`
 
-Values last until the dashboard stops; `R` / |:DbDashResetVariables| goes
-back to the defaults. Changing a value refreshes the dashboard (all panels).
+Values last until the dashboard stops (|:DbDashStop|, or closing its last
+window); `R` / |:DbDashResetVariables| goes back to the defaults. Changing a
+value in the dashboard refreshes it (all panels); an assignment from a
+template or Lua does not (it applies from the next refresh).
 
 Text input (command line, prompts) is parsed by type:
 
@@ -1080,7 +1153,8 @@ arguments from `args` is usually simpler. They run inside the
 refresh without blocking the editor and see the globals (`vim`, `io`, ...)
 plus:
 
-  args                  the dashboard arguments by name (`args.days`)
+  args                  the dashboard arguments by name (`args.days`);
+                        assigning one sets it (|dbdash-assign-args|)
   meta                  the metadata (`meta.config_dir`, |dbdash-meta|),
                         read-only
   store                 the panel's own table, kept while the dashboard
@@ -1172,8 +1246,10 @@ trust) and sees:
   response   (`http(s)://`) `{ status, reason, headers, body, url }`:
              header names in lower case, `body` the raw text, `url` the
              final URL after redirects
-  args, meta the dashboard arguments and metadata; and the `dbdash.*`
-             helpers
+  args, meta the dashboard arguments and metadata (assigning `args.x`
+             sets it, |dbdash-assign-args|)
+  store      the panel's table (|dbdash-store|)
+  dbdash.*   the helpers, `dbdash.run()` too (|dbdash-callback|)
 
 It returns rows in one of the shapes of |dbdash-result|; its errors (and a
 value that is not rows) are reported with the phase "transform" and the

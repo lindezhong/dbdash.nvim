@@ -14,11 +14,15 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
 - **Several panels** per dashboard in a grid, each with its own database (mix SQLite,
   PostgreSQL, an HTTP API, ...) and interval, plus an optional refresh of all of them; the
   top-level `database`, `query` and `show` are defaults every panel can override.
-  Dashboards that are not on screen pause and catch up when shown again.
+  Dashboards that are not on screen pause and catch up when shown again (or keep
+  refreshing with `show.refresh_hidden`); closing a dashboard's last window stops it.
 - **Title and descriptions**: a header with the dashboard's title and a countdown;
   descriptions of the dashboard and each chart are templates shown as Markdown (`K`).
 - **Lua**: a `lua://` source whose query is Lua code, and `query.transform` to reshape any
-  result with Lua before it is checked as rows (trusted configs only, as with `exrc`).
+  result with Lua before it is checked as rows (trusted configs only, as with `exrc`);
+  a `store` table kept per panel, the previous refresh's rows (`meta.prev_result`),
+  `dbdash.run()` to run a panel's query again with other arguments, and assigning
+  arguments from templates and Lua.
 - **Query templates**: a Jinja2 subset with SQL-safe quoting filters, autoescape, macros
   and imports.
 - **Thresholds**: color values (stat cards, table cells) and notify when a value crosses a level.
@@ -91,7 +95,8 @@ show:
 
 Then `:DbDashStart signups.yaml hours=48`, or `:DbDash` for a sidebar listing the configs
 of the current directory as a tree: `<CR>` on a directory expands it, on a file starts its
-dashboard; `●` marks running dashboards, `◐` paused ones (not on screen), `○` the others.
+dashboard; `●` marks running dashboards, `◐` paused ones (not on screen), `○` the others
+(closing a dashboard's last window stops it).
 
 To try it without a database server, open any file in [`example/`](example): most use an
 in-memory SQLite database (`http.yaml` and `multi_panel.yaml` also call the GitHub API).
@@ -102,7 +107,7 @@ in-memory SQLite database (`http.yaml` and `multi_panel.yaml` also call the GitH
 | --- | --- |
 | `:DbDashStart[!] {config} [name=value ...]` | Start a dashboard (`!` asks for every argument; `<panel>.name=value` sets one panel's own) |
 | `:DbDashRestart` | Refresh now |
-| `:DbDashStop [{config}]` | Stop a dashboard |
+| `:DbDashStop [{config}]` | Stop a dashboard (closing its last window does too) |
 | `:DbDashList` / `:DbDashStatus` | Running dashboards / status and query history |
 | `:DbDash` / `:DbDashClose` | Open / close the sidebar |
 | `:DbDashShowVariables`, `:DbDashModifyVariable`, `:DbDashUpdateVariable {name} {value}`, `:DbDashResetVariables` | Show and change arguments |
@@ -110,6 +115,7 @@ in-memory SQLite database (`http.yaml` and `multi_panel.yaml` also call the GitH
 | `:DbDashDescribe` | Show the description of the dashboard or the panel under the cursor (Markdown) |
 | `:DbDashExport[!] [csv\|tsv\|json\|markdown] [{file}]` | Export the result to a register or a file |
 | `:DbDashStyle {type} {style}` | Re-render with another style, e.g. `:DbDashStyle line asciichart` |
+| `:DbDashTrust [allow\|deny\|remove] [{config}]` | Decide about a config that runs Lua without the question |
 | `:DbDashMksession[!] [{file}]` | Write a session (any `:mksession` restores dashboards) |
 
 In a dashboard: `r` refresh, `a` modify an argument, `A` show arguments, `R` reset
@@ -118,9 +124,10 @@ titles that have one). Global mappings: `<leader>ds` start, `<leader>dr` refresh
 `<leader>dt` stop, `<leader>dl` list, `<leader>dd` sidebar.
 
 Every key, the `ⓘ` icon, the sidebar (width, position, directory, file globs, cursor line),
-where dashboards open, the popup border and size, and the default interval, timeouts and
-row limit can be set in `setup()`; see `:help dbdash-setup`. Colors use highlight groups (`:help
-dbdash-highlights`), e.g. `DbDashSidebarDir` for sidebar directories.
+where dashboards open, the popup border and size, the default interval, timeouts and row
+limit, and the `dbdash.run()` limits can be set in `setup()`; see `:help dbdash-setup`.
+Colors use highlight groups (`:help dbdash-highlights`), e.g. `DbDashSidebarDir` for
+sidebar directories.
 
 ### Sessions
 
@@ -165,6 +172,7 @@ Examples, all runnable as they are:
 | [`lua.yaml`](example/lua.yaml) | a `lua://` data source (Lua code, a command's output) |
 | [`transform.yaml`](example/transform.yaml) | `query.transform` reshaping a query result with Lua |
 | [`template_lua.yaml`](example/template_lua.yaml) | Lua in templates: `{% lua %}` blocks and an imported module ([`lua/helpers.lua`](example/lua/helpers.lua)) |
+| [`callback.yaml`](example/callback.yaml) | panel state in Lua: `store` (a counter, a history of results drawn as a line), `meta.prev_result`, `dbdash.run()` callbacks from `query.transform`, `{% lua %}` and an imported module ([`lua/callbacks.lua`](example/lua/callbacks.lua)), assigning arguments, `show.refresh_hidden` |
 | [`http.yaml`](example/http.yaml) | an HTTPS API (GitHub releases) turned into rows by a transform (needs network) |
 
 ### Connection URLs
@@ -240,10 +248,16 @@ query:
 ```
 
 Scripts get `args`, `rs` (for transforms) and helpers such as `dbdash.system()` and
-`dbdash.query()` that wait without blocking the editor. dbdash asks before running a
-config with Lua: one question per config, covering the config and the `.lua` files it imports,
-asked again when any of them changes;
-`setup({ lua = { confirm = false } })` or `lua.trusted_dirs` skip that. See `:help dbdash-lua`.
+`dbdash.query()` that wait without blocking the editor, `store` (a table the panel keeps
+while the dashboard runs), `meta.prev_result` (the previous refresh's rows) and
+`dbdash.run(args)` (the panel's query again with other arguments; `meta.callback` tells a
+callback from a refresh). Assigning `args.x` (or `{% set args.x = v %}` in a template) sets
+an argument for the rest of the refresh and keeps it (`:help dbdash-assign-args`).
+
+dbdash asks before running a config with Lua: one question per config, covering the config
+and the `.lua` files it imports, asked again when any of them changes;
+`setup({ lua = { confirm = false } })` or `lua.trusted_dirs` skip that, and `:DbDashTrust`
+decides without the question. See `:help dbdash-lua`.
 
 Every query goes the same way: query, then `query.transform` if there is one, then a check
 that the result is rows. SQL results pass as they are; a `lua://` value or an HTTP response

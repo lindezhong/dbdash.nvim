@@ -3,15 +3,22 @@
 local sched = require("dbdash.scheduler")
 local eq = MiniTest.expect.equality
 
-local dir
+local dir, notes
+local real_notify = vim.notify
 local T = MiniTest.new_set({
   hooks = {
     pre_case = function()
       dir = vim.fs.normalize(vim.fn.tempname())
       vim.fn.mkdir(dir, "p")
       require("dbdash").setup({ lua = { confirm = false } }) -- trust is tested in test_trust.lua
+      -- Refresh errors notify; keep them (the cases check the errors) instead of printing.
+      notes = {}
+      vim.notify = function(msg, level)
+        notes[#notes + 1] = { msg = msg, level = level }
+      end
     end,
     post_case = function()
+      vim.notify = real_notify
       for _, d in ipairs(sched.list()) do
         sched.stop(d.path)
       end
@@ -251,6 +258,9 @@ query: { sql: "dbdash.run(); return {}" }
 ]])
   local p = d.panels[1]
   eq(sched.format_error(p.error):find("dbdash.run: callbacks nested deeper than 10 (lua.max_callback_depth)", 1, true) ~= nil, true)
+  -- the failed refresh notified it (as an error, once)
+  eq(#notes, 1)
+  eq({ notes[1].level, notes[1].msg:find("nested deeper than 10", 1, true) ~= nil }, { vim.log.levels.ERROR, true })
   -- shallow but wide: 3 calls per level, 5 levels = 3 + 9 + 27 + 81 + 243 calls
   require("dbdash").setup({ lua = { confirm = false, max_callbacks = 50, max_callback_depth = 5 } })
   d = start("wide", [[
@@ -338,6 +348,338 @@ query:
   end)
   eq({ ok, err }, { true, nil })
   eq(d.panels[1].error, nil)
+end
+
+T["args.x = v in Lua: the rest of the run sees it, and it is kept"] = function()
+  vim.fn.writefile({ "local M = {}", "function M.set(n) args.n = n; return n end", "return M" }, dir .. "/s.lua")
+  local d = start("assign", [[
+database: { url: "sqlite:///:memory:" }
+query:
+  args: [{ name: n, type: int, default: 1 }, { name: tag, default: a }]
+  sql: |
+    {% import 's.lua' as s %}
+    SELECT {{ args.n }} AS before,
+    {% lua %}args.n = args.n + 10; return args.n{% endlua %} AS in_block,
+    {{ args.n }} AS after_block,
+    {{ s.set(args.n * 2) }} AS module,
+    {{ args.n }} AS after_module
+  transform: |
+    local r = rs.rows[1]
+    local seen = args.n
+    args.tag = "t" .. args.n
+    return { columns = { "before", "in_block", "after_block", "module", "after_module", "transform" },
+             rows = { { r[1], r[2], r[3], r[4], r[5], seen } } }
+]])
+  local p = d.panels[1]
+  assert(p.rs, p.error and sched.format_error(p.error))
+  eq(p.rs.rows[1], { 1, 11, 11, 22, 22, 22 })
+  -- kept like an edit: shown, used by the next refresh, reset by R
+  local a = require("dbdash.args")
+  local function value(name)
+    return a.value(a.find(d.cfg.args, name), d.state)
+  end
+  eq({ value("n"), value("tag") }, { 22, "t22" })
+  again(p)
+  eq(p.rs.rows[1][1], 22)
+  a.reset(d.state)
+  eq(value("n"), 1)
+end
+
+T["{% set args.x = v %}: like args.x = v, also in macros and imported templates"] = function()
+  vim.fn.writefile({ "{% macro bump() %}{% set args.n = args.n + 100 %}{% endmacro %}" }, dir .. "/m.sql")
+  local d = start("setarg", [[
+database: { url: "sqlite:///:memory:" }
+query:
+  args: [{ name: n, type: int, default: 1 }, { name: ids, type: list, default: [1] }]
+  sql: |
+    {% import 'm.sql' as m %}
+    {% set args.n = args.n + 1 %}
+    {% for i in [1, 2] %}{% set args.n = args.n * 2 %}{% endfor %}
+    {{ m.bump() }}
+    {% set args.ids = [4, 5] %}
+    SELECT {{ args.n }} AS n, {{ args.ids | length }} AS ids
+  transform: |
+    return { columns = { "n", "lua_n", "ids" }, rows = { { rs.rows[1][1], args.n, #args.ids } } }
+]])
+  local p = d.panels[1]
+  assert(p.rs, p.error and sched.format_error(p.error))
+  -- (1 + 1) * 2 * 2 + 100; the loop's assignments are not loop-local
+  eq(p.rs.rows[1], { 108, 108, 2 })
+  local a = require("dbdash.args")
+  eq(a.value(a.find(d.cfg.args, "n"), d.state), 108)
+end
+
+T["assigning args: a callback keeps its values; the assignment is still kept"] = function()
+  local d = start("cbassign", [[
+database: { url: "lua://" }
+query:
+  args: [{ name: n, type: int, default: 1 }]
+  sql: |
+    if meta.callback == 0 then
+      local inner = dbdash.run().rows[1][1]
+      return { { n = args.n, inner = inner } }
+    end
+    args.n = 50
+    return { { n = args.n } }
+]])
+  local p = d.panels[1]
+  assert(p.rs, p.error and sched.format_error(p.error))
+  eq(p.rs.rows[1], { 50, 1 }) -- columns: inner, n; the refresh's own n is still 1
+  local a = require("dbdash.args")
+  eq(a.value(a.find(d.cfg.args, "n"), d.state), 50)
+end
+
+T["assigning args: shared or the panel's own (a local one shadows)"] = function()
+  local d = start("scopes", [[
+database: { url: "lua://" }
+args: [{ name: region, default: EU }]
+panels:
+  - query:
+      args: [{ name: region, default: US }]
+      sql: "args.region = 'CN'; return { { r = args.region } }"
+  - query: { sql: "return { { r = args.region } }" }
+  - query: { sql: "args.region = 'JP'; return { { r = args.region } }" }
+]])
+  local a = require("dbdash.args")
+  local function value(key)
+    return a.value(a.find(d.cfg.args, key), d.state)
+  end
+  eq({ value("1.region"), value("region") }, { "CN", "JP" })
+  again(d.panels[2])
+  eq(d.panels[2].rs.rows[1][1], "JP")
+end
+
+T["assigning args: unknown names, wrong types, the whole args or meta are errors"] = function()
+  local function err_of(name, text)
+    local d = start(name, text)
+    local e = d.panels[1].error
+    return e and sched.format_error(e) or ""
+  end
+  local db = "database: { url: 'sqlite:///:memory:' }\n"
+  eq(err_of("e1", db .. "query:\n  sql: \"{% lua %}args.nope = 1{% endlua %}SELECT 1\"\n"):find("'nope' is not an argument of this panel", 1, true) ~= nil, true)
+  eq(err_of("e2", db .. "query:\n  args: [{ name: n, type: int }]\n  sql: \"{% set args.n = 'x' %}SELECT 1\"\n"):find("argument 'n' is an int, got a string", 1, true) ~= nil, true)
+  eq(err_of("e3", db .. "query:\n  sql: \"{% set args = 1 %}SELECT 1\"\n"):find("'args' is reserved", 1, true) ~= nil, true)
+  eq(err_of("e4", db .. "query:\n  sql: \"{% set meta.x = 1 %}SELECT 1\"\n"):find("'meta' is read-only", 1, true) ~= nil, true)
+  eq(err_of("e5", db .. "query:\n  sql: \"{% set foo.x = 1 %}SELECT 1\"\n"):find("assigning to attributes or items is not supported", 1, true) ~= nil, true)
+  eq(err_of("e6", db .. "query:\n  args: [{ name: n }]\n  sql: \"{% set args['n'] = 1 %}SELECT 1\"\n"):find("not supported", 1, true) ~= nil, true)
+  eq(err_of("e7", "database: { url: 'lua://' }\nquery:\n  args: [{ name: n, type: int }]\n  sql: \"args.n = 'x'; return {}\"\n"):find("argument 'n' is an int, got a string", 1, true) ~= nil, true)
+end
+
+T["{% set args.x %} outside a dashboard is an error"] = function()
+  local out, err = require("dbdash.template").render("{% set args.n = 1 %}", {}, {})
+  eq(out, nil)
+  eq((err.message or ""):find("args can only be assigned in a dashboard", 1, true) ~= nil, true)
+end
+
+T["assigning args: the documented callback case (copy, callback assigns 10)"] = function()
+  local function run_case(name, copy_expr)
+    local d = start(name, ([[
+database: { url: "lua://" }
+query:
+  args: [{ name: days, type: int, default: 0 }]
+  sql: |
+    if meta.callback > 0 then
+      local start = args.days
+      args.days = 10
+      return { { start = start, after = args.days } }
+    end
+    local copy = %s
+    copy.days = 14
+    local r = dbdash.run(copy).rows[1]
+    return { { caller = args.days, copy = copy.days, cb_start = r[2], cb_after = r[1] } }
+]]):format(copy_expr))
+    local p = d.panels[1]
+    assert(p.rs, p.error and sched.format_error(p.error))
+    local a = require("dbdash.args")
+    -- columns sorted: caller, cb_after, cb_start, copy
+    return p.rs.rows[1], a.value(a.find(d.cfg.args, "days"), d.state)
+  end
+  local row, kept = run_case("deep", "vim.deepcopy(args)")
+  eq({ row, kept }, { { 0, 10, 14, 14 }, 10 })
+  -- the same table: the caller assigned 14 itself, applied after the callback's 10
+  row, kept = run_case("same", "args")
+  eq({ row, kept }, { { 14, 10, 14, 14 }, 14 })
+end
+
+-- The callback case of :help dbdash-assign-args, edge by edge. Scripts log what they see
+-- into `store.log`; kept() is the dashboard's value of `days`.
+local function kept(d, name)
+  local a = require("dbdash.args")
+  return a.value(a.find(d.cfg.args, name or "days"), d.state)
+end
+
+---A lua:// panel with argument days (default 0); `body` is its script.
+local function lua_case(name, body)
+  local d = start(name, ([[
+database: { url: "lua://" }
+query:
+  args: [{ name: days, type: int, default: 0 }]
+  sql: |
+    store.log = store.log or {}
+%s
+    return { { ok = 1 } }
+]]):format(body:gsub("\n", "\n    "):gsub("^", "    ")))
+  local p = d.panels[1]
+  assert(p.rs or p.error, "no result")
+  return d, p, p.store.log
+end
+
+T["callback case: assigned in query.sql before use, the callback's query uses 10"] = function()
+  local d = start("cb_sql", [[
+database: { url: "sqlite:///:memory:" }
+query:
+  args: [{ name: days, type: int, default: 0 }]
+  sql: |
+    {% if meta.callback > 0 %}{% set args.days = 10 %}{% endif %}
+    SELECT {{ args.days }} AS used
+  transform: |
+    if meta.callback > 0 then return rs end
+    local copy = vim.deepcopy(args)
+    copy.days = 14
+    local r = dbdash.run(copy).rows[1]
+    return { { caller = args.days, copy = copy.days, callback_query = r[1] } }
+]])
+  local p = d.panels[1]
+  assert(p.rs, p.error and sched.format_error(p.error))
+  -- columns sorted by name: callback_query, caller, copy
+  eq(p.rs.rows[1], { 10, 0, 14 })
+  eq(kept(d), 10)
+end
+
+T["callback case: assigned in its query.transform, the callback's query used 14"] = function()
+  local d = start("cb_transform", [[
+database: { url: "sqlite:///:memory:" }
+query:
+  args: [{ name: days, type: int, default: 0 }]
+  sql: SELECT {{ args.days }} AS used
+  transform: |
+    if meta.callback > 0 then
+      local before = args.days
+      args.days = 10
+      return { { used = rs.rows[1][1], before = before, after = args.days } }
+    end
+    local copy = vim.deepcopy(args)
+    copy.days = 14
+    local r = dbdash.run(copy).rows[1]  -- after, before, used
+    return { { caller = args.days, cb_used = r[3], cb_before = r[2], cb_after = r[1] } }
+]])
+  local p = d.panels[1]
+  assert(p.rs, p.error and sched.format_error(p.error))
+  -- columns: caller, cb_after, cb_before, cb_used
+  eq(p.rs.rows[1], { 0, 10, 14, 14 })
+  eq(kept(d), 10)
+end
+
+T["callback case: a callback that does not assign changes nothing kept"] = function()
+  local d, p, log = lua_case("cb_noassign", [[
+if meta.callback > 0 then table.insert(store.log, args.days); return { { ok = 1 } } end
+dbdash.run({ days = 14 })
+table.insert(store.log, args.days)]])
+  eq(log, { 14, 0 })
+  eq(kept(d), 0)
+  again(p)
+  eq(p.store.log[3], 14) -- the next refresh's callback: 14 again (given), caller 0
+  eq(p.store.log[4], 0)
+end
+
+T["callback case: the caller assigned before calling; the callback starts from it"] = function()
+  local d, _, log = lua_case("cb_before", [[
+if meta.callback > 0 then table.insert(store.log, args.days); return { { ok = 1 } } end
+args.days = 5
+dbdash.run()
+dbdash.run({ days = 14 })]])
+  -- dbdash.run() starts with the caller's 5 (same table, not yet kept); given 14 wins
+  eq(log, { 5, 14 })
+  eq(kept(d), 5)
+end
+
+T["callback case: the caller assigns the same argument after the callback; it wins"] = function()
+  local d, _, log = lua_case("cb_after", [[
+if meta.callback > 0 then args.days = 10; return { { ok = 1 } } end
+dbdash.run({ days = 14 })
+table.insert(store.log, args.days)
+args.days = 3
+table.insert(store.log, args.days)]])
+  eq(log, { 0, 3 })
+  eq(kept(d), 3)
+end
+
+T["callback case: the same table (copy = args); the caller's 14 wins over the callback's 10"] = function()
+  local d, _, log = lua_case("cb_same", [[
+if meta.callback > 0 then table.insert(store.log, args.days); args.days = 10; return { { ok = 1 } } end
+local copy = args
+copy.days = 14
+dbdash.run(copy)
+table.insert(store.log, args.days)]])
+  eq(log, { 14, 14 })
+  eq(kept(d), 14)
+end
+
+T["callback case: two callbacks in one refresh; the second starts from the caller's values"] = function()
+  local d, _, log = lua_case("cb_twice", [[
+if meta.callback > 0 then
+  table.insert(store.log, args.days)
+  if args.days == 14 then args.days = 10 end
+  return { { ok = 1 } }
+end
+local copy = vim.deepcopy(args)
+copy.days = 14
+dbdash.run(copy)
+dbdash.run()
+table.insert(store.log, args.days)]])
+  -- first callback: 14 -> assigns 10; second: the caller's 0 (not 10); caller: 0
+  eq(log, { 14, 0, 0 })
+  eq(kept(d), 10)
+end
+
+T["callback case: nested callbacks; each level keeps its own values"] = function()
+  local d, _, log = lua_case("cb_nested", [[
+if meta.callback == 2 then
+  table.insert(store.log, "2:" .. args.days)
+  args.days = 20
+  return { { ok = 1 } }
+end
+if meta.callback == 1 then
+  table.insert(store.log, "1:" .. args.days)
+  dbdash.run({ days = args.days + 1 })
+  table.insert(store.log, "1:" .. args.days)
+  return { { ok = 1 } }
+end
+dbdash.run({ days = 14 })
+table.insert(store.log, "0:" .. args.days)]])
+  eq(log, { "1:14", "2:15", "1:14", "0:0" })
+  eq(kept(d), 20)
+end
+
+T["callback case: assignments before a failure are kept, within the failing code not"] = function()
+  local d, p = lua_case("cb_fail_after", [[
+if meta.callback > 0 then args.days = 10; return { { ok = 1 } } end
+dbdash.run()
+error("later")]])
+  eq(p.error ~= nil, true)
+  eq(kept(d), 10) -- the callback's script returned before the failure
+  d, p = lua_case("cb_fail_within", [[
+if meta.callback > 0 then args.days = 10; error("inside") end
+dbdash.run()]])
+  eq(p.error ~= nil, true)
+  eq(kept(d), 0) -- assigned in the code that failed: not applied
+end
+
+T["callback case: assigning the current value keeps nothing; R resets an assignment"] = function()
+  local d, p = lua_case("cb_same_value", [[
+if meta.callback > 0 then args.days = 14; return { { ok = 1 } } end
+dbdash.run({ days = 14 })
+args.days = 0]])
+  eq(p.error, nil)
+  eq(d.state.modified.days, nil) -- 14 was the callback's value already; 0 the caller's
+  local d2 = lua_case("cb_reset", [[
+if meta.callback > 0 then args.days = 10; return { { ok = 1 } } end
+dbdash.run()]])
+  eq(kept(d2), 10)
+  require("dbdash.args").reset(d2.state)
+  eq(kept(d2), 0)
+  again(d2.panels[1])
+  eq(kept(d2), 10) -- the next refresh's callback assigns it again
 end
 
 return T

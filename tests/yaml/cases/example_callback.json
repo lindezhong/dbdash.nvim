@@ -1,0 +1,78 @@
+{
+ "title": "Panel state",
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "interval": "10s",
+ "args": [
+  {
+   "name": "days",
+   "type": "int",
+   "default": 7,
+   "description": "Days counted (at most 30)"
+  }
+ ],
+ "show": {
+  "args_show": true,
+  "show_countdown": true,
+  "countdown_format": "{time}s"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "{% if args.days > 30 %}{% set args.days = 30 %}{% endif %}\nSELECT {{ args.days }} * 100 + abs(random() % 50) AS orders\n",
+    "transform": "store.refreshes = (store.refreshes or 0) + 1\nlocal orders = rs.rows[1][1]\nlocal prev = meta.prev_result and meta.prev_result.rows[1][1] or orders\nreturn { columns = { \"orders\", \"change\", \"refreshes\" },\n         rows = { { orders, orders - prev, store.refreshes } } }\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "Orders, change since the last refresh",
+    "refresh_hidden": true
+   }
+  },
+  {
+   "query": {
+    "sql": "{# the cap applies to the refresh, not to its callback (days * 2) #}\n{% if meta.callback == 0 and args.days > 30 %}{% set args.days = 30 %}{% endif %}\nSELECT {{ args.days }} AS days, {{ args.days }} * 100 + abs(random() % 50) AS orders\n",
+    "transform": "if meta.callback > 0 then return rs end   -- the callback's rows, as they are\nlocal wider = dbdash.run({ days = args.days * 2 }).rows[1]\nreturn { columns = { \"days\", \"orders\", \"days_2x\", \"orders_2x\" },\n         rows = { { rs.rows[1][1], rs.rows[1][2], wider[1], wider[2] } } }\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "Twice as long: from query.transform"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT {{ args.days }} AS days, {{ args.days }} * 100 + abs(random() % 50) AS orders,\n{% lua %}\n  if meta.callback > 0 then return \"NULL\" end   -- the callback leaves it empty\n  return dbdash.run({ days = args.days * 2 }).rows[1][2]\n{% endlua %} AS orders_2x\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "Twice as long: from {% lua %} in query.sql"
+   }
+  },
+  {
+   "query": {
+    "sql": "{% import 'lua/callbacks.lua' as cb %}\nSELECT {{ args.days }} AS days, {{ args.days }} * 100 + abs(random() % 50) AS orders,\n       {{ cb.orders(args.days * 2) if meta.callback == 0 else 'NULL' }} AS orders_2x\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "Twice as long: from an imported module"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT abs(random() % 100) AS orders",
+    "transform": "-- Keep each refresh's result in a list (the last 20) and show the list.\nstore.history = store.history or {}\ntable.insert(store.history, { at = os.date(\"%H:%M:%S\"), orders = rs.rows[1][1] })\nwhile #store.history > 20 do\n  table.remove(store.history, 1)\nend\nreturn { columns = { \"at\", \"orders\" }, rows = vim.tbl_map(function(h)\n  return { h.at, h.orders }\nend, store.history) }\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "History kept in store (last 20 refreshes)",
+    "x_column": "at",
+    "y_column": "orders",
+    "interval": "2s",
+    "span": 2
+   }
+  }
+ ]
+}

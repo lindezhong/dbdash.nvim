@@ -1,0 +1,106 @@
+# yaml-language-server: $schema=./dbdash.schema.yaml
+#
+# Panel state in Lua and templates (generated data, SQLite in memory):
+# - store: a table each panel keeps while the dashboard runs (here: a refresh counter, and
+#   a list of the last 20 results drawn as a line).
+# - meta.prev_result / meta.prev_query: the previous refresh's rows, after and before
+#   query.transform (here: the change since the last refresh); meta.prev_error its error.
+# - dbdash.run(args): the panel's query again with other arguments (here: the same count
+#   over twice the days), from query.transform, from a {% lua %} block in query.sql, and
+#   from an imported module (lua/callbacks.lua); meta.callback is 0 in a refresh, 1 in
+#   its callback, so the callback does not call again.
+# - {% set args.x = v %} / args.x = v: set an argument for the rest of the refresh and keep
+#   it like an edit with `a` (here: days is capped at 30; try :DbDashUpdateVariable days 90).
+# - show.refresh_hidden: keep refreshing while the dashboard is not visible.
+# It runs Lua, so dbdash asks whether you trust this file first (:help dbdash-lua).
+
+title: "Panel state"
+
+database:
+  url: "sqlite:///:memory:"
+
+interval: 10s
+
+args:
+  - name: days
+    type: int
+    default: 7
+    description: "Days counted (at most 30)"
+
+show:
+  args_show: true
+  show_countdown: true
+  countdown_format: "{time}s"
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        {% if args.days > 30 %}{% set args.days = 30 %}{% endif %}
+        SELECT {{ args.days }} * 100 + abs(random() % 50) AS orders
+      transform: |
+        store.refreshes = (store.refreshes or 0) + 1
+        local orders = rs.rows[1][1]
+        local prev = meta.prev_result and meta.prev_result.rows[1][1] or orders
+        return { columns = { "orders", "change", "refreshes" },
+                 rows = { { orders, orders - prev, store.refreshes } } }
+    show:
+      type: table
+      title: "Orders, change since the last refresh"
+      refresh_hidden: true          # keeps counting while the dashboard is hidden
+
+  - query:
+      sql: |
+        {# the cap applies to the refresh, not to its callback (days * 2) #}
+        {% if meta.callback == 0 and args.days > 30 %}{% set args.days = 30 %}{% endif %}
+        SELECT {{ args.days }} AS days, {{ args.days }} * 100 + abs(random() % 50) AS orders
+      transform: |
+        if meta.callback > 0 then return rs end   -- the callback's rows, as they are
+        local wider = dbdash.run({ days = args.days * 2 }).rows[1]
+        return { columns = { "days", "orders", "days_2x", "orders_2x" },
+                 rows = { { rs.rows[1][1], rs.rows[1][2], wider[1], wider[2] } } }
+    show:
+      type: table
+      title: "Twice as long: from query.transform"
+
+  - query:
+      sql: |
+        SELECT {{ args.days }} AS days, {{ args.days }} * 100 + abs(random() % 50) AS orders,
+        {% lua %}
+          if meta.callback > 0 then return "NULL" end   -- the callback leaves it empty
+          return dbdash.run({ days = args.days * 2 }).rows[1][2]
+        {% endlua %} AS orders_2x
+    show:
+      type: table
+      title: "Twice as long: from {% lua %} in query.sql"
+
+  - query:
+      sql: |
+        {% import 'lua/callbacks.lua' as cb %}
+        SELECT {{ args.days }} AS days, {{ args.days }} * 100 + abs(random() % 50) AS orders,
+               {{ cb.orders(args.days * 2) if meta.callback == 0 else 'NULL' }} AS orders_2x
+    show:
+      type: table
+      title: "Twice as long: from an imported module"
+
+  - query:
+      sql: SELECT abs(random() % 100) AS orders
+      transform: |
+        -- Keep each refresh's result in a list (the last 20) and show the list.
+        store.history = store.history or {}
+        table.insert(store.history, { at = os.date("%H:%M:%S"), orders = rs.rows[1][1] })
+        while #store.history > 20 do
+          table.remove(store.history, 1)
+        end
+        return { columns = { "at", "orders" }, rows = vim.tbl_map(function(h)
+          return { h.at, h.orders }
+        end, store.history) }
+    show:
+      type: line
+      title: "History kept in store (last 20 refreshes)"
+      x_column: at
+      y_column: orders
+      interval: 2s
+      span: 2
