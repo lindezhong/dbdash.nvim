@@ -222,10 +222,12 @@ function M.view_lines(files, width)
     if #lines > 0 then
       lines[#lines + 1] = ""
     end
+    -- The file name centered in a line of ━ as wide as the float.
     local label = (" %s (%s) "):format(vim.fn.fnamemodify(f.path, ":~:."), KIND[f.kind])
-    local fill = math.max(width - vim.fn.strdisplaywidth(label) - 4, 4)
+    local fill = math.max(width - vim.fn.strdisplaywidth(label), 8)
+    local left = math.floor(fill / 2)
     seps[#seps + 1] = #lines
-    lines[#lines + 1] = ("━━━━%s%s"):format(label, ("━"):rep(fill))
+    lines[#lines + 1] = ("━"):rep(left) .. label .. ("━"):rep(fill - left)
     for _, l in ipairs(vim.split(f.text:gsub("\n$", ""), "\n", { plain = true })) do
       lines[#lines + 1] = l
     end

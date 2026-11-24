@@ -198,8 +198,18 @@ T["View shows every file after a separator naming it; a allows and starts"] = fu
   eq(shown.floating, true)
   eq(vim.inspect(shown.title):find("a allow, d deny, q close", 1, true) ~= nil, true)
   local l = shown.lines
+  ---A line of ━ with " ... label " centered (the two sides differ by at most one).
   local function separator(line, label)
-    return vim.startswith(line, "━━━━ ") and line:find(label, 1, true) ~= nil and vim.endswith(line, "━")
+    local chars = vim.fn.split(line, "\\zs")
+    local lw, rw = 0, 0
+    while chars[lw + 1] == "━" do
+      lw = lw + 1
+    end
+    while chars[#chars - rw] == "━" do
+      rw = rw + 1
+    end
+    local middle = table.concat(chars, "", lw + 1, #chars - rw)
+    return vim.startswith(middle, " ") and vim.endswith(middle, label) and lw >= 4 and math.abs(lw - rw) <= 1
   end
   eq(separator(l[1], "board.yaml (config) "), true)
   eq(vim.list_slice(l, 2, 7), importing("helpers.lua"))
