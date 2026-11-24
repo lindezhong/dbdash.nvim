@@ -95,7 +95,12 @@ T["K on the header shows the dashboard's, on a panel the panel's, rendered as Ma
   eq(lines, { "# Sales overview", "Last **24 hours** from sqlite." })
   local buf = vim.api.nvim_win_get_buf(win)
   eq({ vim.bo[buf].filetype, vim.wo[win].wrap, vim.wo[win].linebreak, vim.wo[win].conceallevel }, { "markdown", true, true, 2 })
-  eq(vim.treesitter.highlighter.active[buf] ~= nil, true)
+  -- Treesitter when Neovim has the markdown parser, else the markdown syntax.
+  if pcall(vim.treesitter.language.add, "markdown") then
+    eq(vim.treesitter.highlighter.active[buf] ~= nil, true)
+  else
+    eq(vim.bo[buf].syntax, "markdown")
+  end
   vim.cmd("close")
   lines = describe(d, 4)
   eq(lines, { "Panel 1 (table), 24h, `sqlite`." })
@@ -153,6 +158,31 @@ query: { sql: SELECT 1 AS x }
   vim.fn.writefile({ "database: { url: 'sqlite:///:memory:' }", "query: { sql: x }", "description: '{% lua %}x = 1{% endlua %}'" }, path)
   local cfg = assert(require("dbdash.config").load(path))
   eq(select(2, require("dbdash.trust").collect(path, cfg)), true)
+end
+
+T["floats work without treesitter parsers (filetype plugins would fail)"] = function()
+  -- Some Neovim installs (seen on Windows) have no parser for lua or markdown: the
+  -- built-in ftplugins then fail in vim.treesitter.start(), printing an error.
+  local real_start, real_add = vim.treesitter.start, vim.treesitter.language.add
+  vim.treesitter.start = function()
+    error("Parser could not be created")
+  end
+  vim.treesitter.language.add = function(lang)
+    return nil, ("No parser for language %q"):format(lang)
+  end
+  vim.v.errmsg = ""
+  local ok, e = pcall(function()
+    local popup = require("dbdash.view.popup")
+    local win, buf = popup.open({ "local x = 1" }, { filetype = "lua" })
+    eq({ vim.bo[buf].filetype, vim.bo[buf].syntax }, { "lua", "lua" })
+    vim.api.nvim_win_close(win, true)
+    win, buf = popup.open({ "# Title", "**bold**" }, { markdown = true })
+    eq({ vim.bo[buf].filetype, vim.bo[buf].syntax }, { "markdown", "markdown" })
+    vim.api.nvim_win_close(win, true)
+  end)
+  vim.treesitter.start, vim.treesitter.language.add = real_start, real_add
+  assert(ok, e)
+  eq(vim.v.errmsg, "") -- no filetype plugin ran into the missing parser
 end
 
 return T

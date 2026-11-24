@@ -1,6 +1,28 @@
 -- Floating windows for SQL, arguments and status (design §3.5).
 local M = {}
 
+---Set the filetype of a float's buffer. The built-in lua and markdown filetype plugins start
+---treesitter and fail when Neovim has no parser for the language (seen on Windows); such an
+---error in a FileType autocmd is only printed, it cannot be caught. So without a parser
+---the filetype is set with FileType ignored and the Vim syntax highlights the text;
+---with one, FileType runs as usual (filetype plugins, the user's autocmds).
+local function set_filetype(buf, ft)
+  local lang = vim.treesitter.language.get_lang(ft) or ft
+  local ok, has_parser = pcall(vim.treesitter.language.add, lang)
+  if ok and has_parser then
+    vim.bo[buf].filetype = ft
+    return
+  end
+  local ei = vim.o.eventignore
+  vim.o.eventignore = "FileType"
+  pcall(function()
+    vim.bo[buf].filetype = ft
+  end)
+  vim.o.eventignore = ei
+  vim.bo[buf].syntax = ft
+end
+M.set_filetype = set_filetype
+
 ---Open a centered floating window.
 ---@param lines string[]
 ---@param opts { title: string?, filetype: string?, hl: table[]?, markdown: boolean? }?
@@ -33,10 +55,8 @@ function M.open(lines, opts)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modifiable = false
   vim.bo[buf].bufhidden = "wipe"
-  if opts.markdown then
-    vim.bo[buf].filetype = "markdown"
-  elseif opts.filetype then
-    vim.bo[buf].filetype = opts.filetype
+  if opts.markdown or opts.filetype then
+    set_filetype(buf, opts.markdown and "markdown" or opts.filetype)
   end
   local ns = require("dbdash.view.buffer").ns
   for _, h in ipairs(opts.hl or {}) do
