@@ -407,8 +407,9 @@ They are not drawn in the dashboard: `ⓘ` after a title says there is one
 (the header's for the dashboard's; a panel's own title for a panel's; in a
 one-chart dashboard the header's for either), and `K` (|:DbDashDescribe|)
 shows it in a float with Markdown highlighting (treesitter; the Vim syntax
-when Neovim has no markdown parser), concealed markup and wrapped lines. A chart's description sees what its query sees: `args`
-with its own arguments and `meta` with its panel and database. The
+when Neovim has no markdown parser), concealed markup and wrapped lines. A
+chart's description sees what its query sees: `args` with its own arguments
+and `meta` with its panel and database. The
 dashboard's sees the shared arguments and `meta` without the panel fields
 (`db_*` of the top-level database). Imports and Lua work as in queries, and
 Lua in a description asks for trust like any other (|dbdash-lua|). The SQL
