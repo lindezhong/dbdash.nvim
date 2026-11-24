@@ -151,6 +151,7 @@ Examples, all runnable as they are:
 | [`sqlite_file.yaml`](example/sqlite_file.yaml) | a SQLite file database |
 | [`lua.yaml`](example/lua.yaml) | a `lua://` data source (Lua code, a command's output) |
 | [`transform.yaml`](example/transform.yaml) | `query.transform` reshaping a query result with Lua |
+| [`template_lua.yaml`](example/template_lua.yaml) | Lua in templates: `{% lua %}` blocks and an imported module ([`lua/helpers.lua`](example/lua/helpers.lua)) |
 | [`http.yaml`](example/http.yaml) | an HTTPS API (GitHub releases) turned into rows by a transform (needs network) |
 
 ### Connection URLs
@@ -194,7 +195,19 @@ LIMIT {{ args.limit | sql_limit }}
 ```
 
 Arguments are `args.<name>` and metadata (config file and directory, database, panel,
-time, OS, ...) `meta.<name>`, in templates and in Lua code alike.
+time, OS, ...) `meta.<name>`, in templates and in Lua code alike. Templates can also run
+Lua, in `query.sql` and `query.transform` alike:
+
+```sql
+{% import 'lua/helpers.lua' as h %}
+SELECT * FROM visits WHERE day >= {{ h.since(args.days) }}
+{% lua %}
+  if meta.os == "windows" then return "AND host = 'win'" end
+{% endlua %}
+```
+
+`{% lua %}` blocks output what their code returns; imported `.lua` modules return a table
+of functions to call (`:help dbdash-template-lua`).
 
 The SQL filters quote for the dashboard's database (MySQL backslashes, SQL Server
 `N'...'` and `[ident]`, JSON for MongoDB, ...). See `:help dbdash-templates`.

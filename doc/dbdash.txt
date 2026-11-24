@@ -325,8 +325,9 @@ setup) for every chart type, the alternative styles (`styles.yaml`), several
 panels (`multi_panel.yaml`), arguments and templates
 (`template_example.yaml`), macros and autoescape (`macros.yaml`), a SQLite
 file (`sqlite_file.yaml`), a Lua data source (`lua.yaml`), a Lua transform
-(`transform.yaml`) and an HTTPS API (`http.yaml`, GitHub releases, needs
-network); the last three ask for trust (|dbdash-lua|).
+(`transform.yaml`), Lua in templates with an imported module
+(`template_lua.yaml` and `lua/helpers.lua`) and an HTTPS API (`http.yaml`,
+GitHub releases, needs network); the last four ask for trust (|dbdash-lua|).
 
 `example/dbdash.schema.yaml` is a JSON Schema for config files. It lists every
 field and the URL format of each database. Editors using yaml-language-server
@@ -537,6 +538,8 @@ Statements:
   {% macro name(a, b=default) %} ... {% endmacro %}
   {% import 'file.sql' as lib %}         then {{ lib.name(...) }}
   {% from 'file.sql' import name, other as alias %}
+  {% import 'file.lua' as h %}           a Lua module, |dbdash-template-lua|
+  {% lua %} ... {% endlua %}             Lua code, |dbdash-template-lua|
 
 Inside a loop: `loop.index` (from 1), `loop.index0`, `loop.revindex`,
 `loop.revindex0`, `loop.first`, `loop.last`, `loop.length`. A `set` inside a
@@ -650,6 +653,50 @@ those as macro arguments: >jinja
   {% from 'macros/filters.sql' import in_list %}
   SELECT * FROM users WHERE {{ in_list('dept', args.departments) }}
 <
+Lua in templates                                         *dbdash-template-lua*
+
+Templates can run Lua, the same way in query.sql, query.transform and
+imported templates:
+>yaml
+  query:
+    sql: |
+      {% import 'lua/helpers.lua' as h %}
+      SELECT * FROM visits
+      WHERE day >= {{ h.since(args.days) }}
+      {% lua %}
+        if meta.os == "windows" then return "AND host = 'win'" end
+      {% endlua %}
+<
+`{% lua %} ... {% endlua %}` runs the Lua code where it stands and outputs
+what it returns, like `{{ }}` (autoescape applies; nil outputs nothing). The
+code is taken as written: `{{` and `{%` inside it are Lua.
+
+`{% import 'x.lua' as h %}` and `{% from 'x.lua' import f %}` load a Lua
+file that returns a table (paths as for template imports). Its functions are
+called from expressions, `{{ h.f(args.days) }}`, with positional arguments
+only; other values are exported as they are. A module runs once per render,
+so its functions see that render's `args` and `meta`. In a `{% lua %}` block,
+`vars.h` is the module's own table.
+
+Lua code sees the globals (`vim`, `os`, ...) plus:
+
+  args         the dashboard arguments (|dbdash-arguments|)
+  meta         the metadata (|dbdash-meta|), read-only
+  vars         ({% lua %} blocks) the template variables visible there:
+               `set`, `for` and macro arguments, read-only
+  dbdash.*     the helpers of |dbdash-lua| (system, query, sleep, ...) and
+               `dbdash.safe(s)`: output s as is, even with autoescape
+
+Values cross over as: none / undefined -> nil, lists -> Lua lists, mappings
+-> tables; back: nil -> none, Lua lists -> lists, other tables -> mappings
+(keys sorted). The code runs while the dashboard refreshes, without blocking
+the editor (the dbdash.* helpers wait), and is stopped at the query timeout.
+Errors name the file and line: the config's line for a block, the .lua
+file's for a module.
+
+A config with Lua in its templates or imports is trusted before it runs,
+together with the files it imports (|dbdash-lua|).
+
 Errors                                                *dbdash-template-errors*
 
 Syntax and runtime errors stop the refresh and are shown in the dashboard
@@ -840,7 +887,8 @@ while `{"data": [...]}`, a number or text need a transform, e.g.
 Lua queries and transforms                                        *dbdash-lua*
 
 A `lua://` database runs `query.sql` as Lua, and `query.transform` reshapes
-the result of any database (including `lua://`) with Lua: >yaml
+the result of any database (including `lua://`) with Lua. Templates can run
+Lua too (|dbdash-template-lua|): >yaml
   database: { url: "lua://" }
   query:
     args: [{ name: days, type: int, default: 7 }]
@@ -880,6 +928,7 @@ plus:
   dbdash.sleep(ms)      wait without blocking
   dbdash.checkpoint()   let the editor run during a long computation
   dbdash.null           NULL in returned rows (nil works too)
+  dbdash.safe(s)        (templates) output s as is, even with autoescape
 
 A `lua://` query returns rows (|dbdash-result|), or any value that its
 `query.transform` turns into rows. Errors name the config file and line; a

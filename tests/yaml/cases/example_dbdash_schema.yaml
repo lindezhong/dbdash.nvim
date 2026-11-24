@@ -192,8 +192,10 @@ definitions:
         type: string
         description: |-
           Query template (Jinja subset, see :help dbdash-templates): arguments are
-          {{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta). Its language
-          depends on the database:
+          {{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta). Lua runs in
+          {% lua %} ... {% endlua %} blocks and in modules imported with
+          {% import 'x.lua' as h %} (:help dbdash-template-lua). Its language depends on
+          the database:
             SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)
             Redis          one command, e.g. HGETALL "user:1001"
             MongoDB        a JSON document:
@@ -219,7 +221,8 @@ definitions:
         type: string
         description: |-
           Lua code that reshapes the result of any database before it is shown (after the
-          template, without autoescape; :help dbdash-transform). Every query goes:
+          same template as query.sql - args, meta, {% lua %}, .lua imports - without
+          autoescape; :help dbdash-transform). Every query goes:
           query -> transform -> rows check. It gets
             rs        SQL and other databases: { columns (names), types, rows (nil for
                       NULL) }; lua://: the script's value; http(s)://: the decoded body
