@@ -303,14 +303,15 @@ Sidebar (`sidebar.keys`: select, stop, refresh, close):
     args_show: false        # argument values above the chart
 <
 Top-level fields: `database`, `query`, `show` (one chart) or `panels` and
-`layout` (several charts, |dbdash-panels|), `args` (shared arguments) and
-`interval` (|dbdash-interval|). Durations are numbers of seconds or strings
-with a unit: "500ms", "30s", "5m", "1h".
+`layout` (several charts, |dbdash-panels|), `args` (shared arguments),
+`interval` (|dbdash-interval|) and the header (|dbdash-header|). Durations
+are numbers of seconds or strings with a unit: "500ms", "30s", "5m", "1h".
 
 Where a field is written says what it applies to, with one chart or many:
 
   dashboard-wide       top-level bare fields: `interval`, `args`, `layout`,
-                       `panels`
+                       `panels`, `title`, `show_countdown`,
+                       `countdown_format`
   per panel, with a    the top-level `database`, `query` and `show`
   top-level default    sections: `database`; `query.timeout`, `max_rows`,
                        `autoescape`; `show.interval`, `show_countdown`,
@@ -341,6 +342,22 @@ simply refreshes with everything else. >yaml
     - show: { interval: 10s }   # this one every 10 seconds too
     - show: {}                  # every minute
 <
+Header                                                         *dbdash-header*
+
+`title` and `show_countdown` (with `countdown_format`) at the top level put a
+header line above the charts: the title on the left, the countdown to the
+next refresh of every panel (the top-level `interval`, which it needs) on the
+right, "…" while that refresh runs. `show.show_countdown` is each chart's own
+countdown. In both formats `{time}` is the seconds left and `{clock}` the
+time as m:ss (h:mm:ss from an hour): >yaml
+  title: "Sales overview"
+  interval: 10m
+  show_countdown: true
+  countdown_format: "all in {clock}"
+<
+The title also names the dashboard in threshold notifications (for a chart
+without `show.title`), the panel picker, |:DbDashStatus|, the sidebar (after
+the file name) and `meta.dashboard_title`.
 `query.max_rows` caps the rows read; `query.timeout` defaults to the URL's
 `timeout`. Values a config leaves out (interval 30s, max_rows 10000, timeout
 30s, countdown_format, chart height) come from `defaults` in |dbdash-setup|.
@@ -539,6 +556,7 @@ there is no value):
   config_file    the config file (absolute path)
   config_dir     its directory
   config_name    its name without the extension
+  dashboard_title  the top-level `title`
   db_type        the panel's database type (postgres, http, lua, ...): its
                  own `database`, else the top-level one (|dbdash-panels|)
   db_host        host, port, database (SQLite file, HTTP path) and user of the
@@ -1178,7 +1196,8 @@ All groups link to standard groups by default:
 Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
 `Directory`), `DbDashSidebarRunning` (● of running dashboards, links to
 `DiagnosticOk`), `DbDashSidebarPaused` (◐ of paused ones, links to
-`DiagnosticWarn`), `DbDashSidebarIdle` (○, links to `Normal`). With
+`DiagnosticWarn`), `DbDashSidebarIdle` (○, links to `Normal`),
+`DbDashSidebarTitle` (a config's title, links to `Comment`). With
 `sidebar.cursorline = "name"` the sidebar window's cursor line uses
 `DbDashSidebarCursorLine` (empty) instead of `CursorLine`, and
 `DbDashSidebarCursor` (underline) marks the name on the cursor line without

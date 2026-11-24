@@ -62,6 +62,18 @@ properties:
     description: >-
       Global refresh: when it elapses every panel refreshes and the panels' own timers
       restart. Also the last default of show.interval (after the top-level show.interval).
+  title:
+    type: string
+    description: >-
+      The dashboard's title: on the header line above the charts, in notifications, the
+      sidebar and :DbDashStatus, and meta.dashboard_title.
+  show_countdown:
+    type: boolean
+    default: false
+    description: Count down to the next refresh of every panel (needs interval), right of the title.
+  countdown_format:
+    type: string
+    description: Text of that countdown ({time} seconds, {clock} m:ss; default setup defaults.countdown_format).
   args:
     type: array
     description: >-
@@ -316,7 +328,7 @@ definitions:
       countdown_format:
         type: string
         default: "Next update: {time}s"
-        description: "{time} is replaced by the seconds left (default: setup defaults.countdown_format)."
+        description: "{time} is replaced by the seconds left, {clock} by m:ss (default: setup defaults.countdown_format)."
       renderer:
         type: string
         description: |-

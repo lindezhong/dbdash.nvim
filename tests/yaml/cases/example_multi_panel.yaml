@@ -10,10 +10,14 @@
 #   network).
 # - args are shared; a panel's query.args are its own. args_show shows, on each panel, the
 #   arguments its query reads.
+title: "Overview"
+
 database:
   url: "sqlite:///:memory:"
 
 interval: 10m # every panel, so the GitHub panel stays within the API's hourly limit
+show_countdown: true # countdown to that refresh, right of the title
+countdown_format: "all in {clock}"
 
 args:
   - name: hours

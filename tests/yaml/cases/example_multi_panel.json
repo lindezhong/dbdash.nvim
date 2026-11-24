@@ -1,8 +1,11 @@
 {
+ "title": "Overview",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "interval": "10m",
+ "show_countdown": true,
+ "countdown_format": "all in {clock}",
  "args": [
   {
    "name": "hours",

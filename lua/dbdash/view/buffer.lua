@@ -111,15 +111,24 @@ function M.draw(buf, lines, hl)
 end
 
 ---Countdown and error display.
----Single panel: `countdown` on the first line and `error` as virtual lines above it.
+---`header`: the global countdown, right-aligned on the first line (the header).
+---Single panel: `countdown` on line `row` (the first after the header) and `error` as
+---virtual lines above it.
 ---Multiple panels: `panels` lists { row, col, text } marks at fixed window columns.
 ---@param buf integer
----@param status { countdown: string?, error: string?, position: string?, panels: { row: integer, col: integer, text: string }[]? }
+---@param status { header: string?, countdown: string?, row: integer?, error: string?, position: string?, panels: { row: integer, col: integer, text: string }[]? }
 function M.set_status(buf, status)
   if not vim.api.nvim_buf_is_valid(buf) then
     return
   end
   vim.api.nvim_buf_clear_namespace(buf, M.ns_status, 0, -1)
+  if status.header then
+    vim.api.nvim_buf_set_extmark(buf, M.ns_status, 0, 0, {
+      virt_text = { { status.header, "DbDashCountdown" } },
+      virt_text_pos = "right_align",
+      priority = 200,
+    })
+  end
   if status.panels then
     local last = vim.api.nvim_buf_line_count(buf) - 1
     for _, m in ipairs(status.panels) do
@@ -133,8 +142,9 @@ function M.set_status(buf, status)
     end
     return
   end
+  local row = math.min(status.row or 0, vim.api.nvim_buf_line_count(buf) - 1)
   if status.countdown then
-    vim.api.nvim_buf_set_extmark(buf, M.ns_status, 0, 0, {
+    vim.api.nvim_buf_set_extmark(buf, M.ns_status, row, 0, {
       virt_text = { { status.countdown, "DbDashCountdown" } },
       virt_text_pos = status.position or "right_align",
       priority = 200,
@@ -145,13 +155,13 @@ function M.set_status(buf, status)
     for line in (status.error .. "\n"):gmatch("([^\n]*)\n") do
       vl[#vl + 1] = { { (#vl == 0 and "✗ " or "  ") .. line, "DbDashError" } }
     end
-    vim.api.nvim_buf_set_extmark(buf, M.ns_status, 0, 0, {
+    vim.api.nvim_buf_set_extmark(buf, M.ns_status, row, 0, {
       virt_lines = vl,
       virt_lines_above = true,
       priority = 200,
     })
     -- Lines above the first buffer line are only visible with topfill.
-    for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+    for _, win in ipairs(row == 0 and vim.fn.win_findbuf(buf) or {}) do
       vim.api.nvim_win_call(win, function()
         local view = vim.fn.winsaveview()
         if view.topline == 1 then

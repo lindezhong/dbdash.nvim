@@ -163,6 +163,7 @@ function Panel:check_thresholds(rs)
     if cur.level > prev and cur.step and cur.step.notify then
       local t = self.cfg.show.title
       local title = (t and t ~= "") and t
+        or self.d.cfg.title
         or (self.d.cfg.grid and self:title() or vim.fn.fnamemodify(self.d.path, ":t"))
       local what = cur.column and (cur.column .. " = ") or ""
       local value = require("dbdash.render.table").format_value(cur.value, nil, "NULL")
@@ -490,9 +491,35 @@ end
 
 -- Dashboards -------------------------------------------------------------------------------
 
----Lines shown above the panels (none yet).
+---Countdown text: {time} the seconds left, {clock} m:ss (h:mm:ss from an hour);
+---"…" while refreshing.
+function M.countdown_text(fmt, secs, running)
+  if running then
+    return "…"
+  end
+  local f = math.floor
+  local clock = secs >= 3600 and ("%d:%02d:%02d"):format(f(secs / 3600), f(secs % 3600 / 60), secs % 60)
+    or ("%d:%02d"):format(f(secs / 60), secs % 60)
+  return (fmt:gsub("{time}", tostring(secs)):gsub("{clock}", clock))
+end
+
+---Seconds until the next refresh of every panel (cfg.refresh_all).
+function Dashboard:remaining_global()
+  if not self.gnext_at then
+    return 0
+  end
+  return math.max(0, math.ceil((self.gnext_at - now()) / 1000))
+end
+
+---The header above the panels: the dashboard title (and the global countdown, an extmark
+---on its line), then an empty line; none without a title or countdown.
 function Dashboard:header()
-  return {}, {}
+  local cfg = self.cfg
+  if not (cfg.title or cfg.show_countdown) then
+    return {}, {}
+  end
+  local title = cfg.title or ""
+  return { title, "" }, { { row = 0, col_s = 0, col_e = #title, group = "DbDashTitle" } }
 end
 
 ---The args_show line of a panel (its shown_args with their current values; local ones
@@ -646,6 +673,7 @@ function Dashboard:redraw()
   if #lines == 0 then
     lines = { "" }
   end
+  self.header_rows = offset
   buffer.draw(self.buf, lines, hl)
   vim.b[self.buf].dbdash_regions = self.regions
   self:update_status()
@@ -653,15 +681,28 @@ end
 
 ---Countdown and error extmarks.
 function Dashboard:update_status()
+  local header
+  if self.cfg.show_countdown then
+    local running = false
+    if self.refreshing_all then
+      for _, p in ipairs(self.panels) do
+        running = running or p.running
+      end
+      self.refreshing_all = running or nil
+    end
+    header = M.countdown_text(self.cfg.countdown_format, self:remaining_global(), running)
+  end
   if not self.cfg.grid then
     local p = self.panels[1]
     local show = p.cfg.show
     local countdown
     if show.show_countdown then
-      countdown = p.running and "…" or show.countdown_format:gsub("{time}", tostring(p:remaining()))
+      countdown = M.countdown_text(show.countdown_format, p:remaining(), p.running)
     end
     buffer.set_status(self.buf, {
+      header = header,
       countdown = countdown,
+      row = self.header_rows or 0,
       error = p.error and M.format_error(p.error) or nil,
       position = opts().countdown_position,
     })
@@ -672,11 +713,11 @@ function Dashboard:update_status()
     local r = self.regions and self.regions[i]
     local show = p.cfg.show
     if r and (show.show_countdown or p.running) then
-      local text = p.running and "…" or show.countdown_format:gsub("{time}", tostring(p:remaining()))
+      local text = M.countdown_text(show.countdown_format, p:remaining(), p.running)
       marks[#marks + 1] = { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text), text = text }
     end
   end
-  buffer.set_status(self.buf, { panels = marks })
+  buffer.set_status(self.buf, { header = header, panels = marks })
 end
 
 ---Panel whose region contains buffer line `lnum` (1-based) and display column `dcol`
@@ -724,6 +765,9 @@ function Dashboard:restart(o)
   end
   if self.gtimer then
     self:start_global_timer()
+    if o and o.timer then
+      self.refreshing_all = true -- "…" in the header until every panel is done
+    end
   end
   local t = now()
   for _, p in ipairs(self.panels) do

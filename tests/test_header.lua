@@ -1,0 +1,128 @@
+-- The dashboard header: the title and the countdown to the global refresh, and the uses of
+-- the title elsewhere (notifications, meta.dashboard_title, the sidebar).
+local sched = require("dbdash.scheduler")
+local buffer = require("dbdash.view.buffer")
+local eq = MiniTest.expect.equality
+
+local dir
+local T = MiniTest.new_set({
+  hooks = {
+    pre_case = function()
+      dir = vim.fs.normalize(vim.fn.tempname())
+      vim.fn.mkdir(dir, "p")
+    end,
+    post_case = function()
+      for _, d in ipairs(sched.list()) do
+        sched.stop(d.path)
+      end
+    end,
+  },
+})
+
+local function run(name, text)
+  local path = dir .. "/" .. name .. ".yaml"
+  vim.fn.writefile(vim.split(text, "\n"), path)
+  sched.start(path, { no_show = true })
+  local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
+  vim.wait(10000, function()
+    for _, p in ipairs(d.panels) do
+      if not (p.rs or p.error) or p.running then
+        return false
+      end
+    end
+    return true
+  end, 10)
+  d:redraw()
+  return d
+end
+
+local function marks(d, row)
+  local out = {}
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(d.buf, buffer.ns_status, { row, 0 }, { row, -1 }, { details = true })) do
+    if m[4].virt_text then
+      out[#out + 1] = m[4].virt_text[1][1]
+    end
+  end
+  return out
+end
+
+T["countdown_text: {time}, {clock}, running"] = function()
+  eq(sched.countdown_text("{time}s", 42), "42s")
+  eq(sched.countdown_text("all in {clock}", 582), "all in 9:42")
+  eq(sched.countdown_text("{clock}", 3725), "1:02:05")
+  eq(sched.countdown_text("{clock}", 5), "0:05")
+  eq(sched.countdown_text("{time}s", 5, true), "…")
+end
+
+T["title and global countdown: a header line, the panel's countdown below it"] = function()
+  local d = run("one", [[
+title: Sales overview
+interval: 10m
+show_countdown: true
+countdown_format: "all in {clock}"
+database: { url: "sqlite:///:memory:" }
+query: { sql: SELECT 1 AS x }
+show: { show_countdown: true, countdown_format: "{time}s", interval: 30s }
+]])
+  local lines = vim.api.nvim_buf_get_lines(d.buf, 0, 3, false)
+  eq({ lines[1], lines[2] }, { "Sales overview", "" })
+  eq(marks(d, 0)[1]:match("^all in %d+:%d%d$") ~= nil, true)
+  eq(marks(d, 2)[1]:match("^%d+s$") ~= nil, true)
+  eq(d.panels[1].meta.dashboard_title, "Sales overview")
+end
+
+T["grid: the header above the panels; without title or countdown, none"] = function()
+  local d = run("grid", [[
+interval: 1h
+show_countdown: true
+database: { url: "sqlite:///:memory:" }
+panels:
+  - query: { sql: SELECT 1 AS x }
+    show: { title: A }
+]])
+  local lines = vim.api.nvim_buf_get_lines(d.buf, 0, 3, false)
+  eq({ lines[1], lines[2], lines[3] }, { "", "", "A" })
+  eq(#marks(d, 0), 1)
+  local plain = run("plain", "database: { url: 'sqlite:///:memory:' }\nquery: { sql: SELECT 1 AS x }\n")
+  eq(vim.api.nvim_buf_get_lines(plain.buf, 0, 1, false)[1] ~= "", true)
+  eq(plain.panels[1].meta.dashboard_title, nil)
+end
+
+T["show_countdown needs the top-level interval"] = function()
+  local path = dir .. "/bad.yaml"
+  vim.fn.writefile({ "show_countdown: true", "database: { url: 'sqlite:///:memory:' }", "query: { sql: x }" }, path)
+  local cfg, err = require("dbdash.config").load(path)
+  eq(cfg, nil)
+  eq(err.message:find("show_countdown counts down to the top%-level interval; set interval") ~= nil, true)
+end
+
+T["threshold notifications use the dashboard title when the panel has none"] = function()
+  local notes = {}
+  local real = vim.notify
+  vim.notify = function(msg)
+    notes[#notes + 1] = msg
+  end
+  run("thr", [[
+title: Board
+database: { url: "sqlite:///:memory:" }
+query: { sql: SELECT 99 AS v }
+show:
+  type: stat
+  thresholds: [{ value: 50, color: red, notify: true }]
+]])
+  vim.notify = real
+  local found = false
+  for _, n in ipairs(notes) do
+    found = found or n:find("^dbdash: Board: ") ~= nil
+  end
+  eq(found, true)
+end
+
+T["the sidebar shows each config's title after its name"] = function()
+  vim.fn.writefile({ "title: My board", "database: { url: 'sqlite:///:memory:' }", "query: { sql: x }" }, dir .. "/a.yaml")
+  eq(require("dbdash.view.sidebar").title_of(dir .. "/a.yaml"), "My board")
+  vim.fn.writefile({ "database: { url: 'sqlite:///:memory:' }", "query: { sql: x }" }, dir .. "/b.yaml")
+  eq(require("dbdash.view.sidebar").title_of(dir .. "/b.yaml"), nil)
+end
+
+return T

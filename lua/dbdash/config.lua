@@ -72,6 +72,14 @@ local DEFAULTS = setmetatable({}, {
 ---@field query { sql: string, sql_line: integer, transform: string?, transform_line: integer, autoescape: boolean, max_rows: integer, timeout: integer?, args_show: boolean, args: dbdash.ArgSpec[] }
 ---@field show table show section, with interval (ms), title, show_countdown, countdown_format
 ---@field positions table<string, {line: integer, col: integer}>
+---@field grid boolean `panels:` (a grid, even of one panel)
+---@field refresh_all integer? ms: the top-level interval, a refresh of every panel
+---@field title string? the dashboard's title (top-level `title`)
+---@field show_countdown boolean countdown to the next refresh_all in the header
+---@field countdown_format string
+---@field shared_args dbdash.ArgSpec[] top-level args
+---@field args dbdash.ArgSpec[] shared and local arguments, each with its `key`
+---@field panels dbdash.PanelConfig[]
 
 local function nn(v)
   if v == vim.NIL then
@@ -429,6 +437,14 @@ function M.validate(data, file, positions)
   }
   if cfg.refresh_all and cfg.refresh_all < 1000 then
     ctx:fail("interval", "interval must be at least 1s")
+  end
+  -- Dashboard-wide: the title and the countdown to the global refresh.
+  cfg.title = ctx:expect("title", data.title, "string", true)
+  cfg.show_countdown = ctx:expect("show_countdown", data.show_countdown, "boolean", true) == true
+  cfg.countdown_format = ctx:expect("countdown_format", data.countdown_format, "string", true)
+    or DEFAULTS.countdown_format
+  if cfg.show_countdown and not cfg.refresh_all then
+    ctx:fail("show_countdown", "show_countdown counts down to the top-level interval; set interval")
   end
   local panels_raw = nn(data.panels)
   cfg.grid = panels_raw ~= nil

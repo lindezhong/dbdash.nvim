@@ -100,7 +100,7 @@ local function with_panel(d, fn)
     end
   end
   vim.ui.select(d.panels, {
-    prompt = "Panel",
+    prompt = d.cfg.title and (d.cfg.title .. ": panel") or "Panel",
     format_item = function(p)
       return p:title()
     end,
@@ -131,12 +131,19 @@ function M.status()
     return
   end
   local url = require("dbdash.db.url")
-  local lines = {
+  local lines = {}
+  if d.cfg.title then
+    lines[#lines + 1] = "Title:     " .. d.cfg.title
+  end
+  vim.list_extend(lines, {
     "Config:    " .. short(d.path),
     "Status:    " .. d:status_word(),
-  }
+  })
   if d.cfg.refresh_all then
-    lines[#lines + 1] = ("Interval:  every panel refreshes every %ds"):format(d.cfg.refresh_all / 1000)
+    lines[#lines + 1] = ("Interval:  every panel refreshes every %ds, next in %ds"):format(
+      d.cfg.refresh_all / 1000,
+      d:remaining_global()
+    )
   end
   for _, p in ipairs(d.panels) do
     lines[#lines + 1] = ""
