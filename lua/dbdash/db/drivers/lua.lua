@@ -24,6 +24,7 @@ function Conn:execute(code, opts)
     line = opts.line,
     args = opts.args,
     meta = opts.meta,
+    lua = opts.lua,
     timeout = opts.timeout,
     max_rows = opts.max_rows,
   })

@@ -88,8 +88,9 @@ end
 
 ---The metadata of a panel for one render.
 ---@param panel table scheduler Panel (cfg, d, index, refresh_count)
+---@param run table? the run (scheduler dbdash.Run) being rendered
 ---@return table values by name (nil where there is no value)
-function M.values(panel)
+function M.values(panel, run)
   local cfg = panel.cfg
   local q, show = cfg.query, cfg.show
   local dbdash = require("dbdash")

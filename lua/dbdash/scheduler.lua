@@ -213,30 +213,103 @@ end
 ---Runs inside a util.async task (template Lua may wait on dbdash.* helpers); raises a
 ---template or database error.
 ---@return string sql, string? transform_code
-function Panel:render_templates()
-  local q, d = self.cfg.query, self.d
-  local values = args.resolve_panel(self.cfg, d.state)
-  self.vars = values -- `args` of lua:// scripts and query.transform
-  self.meta = require("dbdash.metadata").values(self) -- `meta` of the Lua code
+---@param run dbdash.Run
+function Panel:render_templates(run)
+  local q = self.cfg.query
+  run.meta = require("dbdash.metadata").values(self, run) -- `meta` of templates and Lua
+  if run.depth == 0 then
+    self.meta = run.meta
+  end
   local o = {
     dialect = db.driver(self.cfg.database.type).dialect,
     specs = self.cfg.visible_args,
-    values = values,
-    meta = self.meta,
+    values = run.args,
+    meta = run.meta,
+    lua = run.lua,
     timeout = q.timeout,
     on_allow = function()
       self:refresh({ queue = true })
     end,
   }
-  local sql = M.render_text(d, q.sql, q.sql_line, vim.tbl_extend("force", o, { autoescape = q.autoescape }))
-  local code = q.transform and M.render_text(d, q.transform, q.transform_line, o) or nil
+  local sql = M.render_text(self.d, q.sql, q.sql_line, vim.tbl_extend("force", o, { autoescape = q.autoescape }))
+  local code = q.transform and M.render_text(self.d, q.transform, q.transform_line, o) or nil
   return sql, code
+end
+
+---@class dbdash.Run one run of a panel's pipeline: a refresh (depth 0) or a callback
+---@field values table<string, any> the arguments by name
+---@field args table what Lua code sees as `args`
+---@field depth integer 0 for a refresh, n for a callback n levels deep (meta.callback)
+---@field counter { n: integer } callbacks so far in this refresh (shared by its callbacks)
+---@field lua { store: table, helpers: table } globals of all Lua code of the run
+---@field meta table? the metadata of this run
+
+---A run of the panel's pipeline with `values` (default: the current arguments).
+---@param parent dbdash.Run? the run this one is a callback of
+---@return dbdash.Run
+function Panel:new_run(values, parent)
+  local run = {
+    values = values or args.resolve_panel(self.cfg, self.d.state),
+    depth = parent and parent.depth + 1 or 0,
+    counter = parent and parent.counter or { n = 0 },
+  }
+  run.args = run.values
+  run.lua = { store = self.store, helpers = self:helpers(run) }
+  return run
+end
+
+---The `dbdash` table of a run's Lua code: the shared helpers plus the run's own.
+function Panel:helpers(run)
+  return setmetatable({}, { __index = require("dbdash.db.lua_env").helpers })
+end
+
+---Render the templates, query, then query.transform and the rows check (every source goes
+---query -> transform -> rows check). Inside a util.async task.
+---@param run dbdash.Run
+---@return dbdash.db.ResultSet
+function Panel:pipeline(run)
+  local q = self.cfg.query
+  local source = vim.fn.fnamemodify(self.d.path, ":~:.")
+  local sql, code = self:render_templates(run)
+  if run.depth == 0 then
+    self.sql, self.transform_code = sql, code
+  end
+  local rs = db.query_async(self.cfg.database.url, sql, {
+    max_rows = q.max_rows,
+    timeout = q.timeout,
+    options = self.cfg.database.options,
+    base_dir = self.d.cfg.dir,
+    password_cmd = self.cfg.database.password_cmd,
+    args = run.args,
+    meta = run.meta,
+    lua = run.lua,
+    source = source,
+    line = q.sql_line,
+    raw = code ~= nil, -- the transform gets the raw result; checked after it
+    cookie_jar = self.d.cookie_jar,
+  })
+  run.query_result = rs
+  if code then
+    local out = M.transform(code, rs, {
+      source = source,
+      line = q.transform_line,
+      args = run.args,
+      meta = run.meta,
+      lua = run.lua,
+      timeout = q.timeout or require("dbdash").default_ms("timeout"),
+      max_rows = q.max_rows or require("dbdash").options.defaults.max_rows,
+    })
+    out.elapsed_ms = rs.elapsed_ms
+    rs = out
+  end
+  return rs
 end
 
 ---Render template `text` (at `line` of the config) of dashboard `d`. Templates see exactly
 ---two names: args.<name> (o.specs with o.values) and meta.<name> (o.meta); imported
 ---templates and Lua in templates too. Inside a util.async task; raises template errors.
----@param o { dialect: table?, autoescape: boolean?, specs: dbdash.ArgSpec[], values: table, meta: table, timeout: integer?, on_allow: fun()? }
+---@param o { dialect: table?, autoescape: boolean?, specs: dbdash.ArgSpec[], values: table, meta: table, lua: table?, timeout: integer?, on_allow: fun()? }
+---  lua: { store, helpers } globals of Lua in the template ({% lua %}, imported .lua)
 function M.render_text(d, text, line, o)
   local metadata = require("dbdash.metadata")
   local map = require("dbdash.util.map")
@@ -248,7 +321,12 @@ function M.render_text(d, text, line, o)
   local env = template.env(o.dialect, o.autoescape == true, d.cfg.dir)
   env.context = vars
   -- Lua in templates ({% lua %}, imported .lua): args, meta and the query timeout.
-  env.lua = { args = o.values, meta = metadata.for_lua(o.meta) }
+  env.lua = {
+    args = o.values,
+    meta = metadata.for_lua(o.meta),
+    store = o.lua and o.lua.store,
+    helpers = o.lua and o.lua.helpers,
+  }
   env.timeout = o.timeout or require("dbdash").default_ms("timeout")
   env.check_file = function(path, t, kind)
     M.check_file(d, path, t, kind, o.on_allow)
@@ -277,12 +355,13 @@ end
 function Panel:describe_async(cb)
   local show = self.cfg.show
   describe_async(function()
-    local meta = require("dbdash.metadata").values(self)
+    local run = self:new_run()
     return M.render_text(self.d, show.description, show.description_line, {
       dialect = db.driver(self.cfg.database.type).dialect,
       specs = self.cfg.visible_args,
-      values = args.resolve_panel(self.cfg, self.d.state),
-      meta = meta,
+      values = run.args,
+      meta = require("dbdash.metadata").values(self, run),
+      lua = run.lua,
       timeout = self.cfg.query.timeout,
     })
   end, cb)
@@ -349,7 +428,7 @@ end
 ---Render the templates in a task; `cb(err, sql, transform_code)` on the main loop.
 function Panel:render_async(cb)
   require("dbdash.util.async").run(function()
-    return self:render_templates()
+    return self:render_templates(self:new_run())
   end, function(err, sql, code)
     vim.schedule(function()
       if not err then
@@ -421,39 +500,9 @@ function Panel:refresh(o)
   self.refresh_count = (self.refresh_count or 0) + 1 -- meta.refresh_count
   self.d:update_status()
   local gen = self.d.generation
-  local q = self.cfg.query
-  local source = vim.fn.fnamemodify(self.d.path, ":~:.")
-  -- One task: render the templates, query, then query.transform and the rows check (every
-  -- source goes query -> transform -> rows check).
+  -- One task: the whole pipeline (callbacks of dbdash.run() run inside it too).
   require("dbdash.util.async").run(function()
-    local sql, code = self:render_templates()
-    self.sql, self.transform_code = sql, code
-    local rs = db.query_async(self.cfg.database.url, sql, {
-      max_rows = q.max_rows,
-      timeout = q.timeout,
-      options = self.cfg.database.options,
-      base_dir = self.d.cfg.dir,
-      password_cmd = self.cfg.database.password_cmd,
-      args = self.vars,
-      meta = self.meta,
-      source = source,
-      line = q.sql_line,
-      raw = code ~= nil, -- the transform gets the raw result; checked after it
-      cookie_jar = self.d.cookie_jar,
-    })
-    if code then
-      local out = M.transform(code, rs, {
-        source = source,
-        line = q.transform_line,
-        args = self.vars,
-        meta = self.meta,
-        timeout = q.timeout or require("dbdash").default_ms("timeout"),
-        max_rows = q.max_rows or require("dbdash").options.defaults.max_rows,
-      })
-      out.elapsed_ms = rs.elapsed_ms
-      rs = out
-    end
-    return rs
+    return self:pipeline(self:new_run())
   end, function(err, rs)
     vim.schedule(function()
       if gen == self.d.generation then
@@ -481,6 +530,7 @@ function M.transform(code, rs, o)
     line = o.line,
     args = o.args,
     meta = o.meta,
+    lua = o.lua,
     vars = vars,
     timeout = o.timeout,
   })
@@ -1105,6 +1155,7 @@ function M.start(path, o)
         next_at = now(),
         history = {},
         style = {},
+        store = {}, -- `store` of the panel's Lua code, for as long as the dashboard runs
       }, Panel)
     end
     local restored = require("dbdash")._take_pending(path)

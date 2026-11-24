@@ -804,6 +804,8 @@ Lua code sees the globals (`vim`, `os`, ...) plus:
 
   args         the dashboard arguments (|dbdash-arguments|)
   meta         the metadata (|dbdash-meta|), read-only
+  store        the panel's own table, kept while the dashboard runs
+               (|dbdash-store|)
   vars         ({% lua %} blocks) the template variables visible there:
                `set`, `for` and macro arguments, read-only
   dbdash.*     the helpers of |dbdash-lua| (system, query, sleep, ...) and
@@ -1061,6 +1063,8 @@ plus:
   args                  the dashboard arguments by name (`args.days`)
   meta                  the metadata (`meta.config_dir`, |dbdash-meta|),
                         read-only
+  store                 the panel's own table, kept while the dashboard
+                        runs (|dbdash-store|)
   rs, response          (transform) the query result, see
                         |dbdash-transform|
   dbdash.system(cmd, opts)  run a command (a string through `sh -c` or
@@ -1075,6 +1079,14 @@ plus:
   dbdash.null           NULL in returned rows (nil works too)
   dbdash.safe(s)        (templates) output s as is, even with autoescape
 
+                                                                *dbdash-store*
+`store` is a table each panel keeps for as long as its dashboard runs: every
+Lua of the panel sees the same one (`{% lua %}` blocks, imported `.lua`
+modules, `query.transform`, `lua://`, its description), and it survives
+refreshes and argument changes. Panels do not share it, and it starts empty
+when the dashboard is started again (it is not saved in sessions): >lua
+  store.runs = (store.runs or 0) + 1
+<
 A `lua://` query returns rows (|dbdash-result|), or any value that its
 `query.transform` turns into rows. Errors name the config file and line; a
 script still running at the query timeout is stopped (loops that never call a

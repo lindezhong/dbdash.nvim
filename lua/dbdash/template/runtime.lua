@@ -555,14 +555,15 @@ function R.from_lua(v)
   return out
 end
 
----The Lua environment of template code: the globals plus args, meta and the dbdash
----helpers (env.lua: { args, meta } from the dashboard), and `extra` names.
+---The Lua environment of template code: the globals plus args, meta, store and the dbdash
+---helpers (env.lua: { args, meta, store, helpers } from the dashboard), and `extra` names.
 function R.lua_env(env, extra)
   local g = env.lua or {}
   local t = setmetatable({
     args = g.args or {},
     meta = g.meta or require("dbdash.metadata").for_lua({}),
-    dbdash = require("dbdash.db.lua_env").helpers,
+    store = g.store or {},
+    dbdash = g.helpers or require("dbdash.db.lua_env").helpers,
   }, { __index = _G })
   for k, v in pairs(extra or {}) do
     t[k] = v
