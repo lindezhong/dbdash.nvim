@@ -2,7 +2,7 @@
  "database": {
   "url": "sqlite:///:memory:"
  },
- "interval": "60s",
+ "interval": "10m",
  "args": [
   {
    "name": "hours",
@@ -50,6 +50,7 @@
    "show": {
     "type": "table",
     "title": "Now",
+    "interval": "60s",
     "show_countdown": true,
     "countdown_format": "{time}s"
    }
@@ -66,6 +67,24 @@
     "title": "Orders today",
     "format": "{:,}",
     "interval": "10s"
+   }
+  },
+  {
+   "database": {
+    "url": "https://api.github.com"
+   },
+   "query": {
+    "sql": "{\n  \"path\": \"/repos/neovim/neovim/contributors\",\n  \"query\": {\"per_page\": 8},\n  \"headers\": {\"Accept\": \"application/vnd.github+json\"}\n}\n"
+   },
+   "show": {
+    "type": "bar",
+    "title": "Top Neovim contributors",
+    "x_column": "login",
+    "y_column": "contributions",
+    "span": 2,
+    "style": {
+     "show_values": true
+    }
    }
   }
  ]

@@ -322,7 +322,8 @@ Examples and schema                                          *dbdash-examples*
 
 The `example/` directory of the plugin has a runnable config (SQLite, no
 setup) for every chart type, the alternative styles (`styles.yaml`), several
-panels (`multi_panel.yaml`), arguments and templates
+panels with their own databases (`multi_panel.yaml`, SQLite and the GitHub
+API, needs network), arguments and templates
 (`template_example.yaml`), macros and autoescape (`macros.yaml`), a SQLite
 file (`sqlite_file.yaml`), a Lua data source (`lua.yaml`), a Lua transform
 (`transform.yaml`), Lua in templates with an imported module

@@ -146,7 +146,7 @@ Examples, all runnable as they are:
 | [`table.yaml`](example/table.yaml) | table columns, aliases, widths, styles |
 | [`line.yaml`](example/line.yaml), [`area.yaml`](example/area.yaml), [`bar.yaml`](example/bar.yaml), [`histogram.yaml`](example/histogram.yaml), [`boxplot.yaml`](example/boxplot.yaml), [`heatmap.yaml`](example/heatmap.yaml), [`scatter.yaml`](example/scatter.yaml), [`bubble.yaml`](example/bubble.yaml), [`pie.yaml`](example/pie.yaml), [`stat.yaml`](example/stat.yaml), [`text.yaml`](example/text.yaml) | one chart type each |
 | [`styles.yaml`](example/styles.yaml) | the alternative styles and canvases |
-| [`multi_panel.yaml`](example/multi_panel.yaml) | several panels, grid layout, per-panel intervals |
+| [`multi_panel.yaml`](example/multi_panel.yaml) | several panels, grid layout, per-panel intervals and databases (SQLite and an HTTPS API, needs network) |
 | [`template_example.yaml`](example/template_example.yaml) | every argument type and the template syntax |
 | [`macros.yaml`](example/macros.yaml) | macros, imports, autoescape |
 | [`sqlite_file.yaml`](example/sqlite_file.yaml) | a SQLite file database |

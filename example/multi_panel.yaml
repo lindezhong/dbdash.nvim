@@ -4,11 +4,12 @@
 # Each panel refreshes on its own show.interval; the top-level interval is the default
 # and also refreshes every panel.
 # The top-level database is the default of every panel; a panel may set its own
-# (panels[].database), and a panel without one needs the top-level default.
+# (panels[].database), and a panel without one needs the top-level default. Panels can mix
+# data sources: the last one asks the GitHub API over https:// (needs network).
 database:
   url: "sqlite:///:memory:"
 
-interval: 60s
+interval: 10m # also refreshes every panel, so it stays within the GitHub API's limit
 
 args:
   - name: hours
@@ -54,6 +55,7 @@ panels:
     show:
       type: table
       title: "Now"
+      interval: 60s
       show_countdown: true
       countdown_format: "{time}s"
 
@@ -67,3 +69,24 @@ panels:
       title: "Orders today"
       format: "{:,}"
       interval: 10s
+
+  - database:                       # another data source: an HTTPS JSON API
+      url: "https://api.github.com"
+    query:
+      # A GET with parameters (:help dbdash-http). The response is a list of flat records,
+      # which are rows as they are: no transform needed.
+      sql: |
+        {
+          "path": "/repos/neovim/neovim/contributors",
+          "query": {"per_page": 8},
+          "headers": {"Accept": "application/vnd.github+json"}
+        }
+    show:
+      type: bar
+      title: "Top Neovim contributors"
+      x_column: login
+      y_column: contributions
+      span: 2                       # refreshes on the top-level 10m: unauthenticated GitHub
+                                    # API calls are limited to 60 an hour
+      style:
+        show_values: true
