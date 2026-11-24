@@ -11,14 +11,19 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
   stat (a KPI value in large digits with its change and a sparkline), text (the result as
   plain text, e.g. log lines or a command's output),
   each with alternative styles (braille / block canvases, vertical bars, round pie, ...).
-- **Several panels** per dashboard in a grid, each refreshing on its own interval.
+- **Several panels** per dashboard in a grid, each with its own database (mix SQLite,
+  PostgreSQL, an HTTP API, ...) and interval, plus an optional refresh of all of them; the
+  top-level `database`, `query` and `show` are defaults every panel can override.
   Dashboards that are not on screen pause and catch up when shown again.
+- **Title and descriptions**: a header with the dashboard's title and a countdown;
+  descriptions of the dashboard and each chart are templates shown as Markdown (`K`).
 - **Lua**: a `lua://` source whose query is Lua code, and `query.transform` to reshape any
   result with Lua before it is checked as rows (trusted configs only, as with `exrc`).
 - **Query templates**: a Jinja2 subset with SQL-safe quoting filters, autoescape, macros
   and imports.
 - **Thresholds**: color values (stat cards, table cells) and notify when a value crosses a level.
-- **Arguments**: typed variables set from the command line, prompts or in the dashboard.
+- **Arguments**: typed variables set from the command line, prompts or in the dashboard;
+  shared by all panels or a panel's own.
 - **Sidebar**: browse config files and subdirectories as a tree, start and stop dashboards.
 - **Sessions**: dashboards come back with `:mksession`; changed arguments can be kept too.
 - **TLS**: `require`, certificate pinning, `verify-ca` / `verify-full` against the system
@@ -88,14 +93,14 @@ Then `:DbDashStart signups.yaml hours=48`, or `:DbDash` for a sidebar listing th
 of the current directory as a tree: `<CR>` on a directory expands it, on a file starts its
 dashboard; `●` marks running dashboards, `◐` paused ones (not on screen), `○` the others.
 
-To try it without a database server, open any file in [`example/`](example): they all use
-an in-memory SQLite database.
+To try it without a database server, open any file in [`example/`](example): most use an
+in-memory SQLite database (`http.yaml` and `multi_panel.yaml` also call the GitHub API).
 
 ## Usage
 
 | Command | Description |
 | --- | --- |
-| `:DbDashStart[!] {config} [name=value ...]` | Start a dashboard (`!` asks for every argument) |
+| `:DbDashStart[!] {config} [name=value ...]` | Start a dashboard (`!` asks for every argument; `<panel>.name=value` sets one panel's own) |
 | `:DbDashRestart` | Refresh now |
 | `:DbDashStop [{config}]` | Stop a dashboard |
 | `:DbDashList` / `:DbDashStatus` | Running dashboards / status and query history |
@@ -108,12 +113,13 @@ an in-memory SQLite database.
 | `:DbDashMksession[!] [{file}]` | Write a session (any `:mksession` restores dashboards) |
 
 In a dashboard: `r` refresh, `a` modify an argument, `A` show arguments, `R` reset
-arguments, `s` show the query, `e` export the result, `K` show the description. Global mappings: `<leader>ds` start, `<leader>dr` refresh,
+arguments, `s` show the query, `e` export the result, `K` show the description (`ⓘ` marks
+titles that have one). Global mappings: `<leader>ds` start, `<leader>dr` refresh,
 `<leader>dt` stop, `<leader>dl` list, `<leader>dd` sidebar.
 
-Every key, the sidebar (width, position, directory, file globs, cursor line), where dashboards open,
-the popup border and size, and the default interval, timeouts and row limit can be set
-in `setup()`; see `:help dbdash-setup`. Colors use highlight groups (`:help
+Every key, the `ⓘ` icon, the sidebar (width, position, directory, file globs, cursor line),
+where dashboards open, the popup border and size, and the default interval, timeouts and
+row limit can be set in `setup()`; see `:help dbdash-setup`. Colors use highlight groups (`:help
 dbdash-highlights`), e.g. `DbDashSidebarDir` for sidebar directories.
 
 ### Sessions
@@ -131,11 +137,15 @@ require("dbdash").load_session(session_file .. ".dbdash") -- after sourcing the 
 ## Configuration
 
 A config file describes one dashboard: `database`, `query` and `show`, or `panels` and
-`layout` for several charts. Top-level `interval`, `args` and `layout` are dashboard-wide; the
-top-level `database`, `query` and `show` are defaults each panel can override (a panel's own
-`database`, `show.interval`, `query.args`, ...). See `:help dbdash-config`. [`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a
-JSON Schema of the whole format; editors with yaml-language-server validate and complete a
-config that starts with:
+`layout` for several charts. Top-level bare fields are dashboard-wide: `interval` (a refresh
+of every panel), `args` (shared arguments), `layout`, and the header's `title`,
+`description` and `show_countdown`. The top-level `database`, `query` and `show` are
+defaults each panel can override (a panel's own `database`, `show.interval`, ...); fields
+of one chart (`query.sql`, `show.type`, ...) belong in each panel. A panel's `query.args`
+are its own. See `:help dbdash-config`.
+
+[`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a JSON Schema of the whole
+format; editors with yaml-language-server validate and complete a config that starts with:
 
 ```yaml
 # yaml-language-server: $schema=/path/to/dbdash.nvim/example/dbdash.schema.yaml
@@ -148,7 +158,7 @@ Examples, all runnable as they are:
 | [`table.yaml`](example/table.yaml) | table columns, aliases, widths, styles |
 | [`line.yaml`](example/line.yaml), [`area.yaml`](example/area.yaml), [`bar.yaml`](example/bar.yaml), [`histogram.yaml`](example/histogram.yaml), [`boxplot.yaml`](example/boxplot.yaml), [`heatmap.yaml`](example/heatmap.yaml), [`scatter.yaml`](example/scatter.yaml), [`bubble.yaml`](example/bubble.yaml), [`pie.yaml`](example/pie.yaml), [`stat.yaml`](example/stat.yaml), [`text.yaml`](example/text.yaml) | one chart type each |
 | [`styles.yaml`](example/styles.yaml) | the alternative styles and canvases |
-| [`multi_panel.yaml`](example/multi_panel.yaml) | several panels, grid layout, per-panel intervals and databases (SQLite and an HTTPS API, needs network) |
+| [`multi_panel.yaml`](example/multi_panel.yaml) | several panels in a grid: top-level defaults, per-panel intervals and databases (SQLite and an HTTPS API, needs network), title, global countdown, descriptions, argument lines |
 | [`template_example.yaml`](example/template_example.yaml) | every argument type and the template syntax |
 | [`macros.yaml`](example/macros.yaml) | macros, imports, autoescape |
 | [`sqlite_file.yaml`](example/sqlite_file.yaml) | a SQLite file database |
@@ -198,8 +208,8 @@ LIMIT {{ args.limit | sql_limit }}
 ```
 
 Arguments are `args.<name>` and metadata (config file and directory, database, panel,
-time, OS, ...) `meta.<name>`, in templates and in Lua code alike. Templates can also run
-Lua, in `query.sql` and `query.transform` alike:
+time, OS, ...) `meta.<name>`, in templates and in Lua code alike. `query.sql`,
+`query.transform` and the descriptions are all templates, and can also run Lua:
 
 ```sql
 {% import 'lua/helpers.lua' as h %}
@@ -272,6 +282,8 @@ No Python, venv or pynvim any more. Commands are renamed from `:Dashboard…` to
 same. Existing configs mostly work. Differences:
 
 - Arguments use `name:`; the old `key:` is rejected with a hint.
+- `query.args_show` is now `show.args_show` (rejected with a hint), and shows the
+  arguments the query reads.
 - Fields only meaningful for matplotlib are ignored.
 - `sql_id` quotes with the database's identifier quotes instead of always backticks,
   `sql_in` of an empty list gives `(NULL)`, and booleans become SQL literals rather than
@@ -305,7 +317,8 @@ Integration tests run against the services in `tests/docker/compose.yaml`: Redis
 PostgreSQL, MySQL, MongoDB, Cassandra, SQL Server and nginx (HTTP/HTTPS), all official
 images with the configs and test certificates (`tests/fixtures/`) mounted read-only. They
 are skipped unless `DBDASH_IT=1` is set. With `DBDASH_IT=1` the examples test also runs
-`example/http.yaml`, which calls the public GitHub API (network access needed).
+`example/http.yaml` and `example/multi_panel.yaml`, which call the public GitHub API
+(network access needed).
 
 **On one machine** with Docker (your user needs access to it, e.g. in the `docker` group,
 or prefix the command with `sg docker -c "..."`):
