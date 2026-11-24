@@ -52,25 +52,66 @@ local function message_of(e)
   return tostring(e)
 end
 
----Call fn() and stop it when it runs longer than `timeout` ms: an instruction-count hook
----raises { timeout = true, message } (pure Lua loops included). Returns pcall's results.
+-- Timeouts of guarded code. LuaJIT has one debug hook for all coroutines, so a single hook
+-- checks the deadlines of the coroutine running now: a task waiting in guarded code (on a
+-- query, a command) is not checked while other code runs, and guarded code inside guarded
+-- code (dbdash.run() callbacks, modules) keeps the outer deadline too.
+local deadlines = setmetatable({}, { __mode = "k" }) -- coroutine -> { { at, timeout } }
+
+local function timeout_hook()
+  local co = coroutine.running()
+  local list = co and deadlines[co]
+  if not list then
+    if next(deadlines) == nil then
+      debug.sethook() -- nothing guarded any more (e.g. its coroutine was collected)
+    end
+    return
+  end
+  local t = vim.uv.hrtime()
+  for i, d in ipairs(list) do
+    if t > d.at then
+      -- Raise once for the outermost expired deadline; the inner ones end with it.
+      for j = i, #list do
+        list[j].at = math.huge
+      end
+      error({ message = ("script did not finish within %.1fs"):format(d.timeout / 1000), timeout = true }, 0)
+    end
+  end
+end
+
+---Call fn() and stop it when it runs longer than `timeout` ms: the count hook raises
+---{ timeout = true, message } (pure Lua loops included). Returns pcall's results.
 ---@return boolean ok, any result_or_error
 function M.guard(fn, timeout)
   -- Interpreted code so the count hook can stop a runaway loop after the timeout.
   jit.off(fn, true)
   local co = coroutine.running()
-  local deadline = timeout and co and (vim.uv.hrtime() + timeout * 1e6) or nil
-  if deadline then
-    debug.sethook(co, function()
-      if vim.uv.hrtime() > deadline then
-        debug.sethook(co)
-        error({ message = ("script did not finish within %.1fs"):format(timeout / 1000), timeout = true }, 0)
-      end
-    end, "", 10000)
+  if not (timeout and co) then
+    return pcall(fn)
+  end
+  local list = deadlines[co]
+  if not list then
+    list = {}
+    deadlines[co] = list
+  end
+  local entry = { at = vim.uv.hrtime() + timeout * 1e6, timeout = timeout }
+  list[#list + 1] = entry
+  if debug.gethook() ~= timeout_hook then
+    debug.sethook(timeout_hook, "", 10000)
   end
   local ok, ret = pcall(fn)
-  if deadline then
-    debug.sethook(co)
+  entry.at = math.huge
+  for i = #list, 1, -1 do
+    if list[i] == entry then
+      table.remove(list, i)
+      break
+    end
+  end
+  if #list == 0 then
+    deadlines[co] = nil
+    if next(deadlines) == nil then
+      debug.sethook()
+    end
   end
   return ok, ret
 end
