@@ -1,5 +1,4 @@
--- SQL filters/globals. Expected values follow the legacy Python implementation
--- (python3/dashboard/template.py) except for the documented, dialect-aware differences.
+-- SQL filters/globals: their outputs, and how they differ between dialects.
 local template = require("dbdash.template")
 local dialect = require("dbdash.db.dialect")
 local yaml = require("dbdash.yaml")
@@ -25,7 +24,7 @@ n: 10
 conds: {"age > 30": "'senior'", "age > 20": "'mid'"}
 ]])
 
-T["legacy-compatible outputs"] = function()
+T["filter and global outputs"] = function()
   local cases = {
     { "{{ name|sql_escape }}", "it''s" },
     { "{{ nothing|sql_escape }}", "NULL" },
@@ -47,7 +46,7 @@ T["legacy-compatible outputs"] = function()
   end
 end
 
-T["dialect-aware differences from legacy"] = function()
+T["outputs that depend on the dialect"] = function()
   eq(render("{{ 'users'|sql_id }}", ctx, "sqlite"), '"users"')
   eq(render("{{ 'users'|sql_id }}", ctx, "mysql"), "`users`")
   eq(render("{{ 'dbo.users'|sql_id }}", ctx, "mssql"), "[dbo].[users]")

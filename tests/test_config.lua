@@ -84,7 +84,7 @@ T["args are normalized"] = function()
   eq(cfg.query.args[2].default, nil)
 end
 
-T["legacy key: in args is rejected with a hint"] = function()
+T["key: in args is rejected with a hint"] = function()
   local msg = err_of(MINIMAL .. "  args:\n    - key: x\n      default: 1\n")
   eq(msg:find("rename it to 'name:'", 1, true) ~= nil, true)
   eq(msg:find(":7:", 1, true) ~= nil, true)
@@ -100,7 +100,7 @@ T["validation errors name the field and position"] = function()
   eq(err_of("a: [1\n"):find("unterminated flow collection") ~= nil, true)
 end
 
-T["top-level interval is honored like the old plugin"] = function()
+T["the top-level interval is the panel's interval without its own"] = function()
   local cfg = assert(load(MINIMAL .. "interval: 2m\n"))
   eq(cfg.show.interval, 120000)
 end

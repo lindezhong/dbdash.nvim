@@ -592,7 +592,7 @@
   "expected": "12"
  },
  {
-  "name": "legacy table example",
+  "name": "table example",
   "template": "SELECT \n  datetime('now') as current_time,\n  \"{{key1}}\" as k1,\n  \"{{key2}}\" as k2\n",
   "ctx": "{\"key1\": \"value1\", \"key2\": \"value2\"}",
   "expected": "SELECT \n  datetime('now') as current_time,\n  \"value1\" as k1,\n  \"value2\" as k2"

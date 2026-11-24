@@ -148,8 +148,8 @@ CASES = [
     ("loop sees outer set", "{% set p = '>' %}{% for i in items %}{{ p }}{{ i }}{% endfor %}", None, None),
     ("set shadows context", "{% set x = 'local' %}{{ x }}", None, None),
     ("set multiple targets", "{% set a, b = [1, 2] %}{{ a }}{{ b }}", None, None),
-    # --- realistic templates (from the legacy examples) --------------------------------
-    ("legacy table example", "SELECT \n  datetime('now') as current_time,\n  \"{{key1}}\" as k1,\n  \"{{key2}}\" as k2\n", {"key1": "value1", "key2": "value2"}, None),
+    # --- realistic templates -----------------------------------------------------------------
+    ("table example", "SELECT \n  datetime('now') as current_time,\n  \"{{key1}}\" as k1,\n  \"{{key2}}\" as k2\n", {"key1": "value1", "key2": "value2"}, None),
     ("conditional where", "SELECT * FROM users\nWHERE age >= {{ min_age }}\n{% if departments %}\n  AND department IN ({% for d in departments %}'{{ d }}'{{ ', ' if not loop.last }}{% endfor %})\n{% endif %}\nORDER BY age", {"min_age": 18, "departments": ["IT", "HR"]}, None),
     ("map argument", "{% for k, v in filters.items() %}AND {{ k }} = '{{ v }}'\n{% endfor %}", {"filters": {"region": "Asia", "level": "senior"}}, None),
     # --- extra whitespace and expression edge cases -------------------------------------

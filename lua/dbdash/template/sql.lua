@@ -1,8 +1,7 @@
--- SQL filters and globals (design §6.3), implemented through the current driver's dialect.
--- Compatible with the legacy plugin except where it produced invalid SQL:
---   * sql_id quotes with the dialect's identifier quotes (legacy: always backticks)
---   * sql_in of an empty list gives "(NULL)" (legacy: bare "NULL")
---   * booleans become dialect literals (legacy: Python "True"/"False")
+-- SQL filters and globals (design §6.3), implemented through the current driver's dialect:
+--   * sql_id quotes with the dialect's identifier quotes
+--   * sql_in of an empty list gives "(NULL)"
+--   * booleans become dialect literals
 local R = require("dbdash.template.runtime")
 local filters = require("dbdash.template.filters")
 local errors = require("dbdash.template.errors")
@@ -116,7 +115,7 @@ end
 local G = {}
 
 ---sql_case(conditions, default=None): CASE WHEN <cond> THEN <value> ... ELSE <default> END.
----Conditions and values are inserted verbatim, like the legacy implementation.
+---Conditions and values are inserted verbatim.
 G.sql_case = function(args, kw)
   local conditions, default = filters.bind("sql_case", args, kw, { { "conditions" }, { "default", NONE } })
   if not map.is_map(conditions) or next(conditions) == nil then

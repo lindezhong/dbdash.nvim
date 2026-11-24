@@ -156,7 +156,7 @@ definitions:
     additionalProperties: false
     not:
       required: [key]
-      description: "Legacy 'key:' is not supported; use 'name:'."
+      description: "'key:' is not supported; use 'name:'."
     properties:
       name:
         type: string

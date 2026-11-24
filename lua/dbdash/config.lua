@@ -271,7 +271,7 @@ function Ctx:show(s, top_interval, prefix)
     self:fail(prefix .. "show.type", "unknown chart type '%s'", typ)
   end
   -- Keep every field (chart-specific ones are read by the renderers) and normalize the
-  -- common ones in place. Unknown matplotlib-only fields are simply ignored downstream.
+  -- common ones in place. Fields no renderer reads are simply ignored downstream.
   local out = map.new()
   for k, v in map.pairs(s) do
     map.set(out, k, v)

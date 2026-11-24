@@ -140,7 +140,7 @@ function M.color(ctx, show, i, explicit, name)
   return ctx.palette(i)
 end
 
----Axis settings from show.axes.{x_axis,y_axis} (legacy) or x_label/y_label.
+---Axis settings from show.axes.{x_axis,y_axis} or x_label/y_label.
 ---@return { xlabel: string?, ylabel: string?, ymin: number?, ymax: number?, xmin: number?, xmax: number?, yformat: string?, xformat: string? }
 function M.axes(show)
   local axes = nn(show.axes) or {}

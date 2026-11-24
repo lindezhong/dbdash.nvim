@@ -297,8 +297,8 @@ function M.value(spec, state)
   return spec.default
 end
 
----Template variables for the current state. Like the legacy plugin, every declared
----argument is defined; one without any value is `none`.
+---Template variables for the current state. Every declared argument is defined; one
+---without any value is `none`.
 ---@param specs dbdash.ArgSpec[]
 ---@param state dbdash.ArgState
 ---@return table<string, any>
