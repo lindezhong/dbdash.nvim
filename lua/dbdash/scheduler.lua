@@ -44,7 +44,7 @@ Panel.__index = Panel
 ---@field state dbdash.ArgState
 ---@field buf integer
 ---@field panels dbdash.Panel[]
----@field gtimer uv.uv_timer_t? global refresh timer (multi-panel with top-level interval)
+---@field gtimer uv.uv_timer_t? global refresh timer (top-level interval: cfg.refresh_all)
 ---@field ctimer uv.uv_timer_t? countdown display timer
 ---@field regions table[]? buffer regions of the panels (multi-panel)
 ---@field last_size integer[]?
@@ -163,7 +163,7 @@ function Panel:check_thresholds(rs)
     if cur.level > prev and cur.step and cur.step.notify then
       local t = self.cfg.show.title
       local title = (t and t ~= "") and t
-        or (self.d.cfg.multi and self:title() or vim.fn.fnamemodify(self.d.path, ":t"))
+        or (self.d.cfg.grid and self:title() or vim.fn.fnamemodify(self.d.path, ":t"))
       local what = cur.column and (cur.column .. " = ") or ""
       local value = require("dbdash.render.table").format_value(cur.value, nil, "NULL")
       vim.notify(
@@ -215,13 +215,13 @@ end
 function Panel:render_templates()
   local q, d = self.cfg.query, self.d
   local driver = db.driver(self.cfg.database.type)
-  local values = args.resolve(d.cfg.args, d.state)
+  local values = args.resolve_panel(self.cfg, d.state)
   self.vars = values -- `args` of lua:// scripts and query.transform
   local metadata = require("dbdash.metadata")
   self.meta = metadata.values(self) -- `meta` of the Lua code
   -- Templates see exactly two names: args.<name> and meta.<name>; imported templates too.
   local args_map = require("dbdash.util.map").new()
-  for _, spec in ipairs(d.cfg.args) do
+  for _, spec in ipairs(self.cfg.visible_args) do
     require("dbdash.util.map").set(args_map, spec.name, values[spec.name])
   end
   local vars = { args = args_map, meta = metadata.for_template(self.meta) }
@@ -332,14 +332,13 @@ function Panel:fail(err)
   if delay > interval and not self.d.paused then
     self.retry_at = now() + delay
     self.backoff_mult = math.floor(delay / interval + 0.5)
-    local follows_global = self.d.gtimer and not self.cfg.show.own_interval
-    if follows_global then
+    if self.d.gtimer and self.cfg.follows_global then
       self.next_at = self.retry_at
     else
       self:start_timer(delay)
     end
   end
-  if self.d.cfg.multi then
+  if self.d.cfg.grid then
     self.d:redraw() -- the error shows in the panel header
   else
     self.d:update_status()
@@ -451,7 +450,7 @@ function Panel:finish_refresh(gen, qerr, rs)
   if (self.failures or 0) > 0 then
     local was_backing_off = self.retry_at ~= nil
     self.failures, self.retry_at, self.backoff_mult = 0, nil, nil
-    if was_backing_off and not self.d.paused and not (self.d.gtimer and not self.cfg.show.own_interval) then
+    if was_backing_off and not self.d.paused and not (self.d.gtimer and self.cfg.follows_global) then
       self:start_timer() -- back to the normal interval
     end
   end
@@ -461,15 +460,15 @@ function Panel:finish_refresh(gen, qerr, rs)
   self.d:redraw()
 end
 
----(Re)start the panel's own timer. Panels that just follow the top-level interval of a
----multi-panel dashboard have no timer of their own: the global timer drives them.
+---(Re)start the panel's own timer. Panels the global refresh (cfg.refresh_all) comes for
+---as often as their own interval have no timer of their own: the global timer drives them.
 ---@param first integer? ms until the first tick (default: the interval), used on resume
 function Panel:start_timer(first)
   local interval = self.cfg.show.interval
   first = first or interval
   self.next_at = now() + first
   local d = self.d
-  if d.cfg.multi and d.gtimer and not self.cfg.show.own_interval then
+  if d.gtimer and self.cfg.follows_global then
     return
   end
   self.timer = self.timer or vim.uv.new_timer()
@@ -491,39 +490,58 @@ end
 
 -- Dashboards -------------------------------------------------------------------------------
 
----Lines shown above the panels: argument values when args_show is on.
+---Lines shown above the panels (none yet).
 function Dashboard:header()
-  local lines, hl = {}, {}
-  if not self.cfg.args_show then
-    return lines, hl
+  return {}, {}
+end
+
+---The args_show line of a panel (its shown_args with their current values; local ones
+---highlighted apart), cut to `width`; nil when it shows none.
+---@return { lines: string[], hl: table[] }?
+function M.args_line(p, width)
+  local specs = p.cfg.shown_args
+  if #specs == 0 then
+    return nil
   end
   local parts, spans, pos = {}, {}, 0
-  local function put(s, group)
+  local function put(str, group)
     if group then
-      spans[#spans + 1] = { pos, pos + #s, group }
+      spans[#spans + 1] = { pos, pos + #str, group }
     end
-    parts[#parts + 1] = s
-    pos = pos + #s
+    parts[#parts + 1] = str
+    pos = pos + #str
   end
-  for _, spec in ipairs(self.cfg.args) do
-    if spec.show then
-      if #parts > 0 then
-        put("  ")
-      end
-      put(spec.name, "DbDashArgName")
-      put("=")
-      put(args.format_value(args.value(spec, self.state)), "DbDashArgValue")
+  for _, spec in ipairs(specs) do
+    if #parts > 0 then
+      put("  ")
+    end
+    put(spec.name, spec.panel and "DbDashArgLocal" or "DbDashArgName")
+    put("=")
+    put(args.format_value(args.value(spec, p.d.state)), "DbDashArgValue")
+  end
+  local W = require("dbdash.util.width")
+  local text = table.concat(parts)
+  local line = W.truncate(text, width)
+  local hl = {}
+  for _, sp in ipairs(spans) do
+    if sp[1] < #line then
+      hl[#hl + 1] = { row = 0, col_s = sp[1], col_e = math.min(sp[2], #line), group = sp[3] }
     end
   end
-  if #parts == 0 then
-    return lines, hl
+  return { lines = { line }, hl = hl }
+end
+
+---`parts` (rendered blocks) above `body`, rows shifted.
+local function prepend(body, parts)
+  local out = { lines = {}, hl = {} }
+  for _, part in ipairs(vim.list_extend(vim.list_extend({}, parts), { body })) do
+    local off = #out.lines
+    vim.list_extend(out.lines, part.lines)
+    for _, h in ipairs(part.hl) do
+      out.hl[#out.hl + 1] = { row = h.row + off, col_s = h.col_s, col_e = h.col_e, group = h.group }
+    end
   end
-  lines[1] = table.concat(parts)
-  for _, s in ipairs(spans) do
-    hl[#hl + 1] = { row = 0, col_s = s[1], col_e = s[2], group = s[3] }
-  end
-  lines[2] = ""
-  return lines, hl
+  return out
 end
 
 local function message(text, group)
@@ -558,7 +576,11 @@ local function panel_cell(p, width, height)
       head = head .. "  ✗ " .. e
     end
   end
-  local body = render_panel(p, show, width, height)
+  local args_line = M.args_line(p, width)
+  local body = render_panel(p, show, width, args_line and height - 1 or height)
+  if args_line then
+    body = prepend(body, { args_line })
+  end
   local out = { lines = { head }, hl = {} }
   for _, s in ipairs(spans) do
     out.hl[#out.hl + 1] = { row = 0, col_s = s[1], col_e = s[2], group = s[3] }
@@ -582,9 +604,17 @@ function Dashboard:redraw()
   local lines, hl = self:header()
   local offset = #lines
   local body
-  if not self.cfg.multi then
+  if not self.cfg.grid then
     local p = self.panels[1]
-    body = render_panel(p, p:show_config(), width, height - offset)
+    local args_line = M.args_line(p, width)
+    local h = height - offset
+    if args_line then
+      h = h - 2
+    end
+    body = render_panel(p, p:show_config(), width, h)
+    if args_line then
+      body = prepend(body, { args_line, { lines = { "" }, hl = {} } })
+    end
     self.regions = nil
   else
     local layout = require("dbdash.render.layout")
@@ -623,7 +653,7 @@ end
 
 ---Countdown and error extmarks.
 function Dashboard:update_status()
-  if not self.cfg.multi then
+  if not self.cfg.grid then
     local p = self.panels[1]
     local show = p.cfg.show
     local countdown
@@ -653,7 +683,7 @@ end
 ---(0-based); the only panel when single. Panels side by side share lines, so the column
 ---decides between them.
 function Dashboard:panel_at(lnum, dcol)
-  if not self.cfg.multi then
+  if not self.cfg.grid then
     return self.panels[1]
   end
   for i, r in ipairs(self.regions or {}) do
@@ -664,10 +694,10 @@ function Dashboard:panel_at(lnum, dcol)
 end
 
 ---Refresh every panel now and restart all timers.
----Start (or restart) the global timer of a multi-panel dashboard.
+---Start (or restart) the global refresh timer (cfg.refresh_all).
 ---@param first integer? ms until the first tick (default: the interval)
 function Dashboard:start_global_timer(first)
-  local interval = self.cfg.interval
+  local interval = self.cfg.refresh_all
   first = first or interval
   self.gnext_at = now() + first
   self.gtimer:stop()
@@ -716,7 +746,7 @@ function Dashboard:restart(o)
 end
 
 function Dashboard:start_timers()
-  if self.cfg.multi and self.cfg.interval then
+  if self.cfg.refresh_all then
     self.gtimer = vim.uv.new_timer()
   end
   self.ctimer = vim.uv.new_timer()
@@ -790,7 +820,7 @@ function Dashboard:resume()
       end
     end)
   end)
-  if self.cfg.multi and self.cfg.interval then
+  if self.cfg.refresh_all then
     self.gtimer = vim.uv.new_timer()
     local left = (self.gnext_at or t) - t
     if left <= 0 then
@@ -801,8 +831,7 @@ function Dashboard:resume()
     self:start_global_timer(left)
   end
   for _, p in ipairs(self.panels) do
-    local follows_global = self.gtimer and not p.cfg.show.own_interval
-    if not follows_global then
+    if not (self.gtimer and p.cfg.follows_global) then
       local left = (p.next_at or t) - t
       if left <= 0 then
         p:start_timer()
@@ -987,7 +1016,7 @@ function M.start(path, o)
     end
     local missing = args.missing_required(cfg.args, state)
     if #missing > 0 then
-      return notify({ phase = "args", message = "missing required argument '" .. missing[1].name .. "'" })
+      return notify({ phase = "args", message = "missing required argument '" .. (missing[1].key or missing[1].name) .. "'" })
     end
     launch()
   end)

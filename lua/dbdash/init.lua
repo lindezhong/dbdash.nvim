@@ -367,7 +367,7 @@ function M._session_state()
     for _, spec in ipairs(d.cfg.args) do
       local v = args.value(spec, d.state)
       if v ~= nil and not vim.deep_equal(v, spec.default) then
-        values[spec.name] = args.format_value(v)
+        values[spec.key or spec.name] = args.format_value(v)
       end
     end
     if next(values) then
@@ -439,12 +439,18 @@ end
 function M._apply_args(d, values)
   local args = require("dbdash.args")
   local applied = false
-  for name, text in pairs(values) do
-    local spec = type(text) == "string" and args.find(d.cfg.args, name)
-    if spec then
+  for key, text in pairs(values) do
+    -- By key ("name" shared, "<panel>.name" local); a key of no argument (sessions from
+    -- before local arguments) sets every argument of that name.
+    local specs = {}
+    if type(text) == "string" and type(key) == "string" then
+      local spec = args.find(d.cfg.args, key)
+      specs = spec and { spec } or args.match(d.cfg.args, key)
+    end
+    for _, spec in ipairs(specs) do
       local ok, v = pcall(args.parse_value, spec, text)
       if ok then
-        args.set_modified(d.state, name, v)
+        args.set_modified(d.state, spec.key or spec.name, v)
         applied = true
       end
     end

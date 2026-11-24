@@ -187,42 +187,91 @@ function M.format_value(v)
   return tostring(v)
 end
 
----Find an argument spec by name.
-function M.find(specs, name)
+---Find an argument spec by key: "name" for a shared argument, "<panel id>.name" for a
+---panel's local one (a spec without a key is found by name).
+function M.find(specs, key)
   for _, s in ipairs(specs) do
-    if s.name == name then
+    if (s.key or s.name) == key then
       return s
     end
   end
 end
 
----Parse command-line "name=value" tokens.
+---The arguments a command-line key sets: "<panel>.name" that panel's local argument;
+---a bare "name" every argument of that name (the shared one and every local one).
+---@return dbdash.ArgSpec[]
+function M.match(specs, key)
+  if key:find(".", 1, true) then
+    for _, s in ipairs(specs) do
+      if s.key == key or (s.panel_id and (s.panel_id .. "." .. s.name) == key) then
+        return { s }
+      end
+    end
+    return {}
+  end
+  local out = {}
+  for _, s in ipairs(specs) do
+    if s.name == key then
+      out[#out + 1] = s
+    end
+  end
+  return out
+end
+
+---Keys for completion: bare names (each once) and "<panel>.name" of local arguments.
+function M.keys(specs)
+  local out, seen = {}, {}
+  for _, s in ipairs(specs) do
+    for _, k in ipairs({ s.name, s.key }) do
+      if k and not seen[k] then
+        seen[k] = true
+        out[#out + 1] = k
+      end
+    end
+  end
+  return out
+end
+
+---Parse command-line "name=value" / "<panel>.name=value" tokens into values by key. An
+---explicit <panel>.name wins over a bare name, whatever the order.
 ---@param specs dbdash.ArgSpec[]
 ---@param tokens string[]
 ---@return table<string, any>
 function M.parse_cli(specs, tokens)
-  local out = {}
+  local out, given, explicit = {}, {}, {}
   for _, tok in ipairs(tokens) do
-    local name, value = tok:match("^([%a_][%w_]*)=(.*)$")
-    if not name then
+    local key, value = tok:match("^([%w_]+%.[%a_][%w_]*)=(.*)$")
+    if not key then
+      key, value = tok:match("^([%a_][%w_]*)=(.*)$")
+    end
+    if not key then
       fail("expected name=value, got %q", tok)
     end
-    local spec = M.find(specs, name)
-    if not spec then
-      local names = {}
-      for i, s in ipairs(specs) do
-        names[i] = s.name
+    if given[key] then
+      fail("argument '%s' given twice", key)
+    end
+    given[key] = true
+    local targets = M.match(specs, key)
+    if #targets == 0 then
+      local panel, name = key:match("^(.-)%.(.*)$")
+      if panel and M.find(specs, name) then
+        fail("panel '%s' has no local argument '%s' (use %s= for the shared one)", panel, name, name)
       end
+      local keys = M.keys(specs)
       fail(
         "unknown argument '%s'%s",
-        name,
-        #names > 0 and (" (known: " .. table.concat(names, ", ") .. ")") or " (this config has no args)"
+        key,
+        #keys > 0 and (" (known: " .. table.concat(keys, ", ") .. ")") or " (this config has no args)"
       )
     end
-    if out[name] ~= nil then
-      fail("argument '%s' given twice", name)
+    local is_explicit = key:find(".", 1, true) ~= nil
+    for _, spec in ipairs(targets) do
+      local k = spec.key or spec.name
+      if is_explicit or not explicit[k] then
+        out[k] = M.parse_value(spec, value)
+        explicit[k] = explicit[k] or is_explicit
+      end
     end
-    out[name] = M.parse_value(spec, value)
   end
   return out
 end
@@ -239,9 +288,10 @@ end
 
 ---Effective value of one argument, or nil when it has none.
 function M.value(spec, state)
+  local key = spec.key or spec.name
   for _, layer in ipairs({ state.cli, state.modified, state.interactive }) do
-    if layer[spec.name] ~= nil then
-      return layer[spec.name]
+    if layer[key] ~= nil then
+      return layer[key]
     end
   end
   return spec.default
@@ -261,6 +311,14 @@ function M.resolve(specs, state)
   return vars
 end
 
+---Template variables of one panel: its visible arguments (shared ones, each shadowed by
+---a local one of the same name), by name.
+---@param panel dbdash.PanelConfig
+---@param state dbdash.ArgState
+function M.resolve_panel(panel, state)
+  return M.resolve(panel.visible_args, state)
+end
+
 ---Required arguments that still have no value.
 ---@return dbdash.ArgSpec[]
 function M.missing_required(specs, state)
@@ -275,9 +333,10 @@ end
 
 ---Set a value edited in the dashboard. It overrides interactive input and defaults,
 ---and also replaces a command-line value so the edit is visible.
-function M.set_modified(state, name, value)
-  state.modified[name] = value
-  state.cli[name] = nil
+---@param key string the spec's key
+function M.set_modified(state, key, value)
+  state.modified[key] = value
+  state.cli[key] = nil
 end
 
 ---Back to YAML defaults (drops command-line, edited and interactive values).

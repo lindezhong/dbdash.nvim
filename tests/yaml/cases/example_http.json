@@ -3,7 +3,6 @@
   "url": "https://api.github.com"
  },
  "query": {
-  "args_show": true,
   "args": [
    {
     "name": "repo",
@@ -20,6 +19,7 @@
   "transform": "local out = {}\nfor _, r in ipairs(rs) do\n  local downloads = 0\n  for _, a in ipairs(r.assets or {}) do\n    downloads = downloads + (a.download_count or 0)\n  end\n  out[#out + 1] = {\n    release = r.tag_name,\n    published = (r.published_at or \"\"):sub(1, 10),\n    downloads = downloads,\n    prerelease = r.prerelease,\n  }\nend\nreturn { columns = { \"release\", \"published\", \"downloads\", \"prerelease\" }, rows = out }\n"
  },
  "show": {
+  "args_show": true,
   "type": "table",
   "title": "GitHub releases",
   "interval": "10m",

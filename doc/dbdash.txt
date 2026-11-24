@@ -284,7 +284,6 @@ Sidebar (`sidebar.keys`: select, stop, refresh, close):
     autoescape: false       # render {{ x }} as SQL literals
     max_rows: 10000
     timeout: 30s
-    args_show: false        # show argument values above the chart
     args:
       - name: min_age
         type: number        # string | number | int | boolean | list | map
@@ -301,11 +300,47 @@ Sidebar (`sidebar.keys`: select, stop, refresh, close):
     interval: 60s           # s, m, h or ms
     show_countdown: true
     countdown_format: "Next update: {time}s"
+    args_show: false        # argument values above the chart
 <
-Top-level fields: `database`, `query`, `show` (one chart) or `panels`,
-`layout`, `args`, `args_show` (several charts, |dbdash-panels|), and
-`interval` (default refresh interval; `show.interval` wins). Durations are
-numbers of seconds or strings with a unit: "500ms", "30s", "5m", "1h".
+Top-level fields: `database`, `query`, `show` (one chart) or `panels` and
+`layout` (several charts, |dbdash-panels|), `args` (shared arguments) and
+`interval` (|dbdash-interval|). Durations are numbers of seconds or strings
+with a unit: "500ms", "30s", "5m", "1h".
+
+Where a field is written says what it applies to, with one chart or many:
+
+  dashboard-wide       top-level bare fields: `interval`, `args`, `layout`,
+                       `panels`
+  per panel, with a    the top-level `database`, `query` and `show`
+  top-level default    sections: `database`; `query.timeout`, `max_rows`,
+                       `autoescape`; `show.interval`, `show_countdown`,
+                       `countdown_format`, `args_show`, `style`, `renderer`,
+                       `canvas`, `thresholds`, ...
+  one panel only       `query.sql`, `transform`, `args`; `show.type`,
+                       `title`, `span`, `column_list`, the `*_column`
+                       fields, `x_label`, `y_label`
+
+Without `panels` the top level is the only panel, so every field is written
+there. With `panels` each panel is its top-level `query` and `show` with its
+own fields over them (mappings such as `style` merge key by key, lists are
+replaced), and fields of one panel only are an error at the top level. A
+panel's `database` replaces the top-level one as a whole (its `options` and
+`password_cmd` too). Both kinds of config validate each panel the same way.
+
+Refresh intervals                                            *dbdash-interval*
+
+The top-level `interval` refreshes every panel when it elapses and restarts
+their timers. A panel refreshes on `show.interval`: its own, else the
+top-level `show.interval`, else the top-level `interval`, else `defaults` in
+|dbdash-setup| (30s). A panel whose interval is the top-level one (or longer)
+simply refreshes with everything else. >yaml
+  interval: 10m        # every panel, every 10 minutes
+  show:
+    interval: 1m       # each panel's default
+  panels:
+    - show: { interval: 10s }   # this one every 10 seconds too
+    - show: {}                  # every minute
+<
 `query.max_rows` caps the rows read; `query.timeout` defaults to the URL's
 `timeout`. Values a config leaves out (interval 30s, max_rows 10000, timeout
 30s, countdown_format, chart height) come from `defaults` in |dbdash-setup|.
@@ -342,10 +377,12 @@ Multiple panels                                                *dbdash-panels*
 
 One config can hold several charts in a grid: >yaml
   database: { url: "postgres://..." }   # default; a panel may set its own
-  interval: 5m      # default panel interval; also refreshes every panel
-  args:             # shared arguments (merged with each panel's query.args)
+  interval: 5m      # refreshes every panel (|dbdash-interval|)
+  args:             # shared arguments: every panel can use them
     - name: region
       default: EU
+  show:             # defaults of every panel's show
+    show_countdown: true
   layout: { columns: 2, gap: 2 }
   panels:
     - query: { sql: "SELECT ..." }
@@ -354,11 +391,10 @@ One config can hold several charts in a grid: >yaml
       show: { type: table, title: Latest }
 <
 Panels flow left to right and wrap; `show.span` widens a panel over several
-columns. Each panel refreshes on its own `show.interval` (default: the
-top-level `interval`); when the top-level interval elapses every panel
-refreshes and their timers restart. Arguments with the same name must be
-declared identically. In the dashboard, `s` and |:DbDashStyle| act on the
-panel under the cursor (or ask which one); `r` refreshes all panels.
+columns, and a single panel under `panels` is a grid too. `id` names a panel
+for its arguments (|dbdash-arguments|). In the dashboard, `s` and
+|:DbDashStyle| act on the panel under the cursor (or ask which one); `r`
+refreshes all panels.
 
 Each panel queries its own database: `panels[].database` if it sets one,
 else the top-level `database`, which is only a default (a one-chart config is
@@ -734,9 +770,11 @@ print without ".0" (`{{ 4 / 2 }}` is `2`, Jinja prints `2.0`).
 ==============================================================================
 7. ARGUMENTS                                                *dbdash-arguments*
 
-Arguments are the variables of the query template, declared in `query.args`
-(and in the top-level `args` for |dbdash-panels|), and written `args.<name>`
-in templates and Lua code: >yaml
+Arguments are the variables of the query template, written `args.<name>` in
+templates and Lua code. The top-level `args` are shared: every panel can use
+them. A panel's `query.args` are its own: only that panel sees them, and one
+with the name of a shared argument shadows it there. A one-chart config
+follows the same rule (its `query.args` win over top-level `args`). >yaml
   args:
     - name: departments     # used as args.departments (letters, digits, _)
       type: list            # string (default) | number | int | boolean |
@@ -749,6 +787,15 @@ in templates and Lua code: >yaml
 <
 An argument without a default and without a value is `none` in templates
 (|dbdash-template-vars|). The legacy `key:` field is rejected; use `name:`.
+
+A local argument has its own value, set as `<panel>.name`, where `<panel>`
+is the panel's `id` (default its number): >vim
+  :DbDashStart board.yaml region=EU orders.region=US limit=5
+<
+`name=value` sets every argument of that name (the shared one and each
+panel's own); `<panel>.name=value` only that panel's and wins over `name=`.
+The argument list (`A`) and editor (`a`) show local arguments as
+`<panel>.name`.
 
 Where values come from (highest first):
 
@@ -775,8 +822,13 @@ all numbers, strings otherwise. Escape `,` and `:` with a backslash, or quote
 the item: `names='Smith, J',"a:b"`. On the command line, write a space in a
 value as `\ `: `title=two\ words`.
 
-`args_show: true` (in `query`, or at the top level with panels) shows the
-values above the chart, except arguments with `show: false`. `A` /
+`show.args_show: true` shows argument values above the chart (in a grid,
+under the panel's title): the arguments its query reads (`query.sql`,
+`query.transform` and what they import, found by name; all of them when the
+code uses `args` as a whole) and its own `query.args`, except those with
+`show: false`. A list of names shows those instead: `args_show: [region]`.
+Local arguments are highlighted with `DbDashArgLocal`. The top-level
+`show.args_show` is the default of every panel. `A` /
 |:DbDashShowVariables| lists all arguments with their values (and the
 default when the value differs).
 
@@ -1118,7 +1170,7 @@ All groups link to standard groups by default:
 
   DbDashTitle DbDashBorder DbDashHeader DbDashNull DbDashMuted DbDashNumber
   DbDashAxis DbDashLabel DbDashError DbDashWarn DbDashCountdown
-  DbDashArgName DbDashArgValue
+  DbDashArgName DbDashArgValue DbDashArgLocal
   DbDashSeries1 ... DbDashSeries8   chart series colors (palette "theme")
   DbDashStatValue (Number), DbDashUp (DiagnosticOk), DbDashDown
   (DiagnosticError)                 stat value and its change

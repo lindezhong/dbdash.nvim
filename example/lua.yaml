@@ -13,7 +13,6 @@ database:
   url: "lua://"
 
 query:
-  args_show: true
   args:
     - name: days
       type: int
@@ -42,6 +41,7 @@ query:
     return { columns = { "day", "load", "host" }, rows = rows }
 
 show:
+  args_show: true
   type: line
   title: "Lua data source"
   x_column: day

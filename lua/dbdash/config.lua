@@ -233,12 +233,14 @@ function Ctx:query(q, prefix, db)
     q = map.new()
   end
   q = self:expect(prefix .. "query", q, "map")
+  if nn(q.args_show) ~= nil then
+    self:fail(prefix .. "query.args_show", "'args_show' moved to show.args_show")
+  end
   local sql = self:expect(prefix .. "query.sql", q.sql, "string", optional) or ""
   local p = self.pos[prefix .. "query.sql"]
   local transform = self:expect(prefix .. "query.transform", q.transform, "string", true)
   local tp = self.pos[prefix .. "query.transform"]
   local autoescape = self:expect(prefix .. "query.autoescape", q.autoescape, "boolean", true)
-  local args_show = self:expect(prefix .. "query.args_show", q.args_show, "boolean", true)
   return {
     sql = sql,
     sql_line = p and p.line or 1,
@@ -247,35 +249,8 @@ function Ctx:query(q, prefix, db)
     autoescape = autoescape == true,
     max_rows = self:expect(prefix .. "query.max_rows", q.max_rows, "integer", true) or DEFAULTS.max_rows,
     timeout = self:duration(prefix .. "query.timeout", q.timeout),
-    args_show = args_show == true,
     args = self:args_list(q.args, prefix .. "query.args"),
   }
-end
-
----Merge argument lists by name; the same name must be declared identically.
-function Ctx:merge_args(lists)
-  local merged, by_name = {}, {}
-  local function key(spec)
-    return vim.inspect({ spec.type, spec.default, spec.required, spec.show, spec.description, spec.choices })
-  end
-  for _, list in ipairs(lists) do
-    for _, spec in ipairs(list) do
-      local prev = by_name[spec.name]
-      if not prev then
-        by_name[spec.name] = spec
-        merged[#merged + 1] = spec
-      elseif key(prev) ~= key(spec) then
-        self:fail(spec.path, "argument '%s' is declared differently at %s", spec.name, prev.path)
-      end
-    end
-  end
-  -- `path` only serves error messages while merging.
-  for _, list in ipairs(lists) do
-    for _, spec in ipairs(list) do
-      spec.path = nil
-    end
-  end
-  return merged
 end
 
 function Ctx:show(s, top_interval, prefix)
@@ -293,8 +268,10 @@ function Ctx:show(s, top_interval, prefix)
   end
   out.type = typ
   out.title = self:expect(prefix .. "show.title", s.title, "string", true) or ""
-  out.own_interval = nn(s.interval) ~= nil
-  out.interval = self:duration(prefix .. "show.interval", nn(s.interval) or top_interval)
+  -- show.interval (the panel's, else the top-level show.interval), else the top-level
+  -- interval, else setup's default.
+  out.interval = self:duration(prefix .. "show.interval", nn(s.interval))
+    or self:duration("interval", top_interval)
     or DEFAULTS.interval
   if out.interval < 1000 then
     self:fail(prefix .. "show.interval", "interval must be at least 1s")
@@ -321,6 +298,17 @@ function Ctx:show(s, top_interval, prefix)
       end
     end
   end
+  local as = nn(s.args_show)
+  if as ~= nil and type(as) ~= "boolean" then
+    local ok = map.is_list(as)
+    for _, n in ipairs(ok and as or {}) do
+      ok = ok and type(n) == "string"
+    end
+    if not ok then
+      self:fail(prefix .. "show.args_show", "args_show must be true, false or a list of argument names")
+    end
+  end
+  out.args_show = as or false
   out.span = self:expect(prefix .. "show.span", s.span, "integer", true) or 1
   if out.span < 1 then
     self:fail(prefix .. "show.span", "span must be at least 1")
@@ -330,18 +318,97 @@ end
 
 ---@class dbdash.PanelConfig
 ---@field index integer
+---@field id string `id:` or the index; local arguments are given as <id>.<name>
 ---@field database { type: string, url: string, options: table }
 ---@field query table
 ---@field show table
+---@field args dbdash.ArgSpec[] local arguments (query.args), only for this panel
+---@field visible_args dbdash.ArgSpec[] what `args` holds in this panel: the shared arguments,
+---  each shadowed by a local one of the same name
+---@field shown_args dbdash.ArgSpec[] the arguments on this panel's args_show line
+---@field follows_global boolean no timer of its own: the global refresh (cfg.refresh_all)
+---  comes as often or more often than show.interval
+
+-- Fields that describe one chart: with panels they cannot be top-level defaults.
+local PANEL_ONLY = {
+  query = { sql = true, transform = true, args = true },
+  show = {
+    type = true,
+    title = true,
+    description = true,
+    span = true,
+    column_list = true,
+    x_label = true,
+    y_label = true,
+  },
+}
+
+local function panel_only(section, key)
+  return PANEL_ONLY[section][key] or (section == "show" and type(key) == "string" and key:match("_columns?$") ~= nil)
+end
+
+---`b` over `a`: mappings merge key by key (recursively), anything else (lists too) replaces.
+local function merge(a, b)
+  if b == nil then
+    return a
+  end
+  if not (map.is_map(a) and map.is_map(b)) then
+    return b
+  end
+  local out = map.new()
+  for k, v in map.pairs(a) do
+    map.set(out, k, v)
+  end
+  for k, v in map.pairs(b) do
+    map.set(out, k, merge(nn(a[k]), v))
+  end
+  return out
+end
+
+---Names of the arguments that template or Lua `text` reads: args.name, args["name"] and
+---args['name']. `all` when it uses args as a whole (args.items(), `in args`, args passed on,
+---args[expr]) so any argument may matter.
+---@return table<string, boolean> names, boolean all
+function M.arg_refs(text)
+  local names, all = {}, false
+  local init = 1
+  while true do
+    local s, e = text:find("%f[%w_]args%f[^%w_]", init)
+    if not s then
+      break
+    end
+    init = e + 1
+    local before = text:sub(1, s - 1)
+    local after = text:sub(e + 1)
+    if not before:match("[%.:]%s*$") then -- not x.args
+      local name = after:match("^%s*%.%s*([%a_][%w_]*)")
+      local key = after:match("^%s*%[%s*'([%a_][%w_]*)'%s*%]") or after:match('^%s*%[%s*"([%a_][%w_]*)"%s*%]')
+      if name then
+        if after:match("^%s*%.%s*[%a_][%w_]*%s*%(") then -- args.items(), args.keys()
+          all = true
+        else
+          names[name] = true
+        end
+      elseif key then
+        names[key] = true
+      elseif after:match("^%s*%[") or after:match("^%s*[,)]") or before:match("[(,]%s*$") or before:match("%f[%w_]in%s+$") then
+        all = true
+      end
+    end
+  end
+  return names, all
+end
 
 ---Validate parsed YAML data.
 ---
----Single-chart configs (query/show at the top level) and multi-panel configs (`panels:`)
----go through the same steps: each panel uses its own `database` if it sets one, else the
----top-level `database` (only a default); a panel with neither is an error. A single-chart
----config is one panel whose `cfg.database`, `cfg.query` and `cfg.show` refer to it.
----Multi-panel configs add `layout: {columns, gap}`; the top-level `interval` is the default
----panel interval (and, with panels, a forced refresh of every panel) and `args` are shared.
+---One-chart configs (database/query/show at the top level) and multi-panel configs
+---(`panels:`) are one model. Top-level bare fields are dashboard-wide: `interval` (a refresh
+---of every panel, cfg.refresh_all), `args` (shared arguments), `layout`. The top-level
+---`database`, `query` and `show` sections are the panels' defaults: without `panels:` they
+---are the only panel; with `panels:` each panel is merged over them (the database is
+---replaced as a whole) and fields describing one chart may not be top-level. Every panel
+---is then validated the same way (Ctx:panel). `cfg.database`, `cfg.query` and `cfg.show`
+---are the single panel's in one-chart configs.
 ---@param data any
 ---@param file string used in error messages
 ---@param positions table<string, {line: integer, col: integer}>?
@@ -351,61 +418,97 @@ function M.validate(data, file, positions)
   if not map.is_map(data) then
     ctx:fail("", "config must be a mapping with database, query and show sections")
   end
-  local top_interval = ctx:duration("interval", nn(data.interval))
+  if nn(data.args_show) ~= nil then
+    ctx:fail("args_show", "'args_show' moved to show.args_show")
+  end
   local cfg = {
     path = file,
     dir = vim.fs.dirname(file),
     positions = ctx.pos,
-    interval = top_interval,
+    refresh_all = ctx:duration("interval", nn(data.interval)),
   }
+  if cfg.refresh_all and cfg.refresh_all < 1000 then
+    ctx:fail("interval", "interval must be at least 1s")
+  end
   local panels_raw = nn(data.panels)
-  cfg.multi = panels_raw ~= nil
-  if cfg.multi then
+  cfg.grid = panels_raw ~= nil
+  local top_query = ctx:expect("query", data.query, "map", true)
+  local top_show = ctx:expect("show", data.show, "map", true)
+  if cfg.grid then
     ctx:expect("panels", panels_raw, "list")
     if #panels_raw == 0 then
       ctx:fail("panels", "panels must not be empty")
     end
-    if nn(data.query) ~= nil or nn(data.show) ~= nil then
-      ctx:fail("panels", "use either query/show or panels, not both")
+    for section, m in pairs({ query = top_query, show = top_show }) do
+      for k in map.pairs(m or map.new()) do
+        if panel_only(section, k) then
+          local hint = (section == "query" and k == "args") and "; shared arguments go in the top-level args"
+            or ""
+          ctx:fail(("%s.%s"):format(section, k), "'%s.%s' belongs to one panel; with panels, set it in each panel%s", section, k, hint)
+        end
+      end
     end
   else
-    -- The top level is the only panel: its database is the top-level one.
-    panels_raw = { { query = data.query, show = data.show } }
+    if nn(data.layout) ~= nil then
+      ctx:fail("layout", "layout only applies with panels")
+    end
+    -- The top level is the only panel.
+    panels_raw = { { query = top_query, show = top_show } }
+    top_query, top_show = nil, nil
   end
-  local default_db = nn(data.database) ~= nil and ctx:database(data.database) or nil
-  local lists = { ctx:args_list(data.args, "args") }
-  local args_show = nn(data.args_show) == true
+  cfg.database = nn(data.database) ~= nil and ctx:database(data.database) or nil
+  cfg.shared_args = ctx:args_list(data.args, "args")
+  for _, spec in ipairs(cfg.shared_args) do
+    spec.key = spec.name
+  end
   cfg.panels = {}
+  local ids = {}
   for i, raw in ipairs(panels_raw) do
-    local prefix = cfg.multi and ("panels[%d]."):format(i) or ""
-    if cfg.multi then
+    local prefix = cfg.grid and ("panels[%d]."):format(i) or ""
+    if cfg.grid then
       ctx:expect(("panels[%d]"):format(i), raw, "map")
+      -- Inherited fields report the line of the top-level default.
+      for path, p in pairs(ctx.pos) do
+        if (path:match("^query%.") or path:match("^show%.")) and ctx.pos[prefix .. path] == nil then
+          ctx.pos[prefix .. path] = p
+        end
+      end
     end
-    local db = nn(raw.database) ~= nil and ctx:database(raw.database, prefix) or default_db
-    if not db then
-      ctx:fail(
-        prefix .. "database",
-        cfg.multi and "missing required field '%sdatabase' (set it in the panel or at the top level)"
-          or "missing required field '%sdatabase'",
-        prefix
-      )
+    local id = tostring(i)
+    if cfg.grid and nn(raw.id) ~= nil then
+      id = ctx:expect(prefix .. "id", raw.id, "string")
+      if not id:match("^[%a_][%w_]*$") then
+        ctx:fail(prefix .. "id", "panel id '%s' must be an identifier", id)
+      end
     end
-    local panel = {
-      index = i,
-      database = db,
-      query = ctx:query(raw.query, prefix, db),
-      show = ctx:show(raw.show, nn(data.interval), prefix),
-    }
-    lists[#lists + 1] = panel.query.args
-    args_show = args_show or panel.query.args_show
+    if ids[id] then
+      ctx:fail(prefix .. "id", "duplicate panel id '%s' (panels[%d])", id, ids[id])
+    end
+    ids[id] = i
+    local panel = ctx:panel({
+      database = nn(raw.database),
+      query = merge(top_query, nn(raw.query)),
+      show = merge(top_show, nn(raw.show)),
+    }, prefix, cfg, i, id, nn(data.interval))
     cfg.panels[i] = panel
   end
-  cfg.args = ctx:merge_args(lists)
-  cfg.args_show = args_show
-  -- The top-level database, a default for the panels (nil when every panel sets its own).
-  cfg.database = default_db
-  if not cfg.multi then
-    cfg.query, cfg.show = cfg.panels[1].query, cfg.panels[1].show
+  cfg.args = vim.list_extend({}, cfg.shared_args)
+  for _, p in ipairs(cfg.panels) do
+    vim.list_extend(cfg.args, p.args)
+  end
+  -- Keys of the argument values: the name, or <panel id>.<name> for a local argument
+  -- whose name another argument has too.
+  local count = {}
+  for _, spec in ipairs(cfg.args) do
+    count[spec.name] = (count[spec.name] or 0) + 1
+  end
+  for _, spec in ipairs(cfg.args) do
+    spec.path = nil
+    spec.key = (spec.panel and count[spec.name] > 1) and (spec.panel_id .. "." .. spec.name) or spec.name
+  end
+  if not cfg.grid then
+    local p = cfg.panels[1]
+    cfg.query, cfg.show = p.query, p.show
     cfg.layout = { columns = 1, gap = 2 }
     return cfg
   end
@@ -418,6 +521,97 @@ function M.validate(data, file, positions)
     ctx:fail("layout.columns", "columns must be at least 1")
   end
   return cfg
+end
+
+---Validate one panel: the same for the only panel of a one-chart config and for panels[i].
+---@param raw { database: table?, query: table?, show: table? } after merging the defaults
+---@param prefix string "" or "panels[i]."
+---@param top_interval any the top-level interval (the last default of show.interval)
+---@return dbdash.PanelConfig
+function Ctx:panel(raw, prefix, cfg, index, id, top_interval)
+  -- A panel's database replaces the default as a whole (no options or password_cmd of
+  -- another server).
+  local db = raw.database ~= nil and self:database(raw.database, prefix) or cfg.database
+  if not db then
+    self:fail(
+      prefix .. "database",
+      cfg.grid and "missing required field '%sdatabase' (set it in the panel or at the top level)"
+        or "missing required field '%sdatabase'",
+      prefix
+    )
+  end
+  local query = self:query(raw.query, prefix, db)
+  local show = self:show(raw.show, top_interval, prefix)
+  local panel = {
+    index = index,
+    id = id,
+    database = db,
+    query = query,
+    show = show,
+    args = query.args,
+    follows_global = cfg.refresh_all ~= nil and show.interval >= cfg.refresh_all,
+  }
+  for _, spec in ipairs(panel.args) do
+    spec.panel, spec.panel_id = index, id
+  end
+  -- What `args` holds here: shared arguments, shadowed by local ones of the same name.
+  local by_name, visible = {}, {}
+  for _, spec in ipairs(cfg.shared_args) do
+    by_name[spec.name] = spec
+    visible[#visible + 1] = spec.name
+  end
+  for _, spec in ipairs(panel.args) do
+    if not by_name[spec.name] then
+      visible[#visible + 1] = spec.name
+    end
+    by_name[spec.name] = spec
+  end
+  panel.visible_args = {}
+  for i, name in ipairs(visible) do
+    panel.visible_args[i] = by_name[name]
+  end
+  -- The args_show line: the listed names, or (true) the arguments the panel reads.
+  local as = show.args_show
+  panel.shown_args = {}
+  if type(as) == "table" then
+    for i, name in ipairs(as) do
+      local spec = by_name[name]
+      if not spec then
+        self:fail(("%sshow.args_show[%d]"):format(prefix, i - 1), "unknown argument '%s'", name)
+      end
+      panel.shown_args[#panel.shown_args + 1] = spec
+    end
+  elseif as == true then
+    local used, all = M.used_args(cfg.dir, query)
+    for _, spec in ipairs(panel.visible_args) do
+      if spec.show and (all or used[spec.name] or spec.panel == index) then
+        panel.shown_args[#panel.shown_args + 1] = spec
+      end
+    end
+  end
+  return panel
+end
+
+---Arguments a panel's query reads: query.sql, query.transform and the files they import.
+---@return table<string, boolean> names, boolean all
+function M.used_args(dir, query)
+  local trust = require("dbdash.trust")
+  local used, all = {}, false
+  local seen = {}
+  local function scan(text)
+    local names, a = M.arg_refs(text)
+    all = all or a
+    for n in pairs(names) do
+      used[n] = true
+    end
+  end
+  for _, text in ipairs({ query.sql or "", query.transform or "" }) do
+    scan(text)
+    for _, f in ipairs(trust.reachable(dir, text, seen)) do
+      scan(f.text)
+    end
+  end
+  return used, all
 end
 
 ---Load a config file.

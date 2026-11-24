@@ -1,21 +1,31 @@
 # yaml-language-server: $schema=./dbdash.schema.yaml
 #
 # Several panels in one dashboard (layout.columns per row; show.span to widen a panel).
-# Each panel refreshes on its own show.interval; the top-level interval is the default
-# and also refreshes every panel.
-# The top-level database is the default of every panel; a panel may set its own
-# (panels[].database), and a panel without one needs the top-level default. Panels can mix
-# data sources: the last one asks the GitHub API over https:// (needs network).
+# Top-level bare fields are dashboard-wide (interval, args, layout); the top-level
+# database, query and show are defaults that each panel can override (:help dbdash-config).
+# - interval refreshes every panel; each panel also refreshes on its show.interval (its
+#   own, else the top-level show.interval below).
+# - The top-level database is the default; a panel may set its own (panels[].database).
+#   Panels can mix data sources: the last one asks the GitHub API over https:// (needs
+#   network).
+# - args are shared; a panel's query.args are its own. args_show shows, on each panel, the
+#   arguments its query reads.
 database:
   url: "sqlite:///:memory:"
 
-interval: 10m # also refreshes every panel, so it stays within the GitHub API's limit
+interval: 10m # every panel, so the GitHub panel stays within the API's hourly limit
 
 args:
   - name: hours
     type: int
     default: 24
     description: "Hours of history"
+
+show:                               # defaults of every panel's show
+  interval: 60s
+  show_countdown: true
+  countdown_format: "{time}s"
+  args_show: true
 
 layout:
   columns: 2
@@ -35,8 +45,6 @@ panels:
       y_column: visits
       interval: 10s
       span: 2
-      show_countdown: true
-      countdown_format: "{time}s"
 
   - query:
       sql: |
@@ -55,9 +63,6 @@ panels:
     show:
       type: table
       title: "Now"
-      interval: 60s
-      show_countdown: true
-      countdown_format: "{time}s"
 
   - database:                       # this panel's own database (e.g. another server)
       url: "sqlite:///:memory:"
@@ -86,7 +91,7 @@ panels:
       title: "Top Neovim contributors"
       x_column: login
       y_column: contributions
-      span: 2                       # refreshes on the top-level 10m: unauthenticated GitHub
-                                    # API calls are limited to 60 an hour
+      span: 2
+      interval: 10m                 # unauthenticated GitHub API calls: 60 an hour
       style:
         show_values: true

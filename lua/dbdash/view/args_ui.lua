@@ -4,7 +4,7 @@ local args = require("dbdash.args")
 local M = {}
 
 local function prompt_for(spec)
-  local p = spec.name .. " (" .. spec.type .. ")"
+  local p = (spec.key or spec.name) .. " (" .. spec.type .. ")"
   if spec.description then
     p = p .. " " .. spec.description
   end
@@ -73,7 +73,7 @@ function M.ask_all(specs, state, done)
       if v == nil then
         return done(false)
       end
-      state.interactive[spec.name] = v
+      state.interactive[spec.key or spec.name] = v
       vim.schedule(step)
     end)
   end

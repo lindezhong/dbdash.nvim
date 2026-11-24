@@ -15,7 +15,6 @@ database:
   url: "sqlite:///:memory:"
 
 query:
-  args_show: true
   args:
     - name: days
       type: int
@@ -44,5 +43,6 @@ query:
     return out
 
 show:
+  args_show: true
   type: table
   title: "Visits (Lua in templates)"

@@ -11,7 +11,6 @@ database:
   url: "https://api.github.com"
 
 query:
-  args_show: true
   args:
     - name: repo
       type: string
@@ -42,6 +41,7 @@ query:
     return { columns = { "release", "published", "downloads", "prerelease" }, rows = out }
 
 show:
+  args_show: true
   type: table
   title: "GitHub releases"
   interval: 10m # unauthenticated GitHub API calls are limited to 60 an hour

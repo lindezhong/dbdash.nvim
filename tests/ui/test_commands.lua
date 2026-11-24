@@ -11,7 +11,6 @@ database:
 query:
   sql: |
     SELECT {{ args.n }} AS n, '{{ args.label }}' AS label, {{ args.ids|sql_in|sql_quote }} AS ids_sql
-  args_show: true
   args:
     - name: n
       type: int
@@ -23,6 +22,7 @@ query:
       type: list
       default: [1, 2]
 show:
+  args_show: true
   type: table
   title: Test board
   interval: 1h
@@ -515,6 +515,92 @@ end
 
 local function settle(ms)
   child.lua(("vim.wait(%d, function() return false end, 20)"):format(ms))
+end
+
+local GRID = [[
+database: { url: "sqlite:///:memory:" }
+args:
+  - { name: region, default: EU }
+  - { name: hours, type: int, default: 24 }
+show: { args_show: true }
+layout: { columns: 2 }
+panels:
+  - id: orders
+    query:
+      sql: "SELECT '{{ args.region }}' AS r, {{ args.limit }} AS l"
+      args: [{ name: region, default: US }, { name: limit, type: int, default: 5 }]
+    show: { title: Orders }
+  - database: { url: "lua://" }
+    query: { sql: "return { { h = {{ args.hours }} } }" }
+    show: { title: Hours }
+]]
+
+local function start_grid()
+  child.lua("require('dbdash').setup({ lua = { confirm = false } })")
+  vim.fn.writefile(vim.split(GRID, "\n"), dir .. "/grid.yaml")
+  child.cmd("DbDashStart grid.yaml")
+  child.lua([[_G.wait_for(function()
+    local d = require("dbdash.scheduler").list()[1]
+    return d and d.panels[1].rs and d.panels[2].rs
+  end)]])
+end
+
+T["grid: each panel shows the arguments it reads; local ones shadow shared ones"] = function()
+  start_grid()
+  eq(find_line("region=US  limit=5") ~= nil, true) -- panel 1: its own region and limit
+  eq(find_line("hours=24") ~= nil, true) -- panel 2 reads only hours
+  eq(find_line("region=EU"), nil) -- the shared region is shadowed where it is read
+  local rows = child.lua_get("vim.tbl_map(function(p) return p.rs.rows[1][1] end, require('dbdash.scheduler').list()[1].panels)")
+  eq(rows, { "US", 24 })
+  -- region= sets every region; orders.region= only that panel's.
+  child.cmd("DbDashUpdateVariable region JP")
+  child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].rs.rows[1][1] == "JP" end)]])
+  child.cmd("DbDashUpdateVariable orders.region CN")
+  child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].rs.rows[1][1] == "CN" end)]])
+  eq(child.lua_get("require('dbdash.args').value(require('dbdash.scheduler').list()[1].cfg.shared_args[1], require('dbdash.scheduler').list()[1].state)"), "JP")
+end
+
+T["grid: show SQL and status follow each panel's database"] = function()
+  start_grid()
+  local d = "require('dbdash.scheduler').list()[1]"
+  -- The query popup's filetype follows the panel picked (from another buffer: a picker).
+  child.cmd("enew")
+  child.lua(("vim.ui.select = function(items, _, cb) cb(items[2]) end"))
+  child.cmd("DbDashShowSQL")
+  eq(child.lua_get("vim.bo.filetype"), "lua")
+  child.cmd("close")
+  child.lua(("vim.ui.select = function(items, _, cb) cb(items[1]) end"))
+  child.cmd("DbDashShowSQL")
+  eq(child.lua_get("vim.bo.filetype"), "sql")
+  child.cmd("close")
+  child.cmd("DbDashStatus")
+  local text = table.concat(lines(), "\n")
+  eq(text:find("Database:  sqlite") ~= nil and text:find("Database:  lua") ~= nil, true)
+  eq(child.lua_get(d .. ".cfg.grid"), true)
+end
+
+T["the global interval and a panel's own both refresh, without double queries"] = function()
+  -- One-chart config: the top-level interval is a global refresh here too.
+  local both = CFG:gsub("interval: 1h", "interval: 1s"):gsub("\nshow:", "\ninterval: 3s\nshow:")
+  vim.fn.writefile(vim.split(both, "\n"), dir .. "/both.yaml")
+  child.cmd("DbDashStart both.yaml")
+  wait_loaded()
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].gtimer ~= nil"), true)
+  settle(3500)
+  local h = runs()
+  -- 1s timer for ~3.5s plus one global refresh: about 4-5, never doubled ticks.
+  eq(h >= 4 and h <= 6, true)
+  child.cmd("DbDashStop")
+  -- A panel the global refresh comes for as often has no timer of its own.
+  local follow = CFG:gsub("  interval: 1h\n", ""):gsub("\nshow:", "\ninterval: 1s\nshow:")
+  vim.fn.writefile(vim.split(follow, "\n"), dir .. "/follow.yaml")
+  child.cmd("DbDashStart follow.yaml")
+  wait_loaded()
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1].cfg.follows_global"), true)
+  settle(2500)
+  h = runs()
+  eq(h >= 2 and h <= 4, true)
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1].timer"), vim.NIL)
 end
 
 T["changing an argument while a query runs re-runs it with the new value"] = function()

@@ -85,4 +85,32 @@ T["precedence: cli > modified > interactive > default"] = function()
   eq(args.resolve(specs, st).limit, 10)
 end
 
+-- Shared arguments (key = name) and local ones of panels (key = <panel id>.<name>).
+local scoped = {
+  { name = "region", key = "region", type = "string", default = "EU" },
+  { name = "region", key = "orders.region", panel = 1, type = "string", default = "US" },
+  { name = "limit", key = "orders.limit", panel = 1, type = "int", default = 5 },
+  { name = "limit", key = "2.limit", panel = 2, type = "int", default = 9 },
+}
+
+T["cli: a bare name sets every argument of that name, <panel>.name one panel's"] = function()
+  eq(args.parse_cli(scoped, { "region=JP" }), { region = "JP", ["orders.region"] = "JP" })
+  eq(args.parse_cli(scoped, { "limit=3" }), { ["orders.limit"] = 3, ["2.limit"] = 3 })
+  eq(args.parse_cli(scoped, { "orders.region=CN" }), { ["orders.region"] = "CN" })
+  eq(err(args.parse_cli, scoped, { "2.region=CN" }), "panel '2' has no local argument 'region' (use region= for the shared one)")
+  eq(err(args.parse_cli, scoped, { "limit=x" }):find("not a number") ~= nil, true)
+  -- <panel>.name wins over the bare name, in either order.
+  eq(args.parse_cli(scoped, { "orders.region=CN", "region=JP" }), { region = "JP", ["orders.region"] = "CN" })
+  eq(err(args.parse_cli, scoped, { "region=JP", "region=CN" }), "argument 'region' given twice")
+  eq(args.keys(scoped), { "region", "orders.region", "limit", "orders.limit", "2.limit" })
+end
+
+T["resolve_panel: shared values, shadowed by the panel's local ones"] = function()
+  local st = args.new_state(args.parse_cli(scoped, { "region=JP", "orders.region=CN" }))
+  local orders = { visible_args = { scoped[2], scoped[3] } }
+  local other = { visible_args = { scoped[1], scoped[4] } }
+  eq(args.resolve_panel(orders, st), { region = "CN", limit = 5 })
+  eq(args.resolve_panel(other, st), { region = "JP", limit = 9 })
+end
+
 return T

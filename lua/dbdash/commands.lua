@@ -135,12 +135,12 @@ function M.status()
     "Config:    " .. short(d.path),
     "Status:    " .. d:status_word(),
   }
-  if d.cfg.multi and d.cfg.interval then
-    lines[#lines + 1] = ("Interval:  every panel refreshes every %ds"):format(d.cfg.interval / 1000)
+  if d.cfg.refresh_all then
+    lines[#lines + 1] = ("Interval:  every panel refreshes every %ds"):format(d.cfg.refresh_all / 1000)
   end
   for _, p in ipairs(d.panels) do
     lines[#lines + 1] = ""
-    if d.cfg.multi then
+    if d.cfg.grid then
       lines[#lines + 1] = ("Panel %d: %s"):format(p.index, p:title())
     end
     lines[#lines + 1] = "Database:  " .. p.cfg.database.type .. "  " .. url.redact(p.cfg.database.url)
@@ -194,8 +194,9 @@ function M.show_variables()
   local lines, hl = {}, {}
   for _, s in ipairs(specs) do
     local v = args.value(s, d.state)
-    local line = ("%s = %s"):format(s.name, v == nil and "(unset)" or args.format_value(v))
-    hl[#hl + 1] = { row = #lines, col_s = 0, col_e = #s.name, group = "DbDashArgName" }
+    local key = s.key or s.name
+    local line = ("%s = %s"):format(key, v == nil and "(unset)" or args.format_value(v))
+    hl[#hl + 1] = { row = #lines, col_s = 0, col_e = #key, group = s.panel and "DbDashArgLocal" or "DbDashArgName" }
     local extra = { s.type }
     if s.default ~= nil and not vim.deep_equal(s.default, v) then
       extra[#extra + 1] = "default " .. args.format_value(s.default)
@@ -224,7 +225,7 @@ function M.modify_variable()
   vim.ui.select(specs, {
     prompt = "Argument to modify",
     format_item = function(s)
-      return ("%s = %s"):format(s.name, args.format_value(args.value(s, d.state)))
+      return ("%s = %s"):format(s.key or s.name, args.format_value(args.value(s, d.state)))
     end,
   }, function(spec)
     if not spec then
@@ -232,14 +233,15 @@ function M.modify_variable()
     end
     require("dbdash.view.args_ui").ask(spec, args.value(spec, d.state), function(v)
       if v ~= nil and sched.get(d.path) == d then
-        args.set_modified(d.state, spec.name, v)
+        args.set_modified(d.state, spec.key or spec.name, v)
         d:restart()
       end
     end)
   end)
 end
 
----:DbDashUpdateVariable <name> <value>
+---:DbDashUpdateVariable <name> <value>: a bare name sets every argument of that name
+---(shared and local); <panel>.name only that panel's local one.
 function M.update_variable(name, value)
   local d = current()
   if not d then
@@ -248,15 +250,13 @@ function M.update_variable(name, value)
   if not name or not value then
     return err("usage: DbDashUpdateVariable <name> <value>")
   end
-  local spec = args.find(d.cfg.args, name)
-  if not spec then
-    return err("unknown argument '" .. name .. "'")
-  end
-  local ok, v = pcall(args.parse_value, spec, value)
+  local ok, values = pcall(args.parse_cli, d.cfg.args, { name .. "=" .. value })
   if not ok then
-    return err(v.message or tostring(v))
+    return err(values.message or tostring(values))
   end
-  args.set_modified(d.state, name, v)
+  for key, v in pairs(values) do
+    args.set_modified(d.state, key, v)
+  end
   d:restart()
 end
 
@@ -346,7 +346,7 @@ function M.show_sql()
         vim.list_extend(lines, vim.split(code, "\n", { plain = true }))
       end
       require("dbdash.view.popup").open(lines, {
-        title = d.cfg.multi and ("DbDash query: " .. p:title()) or "DbDash query",
+        title = d.cfg.grid and ("DbDash query: " .. p:title()) or "DbDash query",
         filetype = ({ mongodb = "json", http = "json", lua = "lua" })[p.cfg.database.type] or "sql",
       })
     end
@@ -463,9 +463,9 @@ end
 
 local function complete_args(specs, arglead)
   local out = {}
-  local name, partial = arglead:match("^([%a_][%w_]*)=(.*)$")
+  local name, partial = arglead:match("^([%w_.]+)=(.*)$")
   if name then
-    local spec = args.find(specs, name)
+    local spec = args.match(specs, name)[1]
     for _, c in ipairs(spec and spec.choices or {}) do
       local text = args.format_value(c)
       if vim.startswith(text, partial) then
@@ -474,9 +474,9 @@ local function complete_args(specs, arglead)
     end
     return out
   end
-  for _, s in ipairs(specs) do
-    if vim.startswith(s.name, arglead) then
-      out[#out + 1] = s.name .. "="
+  for _, k in ipairs(args.keys(specs)) do
+    if vim.startswith(k, arglead) then
+      out[#out + 1] = k .. "="
     end
   end
   return out
@@ -518,14 +518,14 @@ function M.complete_update(arglead, cmdline)
   local words = vim.split(cmdline:gsub("^%s*%S+%s*", ""), "%s+", { trimempty = true })
   if #words == 0 or (#words == 1 and arglead ~= "") then
     local out = {}
-    for _, s in ipairs(d.cfg.args) do
-      if vim.startswith(s.name, arglead) then
-        out[#out + 1] = s.name
+    for _, k in ipairs(args.keys(d.cfg.args)) do
+      if vim.startswith(k, arglead) then
+        out[#out + 1] = k
       end
     end
     return out
   end
-  local spec = args.find(d.cfg.args, words[1])
+  local spec = args.match(d.cfg.args, words[1])[1]
   local out = {}
   for _, c in ipairs(spec and spec.choices or {}) do
     local text = args.format_value(c)

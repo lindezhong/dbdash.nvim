@@ -53,6 +53,36 @@ function M.resolve(base_dir, name)
   return vim.fs.normalize(vim.fs.joinpath(base_dir, name))
 end
 
+---Files reachable from template text through literal imports (recursively, each once):
+---{ path, kind = "lua"|"template", text }. `seen` (by resolved path) is shared across calls.
+---@param base_dir string the config's directory
+---@param text string
+---@param seen table<string, boolean>?
+---@return { path: string, kind: string, text: string }[]
+function M.reachable(base_dir, text, seen)
+  seen = seen or {}
+  local out = {}
+  local function visit(t)
+    for _, target in ipairs(M.import_targets(t)) do
+      local p = M.resolve(base_dir, target)
+      if not seen[p] then
+        seen[p] = true
+        local ft = read(p)
+        if ft then
+          if p:match("%.lua$") then
+            out[#out + 1] = { path = p, kind = "lua", text = ft }
+          else
+            out[#out + 1] = { path = p, kind = "template", text = ft }
+            visit(ft)
+          end
+        end
+      end
+    end
+  end
+  visit(text)
+  return out
+end
+
 ---The files whose Lua a config runs: the config itself (always first, as the unit of
 ---trust) and the .lua files and {% lua %} templates reachable through literal imports.
 ---@param path string config path
@@ -64,23 +94,10 @@ function M.collect(path, cfg)
   local has_lua = false
   local seen = {}
   local function visit(text)
-    for _, target in ipairs(M.import_targets(text)) do
-      local p = M.resolve(cfg.dir, target)
-      if not seen[p] then
-        seen[p] = true
-        local t = read(p)
-        if t then
-          if p:match("%.lua$") then
-            has_lua = true
-            files[#files + 1] = { path = real(p), kind = "lua", text = t }
-          else
-            if M.has_lua_block(t) then
-              has_lua = true
-              files[#files + 1] = { path = real(p), kind = "template", text = t }
-            end
-            visit(t)
-          end
-        end
+    for _, f in ipairs(M.reachable(cfg.dir, text, seen)) do
+      if f.kind == "lua" or M.has_lua_block(f.text) then
+        has_lua = true
+        files[#files + 1] = { path = real(f.path), kind = f.kind, text = f.text }
       end
     end
   end

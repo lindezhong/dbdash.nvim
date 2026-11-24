@@ -12,7 +12,6 @@ database:
   url: "sqlite:///:memory:"
 
 query:
-  args_show: true                    # show the argument values above the table
 
   args:
     - name: user_status              # string (the default type)
@@ -101,6 +100,7 @@ query:
     LIMIT {{ args.limit | sql_limit }}
 
 show:
+  args_show: true                    # show the argument values above the chart
   type: table
   title: "Users"
   interval: 30s

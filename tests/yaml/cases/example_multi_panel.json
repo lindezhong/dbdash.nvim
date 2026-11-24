@@ -11,6 +11,12 @@
    "description": "Hours of history"
   }
  ],
+ "show": {
+  "interval": "60s",
+  "show_countdown": true,
+  "countdown_format": "{time}s",
+  "args_show": true
+ },
  "layout": {
   "columns": 2,
   "gap": 3
@@ -26,9 +32,7 @@
     "x_column": "hour",
     "y_column": "visits",
     "interval": "10s",
-    "span": 2,
-    "show_countdown": true,
-    "countdown_format": "{time}s"
+    "span": 2
    }
   },
   {
@@ -49,10 +53,7 @@
    },
    "show": {
     "type": "table",
-    "title": "Now",
-    "interval": "60s",
-    "show_countdown": true,
-    "countdown_format": "{time}s"
+    "title": "Now"
    }
   },
   {
@@ -82,6 +83,7 @@
     "x_column": "login",
     "y_column": "contributions",
     "span": 2,
+    "interval": "10m",
     "style": {
      "show_values": true
     }

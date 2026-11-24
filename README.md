@@ -130,8 +130,9 @@ require("dbdash").load_session(session_file .. ".dbdash") -- after sourcing the 
 ## Configuration
 
 A config file describes one dashboard: `database`, `query` and `show`, or `panels` and
-`layout` for several charts. Each panel may set its own `database`; the top-level one is the
-default for panels that do not. [`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a
+`layout` for several charts. Top-level `interval`, `args` and `layout` are dashboard-wide; the
+top-level `database`, `query` and `show` are defaults each panel can override (a panel's own
+`database`, `show.interval`, `query.args`, ...). See `:help dbdash-config`. [`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a
 JSON Schema of the whole format; editors with yaml-language-server validate and complete a
 config that starts with:
 

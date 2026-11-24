@@ -3,7 +3,6 @@
   "url": "lua://"
  },
  "query": {
-  "args_show": true,
   "args": [
    {
     "name": "days",
@@ -25,6 +24,7 @@
   "sql": "-- A command's output: here just the host name.\nlocal host = vim.trim(dbdash.system(\"hostname\").stdout)\n\n-- Data computed in Lua; dbdash.query() could read it from a database instead.\nlocal rows = {}\nfor i = {{ args.days }} - 1, 0, -1 do            -- template: the value is written into the code\n  local t = os.time() - i * 86400\n  local load = args.base                    -- args: the value as a Lua number\n{% if args.wave %}\n  load = load + math.floor(30 * math.sin(i / 2))\n{% endif %}\n  rows[#rows + 1] = { os.date(\"%m-%d\", t), load, host }\nend\nreturn { columns = { \"day\", \"load\", \"host\" }, rows = rows }\n"
  },
  "show": {
+  "args_show": true,
   "type": "line",
   "title": "Lua data source",
   "x_column": "day",

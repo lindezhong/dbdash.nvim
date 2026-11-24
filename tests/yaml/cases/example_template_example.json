@@ -3,7 +3,6 @@
   "url": "sqlite:///:memory:"
  },
  "query": {
-  "args_show": true,
   "args": [
    {
     "name": "user_status",
@@ -84,6 +83,7 @@
   "sql": "WITH sample_users AS (\n  SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'IT' AS department, 'active' AS status,\n         datetime('now', '-30 days') AS created_at\n  UNION ALL SELECT 2, 'Bob', 32, 'HR', 'active', datetime('now', '-25 days')\n  UNION ALL SELECT 3, 'Charlie', 28, 'Finance', 'inactive', datetime('now', '-20 days')\n  UNION ALL SELECT 4, 'Diana', 35, 'IT', 'active', datetime('now', '-15 days')\n  UNION ALL SELECT 5, 'Eve', 29, 'HR', 'active', datetime('now', '-10 days')\n  UNION ALL SELECT 6, 'Frank', 42, 'Finance', 'inactive', datetime('now', '-5 days')\n  UNION ALL SELECT 7, 'Grace', 26, 'IT', 'active', datetime('now', '-2 days')\n)\nSELECT id, name, age, department, status, created_at,\n       {{ (args.search_keyword or '') | sql_quote }} AS search_term\nFROM sample_users\nWHERE 1 = 1\n{% if not args.include_inactive %}\n  AND status = {{ args.user_status | sql_quote }}\n{% endif %}\n  AND age BETWEEN {{ args.min_age }} AND {{ args.max_age }}\n{% if args.departments %}\n  AND department IN {{ args.departments | sql_in }}\n{% endif %}\n{% if args.user_ids %}\n  AND id IN {{ args.user_ids | sql_in }}\n{% endif %}\n{% for key, value in args.filters.items() %}\n  -- filter {{ loop.index }}: {{ key }} = {{ value }} (illustration only)\n{% endfor %}\n{% if args.search_keyword is not none and args.search_keyword | trim %}\n  AND (name LIKE {{ ('%' ~ args.search_keyword ~ '%') | sql_quote }}\n       OR department LIKE {{ ('%' ~ args.search_keyword ~ '%') | sql_quote }})\n{% endif %}\nORDER BY created_at DESC\nLIMIT {{ args.limit | sql_limit }}\n"
  },
  "show": {
+  "args_show": true,
   "type": "table",
   "title": "Users",
   "interval": "30s",
