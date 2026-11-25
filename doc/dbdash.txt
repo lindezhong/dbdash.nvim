@@ -167,6 +167,9 @@ database:
 
 :DbDashStop [{config}]                                           *:DbDashStop*
     Stop a dashboard (default: the current one) and close its buffer.
+    Closing the dashboard's last window (`:q`, `:close`, `:only`,
+    `:tabclose`) or deleting its buffer (`:bdelete`) stops it the same way;
+    only hiding it pauses it (|dbdash-pause|).
 
 :DbDashList                                                      *:DbDashList*
     List running dashboards.
@@ -192,9 +195,12 @@ database:
                                                                 *dbdash-pause*
 A dashboard that no window of the current tab page shows (you switched the
 window to another buffer, or it is only in another tab page) pauses: no
-queries, no countdown. A window that shows it counts even when the cursor
-is in another window. When it is shown again, it refreshes right away if
-its next refresh is due, and otherwise continues the countdown. Set
+queries, no countdown. Closing its last window is not hiding it: that stops
+the dashboard like |:DbDashStop| (the sidebar shows `○`, not `◐`), except
+while Neovim exits or a session loads. A window that shows it counts even
+when the cursor is in another window. When it is shown again, it refreshes
+right away if its next refresh is due, and otherwise continues the
+countdown. Set
 `dashboard.pause_hidden = false` to keep hidden dashboards refreshing, or
 `show.refresh_hidden: true` for some panels: they keep refreshing on their
 interval (and with the top-level `interval`) while the dashboard is paused,

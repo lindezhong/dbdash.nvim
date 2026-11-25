@@ -1245,7 +1245,8 @@ function M.start(path, o)
     end
     d.buf = buffer.create(path, o.buf)
     M.dashboards[path] = d
-    vim.api.nvim_create_autocmd("BufWipeout", {
+    -- Deleting the buffer (:bdelete, :bwipeout) stops the dashboard.
+    vim.api.nvim_create_autocmd({ "BufDelete", "BufWipeout" }, {
       buffer = d.buf,
       once = true,
       callback = function()
@@ -1369,6 +1370,30 @@ function M.freeze_all()
     d.generation = d.generation + 1
     d:stop_timers()
   end
+end
+
+---A window closes (WinClosed: it still shows its buffer). Closing the last window of a
+---dashboard (:q, :close, :only, :tabclose) stops it like :DbDashStop; a dashboard that is
+---only hidden (another buffer in its window, another tab page) pauses instead. Not while
+---Neovim exits or a session loads (they close and recreate windows).
+---@param win integer
+function M.on_win_closed(win)
+  if vim.v.exiting ~= vim.NIL or vim.g.SessionLoad == 1 then
+    return
+  end
+  local ok, buf = pcall(vim.api.nvim_win_get_buf, win)
+  local d = ok and M.for_buf(buf)
+  if not d then
+    return
+  end
+  vim.schedule(function()
+    if M.dashboards[d.path] ~= d or vim.v.exiting ~= vim.NIL or vim.g.SessionLoad == 1 then
+      return
+    end
+    if vim.api.nvim_buf_is_valid(d.buf) and #vim.fn.win_findbuf(d.buf) == 0 then
+      M.stop(d.path)
+    end
+  end)
 end
 
 function M.stop_all()

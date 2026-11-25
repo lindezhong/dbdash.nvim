@@ -165,6 +165,15 @@ vim.api.nvim_create_autocmd({ "BufWinEnter", "BufWinLeave", "WinClosed", "TabEnt
     end
   end,
 })
+-- Closing the last window of a dashboard stops it (hiding it only pauses it).
+vim.api.nvim_create_autocmd("WinClosed", {
+  group = group,
+  callback = function(ev)
+    if package.loaded["dbdash.scheduler"] then
+      require("dbdash.scheduler").on_win_closed(tonumber(ev.match))
+    end
+  end,
+})
 vim.api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
   group = group,
   callback = function()

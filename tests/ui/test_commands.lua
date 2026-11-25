@@ -641,6 +641,87 @@ T["hidden dashboards pause; showing them again refreshes what is due"] = functio
   eq(runs() >= before + 2, true) -- and the timer runs again
 end
 
+local function running()
+  return child.lua_get("#require('dbdash.scheduler').list()")
+end
+
+local function sidebar_mark(name)
+  return child.lua_get(([[(function()
+    for _, b in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.b[b].dbdash_sidebar_nodes then
+        for _, l in ipairs(vim.api.nvim_buf_get_lines(b, 0, -1, false)) do
+          if l:find(%q, 1, true) then return vim.trim(l):sub(1, 3) end
+        end
+      end
+    end
+  end)()]]):format(name))
+end
+
+T["closing the last window of a dashboard stops it; hiding it pauses it"] = function()
+  child.cmd("DbDash")
+  child.cmd("wincmd l")
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  local buf = child.lua_get("vim.api.nvim_get_current_buf()")
+  -- hidden: another buffer in its window -> paused (◐), still running
+  child.cmd("enew")
+  settle(100)
+  eq({ running(), paused(), sidebar_mark("board.yaml") }, { 1, true, "◐" })
+  child.cmd("buffer " .. buf)
+  settle(100)
+  eq({ paused(), sidebar_mark("board.yaml") }, { false, "●" })
+  -- two windows: closing one keeps it running
+  child.cmd("split")
+  child.cmd("q")
+  settle(100)
+  eq({ running(), paused() }, { 1, false })
+  -- closing its last window (:q) stops it like :DbDashStop (○), the buffer is gone
+  child.cmd("q")
+  settle(100)
+  eq({ running(), sidebar_mark("board.yaml"), child.lua_get(("vim.api.nvim_buf_is_valid(%d)"):format(buf)) }, { 0, "○", false })
+end
+
+T["a dashboard only in another tab pauses; closing that tab stops it"] = function()
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  local buf = child.lua_get("vim.api.nvim_get_current_buf()")
+  child.cmd("tabnew")
+  settle(100)
+  eq({ running(), paused() }, { 1, true }) -- shown in tab 1 only
+  child.cmd("tabprevious")
+  settle(100)
+  eq(paused(), false)
+  child.cmd("tabnext")
+  child.cmd("buffer " .. buf)
+  child.cmd("tabprevious")
+  child.cmd("enew")
+  child.cmd("tabnext")
+  child.cmd("tabclose")
+  settle(100)
+  eq(running(), 0)
+end
+
+T[":bdelete stops a dashboard; closing windows while a session loads does not"] = function()
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  child.cmd("vsplit")
+  child.cmd("enew")
+  child.cmd("bdelete " .. child.lua_get("vim.fn.bufnr('dbdash://*')"))
+  settle(100)
+  eq(running(), 0)
+  -- while a session loads, closed windows stop nothing
+  child.cmd("DbDashStart board.yaml")
+  wait_loaded()
+  child.cmd("vsplit")
+  child.cmd("enew") -- another window stays open
+  child.cmd("wincmd p")
+  child.lua("vim.g.SessionLoad = 1")
+  child.cmd("q") -- the dashboard's only window
+  settle(100)
+  child.lua("vim.g.SessionLoad = nil")
+  eq(running(), 1)
+end
+
 T["visible in a split without the cursor keeps refreshing"] = function()
   fast_board()
   child.cmd("vsplit")
