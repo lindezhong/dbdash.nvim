@@ -67,7 +67,7 @@ T["every name has a value of the right type"] = function()
   eq(v.refresh_count, 1)
   -- every documented name is known
   table.sort(strings)
-  eq(#metadata.NAMES, 29)
+  eq(#metadata.NAMES, 31)
 end
 
 T["db_*: from the URL as written, without the password or expanded ${NAME}"] = function()

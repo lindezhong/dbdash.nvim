@@ -75,8 +75,8 @@ properties:
     type: string
     description: >-
       The dashboard's description: a template (the shared args; meta without panel fields;
-      it cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe; ⓘ in the header says there is
-      one.
+      it cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe;
+      ⓘ in the header says there is one.
   show_countdown:
     type: boolean
     default: false
@@ -231,7 +231,10 @@ definitions:
         description: |-
           Query template (Jinja subset, see :help dbdash-templates): arguments are
           {{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta, e.g.
-          meta.prev_result: the previous refresh's rows; meta.callback), and
+          run records with ids, times and results: meta.run (meta.run.kind: "refresh" or
+          "callback"; meta.run.depth: 0 in a refresh, n in a callback), meta.runs,
+          meta.prev, meta.prev_ok (the last successful refresh, its rows in
+          meta.prev_ok.result): :help dbdash-runs), and
           {% set args.<name> = value %} sets an argument (:help dbdash-assign-args). Lua
           runs in {% lua %} ... {% endlua %} blocks and in modules imported with
           {% import 'x.lua' as h %} (:help dbdash-template-lua), with args, meta, store and
@@ -340,9 +343,9 @@ definitions:
         type: string
         description: >-
           This chart's description: a template (args, meta, as its query sees them; it
-          cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe; ⓘ after the panel's title (in a
-          one-chart dashboard: in the header) says there is one. With panels, it belongs in
-          each panel.
+          cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe;
+          ⓘ after the panel's title (in a one-chart dashboard: in the header) says there is
+          one. With panels, it belongs in each panel.
       interval:
         $ref: "#/definitions/duration"
         description: >-

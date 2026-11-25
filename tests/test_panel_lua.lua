@@ -111,37 +111,37 @@ query: { sql: "store.n = (store.n or 0) + 1; return { { n = store.n } }" }
   eq(cell(d.panels[1]), 1)
 end
 
-T["meta.prev_query / prev_result: the previous refresh's results, before and after the transform"] = function()
+T["meta.prev_ok.query / .result: the last success's results, before and after the transform"] = function()
   local d = start("prev", [[
 database: { url: "sqlite:///:memory:" }
 query:
   sql: |
     SELECT {{ meta.refresh_count }} AS n,
-           {{ (meta.prev_result.rows[0][0] if meta.prev_result is not none else 0) }} AS prev_doubled,
-           {{ (meta.prev_query.rows[0][0] if meta.prev_query is not none else 0) }} AS prev_raw,
-           {{ 1 if meta.prev_error is none else 0 }} AS ok
+           {{ (meta.prev_ok.result.rows[0][0] if meta.prev_ok is not none else 0) }} AS prev_doubled,
+           {{ (meta.prev_ok.query.rows[0][0] if meta.prev_ok is not none else 0) }} AS prev_raw,
+           {{ 1 if meta.prev is none or meta.prev.error is none else 0 }} AS ok
   transform: |
     local r = rs.rows[1]
-    local pq = meta.prev_query and meta.prev_query.columns[1] or "none"
+    local pq = meta.prev_ok and meta.prev_ok.query.columns[1] or "none"
     return { columns = { "doubled", "prev_doubled", "prev_raw", "ok", "prev_query_col" },
              rows = { { r[1] * 2, r[2], r[3], r[4], pq } } }
 ]])
   local p = d.panels[1]
   eq(p.rs.rows[1], { 2, 0, 0, 1, "none" })
   again(p)
-  -- prev_result is the transformed row (doubled = 2), prev_query the query's own (n = 1)
+  -- prev_ok.result is the transformed row (doubled = 2), prev_ok.query the query's own (n = 1)
   eq(p.rs.rows[1], { 4, 2, 1, 1, "n" })
 end
 
-T["meta.prev_error: the previous refresh's error; prev_* keep the last success"] = function()
+T["meta.prev.error: the previous refresh's error; meta.prev_ok keeps the last success"] = function()
   local d = start("err", [[
 database: { url: "lua://" }
 query:
   sql: |
     store.n = (store.n or 0) + 1
     if store.n == 2 then error("boom") end
-    return { { n = store.n, prev = meta.prev_result and meta.prev_result.rows[1][2] or 0, -- (err, n, prev)
-               err = meta.prev_error or "" } }
+    return { { n = store.n, prev = meta.prev_ok and meta.prev_ok.result.rows[1][2] or 0, -- (err, n, prev)
+               err = meta.prev and meta.prev.error or "" } }
 ]])
   local p = d.panels[1]
   eq(p.rs.rows[1], { "", 1, 0 }) -- columns sorted: err, n, prev
@@ -152,7 +152,7 @@ query:
   eq({ row[2], row[3] }, { 3, 1 }) -- the last success was refresh 1
   eq(row[1]:find("boom", 1, true) ~= nil, true)
   again(p)
-  eq(p.rs.rows[1][1], "") -- refresh 3 succeeded: no prev_error
+  eq(p.rs.rows[1][1], "") -- refresh 3 succeeded: no meta.prev.error
 end
 
 T["show.refresh_hidden: keeps refreshing while the dashboard is paused"] = function()
@@ -201,15 +201,15 @@ panels:
   d:resume()
 end
 
-T["dbdash.run(): the panel's pipeline with other arguments; meta.callback is the depth"] = function()
+T["dbdash.run(): the panel's pipeline with other arguments; meta.run.depth is the depth"] = function()
   local d = start("cb", [[
 database: { url: "sqlite:///:memory:" }
 query:
   args: [{ name: n, type: int, default: 1 }]
   sql: |
-    SELECT {{ args.n }} AS n, {{ meta.callback }} AS depth,
+    SELECT {{ args.n }} AS n, {{ meta.run.depth }} AS depth,
     {% lua %}
-      if meta.callback < 2 then
+      if meta.run.depth < 2 then
         local r = dbdash.run({ n = args.n * 10 }).rows[1]
         return "'" .. r[1] .. ":" .. r[2] .. "," .. r[3] .. "'"
       end
@@ -234,14 +234,14 @@ panels:
       args: [{ name: k, type: int, default: 1 }]
       sql: |
         {% import 'm.lua' as m %}
-        return { { v = {{ args.k }} * 7, via_module = {{ m.twice() if meta.callback == 0 else 0 }} } }
+        return { { v = {{ args.k }} * 7, via_module = {{ m.twice() if meta.run.depth == 0 else 0 }} } }
       transform: |
-        local via_transform = meta.callback == 0 and dbdash.run({ k = 3 }).rows[1][1] or 0
+        local via_transform = meta.run.depth == 0 and dbdash.run({ k = 3 }).rows[1][1] or 0
         return { { v = rs[1].v, via_module = rs[1].via_module, via_transform = via_transform } }
   - query:
       args: [{ name: k, type: int, default: 1 }]
       sql: |
-        if meta.callback == 0 then return { { v = dbdash.run({ k = 5 }).rows[1][1] } } end
+        if meta.run.depth == 0 then return { { v = dbdash.run({ k = 5 }).rows[1][1] } } end
         return { { v = args.k * 11 } }
 ]])
   local p1, p2 = d.panels[1], d.panels[2]
@@ -265,7 +265,7 @@ query: { sql: "dbdash.run(); return {}" }
   require("dbdash").setup({ lua = { confirm = false, max_callbacks = 50, max_callback_depth = 5 } })
   d = start("wide", [[
 database: { url: "lua://" }
-query: { sql: "if meta.callback < 5 then for _ = 1, 3 do dbdash.run() end end; return { { c = meta.callback } }" }
+query: { sql: "if meta.run.depth < 5 then for _ = 1, 3 do dbdash.run() end end; return { { c = meta.run.depth } }" }
 ]])
   p = d.panels[1]
   eq(sched.format_error(p.error):find("dbdash.run: more than 50 callbacks in one refresh (lua.max_callbacks)", 1, true) ~= nil, true)
@@ -273,7 +273,7 @@ query: { sql: "if meta.callback < 5 then for _ = 1, 3 do dbdash.run() end end; r
   require("dbdash").setup({ lua = { confirm = false, max_callbacks = 12 } })
   d = start("fits", [[
 database: { url: "lua://" }
-query: { sql: "if meta.callback < 2 then for _ = 1, 3 do dbdash.run() end end; return { { c = 1 } }" }
+query: { sql: "if meta.run.depth < 2 then for _ = 1, 3 do dbdash.run() end end; return { { c = 1 } }" }
 ]])
   p = d.panels[1]
   eq(p.error, nil)
@@ -287,14 +287,14 @@ T["dbdash.run(): unknown arguments and wrong types are errors"] = function()
 database: { url: "lua://" }
 query:
   args: [{ name: n, type: int }]
-  sql: "if meta.callback == 0 then dbdash.run({ {{ 'nope' if true }} = 1 }) end; return {}"
+  sql: "if meta.run.depth == 0 then dbdash.run({ {{ 'nope' if true }} = 1 }) end; return {}"
 ]])
   eq(sched.format_error(d.panels[1].error):find("'nope' is not an argument of this panel", 1, true) ~= nil, true)
   d = start("badtype", [[
 database: { url: "lua://" }
 query:
   args: [{ name: n, type: int }]
-  sql: "if meta.callback == 0 then dbdash.run({ n = 'x' }) end; return {}"
+  sql: "if meta.run.depth == 0 then dbdash.run({ n = 'x' }) end; return {}"
 ]])
   eq(sched.format_error(d.panels[1].error):find("argument 'n' is an int, got a string", 1, true) ~= nil, true)
 end
@@ -305,7 +305,7 @@ database: { url: "lua://" }
 query:
   timeout: 1s
   sql: |
-    if meta.callback > 0 then return { { x = 1 } } end
+    if meta.run.depth > 0 then return { { x = 1 } } end
     dbdash.run()
     while true do end
 ]])
@@ -415,7 +415,7 @@ database: { url: "lua://" }
 query:
   args: [{ name: n, type: int, default: 1 }]
   sql: |
-    if meta.callback == 0 then
+    if meta.run.depth == 0 then
       local inner = dbdash.run().rows[1][1]
       return { { n = args.n, inner = inner } }
     end
@@ -478,7 +478,7 @@ database: { url: "lua://" }
 query:
   args: [{ name: days, type: int, default: 0 }]
   sql: |
-    if meta.callback > 0 then
+    if meta.run.depth > 0 then
       local start = args.days
       args.days = 10
       return { { start = start, after = args.days } }
@@ -530,10 +530,10 @@ database: { url: "sqlite:///:memory:" }
 query:
   args: [{ name: days, type: int, default: 0 }]
   sql: |
-    {% if meta.callback > 0 %}{% set args.days = 10 %}{% endif %}
+    {% if meta.run.depth > 0 %}{% set args.days = 10 %}{% endif %}
     SELECT {{ args.days }} AS used
   transform: |
-    if meta.callback > 0 then return rs end
+    if meta.run.depth > 0 then return rs end
     local copy = vim.deepcopy(args)
     copy.days = 14
     local r = dbdash.run(copy).rows[1]
@@ -553,7 +553,7 @@ query:
   args: [{ name: days, type: int, default: 0 }]
   sql: SELECT {{ args.days }} AS used
   transform: |
-    if meta.callback > 0 then
+    if meta.run.depth > 0 then
       local before = args.days
       args.days = 10
       return { { used = rs.rows[1][1], before = before, after = args.days } }
@@ -572,7 +572,7 @@ end
 
 T["callback case: a callback that does not assign changes nothing kept"] = function()
   local d, p, log = lua_case("cb_noassign", [[
-if meta.callback > 0 then table.insert(store.log, args.days); return { { ok = 1 } } end
+if meta.run.depth > 0 then table.insert(store.log, args.days); return { { ok = 1 } } end
 dbdash.run({ days = 14 })
 table.insert(store.log, args.days)]])
   eq(log, { 14, 0 })
@@ -584,7 +584,7 @@ end
 
 T["callback case: the caller assigned before calling; the callback starts from it"] = function()
   local d, _, log = lua_case("cb_before", [[
-if meta.callback > 0 then table.insert(store.log, args.days); return { { ok = 1 } } end
+if meta.run.depth > 0 then table.insert(store.log, args.days); return { { ok = 1 } } end
 args.days = 5
 dbdash.run()
 dbdash.run({ days = 14 })]])
@@ -595,7 +595,7 @@ end
 
 T["callback case: the caller assigns the same argument after the callback; it wins"] = function()
   local d, _, log = lua_case("cb_after", [[
-if meta.callback > 0 then args.days = 10; return { { ok = 1 } } end
+if meta.run.depth > 0 then args.days = 10; return { { ok = 1 } } end
 dbdash.run({ days = 14 })
 table.insert(store.log, args.days)
 args.days = 3
@@ -606,7 +606,7 @@ end
 
 T["callback case: the same table (copy = args); the caller's 14 wins over the callback's 10"] = function()
   local d, _, log = lua_case("cb_same", [[
-if meta.callback > 0 then table.insert(store.log, args.days); args.days = 10; return { { ok = 1 } } end
+if meta.run.depth > 0 then table.insert(store.log, args.days); args.days = 10; return { { ok = 1 } } end
 local copy = args
 copy.days = 14
 dbdash.run(copy)
@@ -617,7 +617,7 @@ end
 
 T["callback case: two callbacks in one refresh; the second starts from the caller's values"] = function()
   local d, _, log = lua_case("cb_twice", [[
-if meta.callback > 0 then
+if meta.run.depth > 0 then
   table.insert(store.log, args.days)
   if args.days == 14 then args.days = 10 end
   return { { ok = 1 } }
@@ -634,12 +634,12 @@ end
 
 T["callback case: nested callbacks; each level keeps its own values"] = function()
   local d, _, log = lua_case("cb_nested", [[
-if meta.callback == 2 then
+if meta.run.depth == 2 then
   table.insert(store.log, "2:" .. args.days)
   args.days = 20
   return { { ok = 1 } }
 end
-if meta.callback == 1 then
+if meta.run.depth == 1 then
   table.insert(store.log, "1:" .. args.days)
   dbdash.run({ days = args.days + 1 })
   table.insert(store.log, "1:" .. args.days)
@@ -653,13 +653,13 @@ end
 
 T["callback case: assignments before a failure are kept, within the failing code not"] = function()
   local d, p = lua_case("cb_fail_after", [[
-if meta.callback > 0 then args.days = 10; return { { ok = 1 } } end
+if meta.run.depth > 0 then args.days = 10; return { { ok = 1 } } end
 dbdash.run()
 error("later")]])
   eq(p.error ~= nil, true)
   eq(kept(d), 10) -- the callback's script returned before the failure
   d, p = lua_case("cb_fail_within", [[
-if meta.callback > 0 then args.days = 10; error("inside") end
+if meta.run.depth > 0 then args.days = 10; error("inside") end
 dbdash.run()]])
   eq(p.error ~= nil, true)
   eq(kept(d), 0) -- assigned in the code that failed: not applied
@@ -667,19 +667,214 @@ end
 
 T["callback case: assigning the current value keeps nothing; R resets an assignment"] = function()
   local d, p = lua_case("cb_same_value", [[
-if meta.callback > 0 then args.days = 14; return { { ok = 1 } } end
+if meta.run.depth > 0 then args.days = 14; return { { ok = 1 } } end
 dbdash.run({ days = 14 })
 args.days = 0]])
   eq(p.error, nil)
   eq(d.state.modified.days, nil) -- 14 was the callback's value already; 0 the caller's
   local d2 = lua_case("cb_reset", [[
-if meta.callback > 0 then args.days = 10; return { { ok = 1 } } end
+if meta.run.depth > 0 then args.days = 10; return { { ok = 1 } } end
 dbdash.run()]])
   eq(kept(d2), 10)
   require("dbdash.args").reset(d2.state)
   eq(kept(d2), 0)
   again(d2.panels[1])
   eq(kept(d2), 10) -- the next refresh's callback assigns it again
+end
+
+-- Run records: meta.run, meta.runs, meta.prev, meta.prev_ok, meta.prev_runs, meta.prev_ok_runs.
+
+---A lua:// panel whose script logs `meta` into store.seen (one entry per run) and may call
+---back once; `fail` makes refresh number `fail` fail after its callback.
+local function runs_case(name, fail)
+  local d = start(name, ([[
+database: { url: "lua://" }
+query:
+  args: [{ name: n, type: int, default: 1 }]
+  sql: |
+    store.seen = store.seen or {}
+    local entry = { run = meta.run, runs_before = #meta.runs, prev = meta.prev, prev_ok = meta.prev_ok,
+                    prev_runs = meta.prev_runs, prev_ok_runs = meta.prev_ok_runs }
+    table.insert(store.seen, entry)
+    if meta.run.depth == 0 then
+      local r = dbdash.run({ n = args.n * 10 })
+      entry.callback_result = r
+      entry.runs_after = #meta.runs
+      entry.runs = meta.runs
+      if meta.refresh_count == %d then error("fail " .. meta.refresh_count) end
+    end
+    return { { n = args.n, count = meta.refresh_count } }
+]]):format(fail or -1))
+  return d, d.panels[1]
+end
+
+T["run records: the refresh and its callback, ids, kinds, parents, times"] = function()
+  local _, p = runs_case("rec1")
+  assert(p.rs, p.error and sched.format_error(p.error))
+  local refresh, callback = p.store.seen[1], p.store.seen[2]
+  local r, c = refresh.run, callback.run
+  eq({ r.kind, r.depth, r.parent_id, r.refresh_id }, { "refresh", 0, nil, r.id })
+  eq({ c.kind, c.depth, c.parent_id, c.refresh_id, c.args.n }, { "callback", 1, r.id, r.id, 10 })
+  eq(r.id:match("^%x+%-%x+%-7") ~= nil and c.id > r.id, true)
+  eq(type(r.started_at) == "number" and c.started_at >= r.started_at, true)
+  -- first refresh: nothing before it
+  eq({ refresh.prev, refresh.prev_ok, refresh.prev_runs, refresh.prev_ok_runs }, { nil, nil, nil, nil })
+  -- meta.runs is live in Lua: the callback is in it, finished, once dbdash.run() returned
+  eq({ refresh.runs_before, refresh.runs_after }, { 1, 2 })
+  local done = refresh.runs[2]
+  eq({ done.id, done.ok, done.elapsed_ms, done.finished_at - done.started_at }, { c.id, true, done.elapsed_ms, done.elapsed_ms })
+  -- its data: rendered sql, query result, result (what dbdash.run() returned)
+  eq(type(done.sql), "string")
+  eq(done.result, refresh.callback_result)
+  eq(done.result.rows[1], { 1, 10 }) -- columns: count, n
+end
+
+T["run records: meta.prev is the last refresh, finished, with its data"] = function()
+  local _, p = runs_case("rec2")
+  again(p)
+  local first, second = p.store.seen[1], p.store.seen[3]
+  local prev = second.prev
+  eq({ prev.id, prev.kind, prev.ok, prev.error }, { first.run.id, "refresh", true, nil })
+  eq({ prev.finished_at >= prev.started_at, prev.elapsed_ms == prev.finished_at - prev.started_at }, { true, true })
+  eq(type(prev.sql), "string")
+  eq(prev.result.rows[1], { 1, 1 }) -- count 1, n 1
+  -- prev_ok is the same refresh
+  eq(second.prev_ok.id, first.run.id)
+  eq(second.prev_ok, prev)
+  -- the previous life: the refresh and its callback
+  eq(vim.tbl_map(function(x)
+    return x.kind
+  end, second.prev_runs), { "refresh", "callback" })
+  eq(second.prev_ok_runs, second.prev_runs)
+end
+
+T["run records: after a failed refresh, prev is it, prev_ok the last success"] = function()
+  local _, p = runs_case("rec3", 2)
+  again(p) -- refresh 2 fails after its callback
+  eq(p.error ~= nil, true)
+  again(p) -- refresh 3 sees both
+  local first, second, third = p.store.seen[1], p.store.seen[3], p.store.seen[5]
+  eq({ third.prev.id, third.prev.ok }, { second.run.id, false })
+  eq(third.prev.error:find("fail 2", 1, true) ~= nil, true)
+  eq(third.prev_ok.id, first.run.id)
+  eq(third.prev_ok.result.rows[1][1], 1) -- refresh 1's rows (count 1), not 2's
+  -- the failed refresh still recorded what it got: its callback finished fine
+  eq({ #third.prev_runs, third.prev_runs[1].id, third.prev_runs[2].ok }, { 2, second.run.id, true })
+  eq(third.prev_ok_runs[1].id, first.run.id)
+end
+
+T["run records: nested and sibling callbacks, failed callbacks"] = function()
+  local d = start("rec4", [[
+database: { url: "lua://" }
+query:
+  sql: |
+    if meta.run.depth == 0 then
+      dbdash.run()
+      pcall(dbdash.run, { })  -- a second one, at depth 1 it calls once more
+      store.runs = meta.runs
+      return { { x = 1 } }
+    end
+    if meta.run.depth == 1 and meta.runs[#meta.runs].kind == "callback" and #meta.runs == 3 then
+      dbdash.run()
+    end
+    if meta.run.depth == 2 then error("deep") end
+    return { { x = meta.run.depth } }
+]])
+  local p = d.panels[1]
+  local runs = p.store.runs
+  -- refresh, callback A (1), callback B (1), B's callback (2, failed); the records are live:
+  -- the refresh has finished by now
+  eq(vim.tbl_map(function(x)
+    return { x.kind, x.depth, x.ok }
+  end, runs), { { "refresh", 0, true }, { "callback", 1, true }, { "callback", 1, false }, { "callback", 2, false } })
+  eq({ runs[2].parent_id, runs[3].parent_id, runs[4].parent_id }, { runs[1].id, runs[1].id, runs[3].id })
+  eq({ runs[4].refresh_id, runs[4].error:find("deep", 1, true) ~= nil }, { runs[1].id, true })
+  eq(runs[3].error ~= nil, true) -- failed because its callback failed
+end
+
+T["run records: in templates, meta.runs follows the Lua that ran"] = function()
+  local d = start("rec5", [[
+database: { url: "sqlite:///:memory:" }
+query:
+  sql: |
+    {% if meta.run.depth == 0 %}{% lua %}dbdash.run(){% endlua %}{% endif %}
+    SELECT {{ meta.runs | length }} AS runs, '{{ meta.run.kind }}' AS kind,
+           '{{ meta.run.parent_id }}' AS parent, '{{ meta.prev.id if meta.prev is not none else "-" }}' AS prev
+]])
+  local p = d.panels[1]
+  assert(p.rs, p.error and sched.format_error(p.error))
+  eq(p.rs.rows[1], { 2, "refresh", "None", "-" })
+  local first = p.prev.id
+  again(p)
+  eq(p.rs.rows[1][4], first)
+end
+
+T["run records: showing the SQL or a description is not a run"] = function()
+  local _, p = runs_case("rec6")
+  local runs, prev = #p.prev_runs, p.prev.id
+  local done = false
+  p:render_async(function()
+    done = true
+  end)
+  vim.wait(3000, function()
+    return done
+  end, 10)
+  eq({ #p.prev_runs, p.prev.id }, { runs, prev })
+end
+
+T["run records: a query that worked and a transform that failed"] = function()
+  local d = start("rec7", [[
+database: { url: "sqlite:///:memory:" }
+query:
+  sql: SELECT 7 AS x
+  transform: |
+    error("bad transform")
+]])
+  local p = d.panels[1]
+  eq(p.error ~= nil, true)
+  local r = p.prev
+  eq({ r.ok, r.query.rows[1][1], r.result, r.error:find("bad transform", 1, true) ~= nil }, { false, 7, nil, true })
+  eq(r.sql, "SELECT 7 AS x")
+  eq(p.prev_ok, nil)
+end
+
+T["meta.callback, prev_query, prev_result and prev_error are gone (meta.run, prev, prev_ok)"] = function()
+  local d = start("gone", [[
+database: { url: "lua://" }
+query:
+  sql: |
+    return { { cb = tostring(meta.callback), pq = tostring(meta.prev_query),
+               pr = tostring(meta.prev_result), pe = tostring(meta.prev_error) } }
+]])
+  eq(d.panels[1].rs.rows[1], { "nil", "nil", "nil", "nil" })
+  for i, name in ipairs({ "callback", "prev_query", "prev_result", "prev_error" }) do
+    local e = start("gone" .. i, ("database: { url: 'sqlite:///:memory:' }\nquery: { sql: 'SELECT {{ meta.%s }}' }\n"):format(name))
+    eq({ name, e.panels[1].error ~= nil }, { name, true })
+  end
+end
+
+T["callbacks of callbacks stop at a meta.run.depth (the :help dbdash-callback example)"] = function()
+  local d = start("depth", [[
+database: { url: "sqlite:///:memory:" }
+query:
+  args: [{ name: days, type: int, default: 7 }]
+  sql: SELECT {{ args.days }} AS days
+  transform: |
+    if meta.run.depth < 3 then
+      dbdash.run({ days = args.days * 2 })
+    end
+    if meta.run.kind == "callback" then
+      return rs
+    end
+    local out = {}
+    for _, r in ipairs(meta.runs) do
+      out[#out + 1] = { depth = r.depth, days = r.args.days }
+    end
+    return out
+]])
+  local p = d.panels[1]
+  assert(p.rs, p.error and sched.format_error(p.error))
+  eq(p.rs.rows, { { 7, 0 }, { 14, 1 }, { 28, 2 }, { 56, 3 } }) -- columns sorted by name: days, depth
 end
 
 return T

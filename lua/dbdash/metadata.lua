@@ -25,10 +25,12 @@ M.NAMES = {
   "max_rows",
   "timeout",
   "refresh_count",
-  "prev_query",
-  "prev_result",
-  "prev_error",
-  "callback",
+  "run",
+  "runs",
+  "prev",
+  "prev_ok",
+  "prev_runs",
+  "prev_ok_runs",
   "now",
   "today",
   "hostname",
@@ -36,6 +38,24 @@ M.NAMES = {
   "nvim_version",
   "os",
   "arch",
+}
+
+-- The fields of a run record (meta.run, meta.runs[i], meta.prev, meta.prev_ok, ...).
+M.RUN_FIELDS = {
+  "id",
+  "kind",
+  "depth",
+  "parent_id",
+  "refresh_id",
+  "args",
+  "started_at",
+  "finished_at",
+  "elapsed_ms",
+  "ok",
+  "error",
+  "sql",
+  "query",
+  "result",
 }
 
 ---"linux" | "windows" | "macos" | "bsd" | the lower-case system name.
@@ -106,13 +126,14 @@ function M.values(panel, run)
   out.max_rows = q.max_rows or dbdash.options.defaults.max_rows
   out.timeout = q.timeout or dbdash.default_ms("timeout")
   out.refresh_count = panel.refresh_count or 0
-  -- The previous refresh: its query's own result and the final rows (the last success),
-  -- and its error when it failed.
-  out.prev_query = panel.prev_query
-  out.prev_result = panel.prev_result
-  out.prev_error = panel.prev_error
-  -- 0 in a refresh, n in a dbdash.run() callback n levels deep.
-  out.callback = run and run.depth or 0
+  -- Run records (scheduler Panel:new_run): this run and its refresh's life so far, the
+  -- previous refresh (prev, prev_runs) and the last successful one (prev_ok, prev_ok_runs).
+  out.run = run and run.record
+  out.runs = run and run.life and run.life.runs
+  out.prev = panel.prev
+  out.prev_ok = panel.prev_ok
+  out.prev_runs = panel.prev_runs
+  out.prev_ok_runs = panel.prev_ok_runs
   return out
 end
 
@@ -147,12 +168,41 @@ function M.dashboard_values(d, dbcfg)
 end
 
 ---A metadata value for templates: result tables keep NULL cells as none (their rows may
----have holes), other tables are converted as Lua data.
+---have holes), lists and other tables (run records) element by element.
 local function template_value(x)
   if type(x) ~= "table" then
     return x
   end
   local R = require("dbdash.template.runtime")
+  if not (type(x.columns) == "table" and type(x.rows) == "table") then
+    if map.is_map(x) then
+      return R.from_lua(x)
+    end
+    if vim.islist(x) then
+      local out = {}
+      for i, v in ipairs(x) do
+        out[i] = template_value(v)
+      end
+      return out
+    end
+    local m = map.new()
+    if x.id and x.kind then
+      -- A run record: every field, none while unknown (parent_id, finished_at, ...).
+      for _, k in ipairs(M.RUN_FIELDS) do
+        local v = x[k]
+        map.set(m, k, v == nil and vim.NIL or template_value(v))
+      end
+      return m
+    end
+    local keys = vim.tbl_keys(x)
+    table.sort(keys, function(a, b)
+      return tostring(a) < tostring(b)
+    end)
+    for _, k in ipairs(keys) do
+      map.set(m, k, template_value(x[k]))
+    end
+    return m
+  end
   if type(x.columns) == "table" and type(x.rows) == "table" then
     local rows = {}
     for r, row in ipairs(x.rows) do
@@ -172,6 +222,8 @@ local function template_value(x)
   end
   return R.from_lua(x)
 end
+
+M.template_value = template_value
 
 ---The values as a template mapping (missing values are none).
 function M.for_template(values)

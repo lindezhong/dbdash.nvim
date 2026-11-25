@@ -20,7 +20,7 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
   descriptions of the dashboard and each chart are templates shown as Markdown (`K`).
 - **Lua**: a `lua://` source whose query is Lua code, and `query.transform` to reshape any
   result with Lua before it is checked as rows (trusted configs only, as with `exrc`);
-  a `store` table kept per panel, the previous refresh's rows (`meta.prev_result`),
+  a `store` table kept per panel, run records with the previous results (`meta.prev_ok`),
   `dbdash.run()` to run a panel's query again with other arguments, and assigning
   arguments from templates and Lua.
 - **Query templates**: a Jinja2 subset with SQL-safe quoting filters, autoescape, macros
@@ -173,7 +173,7 @@ Examples, all runnable as they are:
 | [`lua.yaml`](example/lua.yaml) | a `lua://` data source (Lua code, a command's output) |
 | [`transform.yaml`](example/transform.yaml) | `query.transform` reshaping a query result with Lua |
 | [`template_lua.yaml`](example/template_lua.yaml) | Lua in templates: `{% lua %}` blocks and an imported module ([`lua/helpers.lua`](example/lua/helpers.lua)) |
-| [`callback.yaml`](example/callback.yaml) | panel state in Lua: `store` (a counter, a history of results drawn as a line), `meta.prev_result`, `dbdash.run()` callbacks from `query.transform`, `{% lua %}` and an imported module ([`lua/callbacks.lua`](example/lua/callbacks.lua)), assigning arguments, `show.refresh_hidden` |
+| [`callback.yaml`](example/callback.yaml) | panel state in Lua: `store` (a counter, a history of results drawn as a line), `meta.prev_ok.result`, `dbdash.run()` callbacks from `query.transform`, `{% lua %}` and an imported module ([`lua/callbacks.lua`](example/lua/callbacks.lua)), assigning arguments, `show.refresh_hidden`, run records (`meta.prev_runs`: a refresh and its callbacks with ids, callers, times) |
 | [`http.yaml`](example/http.yaml) | an HTTPS API (GitHub releases) turned into rows by a transform (needs network) |
 
 ### Connection URLs
@@ -217,8 +217,9 @@ LIMIT {{ args.limit | sql_limit }}
 ```
 
 Arguments are `args.<name>` and metadata (config file and directory, database, panel,
-time, OS, ...) `meta.<name>`, in templates and in Lua code alike. `query.sql`,
-`query.transform` and the descriptions are all templates, and can also run Lua:
+time, OS, the previous results and run records, ...) `meta.<name>`, in templates and in
+Lua code alike. `query.sql`, `query.transform` and the descriptions are all templates, and
+can also run Lua:
 
 ```sql
 {% import 'lua/helpers.lua' as h %}
@@ -250,10 +251,13 @@ query:
 
 Scripts get `args`, `rs` (for transforms) and helpers such as `dbdash.system()` and
 `dbdash.query()` that wait without blocking the editor, `store` (a table the panel keeps
-while the dashboard runs), `meta.prev_result` (the previous refresh's rows) and
-`dbdash.run(args)` (the panel's query again with other arguments; `meta.callback` tells a
-callback from a refresh). Assigning `args.x` (or `{% set args.x = v %}` in a template) sets
-an argument for the rest of the refresh and keeps it (`:help dbdash-assign-args`).
+while the dashboard runs), `meta.prev_ok.result` (the last successful refresh's rows) and
+`dbdash.run(args)` (the panel's query again with other arguments; `meta.run.kind` tells a
+callback from a refresh, `meta.run.depth` how deep a callback of callbacks is). Every
+refresh and callback has a run record (`meta.run`, `meta.runs`, `meta.prev`,
+`meta.prev_ok`: id, caller, times, SQL and results; `:help dbdash-runs`). Assigning `args.x`
+(or `{% set args.x = v %}` in a template) sets an argument for the rest of the refresh and
+keeps it (`:help dbdash-assign-args`).
 
 dbdash asks before running a config with Lua: one question per config, covering the config
 and the `.lua` files it imports, asked again when any of them changes;

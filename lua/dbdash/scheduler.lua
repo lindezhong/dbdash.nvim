@@ -243,20 +243,43 @@ end
 ---@class dbdash.Run one run of a panel's pipeline: a refresh (depth 0) or a callback
 ---@field values table<string, any> the arguments by name
 ---@field args table what Lua code sees as `args`
----@field depth integer 0 for a refresh, n for a callback n levels deep (meta.callback)
----@field counter { n: integer } callbacks so far in this refresh (shared by its callbacks)
+---@field depth integer 0 for a refresh, n for a callback n levels deep (meta.run.depth)
+---@field counter { n: integer, runs: table[] } the refresh's life: dbdash.run() calls so
+---  far and the run records (meta.runs), shared by its callbacks (= run.life)
+---@field record table this run's record (meta.run): id, kind, depth, parent_id, refresh_id,
+---  args, started_at, finished_at, elapsed_ms, ok, error, sql, query, result
 ---@field lua { store: table, helpers: table } globals of all Lua code of the run
 ---@field meta table? the metadata of this run
 
 ---A run of the panel's pipeline with `values` (default: the current arguments).
 ---@param parent dbdash.Run? the run this one is a callback of
 ---@return dbdash.Run
-function Panel:new_run(values, parent)
+---@param kind "refresh"|"callback"|"render"? render: :DbDashShowSQL and descriptions (not a
+---  run of the life; default refresh, or callback with a parent)
+function Panel:new_run(values, parent, kind)
   local run = {
     values = values or args.resolve_panel(self.cfg, self.d.state),
     depth = parent and parent.depth + 1 or 0,
-    counter = parent and parent.counter or { n = 0 },
+    counter = parent and parent.counter or { n = 0, runs = {}, version = 0 },
   }
+  run.life = run.counter
+  -- The run record: meta.run, and in meta.runs (meta.prev_runs ... once the life is over).
+  local uuid = require("dbdash.util.uuid")
+  local id = uuid.v7()
+  run.record = {
+    id = id,
+    kind = kind or (parent and "callback" or "refresh"),
+    depth = run.depth,
+    parent_id = parent and parent.record.id or nil,
+    refresh_id = parent and parent.record.refresh_id or id,
+    args = vim.deepcopy(run.values),
+    started_at = uuid.now_ms(),
+  }
+  if run.record.kind ~= "render" then
+    table.insert(run.life.runs, run.record)
+    run.life.version = run.life.version + 1
+  end
+  run.meta_maps = {} -- the template `meta` mappings of this run (their run / runs follow)
   run.maps = {} -- the template `args` mappings of this run (kept in step with assignments)
   run.args = run.values -- Lua code sees (and may assign) the values; see Panel:sync_args
   run.seen = vim.deepcopy(run.values)
@@ -275,6 +298,16 @@ end
 ---and raises.
 ---@param run dbdash.Run
 function Panel:sync_args(run)
+  -- Templates see meta.run / meta.runs as they are now (a callback may have run).
+  if #run.meta_maps > 0 and run.meta_version ~= run.life.version then
+    run.meta_version = run.life.version
+    local metadata = require("dbdash.metadata")
+    local map = require("dbdash.util.map")
+    for _, m in ipairs(run.meta_maps) do
+      map.set(m, "run", metadata.template_value(run.record))
+      map.set(m, "runs", metadata.template_value(run.life.runs))
+    end
+  end
   local values, seen = run.values, run.seen
   local names = {}
   for k in pairs(values) do
@@ -334,7 +367,8 @@ end
 
 ---The `dbdash` table of a run's Lua code: the shared helpers plus the run's own:
 ---dbdash.run(args) runs the panel's pipeline again with `args` merged over the run's
----arguments (a callback: meta.callback is its depth) and returns its rows as Lua data.
+---arguments (a callback: meta.run.kind is "callback", meta.run.depth its depth) and returns
+---its rows as Lua data.
 function Panel:helpers(run)
   local own = {
     run = function(over)
@@ -364,8 +398,13 @@ function Panel:helpers(run)
         values[name] = v
       end
       run.counter.n = run.counter.n + 1
-      local rs = self:pipeline(self:new_run(values, run))
-      return require("dbdash.db.lua_result").to_lua(rs)
+      local child = self:new_run(values, run)
+      local ok, err = pcall(self.pipeline, self, child)
+      self:finish_record(child, not ok and err or nil)
+      if not ok then
+        error(err, 0)
+      end
+      return child.record.result
     end,
   }
   return setmetatable(own, { __index = require("dbdash.db.lua_env").helpers })
@@ -379,6 +418,7 @@ function Panel:pipeline(run)
   local q = self.cfg.query
   local source = vim.fn.fnamemodify(self.d.path, ":~:.")
   local sql, code = self:render_templates(run)
+  run.record.sql = sql
   if run.depth == 0 then
     self.sql, self.transform_code = sql, code
   end
@@ -396,7 +436,9 @@ function Panel:pipeline(run)
     raw = code ~= nil, -- the transform gets the raw result; checked after it
     cookie_jar = self.d.cookie_jar,
   })
-  run.query_result = rs
+  -- The query's own result (before query.transform): rows as Lua data, or the raw value.
+  local lua_result = require("dbdash.db.lua_result")
+  run.record.query = lua_result.is_raw(rs) and rs.value or lua_result.to_lua(rs)
   if code then
     local out = M.transform(code, rs, {
       source = source,
@@ -410,6 +452,7 @@ function Panel:pipeline(run)
     out.elapsed_ms = rs.elapsed_ms
     rs = out
   end
+  run.record.result = lua_result.to_lua(rs)
   return rs
 end
 
@@ -432,6 +475,9 @@ function M.render_text(d, text, line, o)
     table.insert(o.run.maps, args_map)
   end
   local vars = { args = args_map, meta = metadata.for_template(o.meta) }
+  if o.run then
+    table.insert(o.run.meta_maps, vars.meta)
+  end
   local env = template.env(o.dialect, o.autoescape == true, d.cfg.dir)
   env.context = vars
   -- Lua in templates ({% lua %}, imported .lua): args, meta and the query timeout.
@@ -471,7 +517,7 @@ end
 function Panel:describe_async(cb)
   local show = self.cfg.show
   describe_async(function()
-    local run = self:new_run()
+    local run = self:new_run(nil, nil, "render")
     run.read_only = true -- showing a description does not change arguments
     return M.render_text(self.d, show.description, show.description_line, {
       dialect = db.driver(self.cfg.database.type).dialect,
@@ -562,7 +608,7 @@ end
 ---Render the templates in a task; `cb(err, sql, transform_code)` on the main loop.
 function Panel:render_async(cb)
   require("dbdash.util.async").run(function()
-    return self:render_templates(self:new_run())
+    return self:render_templates(self:new_run(nil, nil, "render"))
   end, function(err, sql, code)
     vim.schedule(function()
       if not err then
@@ -635,10 +681,10 @@ function Panel:refresh(o)
   self.d:update_status()
   local gen = self.d.generation
   -- One task: the whole pipeline (callbacks of dbdash.run() run inside it too).
+  local run = self:new_run()
   require("dbdash.util.async").run(function()
-    local run = self:new_run()
-    return self:pipeline(run), run
-  end, function(err, rs, run)
+    return self:pipeline(run)
+  end, function(err, rs)
     vim.schedule(function()
       if gen == self.d.generation then
         self:finish_refresh(gen, err and as_error(err) or nil, rs, run)
@@ -673,6 +719,16 @@ function M.transform(code, rs, o)
 end
 
 ---The end of a refresh: the query (and transform) result or error.
+---Close a run's record: finished_at, elapsed_ms, ok and error.
+function Panel:finish_record(run, err)
+  local r = run.record
+  r.finished_at = require("dbdash.util.uuid").now_ms()
+  r.elapsed_ms = r.finished_at - r.started_at
+  r.ok = err == nil
+  r.error = err ~= nil and M.format_error(as_error(err)) or nil
+  run.life.version = run.life.version + 1
+end
+
 function Panel:finish_refresh(gen, qerr, rs, run)
   self.running = false
   if self.rerun then
@@ -683,21 +739,20 @@ function Panel:finish_refresh(gen, qerr, rs, run)
       end
     end)
   end
-  local lua_result = require("dbdash.db.lua_result")
+  -- The refresh's record and life become meta.prev / prev_runs (prev_ok / prev_ok_runs
+  -- when it succeeded).
+  if run then
+    self:finish_record(run, qerr)
+    self.prev, self.prev_runs = run.record, run.life.runs
+    if not qerr then
+      self.prev_ok, self.prev_ok_runs = run.record, run.life.runs
+    end
+  end
   if qerr then
-    -- meta.prev_error; meta.prev_query / prev_result keep the last success.
-    self.prev_error = M.format_error(qerr)
     self:push_history({ error = M.format_error(qerr) })
     self:fail(qerr)
     return
   end
-  -- meta.prev_query (the query's own result, before query.transform) and prev_result.
-  local raw = run and run.query_result
-  if raw ~= nil then
-    self.prev_query = lua_result.is_raw(raw) and raw.value or lua_result.to_lua(raw)
-  end
-  self.prev_result = lua_result.to_lua(rs)
-  self.prev_error = nil
   self:push_history({ elapsed_ms = rs.elapsed_ms, rows = rs.row_count })
   self.rs = rs
   if (self.failures or 0) > 0 then

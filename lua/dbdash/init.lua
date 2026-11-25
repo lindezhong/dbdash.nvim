@@ -44,7 +44,7 @@ local M = {}
 ---  (lua:// or query.transform); false runs them without asking (default true)
 ---@field trusted_dirs string[] configs under these directories run without asking
 ---@field max_callbacks integer dbdash.run() calls in one refresh, all levels together (default 100)
----@field max_callback_depth integer dbdash.run() nesting (meta.callback), default 10
+---@field max_callback_depth integer dbdash.run() nesting (meta.run.depth), default 10
 
 ---@class dbdash.Options
 ---@field mappings boolean|table<"start"|"refresh"|"stop"|"list"|"sidebar", string|false>

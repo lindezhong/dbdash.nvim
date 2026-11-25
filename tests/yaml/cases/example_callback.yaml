@@ -3,15 +3,19 @@
 # Panel state in Lua and templates (generated data, SQLite in memory):
 # - store: a table each panel keeps while the dashboard runs (here: a refresh counter, and
 #   a list of the last 20 results drawn as a line).
-# - meta.prev_result / meta.prev_query: the previous refresh's rows, after and before
-#   query.transform (here: the change since the last refresh); meta.prev_error its error.
+# - meta.prev_ok: the last successful refresh's run record, with its rows after and before
+#   query.transform (.result, .query; here: the change since then); meta.prev the previous
+#   refresh's, with .error when it failed.
 # - dbdash.run(args): the panel's query again with other arguments (here: the same count
 #   over twice the days), from query.transform, from a {% lua %} block in query.sql, and
-#   from an imported module (lua/callbacks.lua); meta.callback is 0 in a refresh, 1 in
-#   its callback, so the callback does not call again.
+#   from an imported module (lua/callbacks.lua); meta.run.kind ("refresh" or "callback")
+#   keeps a callback from calling again. Callbacks of callbacks go deeper: meta.run.depth
+#   (0 in a refresh, 1 in its callback, 2 in that one's, ...) stops them at a level.
 # - {% set args.x = v %} / args.x = v: set an argument for the rest of the refresh and keep
 #   it like an edit with `a` (here: days is capped at 30; try :DbDashUpdateVariable days 90).
 # - show.refresh_hidden: keep refreshing while the dashboard is not visible.
+# - Run records (:help dbdash-runs): every refresh and callback has an id, its caller,
+#   times and data; meta.prev_runs lists the previous refresh's life.
 # It runs Lua, so dbdash asks whether you trust this file first (:help dbdash-lua).
 
 title: "Panel state"
@@ -43,7 +47,7 @@ panels:
       transform: |
         store.refreshes = (store.refreshes or 0) + 1
         local orders = rs.rows[1][1]
-        local prev = meta.prev_result and meta.prev_result.rows[1][1] or orders
+        local prev = meta.prev_ok and meta.prev_ok.result.rows[1][1] or orders
         return { columns = { "orders", "change", "refreshes" },
                  rows = { { orders, orders - prev, store.refreshes } } }
     show:
@@ -54,10 +58,10 @@ panels:
   - query:
       sql: |
         {# the cap applies to the refresh, not to its callback (days * 2) #}
-        {% if meta.callback == 0 and args.days > 30 %}{% set args.days = 30 %}{% endif %}
+        {% if meta.run.kind == "refresh" and args.days > 30 %}{% set args.days = 30 %}{% endif %}
         SELECT {{ args.days }} AS days, {{ args.days }} * 100 + abs(random() % 50) AS orders
       transform: |
-        if meta.callback > 0 then return rs end   -- the callback's rows, as they are
+        if meta.run.kind == "callback" then return rs end   -- the callback's rows, as they are
         local wider = dbdash.run({ days = args.days * 2 }).rows[1]
         return { columns = { "days", "orders", "days_2x", "orders_2x" },
                  rows = { { rs.rows[1][1], rs.rows[1][2], wider[1], wider[2] } } }
@@ -69,7 +73,7 @@ panels:
       sql: |
         SELECT {{ args.days }} AS days, {{ args.days }} * 100 + abs(random() % 50) AS orders,
         {% lua %}
-          if meta.callback > 0 then return "NULL" end   -- the callback leaves it empty
+          if meta.run.kind == "callback" then return "NULL" end   -- the callback leaves it empty
           return dbdash.run({ days = args.days * 2 }).rows[1][2]
         {% endlua %} AS orders_2x
     show:
@@ -80,7 +84,7 @@ panels:
       sql: |
         {% import 'lua/callbacks.lua' as cb %}
         SELECT {{ args.days }} AS days, {{ args.days }} * 100 + abs(random() % 50) AS orders,
-               {{ cb.orders(args.days * 2) if meta.callback == 0 else 'NULL' }} AS orders_2x
+               {{ cb.orders(args.days * 2) if meta.run.kind == "refresh" else 'NULL' }} AS orders_2x
     show:
       type: table
       title: "Twice as long: from an imported module"
@@ -104,3 +108,45 @@ panels:
       y_column: orders
       interval: 2s
       span: 2
+
+  - database: { url: "lua://" }
+    query:
+      sql: |
+        -- A refresh with two callbacks; the table lists the previous refresh's life
+        -- (meta.prev_runs): its records, with ids, callers and times (the current life on
+        -- the first refresh, still running).
+        if meta.run.kind == "callback" then return { { days = args.days } } end
+        dbdash.run({ days = args.days })
+        dbdash.run({ days = args.days * 2 })
+        local short = function(id) return id and id:sub(1, 8) .. "…" .. id:sub(-4) or "" end
+        local rows = {}
+        for _, r in ipairs(meta.prev_runs or meta.runs) do
+          rows[#rows + 1] = { short(r.id), r.kind, r.depth, short(r.parent_id), r.args.days,
+                              r.elapsed_ms or "", r.ok == nil and "…" or tostring(r.ok) }
+        end
+        return { columns = { "id", "kind", "depth", "parent", "days", "ms", "ok" }, rows = rows }
+    show:
+      type: table
+      title: "Run records of the previous refresh (meta.prev_runs)"
+      span: 2
+
+  - database: { url: "lua://" }
+    query:
+      sql: |
+        -- Callbacks of callbacks: every level runs the query again with twice the days
+        -- until meta.run.depth is 3, so the refresh (depth 0) has a chain of three
+        -- callbacks; it lists every level of its life (meta.runs).
+        if meta.run.depth < 3 then
+          dbdash.run({ days = args.days * 2 })
+        end
+        if meta.run.kind == "callback" then
+          return { { days = args.days } }
+        end
+        local rows = {}
+        for _, r in ipairs(meta.runs) do
+          rows[#rows + 1] = { r.depth, r.kind, r.args.days, r.ok == nil and "…" or tostring(r.ok) }
+        end
+        return { columns = { "depth", "kind", "days", "ok" }, rows = rows }
+    show:
+      type: table
+      title: "Callbacks of callbacks, stopped at meta.run.depth 3"

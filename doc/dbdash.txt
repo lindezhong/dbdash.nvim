@@ -439,7 +439,7 @@ API, needs network), arguments and templates
 file (`sqlite_file.yaml`), a Lua data source (`lua.yaml`), a Lua transform
 (`transform.yaml`), Lua in templates with an imported module
 (`template_lua.yaml` and `lua/helpers.lua`), panel state in Lua (`store`,
-`meta.prev_result`, `dbdash.run()` from `query.transform`, `{% lua %}` and
+run records, `dbdash.run()` from `query.transform`, `{% lua %}` and
 an imported module, assigned arguments: `callback.yaml` and
 `lua/callbacks.lua`) and
 an HTTPS API (`http.yaml`, GitHub releases, needs network); the last five
@@ -678,7 +678,8 @@ More cases:
 Metadata                                                        *dbdash-meta*
 
 `meta.<name>` holds read-only values computed for each render (none / nil when
-there is no value):
+there is no value; in Lua `meta.run` and `meta.runs` follow the run as it
+goes, |dbdash-runs|):
 
   cwd            Neovim's current directory
   config_file    the config file (absolute path)
@@ -699,15 +700,18 @@ there is no value):
   max_rows       `query.max_rows`
   timeout        the query timeout in ms
   refresh_count  how many times this panel has refreshed (from 1)
-  prev_query     the previous successful refresh's query result, before
-                 `query.transform`: { columns, types, rows } (for `lua://`
-                 and `http(s)://` with a transform: the raw value)
-  prev_result    its final rows (after `query.transform`, as shown):
-                 { columns, types, rows }; NULL cells are none / nil
-  prev_error     the previous refresh's error when it failed (prev_query
-                 and prev_result then keep the last success), else none
-  callback       0 in a refresh, n in a dbdash.run() callback n levels deep
-                 (|dbdash-callback|)
+  run            this run's record (|dbdash-runs|): `run.kind` is "refresh"
+                 or "callback", `run.depth` 0 in a refresh, n in a
+                 dbdash.run() callback n levels deep (|dbdash-callback|)
+  runs           the records of this refresh's life so far: the refresh,
+                 then its callbacks in the order they started
+  prev           the previous refresh's record (succeeded or failed):
+                 `prev.error` when it failed
+  prev_ok        the last successful refresh's record: its query result
+                 before `query.transform` in `prev_ok.query` and its rows
+                 in `prev_ok.result`
+  prev_runs      the records of the previous refresh's life
+  prev_ok_runs   the records of the last successful refresh's life
   now            render time, ISO 8601 with the UTC offset
                  (2026-11-24T10:00:00+08:00)
   today          the date (2026-11-24)
@@ -720,7 +724,47 @@ there is no value):
 No password and no expanded environment variable is part of the metadata.
 In the dashboard's description (|dbdash-description|) the panel fields
 (`panel_*`, `chart_type`, `interval`, `max_rows`, `timeout`,
-`refresh_count`) are none and `db_*` describe the top-level database.
+`refresh_count`, `run`, `runs`, `prev`, `prev_ok`, `prev_runs`,
+`prev_ok_runs`) are none and `db_*` describe the top-level database.
+
+Run records                                                     *dbdash-runs*
+
+Every run of a panel's pipeline (a refresh, or a `dbdash.run()` callback,
+|dbdash-callback|) has a record. A refresh and the callbacks it makes are one
+life, from that refresh until the next one starts. A record has:
+
+  id           a UUID version 7 (made in Lua; within one Neovim ids are
+               unique and increase)
+  kind         "refresh" or "callback"
+  depth        0 for a refresh, n for a callback n levels deep
+  parent_id    the id of the run that called it (none for a refresh)
+  refresh_id   the id of the refresh of its life (its own for a refresh)
+  args         the arguments it started with (a callback: merged)
+  started_at   when it started, milliseconds since the Unix epoch
+  finished_at  when it ended (none while it runs)
+  elapsed_ms   finished_at - started_at (none while it runs)
+  ok           true or false (none while it runs)
+  error        its error when it failed, as the dashboard shows it
+  sql          the rendered `query.sql`
+  query        the query's result before `query.transform`: { columns,
+               types, rows }, or the raw value of `lua://` / `http(s)://`
+  result       the final rows: { columns, types, rows } (what
+               `dbdash.run()` returns)
+
+What a failed run got before it failed is kept (a query that worked keeps
+`query` when its transform fails). `meta.runs` holds the life so far: in
+Lua it is live (after `dbdash.run()` returns, the callback's finished record
+is in it); templates see `meta.run` and `meta.runs` as they were after the
+last Lua code that ran ({% lua %} blocks, module functions). >lua
+  for _, r in ipairs(meta.prev_runs or {}) do
+    print(r.kind, r.depth, r.id, r.parent_id, r.elapsed_ms, r.ok)
+  end
+<
+`:DbDashShowSQL` and descriptions are not runs: their `meta.run` has kind
+"render" and they leave `runs` and `prev*` alone. The records of up to
+three lives are kept (this one, `prev_runs` and `prev_ok_runs`), with their
+data, so a refresh with many callbacks and large results holds that much
+memory.
 
 Syntax                                                *dbdash-template-syntax*
 
@@ -1188,21 +1232,42 @@ when the dashboard is started again (it is not saved in sessions): >lua
 `dbdash.run(args)` runs the panel's whole pipeline again (`query.sql`
 template, query, `query.transform`, rows check) with `args` merged over the
 current arguments, and returns the rows as `{ columns, types, rows }`; every
-Lua of the panel can call it. In that run `meta.callback` is 1, in a
-callback of a callback 2, and so on (0 in a refresh), so a template can stop
-the recursion: >jinja
+Lua of the panel can call it. In that run `meta.run.kind` is "callback"
+("refresh" in a refresh), so the template can call back only from the
+refresh: >jinja
   {% lua %}
-    if meta.callback == 0 then
+    if meta.run.kind == "refresh" then
       store.last_week = dbdash.run({ days = 14 }).rows[1][1]
     end
   {% endlua %}
 <
+A callback can call back too. `meta.run.depth` is 0 in a refresh, 1 in its
+callback, 2 in that one's, and so on: compare it to stop at a level. Here
+the refresh and its callbacks run the query for 7, 14, 28 and 56 days (with
+`days` 7), each level calling the next until depth 3: >lua
+  -- query.transform
+  if meta.run.depth < 3 then
+    dbdash.run({ days = args.days * 2 })
+  end
+  if meta.run.kind == "callback" then
+    return rs                       -- a callback: its own rows
+  end
+  -- the refresh: one row per level of its life
+  local out = {}
+  for _, r in ipairs(meta.runs) do
+    out[#out + 1] = { depth = r.depth, days = r.args.days }
+  end
+  return out
+<
 A callback is not a refresh: no new rows on screen, no history, and
-`refresh_count` and `meta.prev_*` do not change. It runs inside the
-refresh, within the query timeout, and its errors fail the refresh. More
+`refresh_count`, `meta.prev` and `meta.prev_ok` do not change. It runs
+inside the refresh, within the query timeout, and its errors fail the
+refresh. More
 than `lua.max_callbacks` calls in one refresh (all levels together; each
 refresh counts from 0) or nesting deeper than `lua.max_callback_depth`
-(|dbdash-setup|) fails the refresh too.
+(|dbdash-setup|) fails the refresh too. Each callback has a run record
+(|dbdash-runs|): `meta.run.parent_id` is its caller, `meta.run.refresh_id`
+its refresh, and the caller finds it in `meta.runs`.
 
 A `lua://` query returns rows (|dbdash-result|), or any value that its
 `query.transform` turns into rows. Errors name the config file and line; a
