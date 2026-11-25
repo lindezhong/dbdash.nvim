@@ -63,7 +63,8 @@ With the built-in package manager:
 vim.pack.add({ "https://github.com/lindezhong/dbdash.nvim" })
 ```
 
-`setup()` is optional. Run `:helptags ALL` if your plugin manager does not build help tags.
+`setup()` is optional. The help tags come with the plugin (`doc/tags`): `:help dbdash` works
+right after installing it.
 `:checkhealth dbdash` checks the plugin; `:checkhealth dbdash.sqlite` (or `.postgres`,
 `.mongodb`, ...) checks what one database needs, such as the SQLite library or CA
 certificates.
@@ -313,7 +314,8 @@ make it                    # make it-up, then all tests including the integratio
 make it-down               # stop and remove the integration services
 DBDASH_NET=1 make test     # include a TLS handshake with a public server (system CAs)
 make fmt                   # format with stylua
-make doc                   # regenerate doc/dbdash-schema.txt after changing the schema
+make doc                   # regenerate doc/dbdash-schema.txt and doc/tags after changing
+                           # the schema or the help
 ```
 
 ### Integration tests

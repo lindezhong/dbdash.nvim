@@ -32,9 +32,9 @@ it-down:
 fmt:
 	stylua lua tests plugin scripts
 
-# doc/dbdash-schema.txt (:help dbdash-schema) from example/dbdash.schema.yaml; make test
-# fails while it is out of date. Also rebuilds doc/tags (not committed; plugin managers
-# build it on install and update, but not for a local checkout used with lazy.nvim's dir).
+# doc/dbdash-schema.txt (:help dbdash-schema) from example/dbdash.schema.yaml, and
+# doc/tags (committed, so :help works right after any install); make test fails while
+# either is out of date.
 doc:
 	$(NVIM) --headless -u NONE -l scripts/schema_doc.lua
 	$(NVIM) --headless -u NONE -c "helptags doc" -c q

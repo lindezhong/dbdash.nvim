@@ -1,6 +1,7 @@
 -- doc/dbdash.txt must stay complete: every command, template filter, test, global
 -- and setup option is documented, help tags build, and lines fit in 78 columns.
--- doc/dbdash-schema.txt must match example/dbdash.schema.yaml (make doc).
+-- doc/dbdash-schema.txt must match example/dbdash.schema.yaml, and doc/tags the help files
+-- (make doc).
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()
 
@@ -78,6 +79,23 @@ T["doc/dbdash-schema.txt is generated from the current schema (make doc)"] = fun
   local have = gen.read(gen.HELP):gsub("\r\n", "\n")
   if have ~= want then
     error(gen.HELP .. " is out of date with " .. gen.SCHEMA .. ": run make doc", 0)
+  end
+end
+
+T["doc/tags is the help tags of the current help files (make doc)"] = function()
+  local dir = vim.fn.tempname()
+  vim.fn.mkdir(dir .. "/doc", "p")
+  for _, f in ipairs({ "dbdash.txt", "dbdash-schema.txt" }) do
+    vim.fn.writefile(vim.fn.readfile("doc/" .. f), dir .. "/doc/" .. f)
+  end
+  vim.cmd("helptags " .. vim.fn.fnameescape(dir .. "/doc"))
+  local function lines(path)
+    return vim.tbl_map(function(l)
+      return (l:gsub("\r$", ""))
+    end, vim.fn.readfile(path))
+  end
+  if not vim.deep_equal(lines("doc/tags"), lines(dir .. "/doc/tags")) then
+    error("doc/tags is out of date with the help files: run make doc", 0)
   end
 end
 

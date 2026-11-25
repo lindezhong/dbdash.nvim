@@ -1,5 +1,4 @@
 /deps/
 /tests/**/*.actual
 .luarc.local.json
-/doc/tags
 /example/*.db
