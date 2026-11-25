@@ -1,5 +1,6 @@
 -- doc/dbdash.txt must stay complete: every command, template filter, test, global
 -- and setup option is documented, help tags build, and lines fit in 78 columns.
+-- doc/dbdash-schema.txt must match example/dbdash.schema.yaml (make doc).
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()
 
@@ -58,7 +59,9 @@ end
 T["help tags build and lines fit in 78 columns"] = function()
   local dir = vim.fn.tempname()
   vim.fn.mkdir(dir .. "/doc", "p")
-  vim.fn.writefile(vim.fn.readfile("doc/dbdash.txt"), dir .. "/doc/dbdash.txt")
+  for _, f in ipairs({ "dbdash.txt", "dbdash-schema.txt" }) do
+    vim.fn.writefile(vim.fn.readfile("doc/" .. f), dir .. "/doc/" .. f)
+  end
   vim.cmd("helptags " .. vim.fn.fnameescape(dir .. "/doc")) -- raises on duplicate tags
   local long = {}
   for i, l in ipairs(vim.split(DOC, "\n")) do
@@ -67,6 +70,43 @@ T["help tags build and lines fit in 78 columns"] = function()
     end
   end
   eq(long, {})
+end
+
+T["doc/dbdash-schema.txt is generated from the current schema (make doc)"] = function()
+  local gen = dofile("scripts/schema_doc.lua")
+  local want = gen.render(gen.read(gen.SCHEMA))
+  local have = gen.read(gen.HELP):gsub("\r\n", "\n")
+  if have ~= want then
+    error(gen.HELP .. " is out of date with " .. gen.SCHEMA .. ": run make doc", 0)
+  end
+end
+
+T["every schema field has a help tag that jumps to it"] = function()
+  local gen = dofile("scripts/schema_doc.lua")
+  local schema = vim.split(gen.read(gen.SCHEMA):gsub("\r\n", "\n"), "\n")
+  local tags = gen.tags(schema)
+  local help = gen.read(gen.HELP)
+  -- a sample of each kind, and every top-level field and definition
+  for _, t in ipairs({ "dbdash-schema-panels", "dbdash-schema-layout.columns", "dbdash-schema-def-show",
+                       "dbdash-schema-show.interval", "dbdash-schema-database.options.lib_path",
+                       "dbdash-schema-show.column_list.alias", "dbdash-schema-query.sql" }) do
+    eq({ t, help:find("*" .. t .. "* >yaml", 1, true) ~= nil }, { t, true })
+  end
+  local top, defs = {}, {}
+  local section
+  for i, l in ipairs(schema) do
+    section = l:match("^(%w+):") or section
+    local key = l:match("^  ([%w_]+):")
+    if key and section == "properties" then
+      top[#top + 1] = { tags[i], "dbdash-schema-" .. key }
+    elseif key and section == "definitions" then
+      defs[#defs + 1] = { tags[i], "dbdash-schema-def-" .. key }
+    end
+  end
+  for _, pair in ipairs(vim.list_extend(top, defs)) do
+    eq(pair[1], pair[2])
+  end
+  eq(#top > 10, true)
 end
 
 return T

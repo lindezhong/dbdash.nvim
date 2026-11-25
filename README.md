@@ -152,7 +152,8 @@ of one chart (`query.sql`, `show.type`, ...) belong in each panel. A panel's `qu
 are its own. See `:help dbdash-config`.
 
 [`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a JSON Schema of the whole
-format; editors with yaml-language-server validate and complete a config that starts with:
+format (also in `:help dbdash-schema`, with a tag for every field); editors with
+yaml-language-server validate and complete a config that starts with:
 
 ```yaml
 # yaml-language-server: $schema=/path/to/dbdash.nvim/example/dbdash.schema.yaml
@@ -308,6 +309,7 @@ make it                    # make it-up, then all tests including the integratio
 make it-down               # stop and remove the integration services
 DBDASH_NET=1 make test     # include a TLS handshake with a public server (system CAs)
 make fmt                   # format with stylua
+make doc                   # regenerate doc/dbdash-schema.txt after changing the schema
 ```
 
 ### Integration tests

@@ -2,7 +2,7 @@
 NVIM ?= nvim
 FILE ?=
 
-.PHONY: deps test it it-up it-down fmt
+.PHONY: deps test it it-up it-down fmt doc
 
 deps: deps/mini.nvim
 
@@ -30,4 +30,11 @@ it-down:
 	$(COMPOSE) down -v
 
 fmt:
-	stylua lua tests plugin
+	stylua lua tests plugin scripts
+
+# doc/dbdash-schema.txt (:help dbdash-schema) from example/dbdash.schema.yaml; make test
+# fails while it is out of date. Also rebuilds doc/tags (not committed; plugin managers
+# build it on install and update, but not for a local checkout used with lazy.nvim's dir).
+doc:
+	$(NVIM) --headless -u NONE -l scripts/schema_doc.lua
+	$(NVIM) --headless -u NONE -c "helptags doc" -c q

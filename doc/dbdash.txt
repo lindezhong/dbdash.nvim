@@ -446,8 +446,9 @@ an HTTPS API (`http.yaml`, GitHub releases, needs network); the last five
 ask for trust (|dbdash-lua|).
 
 `example/dbdash.schema.yaml` is a JSON Schema for config files. It lists every
-field and the URL format of each database. Editors using yaml-language-server
-validate and complete a config that starts with: >yaml
+field and the URL format of each database; |dbdash-schema| shows it, with a
+tag for every field (`:help dbdash-schema-show.interval`). Editors using
+yaml-language-server validate and complete a config that starts with: >yaml
   # yaml-language-server: $schema=/path/to/example/dbdash.schema.yaml
 <
 The sidebar does not list `*.schema.yaml` files (the default
