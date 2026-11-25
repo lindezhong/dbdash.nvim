@@ -22,8 +22,10 @@ T["unique and increasing, also many in one millisecond"] = function()
   end
 end
 
+---The 48-bit timestamp of an id. Parsed in two parts: tonumber(s, 16) stops at 2^32 - 1
+---on Windows' LuaJIT.
 local function ms_of(id)
-  return tonumber(id:sub(1, 8) .. id:sub(10, 13), 16)
+  return tonumber(id:sub(1, 8), 16) * 65536 + tonumber(id:sub(10, 13), 16)
 end
 
 T["the first 48 bits are the time in milliseconds"] = function()
