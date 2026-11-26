@@ -146,8 +146,9 @@ function M.render(rs, show, ctx)
   local border = nn(style.border) ~= false
   local show_lines = nn(style.show_lines) == true
   local null_text = nn(style.null_text) or "NULL"
-  local g_border = ctx.color(nn(style.border_style), "DbDashBorder")
-  local g_header = ctx.color(nn(style.header_style), "DbDashHeader")
+  local g_border = ctx.color(nn(style.border_style), ctx.css:border_hl("table"))
+  local g_header = ctx.color(nn(style.header_style), ctx.css:hl("header"))
+  local null_hl = ctx.css:hl("cell", { classes = { "null" } })
   local wrap = nn(style.wrap)
   local wrap_mode = wrap == "char" and "char" or (wrap ~= false and "word" or nil)
   local cell_w, cell_h = tonumber(nn(style.cell_width)), tonumber(nn(style.cell_height))
@@ -166,7 +167,7 @@ function M.render(rs, show, ctx)
   end
 
   if #cols == 0 then
-    add("(no columns)", { { 0, #"(no columns)", "DbDashMuted" } })
+    add("(no columns)", { { 0, #"(no columns)", ctx.css:hl("note") } })
     return { lines = lines, hl = hl }
   end
 
@@ -390,7 +391,7 @@ function M.render(rs, show, ctx)
     for c, cell in ipairs(row) do
       parts[c] = cell_lines(cell.text, c)
       n = math.max(n, #parts[c])
-      groups[c] = cell.null and "DbDashNull" or cell.group or row_groups[r] or cols[c].group
+      groups[c] = cell.null and null_hl or cell.group or row_groups[r] or cols[c].group
     end
     for k = 1, n do
       local texts = {}
@@ -423,7 +424,7 @@ function M.render(rs, show, ctx)
     note = ("… showing the first %d rows (query.max_rows)"):format(#rs.rows)
   end
   if note then
-    add(note, { { 0, #note, "DbDashMuted" } })
+    add(note, { { 0, #note, ctx.css:hl("note") } })
   end
   return { lines = lines, hl = hl }
 end

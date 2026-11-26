@@ -108,7 +108,7 @@ function M.render(rs, show, ctx)
     if show_values then -- the median beside the box
       local text = fmt.number(s.median)
       for k = 1, #text do
-        put(m, c + half + 1 + k, text:sub(k, k), "DbDashNumber", true)
+        put(m, c + half + 1 + k, text:sub(k, k), ctx.css:hl("value"), true)
       end
     end
     spec.xticks[i] = { col = c, label = W.truncate(order[i], slot - 1) }

@@ -149,7 +149,7 @@ end
 ---Render a result set according to the show config.
 ---@param rs dbdash.db.ResultSet
 ---@param show table
----@param opts { width: integer, height: integer?, history: number[]?, fill: boolean? }
+---@param opts { width: integer, height: integer?, history: number[]?, fill: boolean?, node: dbdash.dom.Node? }
 ---@return dbdash.render.Output
 function M.render(rs, show, opts)
   local renderer, canvas = registry.resolve(show, options().styles)
@@ -170,6 +170,9 @@ function M.render(rs, show, opts)
     local mh = tonumber(show.min_height ~= vim.NIL and show.min_height or nil) or defaults.min_height or 3
     ctx.min_plot_height = math.min(mh, h or 15)
     ctx.history = opts.history
+    -- the chart's element (its parts are styled through it); a chart rendered on its own
+    -- gets a document of its own with the default sheets
+    ctx.css = require("dbdash.css").scope(opts.node, show.type)
     local st = nn(show.style) or {}
     ctx.border = nn(st.border)
     ctx.show_axes = nn(st.show_axes) ~= false

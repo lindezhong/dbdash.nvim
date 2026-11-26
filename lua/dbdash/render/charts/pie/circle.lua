@@ -17,7 +17,7 @@ function M.render(rs, show, ctx)
     end
   end
   if #items == 0 then
-    add("(no positive values to plot)", { { 0, 28, "DbDashMuted" } })
+    add("(no positive values to plot)", { { 0, 28, ctx.css:hl("note") } })
     return { lines = lines, hl = hl }
   end
 
@@ -29,13 +29,13 @@ function M.render(rs, show, ctx)
     return w
   end
   local pos = P.legend_position(show)
-  local legend = pos == "none" and {} or P.legend(items, sum, show)
+  local legend = pos == "none" and {} or P.legend(items, sum, show, nil, ctx)
   local lw = legend_width(legend)
   local style = show.style ~= vim.NIL and show.style or {}
   local donut = math.max(0, math.min(tonumber(style.donut ~= vim.NIL and style.donut or nil) or 0, 0.9))
   local half = style.half == true
   if lw > ctx.width then -- shorten labels until the legend fits the window
-    legend = P.legend(items, sum, show, math.max(3, 30 - (lw - ctx.width)))
+    legend = P.legend(items, sum, show, math.max(3, 30 - (lw - ctx.width)), ctx)
     lw = legend_width(legend)
   end
   local px = ctx.canvas_type.px_per_char
@@ -120,7 +120,7 @@ function M.render(rs, show, ctx)
       body_hl = vim.tbl_filter(function(h)
         return h.row ~= mid - 1
       end, body_hl)
-      body_hl[#body_hl + 1] = { row = mid - 1, col_s = byte, col_e = byte + #text, group = "DbDashNumber" }
+      body_hl[#body_hl + 1] = { row = mid - 1, col_s = byte, col_e = byte + #text, group = ctx.css:hl("value") }
     end
   end
 

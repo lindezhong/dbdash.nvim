@@ -196,11 +196,11 @@ function M.horizontal(ctx, bars, o)
           -- the value inside the end of the bar (ECharts label.position: insideRight)
           local keep = W.truncate(line, pos - W.width(t) - 1, "")
           line = keep .. " " .. t
-          hl[#hl + 1] = { row = i - 1, col_s = #keep, col_e = #line, group = "DbDashNumber", priority = 110 }
+          hl[#hl + 1] = { row = i - 1, col_s = #keep, col_e = #line, group = ctx.css:hl("value"), priority = 110 }
         else
           local before = #line
           line = line .. " " .. t
-          hl[#hl + 1] = { row = i - 1, col_s = before + 1, col_e = #line, group = "DbDashNumber" }
+          hl[#hl + 1] = { row = i - 1, col_s = before + 1, col_e = #line, group = ctx.css:hl("value") }
         end
       end
     end
@@ -223,7 +223,7 @@ function M.horizontal(ctx, bars, o)
   local label_line, label_hl = "", {}
   for _, m in ipairs(marks) do
     local c = col_of(m.value)
-    local group = m.color and ctx.color(m.color) or "DbDashMark"
+    local group = m.color and ctx.color(m.color) or ctx.css:hl("mark")
     for i = 1, #lines do
       local l = lines[i]
       local w = W.width(l)
@@ -339,7 +339,7 @@ function M.vertical(ctx, bars, o)
         local at = start_c + math.floor((bw - W.width(text)) / 2)
         -- above the bar only when that cell is free (inside: over the bar)
         if W.width(text) <= bw + 1 and r >= 0 and r < rows and (o.inside or not grid[r][at]) then
-          put_text(r, at, text, "DbDashNumber")
+          put_text(r, at, text, ctx.css:hl("value"))
         end
       end
     end
@@ -348,7 +348,7 @@ function M.vertical(ctx, bars, o)
       local r = o.inside and (rows - math.floor(top_h)) or (rows - 1 - math.min(math.ceil(top_h), rows - 1))
       local at = c0 + math.floor((bw - W.width(text)) / 2)
       if W.width(text) <= slot and r >= 0 and r < rows and (o.inside or not grid[r][at]) then
-        put_text(r, at, text, "DbDashNumber")
+        put_text(r, at, text, ctx.css:hl("value"))
       end
     end
   end
@@ -356,7 +356,7 @@ function M.vertical(ctx, bars, o)
   for _, m in ipairs(mark_values(o.marks, all)) do
     local r = rows - 1 - math.floor(height_of(m.value))
     if r >= 0 and r < rows then
-      local group = m.color and ctx.color(m.color) or "DbDashMark"
+      local group = m.color and ctx.color(m.color) or ctx.css:hl("mark")
       for c = 0, cols - 1 do
         if not grid[r][c] then
           grid[r][c] = "┄"

@@ -164,6 +164,7 @@ function M.setup()
     local src = vim.api.nvim_get_hl(0, { name = group, link = false })
     vim.api.nvim_set_hl(0, name, vim.tbl_extend("force", src, { reverse = true, bold = true }))
   end
+  require("dbdash.css.hl").refresh() -- groups made from computed styles
 end
 
 return M

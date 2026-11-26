@@ -163,14 +163,14 @@ function M.legend(ctx, out, g, indent, scale, show)
   if scale.steps then
     for i, st in ipairs(scale.steps) do
       put((i > 1 and "  " or "") .. "█", ctx.color(st.color))
-      put(" ≥" .. fmt.value(st.value, f), "DbDashLegend")
+      put(" ≥" .. fmt.value(st.value, f), ctx.css:hl("legend"))
     end
   else
-    put(fmt.value(scale.lo, f) .. " ", "DbDashAxis")
+    put(fmt.value(scale.lo, f) .. " ", ctx.css:hl("axis"))
     for l = 1, M.LEVELS do
       put("█", ctx.color(M.level_hex(l, scale.stops)))
     end
-    put(" " .. fmt.value(scale.hi, f), "DbDashAxis")
+    put(" " .. fmt.value(scale.hi, f), ctx.css:hl("axis"))
   end
   out.lines[#out.lines + 1] = table.concat(parts)
   for _, h in ipairs(hl) do

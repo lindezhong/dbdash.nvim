@@ -68,16 +68,16 @@ local function one(rs, show, ctx, history)
   local title = show.title ~= vim.NIL and show.title or ""
   if title ~= "" then
     title = W.truncate(title, ctx.width)
-    add(title, { { 0, #title, "DbDashTitle" } })
+    add(title, { { 0, #title, ctx.css:hl("title") } })
   end
 
   local v, err = C.value(rs, show)
   if err then
-    add(err, { { 0, #err, "DbDashWarn" } })
+    add(err, { { 0, #err, ctx.css:hl("warning") } })
     return { lines = lines, hl = hl }
   end
   local text, unit = C.text(v, show)
-  local group = ctx.value_group or "DbDashStatValue"
+  local group = ctx.value_group or ctx.css:hl("value")
   if show.thresholds and show.thresholds ~= vim.NIL then
     local T = require("dbdash.render.thresholds")
     local below = show.thresholds_below == true
@@ -87,7 +87,7 @@ local function one(rs, show, ctx, history)
   -- Grafana colorMode: value (the digits), background (reversed), none (plain text)
   local mode = show.color_mode ~= vim.NIL and show.color_mode or "value"
   if mode == "none" then
-    group = "DbDashText"
+    group = ctx.css:hl("line")
   elseif mode == "background" then
     group = require("dbdash.render.highlight").reverse(group)
   end
@@ -100,7 +100,7 @@ local function one(rs, show, ctx, history)
       local s = rows[r]
       local spans = { { 0, #s, group } }
       if r == 3 and unit then
-        spans[#spans + 1] = { #s + 1, #s + 1 + #unit, "DbDashMuted" }
+        spans[#spans + 1] = { #s + 1, #s + 1 + #unit, ctx.css:hl("unit") }
         s = s .. " " .. unit
       end
       add(s, spans)
@@ -112,7 +112,7 @@ local function one(rs, show, ctx, history)
   local label = show.label ~= vim.NIL and show.label or nil
   if label then -- a muted line under the value (Grafana stat text)
     local l = W.truncate(tostring(label), ctx.width)
-    add(l, { { 0, #l, "DbDashMuted" } })
+    add(l, { { 0, #l, ctx.css:hl("label") } })
   end
 
   -- change and sparkline
@@ -126,7 +126,7 @@ local function one(rs, show, ctx, history)
   if show.delta ~= false then
     local d = C.delta(history, show.delta_mode ~= vim.NIL and show.delta_mode or nil)
     if d then
-      put(d.text, ({ up = "DbDashUp", down = "DbDashDown", same = "DbDashMuted" })[d.dir])
+      put(d.text, ctx.css:hl("delta", { classes = { d.dir } }))
     end
   end
   if show.sparkline ~= false then
@@ -138,7 +138,7 @@ local function one(rs, show, ctx, history)
         parts[#parts + 1] = "  "
         pos = pos + 2
       end
-      put(spark, "DbDashSeries1")
+      put(spark, ctx.css:hl("sparkline"))
     end
   end
   if #parts > 0 then

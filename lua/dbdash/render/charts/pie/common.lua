@@ -40,7 +40,7 @@ function M.items(rs, show, ctx)
     items[#items + 1] = { label = C.nn(style.other_label) or "Other", value = rest, other = true }
   end
   for i, it in ipairs(items) do
-    it.group = it.other and "DbDashMuted" or C.color(ctx, show, i, nil, it.label)
+    it.group = it.other and ctx.css:hl("series", { classes = { "other" } }) or C.color(ctx, show, i, nil, it.label)
   end
   return items, sum
 end
@@ -54,7 +54,7 @@ end
 ---show_percentages. Spans are byte ranges within each line.
 ---@param max_label integer? label width cap (default 30)
 ---@return { text: string, spans: { [1]: integer, [2]: integer, [3]: string }[] }[]
-function M.legend(items, sum, show, max_label)
+function M.legend(items, sum, show, max_label, ctx)
   local style = C.nn(show.style) or {}
   local show_labels = C.nn(style.show_labels) ~= false
   local show_values = C.nn(style.show_values) ~= false
@@ -77,13 +77,13 @@ function M.legend(items, sum, show, max_label)
     end
     put("■", it.group)
     if show_labels then
-      put(" " .. W.pad(it.label, lw), "DbDashLegend")
+      put(" " .. W.pad(it.label, lw), ctx.css:hl("legend"))
     end
     if show_values then
-      put("  " .. W.pad(fmt.value(it.value, C.nn(show.format)), vw, "right"), "DbDashNumber")
+      put("  " .. W.pad(fmt.value(it.value, C.nn(show.format)), vw, "right"), ctx.css:hl("value"))
     end
     if show_pct then
-      put(("  %5.1f%%"):format(it.value / sum * 100), "DbDashMuted")
+      put(("  %5.1f%%"):format(it.value / sum * 100), ctx.css:hl("percent"))
     end
     out[#out + 1] = { text = table.concat(b), spans = sp }
   end

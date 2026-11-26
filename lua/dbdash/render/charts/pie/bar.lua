@@ -44,7 +44,7 @@ function M.render(rs, show, ctx)
     add(" " .. title.text, title.spans, 1)
   end
   if #items == 0 then
-    add("(no positive values to plot)", { { 0, 28, "DbDashMuted" } })
+    add("(no positive values to plot)", { { 0, 28, ctx.css:hl("note") } })
     return { lines = lines, hl = hl }
   end
   local sizes = apportion(vim.tbl_map(function(it)
@@ -61,7 +61,7 @@ function M.render(rs, show, ctx)
   add(table.concat(parts), spans)
   if P.legend_position(show) ~= "none" then
     add("")
-    for _, l in ipairs(P.legend(items, sum, show)) do
+    for _, l in ipairs(P.legend(items, sum, show, nil, ctx)) do
       add(" " .. l.text, l.spans, 1)
     end
   end

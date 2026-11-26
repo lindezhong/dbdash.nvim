@@ -157,7 +157,7 @@ function M.render(rs, show, ctx)
         local start = math.max(col(v) - math.floor(#text / 2), used + 1)
         if start + #text <= cols then
           for k = 1, #text do
-            put(bot + 1, start + k - 1, text:sub(k, k), "DbDashNumber")
+            put(bot + 1, start + k - 1, text:sub(k, k), ctx.css:hl("value"))
           end
           used = start + #text
         end

@@ -102,6 +102,7 @@ end
 function M.render(ctx, spec, body)
   M.apply_style(ctx, spec)
   local ch = spec.chars or borders.STYLES.single
+  local g_border, g_axis, g_legend = ctx.css:border_hl("plot"), ctx.css:hl("axis"), ctx.css:hl("legend")
   local cols, rows = 0, #body.lines
   for _, l in ipairs(body.lines) do
     cols = math.max(cols, W.width(l))
@@ -121,11 +122,11 @@ function M.render(ctx, spec, body)
   if spec.title and spec.title ~= "" then
     local t = W.truncate(spec.title, plot_w)
     local pad = left + math.max(0, math.floor((plot_w - W.width(t)) / 2))
-    add(string.rep(" ", pad) .. t, { { pad, pad + #t, "DbDashTitle" } })
+    add(string.rep(" ", pad) .. t, { { pad, pad + #t, ctx.css:hl("title") } })
   end
   if spec.ylabel then
     local t = W.truncate(spec.ylabel, ctx.width)
-    add(t, { { 0, #t, "DbDashLabel" } })
+    add(t, { { 0, #t, ctx.css:hl("axis-title") } })
   end
 
   local ylab = {}
@@ -140,14 +141,14 @@ function M.render(ctx, spec, body)
     if legend_right and e then
       b.put(" ")
       b.put(e.symbol or "■", e.group)
-      b.put(" " .. W.truncate(e.label, 24), "DbDashLegend")
+      b.put(" " .. W.truncate(e.label, 24), g_legend)
     end
   end
 
   if border then
     local b = builder()
     b.put(string.rep(" ", left))
-    b.put(ch.tl .. string.rep(ch.h, cols) .. ch.tr, "DbDashBorder")
+    b.put(ch.tl .. string.rep(ch.h, cols) .. ch.tr, g_border)
     add(b.done())
   end
   for r = 0, rows - 1 do
@@ -156,12 +157,12 @@ function M.render(ctx, spec, body)
     if m > 0 then
       b.put(string.rep(" ", m - (label and W.width(label) or 0)))
       if label then
-        b.put(label, "DbDashAxis")
+        b.put(label, g_axis)
       end
       b.put(" ")
     end
     if border then
-      b.put(ch.v, "DbDashBorder")
+      b.put(ch.v, g_border)
     end
     local line = body.lines[r + 1] or ""
     local base = b.pos
@@ -176,7 +177,7 @@ function M.render(ctx, spec, body)
       b.put(string.rep(" ", pad))
     end
     if border then
-      b.put(ch.v, "DbDashBorder")
+      b.put(ch.v, g_border)
     end
     legend_cell(b, r + 1)
     add(b.done())
@@ -184,7 +185,7 @@ function M.render(ctx, spec, body)
   if border then
     local b = builder()
     b.put(string.rep(" ", left))
-    b.put(ch.bl .. string.rep(ch.h, cols) .. ch.br, "DbDashBorder")
+    b.put(ch.bl .. string.rep(ch.h, cols) .. ch.br, g_border)
     add(b.done())
   end
 
@@ -215,12 +216,12 @@ function M.render(ctx, spec, body)
       end
     end
     local s = table.concat(cells):gsub("%s+$", "")
-    add(s, #s > 0 and { { 0, #s, "DbDashAxis" } } or nil)
+    add(s, #s > 0 and { { 0, #s, g_axis } } or nil)
   end
   if spec.xlabel then
     local t = W.truncate(spec.xlabel, plot_w)
     local pad = left + math.max(0, math.floor((plot_w - W.width(t)) / 2))
-    add(string.rep(" ", pad) .. t, { { pad, pad + #t, "DbDashLabel" } })
+    add(string.rep(" ", pad) .. t, { { pad, pad + #t, ctx.css:hl("axis-title") } })
   end
   if spec.legend_position == "bottom" and #legend > 0 then
     local b = builder()
@@ -230,7 +231,7 @@ function M.render(ctx, spec, body)
         b.put("  ")
       end
       b.put(e.symbol or "■", e.group)
-      b.put(" " .. e.label, "DbDashLegend")
+      b.put(" " .. e.label, g_legend)
     end
     add(b.done())
   end

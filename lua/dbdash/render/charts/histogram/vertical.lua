@@ -17,7 +17,7 @@ return {
     end
     -- mark_lines are values of the data: the bin they fall in is colored
     for _, m in ipairs(bars.histogram_marks(show, bins, vals)) do
-      m.bin.group = m.color and ctx.color(m.color) or "DbDashMark"
+      m.bin.group = m.color and ctx.color(m.color) or ctx.css:hl("mark")
     end
     return bars.vertical(ctx, bins, o)
   end,

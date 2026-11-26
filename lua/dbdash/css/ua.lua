@@ -1,0 +1,48 @@
+-- The UA (user agent) style sheet: how everything looks before any user, dashboard or
+-- panel rule. Colors are the DbDash* highlight groups, which link to standard groups and
+-- so follow the colorscheme (:help dbdash-highlights).
+return {
+  -- the dashboard view
+  ["header-title"] = { color = "DbDashTitle" },
+  ["description-icon"] = { color = "DbDashDescIcon", content = "ⓘ" },
+  ["countdown"] = { color = "DbDashCountdown" },
+  ["panel"] = { ["border-color"] = "DbDashBorder" },
+  ["panel-title"] = { color = "DbDashTitle" },
+  ["arg-name"] = { color = "DbDashArgName" },
+  ["arg-value"] = { color = "DbDashArgValue" },
+  ["arg-value.local"] = { color = "DbDashArgLocal" },
+  ["error"] = { color = "DbDashError" },
+  ["warning"] = { color = "DbDashWarn" },
+  ["note"] = { color = "DbDashMuted" },
+  -- charts
+  ["title"] = { color = "DbDashTitle" },
+  ["subtitle"] = { color = "DbDashMuted" },
+  ["plot"] = { ["border-color"] = "DbDashBorder", border = "single" },
+  ["axis"] = { color = "DbDashAxis" },
+  ["axis-title"] = { color = "DbDashLabel" },
+  ["label"] = { color = "DbDashLabel" },
+  ["legend"] = { color = "DbDashLegend" },
+  ["grid"] = { color = "DbDashGrid" },
+  ["mark"] = { color = "DbDashMark" },
+  ["value"] = { color = "DbDashNumber" },
+  ["percent"] = { color = "DbDashMuted" },
+  ["unit"] = { color = "DbDashMuted" },
+  ["series.other"] = { color = "DbDashMuted" },
+  ["chart.stat value"] = { color = "DbDashStatValue" },
+  ["chart.stat label"] = { color = "DbDashMuted" },
+  ["delta.up"] = { color = "DbDashUp" },
+  ["delta.down"] = { color = "DbDashDown" },
+  ["delta.same"] = { color = "DbDashMuted" },
+  ["sparkline"] = { color = "DbDashSeries1" },
+  ["table"] = { ["border-color"] = "DbDashBorder" },
+  ["header"] = { color = "DbDashHeader" },
+  ["cell.null"] = { color = "DbDashNull" },
+  ["line"] = { color = "DbDashText" },
+  ["line-number"] = { color = "DbDashMuted" },
+  -- the sidebar
+  ["sidebar-dir"] = { color = "DbDashSidebarDir" },
+  ["sidebar-item.running"] = { color = "DbDashSidebarRunning" },
+  ["sidebar-item.paused"] = { color = "DbDashSidebarPaused" },
+  ["sidebar-item.idle"] = { color = "DbDashSidebarIdle" },
+  ["sidebar-item.cursor"] = { color = "DbDashSidebarCursor" },
+}

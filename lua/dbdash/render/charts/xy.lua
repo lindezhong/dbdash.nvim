@@ -247,7 +247,7 @@ function M.render(rs, show, ctx, kind)
     end
   end
   if not xlo then
-    return { lines = { "(no data to plot)" }, hl = { { row = 0, col_s = 0, col_e = 17, group = "DbDashMuted" } } }
+    return { lines = { "(no data to plot)" }, hl = { { row = 0, col_s = 0, col_e = 17, group = ctx.css:hl("note") } } }
   end
   if kind == "area" and not ylog then
     ylo, yhi = math.min(ylo, 0), math.max(yhi, 0)
@@ -304,11 +304,12 @@ function M.render(rs, show, ctx, kind)
   local canvas = ctx.canvas(cols, rows, { xlo, xhi }, { ylo, yhi })
 
   -- Grid lines first, so the data is drawn over them (Chart.js grid.display).
+  local grid_hl = ctx.css:hl("grid")
   if axes.ygrid then
     for _, t in ipairs(spec.yticks or {}) do
       local py = (rows - 1 - t.row) * canvas.px_y + math.floor(canvas.px_y / 2)
       for px = 0, canvas:width_px() - 1, 4 do
-        canvas:pixel(px, py, "DbDashGrid")
+        canvas:pixel(px, py, grid_hl)
       end
     end
   end
@@ -316,7 +317,7 @@ function M.render(rs, show, ctx, kind)
     for _, t in ipairs(spec.xticks or {}) do
       local px = t.col * canvas.px_x + math.floor(canvas.px_x / 2)
       for py = 0, canvas:height_px() - 1, 4 do
-        canvas:pixel(px, py, "DbDashGrid")
+        canvas:pixel(px, py, grid_hl)
       end
     end
   end
@@ -436,7 +437,7 @@ function M.render(rs, show, ctx, kind)
     end
   end
   for _, m in ipairs(nn(show.mark_lines) or {}) do
-    local group = nn(m.color) and ctx.color(m.color) or "DbDashMark"
+    local group = nn(m.color) and ctx.color(m.color) or ctx.css:hl("mark")
     local axis = nn(m.axis) or "y"
     local v = nn(m.value)
     if axis == "x" then

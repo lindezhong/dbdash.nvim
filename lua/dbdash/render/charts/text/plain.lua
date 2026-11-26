@@ -86,11 +86,11 @@ function M.render(rs, show, ctx)
   if title and title ~= "" then
     local t = W.truncate(title, ctx.width)
     lines[1] = t
-    hl[1] = { row = 0, col_s = 0, col_e = #t, group = ctx.color(nn(style.title_style), "DbDashTitle") }
+    hl[1] = { row = 0, col_s = 0, col_e = #t, group = ctx.color(nn(style.title_style), ctx.css:hl("title")) }
   end
   if #rs.rows == 0 then
     lines[#lines + 1] = "(no rows)"
-    hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #"(no rows)", group = "DbDashMuted" }
+    hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #"(no rows)", group = ctx.css:hl("note") }
     return { lines = lines, hl = hl }
   end
   local cols = columns(rs, show)
@@ -106,7 +106,7 @@ function M.render(rs, show, ctx)
     if not ok then
       error({ phase = "render", message = ("style.highlight: invalid pattern %q"):format(tostring(nn(r.pattern))) }, 0)
     end
-    rules[#rules + 1] = { re = re, group = ctx.color(nn(r.color), "DbDashWarn") }
+    rules[#rules + 1] = { re = re, group = ctx.color(nn(r.color), ctx.css:hl("warning")) }
   end
   local rows = rs.rows
   if nn(style.reverse) == true then
@@ -124,7 +124,7 @@ function M.render(rs, show, ctx)
       parts[k] = cell_text(row[i], rs.columns[i].type, null_text)
     end
     local text = table.concat(parts, sep):gsub("\r\n", "\n"):gsub("\r", "")
-    local group = "DbDashText"
+    local group = ctx.css:hl("line")
     for _, r in ipairs(rules) do
       if r.re:match_str(text) then
         group = r.group
@@ -163,7 +163,7 @@ function M.render(rs, show, ctx)
     local line = prefix .. string.rep(" ", math.max(lead, 0)) .. b.text
     lines[#lines + 1] = line
     if numbers and b.n then
-      hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #prefix, group = "DbDashMuted" }
+      hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #prefix, group = ctx.css:hl("line-number") }
     end
     if b.text ~= "" then
       hl[#hl + 1] = { row = #lines - 1, col_s = #line - #b.text, col_e = #line, group = b.group }
@@ -172,12 +172,12 @@ function M.render(rs, show, ctx)
   if hidden > 0 then
     local note = ("… %d more lines (style.max_lines)"):format(hidden)
     lines[#lines + 1] = note
-    hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #note, group = "DbDashMuted" }
+    hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #note, group = ctx.css:hl("note") }
   end
   if rs.truncated then
     local note = ("… showing the first %d rows (query.max_rows)"):format(#rs.rows)
     lines[#lines + 1] = note
-    hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #note, group = "DbDashMuted" }
+    hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #note, group = ctx.css:hl("note") }
   end
   return { lines = lines, hl = hl }
 end
