@@ -104,6 +104,17 @@ M.HEADER = {
   "",
 }
 
+local sidebar_doc
+
+---Style queries on the sidebar's document (rebuilt when the user sheet changes).
+function M.css()
+  local user = require("dbdash.css").user_rules()
+  if not sidebar_doc or sidebar_doc.user ~= user then
+    sidebar_doc = { doc = require("dbdash.dom.build").view("sidebar"), user = user }
+  end
+  return require("dbdash.css").scope(sidebar_doc.doc.root)
+end
+
 ---Fill the sidebar buffer with the tree; b:dbdash_sidebar_nodes maps line numbers to
 ---{ path, dir } nodes.
 function M.render(buf)
@@ -112,10 +123,15 @@ function M.render(buf)
   local root = M.dir()
   local lines = vim.deepcopy(M.HEADER)
   lines[2] = "Directory: " .. vim.fn.fnamemodify(root, ":~")
+  -- colors from the sidebar's own document (css: sidebar-item.running, sidebar-dir, ...)
+  local css = M.css()
+  local function item(state)
+    return css:hl("sidebar-item", { classes = { state } })
+  end
   local hl = {
-    { row = 3, col_s = 0, col_e = #"●", group = "DbDashSidebarRunning" },
-    { row = 3, col_s = #"● = Running  ", col_e = #"● = Running  ◐", group = "DbDashSidebarPaused" },
-    { row = 3, col_s = #"● = Running  ◐ = Paused  ", col_e = #"● = Running  ◐ = Paused  ○", group = "DbDashSidebarIdle" },
+    { row = 3, col_s = 0, col_e = #"●", group = item("running") },
+    { row = 3, col_s = #"● = Running  ", col_e = #"● = Running  ◐", group = item("paused") },
+    { row = 3, col_s = #"● = Running  ◐ = Paused  ", col_e = #"● = Running  ◐ = Paused  ○", group = item("idle") },
   }
   local nodes = {}
 
@@ -125,11 +141,11 @@ function M.render(buf)
     for _, f in ipairs(e.files) do
       local path = vim.fs.joinpath(dir, f)
       local d = sched.get(path)
-      local mark, group = "○", "DbDashSidebarIdle"
+      local mark, group = "○", item("idle")
       if d and d.paused then
-        mark, group = "◐", "DbDashSidebarPaused"
+        mark, group = "◐", item("paused")
       elseif d then
-        mark, group = "●", "DbDashSidebarRunning"
+        mark, group = "●", item("running")
       end
       lines[#lines + 1] = indent .. mark .. " " .. f
       hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #indent + #mark, group = group }
@@ -139,7 +155,7 @@ function M.render(buf)
       local path = vim.fs.joinpath(dir, d)
       local open = is_expanded(root, path)
       lines[#lines + 1] = indent .. (open and "▾" or "▸") .. " " .. d .. "/"
-      hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #lines[#lines], group = "DbDashSidebarDir" }
+      hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #lines[#lines], group = css:hl("sidebar-dir") }
       nodes[tostring(#lines)] = { path = path, dir = true, name_col = #indent }
       if open then
         walk(path, depth + 1)
@@ -182,7 +198,7 @@ function M.update_cursor(buf)
   local node = (vim.b[buf].dbdash_sidebar_nodes or {})[tostring(lnum)]
   local s = node and node.name_col or 0
   if #line > s then
-    vim.api.nvim_buf_set_extmark(buf, CURSOR_NS, lnum - 1, s, { end_col = #line, hl_group = "DbDashSidebarCursor" })
+    vim.api.nvim_buf_set_extmark(buf, CURSOR_NS, lnum - 1, s, { end_col = #line, hl_group = M.css():hl("sidebar-item", { classes = { "cursor" } }) })
   end
 end
 

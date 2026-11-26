@@ -105,7 +105,7 @@ end
 local LEFT_TITLES = { stat = true, text = true }
 
 ---Put the title line above a chart: aligned over the chart's width.
-function M.with_title(out, title, style, width, chart_type, subtitle)
+function M.with_title(out, title, style, width, chart_type, subtitle, css)
   local w = 0
   for _, l in ipairs(out.lines) do
     w = math.max(w, W.width(l))
@@ -113,14 +113,15 @@ function M.with_title(out, title, style, width, chart_type, subtitle)
   w = math.min(math.max(w, 1), width)
   local align = nn(style.title_align) or (LEFT_TITLES[chart_type] and "left" or "center")
   local line, s, e = require("dbdash.render.box").title_line(title, w, align, nn(style.ellipsis))
-  local group = highlight.color(nn(style.title_style), "DbDashTitle")
+  local group = highlight.color(nn(style.title_style), css and css:hl(style.__part or "title") or "DbDashTitle")
   line = line:gsub("%s+$", "")
   if subtitle then -- a muted second line (Chart.js subtitle)
     local sl, ss, se = require("dbdash.render.box").title_line(subtitle, w, align, nn(style.ellipsis))
     out = M.with_title(out, sl:sub(ss + 1, se), vim.tbl_extend("force", {}, style, {
-      title_style = "DbDashMuted",
+      title_style = vim.NIL,
       title_align = align,
-    }), width, chart_type)
+      __part = "subtitle",
+    }), width, chart_type, nil, css)
     -- the subtitle is now the first line; keep the title above (or below) it
   end
   -- caption: bottom puts it under the chart (CSS caption-side)
@@ -200,7 +201,7 @@ function M.render(rs, show, opts)
     local out = (style.render or style)(rs, inner, ctx)
     out = M.restyle(out, st)
     if title and title ~= "" then
-      out = M.with_title(out, title, st, ctx.width, show.type, subtitle)
+      out = M.with_title(out, title, st, ctx.width, show.type, subtitle, ctx.css)
     end
     return out
   end)
@@ -208,7 +209,7 @@ function M.render(rs, show, opts)
     return res
   end
   if type(res) == "table" and res.message then
-    return message(res.message, "DbDashError")
+    return message(res.message, require("dbdash.css").scope(opts.node, show.type):hl("error"))
   end
   error(res, 0)
 end

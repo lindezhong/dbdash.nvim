@@ -117,15 +117,17 @@ end
 ---virtual lines above it.
 ---Multiple panels: `panels` lists { row, col, text } marks at fixed window columns.
 ---@param buf integer
----@param status { header: string?, countdown: string?, row: integer?, error: string?, position: string?, panels: { row: integer, col: integer, text: string }[]? }
+---@param status { header: string?, countdown: string?, row: integer?, error: string?, position: string?, panels: { row: integer, col: integer, text: string }[]?, countdown_hl: string?, error_hl: string? }
 function M.set_status(buf, status)
   if not vim.api.nvim_buf_is_valid(buf) then
     return
   end
   vim.api.nvim_buf_clear_namespace(buf, M.ns_status, 0, -1)
+  -- colors come from the computed styles of `countdown` and `error` (css)
+  local cd_hl, err_hl = status.countdown_hl or "DbDashCountdown", status.error_hl or "DbDashError"
   if status.header then
     vim.api.nvim_buf_set_extmark(buf, M.ns_status, 0, 0, {
-      virt_text = { { status.header, "DbDashCountdown" } },
+      virt_text = { { status.header, cd_hl } },
       virt_text_pos = "right_align",
       priority = 200,
     })
@@ -135,7 +137,7 @@ function M.set_status(buf, status)
     for _, m in ipairs(status.panels) do
       if m.row <= last then
         vim.api.nvim_buf_set_extmark(buf, M.ns_status, m.row, 0, {
-          virt_text = { { m.text, "DbDashCountdown" } },
+          virt_text = { { m.text, cd_hl } },
           virt_text_win_col = math.max(0, m.col),
           priority = 200,
         })
@@ -146,7 +148,7 @@ function M.set_status(buf, status)
   local row = math.min(status.row or 0, vim.api.nvim_buf_line_count(buf) - 1)
   if status.countdown then
     vim.api.nvim_buf_set_extmark(buf, M.ns_status, row, 0, {
-      virt_text = { { status.countdown, "DbDashCountdown" } },
+      virt_text = { { status.countdown, cd_hl } },
       virt_text_pos = status.position or "right_align",
       priority = 200,
     })
@@ -154,7 +156,7 @@ function M.set_status(buf, status)
   if status.error then
     local vl = {}
     for line in (status.error .. "\n"):gmatch("([^\n]*)\n") do
-      vl[#vl + 1] = { { (#vl == 0 and "✗ " or "  ") .. line, "DbDashError" } }
+      vl[#vl + 1] = { { (#vl == 0 and "✗ " or "  ") .. line, err_hl } }
     end
     vim.api.nvim_buf_set_extmark(buf, M.ns_status, row, 0, {
       virt_lines = vl,

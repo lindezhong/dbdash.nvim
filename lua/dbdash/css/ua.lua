@@ -10,7 +10,7 @@ return {
   ["panel-title"] = { color = "DbDashTitle" },
   ["arg-name"] = { color = "DbDashArgName" },
   ["arg-value"] = { color = "DbDashArgValue" },
-  ["arg-value.local"] = { color = "DbDashArgLocal" },
+  ["arg-name.local"] = { color = "DbDashArgLocal" },
   ["error"] = { color = "DbDashError" },
   ["warning"] = { color = "DbDashWarn" },
   ["note"] = { color = "DbDashMuted" },

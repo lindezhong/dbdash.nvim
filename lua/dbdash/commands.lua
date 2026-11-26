@@ -223,7 +223,8 @@ function M.show_variables()
     local v = args.value(s, d.state)
     local key = s.key or s.name
     local line = ("%s = %s"):format(key, v == nil and "(unset)" or args.format_value(v))
-    hl[#hl + 1] = { row = #lines, col_s = 0, col_e = #key, group = s.panel and "DbDashArgLocal" or "DbDashArgName" }
+    local css = require("dbdash.css").scope(d.doc and d.doc.root or nil)
+    hl[#hl + 1] = { row = #lines, col_s = 0, col_e = #key, group = css:hl("arg-name", { classes = s.panel and { "local" } or nil }) }
     local extra = { s.type }
     if s.default ~= nil and not vim.deep_equal(s.default, v) then
       extra[#extra + 1] = "default " .. args.format_value(s.default)

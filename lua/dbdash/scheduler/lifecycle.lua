@@ -132,6 +132,7 @@ function M.start(path, o)
         store = {}, -- `store` of the panel's Lua code, for as long as the dashboard runs
       }, Panel)
     end
+    require("dbdash.dom.build").dashboard(d) -- d.doc: the dashboard's document
     local restored = require("dbdash")._take_pending(path)
     if restored then
       require("dbdash")._apply_args(d, restored)

@@ -27,6 +27,11 @@ function Dashboard:remaining_global()
   return math.max(0, math.ceil((self.gnext_at - now()) / 1000))
 end
 
+---Style queries on an element of the dashboard's document (css.scope).
+local function scope(node)
+  return require("dbdash.css").scope(node, nil)
+end
+
 ---The header above the panels: the dashboard title (and the global countdown, an extmark
 ---on its line), then an empty line; none without a title or countdown.
 ---ⓘ (dashboard.icons.description): there is a description to read with K.
@@ -50,10 +55,11 @@ function Dashboard:header()
     return {}, {}
   end
   local title = cfg.title or ""
-  local line, hl = title, { { row = 0, col_s = 0, col_e = #title, group = "DbDashTitle" } }
+  local css = scope(self.header_node)
+  local line, hl = title, { { row = 0, col_s = 0, col_e = #title, group = css:hl("header-title") } }
   if icon then
     line = title ~= "" and (title .. " ") or ""
-    hl[#hl + 1] = { row = 0, col_s = #line, col_e = #line + #desc_icon(), group = "DbDashDescIcon" }
+    hl[#hl + 1] = { row = 0, col_s = #line, col_e = #line + #desc_icon(), group = css:hl("description-icon") }
     line = line .. desc_icon()
   end
   return { line, "" }, hl
@@ -75,13 +81,14 @@ function M.args_line(p, width)
     parts[#parts + 1] = str
     pos = pos + #str
   end
+  local css = scope(p.node)
   for _, spec in ipairs(specs) do
     if #parts > 0 then
       put("  ")
     end
-    put(spec.name, spec.panel and "DbDashArgLocal" or "DbDashArgName")
+    put(spec.name, css:hl("arg-name", { classes = spec.panel and { "local" } or nil }))
     put("=")
-    put(args.format_value(args.value(spec, p.d.state)), "DbDashArgValue")
+    put(args.format_value(args.value(spec, p.d.state)), css:hl("arg-value"))
   end
   local W = require("dbdash.util.width")
   local text = table.concat(parts)
@@ -119,14 +126,14 @@ local function render_panel(p, show, width, height, fill)
       require("dbdash.render").render,
       p.rs,
       show,
-      { width = width, height = height, history = p.values, fill = fill }
+      { width = width, height = height, history = p.values, fill = fill, node = p.chart_node }
     )
     if ok then
       return out
     end
-    return message("render error: " .. tostring(out), "DbDashError")
+    return message("render error: " .. tostring(out), scope(p.node):hl("error"))
   elseif not p.error then
-    return message("Loading…", "DbDashMuted")
+    return message("Loading…", scope(p.node):hl("note"))
   end
   return { lines = {}, hl = {} }
 end
@@ -138,7 +145,7 @@ end
 local function panel_cell(p, width, height, fill, exact)
   local box = require("dbdash.render.box")
   local show = vim.deepcopy(p:show_config())
-  local st = box.settings(show)
+  local st = box.settings(show, scope(p.node))
   show.title = nil -- shown in the header line (or the box's top border) instead
   local iw, ih = box.inner(st, width, height)
   local style = show.style ~= vim.NIL and show.style or {}
@@ -150,13 +157,13 @@ local function panel_cell(p, width, height, fill, exact)
   local spans = { { s0, e0, st.title_group } }
   if icon then
     head = head .. " " .. icon
-    spans[#spans + 1] = { #head - #icon, #head, "DbDashDescIcon" }
+    spans[#spans + 1] = { #head - #icon, #head, scope(p.node):hl("description-icon") }
   end
   if p.error then
     local free = iw - W.width(head) - 3
     if free > 5 then
       local e = W.truncate(M.format_error(p.error):gsub("\n", " "), free)
-      spans[#spans + 1] = { #head + 2, #head + 2 + #("✗ " .. e), "DbDashError" }
+      spans[#spans + 1] = { #head + 2, #head + 2 + #("✗ " .. e), scope(p.node):hl("error") }
       head = head .. "  ✗ " .. e
     end
   end
@@ -178,7 +185,7 @@ local function panel_cell(p, width, height, fill, exact)
   if subtitle and header then
     local sl, ss, se = box.title_line(subtitle, iw, st.title_align or "left", st.ellipsis)
     header.lines[2] = sl
-    header.hl[#header.hl + 1] = { row = 1, col_s = ss, col_e = se, group = "DbDashMuted" }
+    header.hl[#header.hl + 1] = { row = 1, col_s = ss, col_e = se, group = scope(p.node):hl("subtitle") }
   end
   show.subtitle = nil
   local args_line = M.args_line(p, iw)
@@ -205,7 +212,7 @@ end
 function M.single(p, width, height)
   local box = require("dbdash.render.box")
   local show = p:show_config()
-  local st = box.settings(show)
+  local st = box.settings(show, scope(p.node))
   local iw, ih = box.inner(st, width, height)
   local border_title
   if st.border and show.title ~= nil and show.title ~= vim.NIL then
@@ -355,6 +362,8 @@ function Dashboard:update_status()
       row = self.header_rows or 0,
       error = p.error and M.format_error(p.error) or nil,
       position = opts().countdown_position,
+      countdown_hl = scope(self.header_node):hl("countdown"),
+      error_hl = scope(p.node):hl("error"),
     })
     return
   end
@@ -370,7 +379,7 @@ function Dashboard:update_status()
       marks[#marks + 1] = { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text), text = text }
     end
   end
-  buffer.set_status(self.buf, { header = header, panels = marks })
+  buffer.set_status(self.buf, { header = header, panels = marks, countdown_hl = scope(self.header_node):hl("countdown") })
 end
 
 ---Panel whose region contains buffer line `lnum` (1-based) and display column `dcol`

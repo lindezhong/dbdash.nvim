@@ -21,7 +21,9 @@ end
 
 ---The box settings of a show config (show.style).
 ---@return { pad: integer[], border: table?, border_group: string, background: string?, justify: string, align: string, title_group: string, title_align: string?, ellipsis: string }
-function M.settings(show)
+---@param css dbdash.css.Scope? the panel's element (default colors: panel border and title)
+function M.settings(show, css)
+  css = css or require("dbdash.css").scope(nil, nil)
   local style = nn(show.style) or {}
   local color = require("dbdash.render.highlight").color
   local pad = nn(style.padding)
@@ -47,11 +49,12 @@ function M.settings(show)
   return {
     pad = { top, right, bottom, left },
     border = (border ~= nil and border ~= false) and borders.get(border, "single") or nil,
-    border_group = color(nn(style.border_style), "DbDashBorder"),
+    -- the panel's own border color (a panel part when styling outside a dashboard)
+    border_group = color(nn(style.border_style), css:border_hl(css.node.tag ~= "panel" and "panel" or nil)),
     background = nn(style.background) and color("on " .. style.background:gsub("^on%s+", "")) or nil,
     justify = nn(style.justify) or "stretch",
     align = nn(style.align) or "start",
-    title_group = color(nn(style.title_style), "DbDashTitle"),
+    title_group = color(nn(style.title_style), css:hl("panel-title")),
     title_align = nn(style.title_align),
     ellipsis = nn(style.ellipsis) or "…",
   }
