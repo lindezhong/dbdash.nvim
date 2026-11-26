@@ -2,9 +2,17 @@
 #
 # Methods of strings, mappings, lists and tuples, as in Python / Jinja2 (:help
 # dbdash-templates). Methods that change a value work on the template's own values, not
-# on args and meta (read-only). Each panel is a table of what a method gives.
+# on args and meta (read-only).
+# Every row is one template exactly as written (the template column) and what it
+# rendered (the result column); tests/test_examples.lua renders each template again
+# and checks the result. The templates are Jinja2 (3.1): trim_blocks, lstrip_blocks,
+# undefined values are errors, and the loopcontrols and do extensions are built in.
+# parts/show.sql has the rows() macro that makes the table.
 
 title: "Methods"
+description: |
+  Methods of strings, mappings, lists and tuples (`:help dbdash-templates`): each row is
+  a template as written and what it gave.
 
 database:
   url: "sqlite:///:memory:"
@@ -13,63 +21,80 @@ show:
   interval: 1h
 
 layout:
-  columns: 2
+  columns: 1
 
 panels:
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {{ show("'a,b,c'.split(','), 'a b'.split(), 'a,b,c'.rsplit(',', 1)", 'a,b,c'.split(',') ~ 'a b'.split() ~ 'a,b,c'.rsplit(',', 1)) }}
-        UNION ALL {{ show("'-'.join(['a', 'b'])", '-'.join(['a', 'b'])) }}
-        UNION ALL {{ show("'abcb'.replace('b', 'x', 1)", 'abcb'.replace('b', 'x', 1)) }}
-        UNION ALL {{ show("find / rfind / index / rindex / count", 'abcb'.find('b') ~ 'abcb'.rfind('b') ~ 'abcb'.index('c') ~ 'abcb'.rindex('b') ~ 'abcb'.count('b')) }}
-        UNION ALL {{ show("startswith / endswith", 'abc'.startswith(('x', 'a')) ~ ' ' ~ 'abc'.endswith('bc')) }}
-        UNION ALL {{ show("upper / lower / title / capitalize / swapcase / casefold", 'aB'.upper() ~ 'aB'.lower() ~ ' ' ~ 'ab cd'.title() ~ ' ' ~ 'aB'.capitalize() ~ 'aB'.swapcase() ~ 'ẞ'.casefold()) }}
-        UNION ALL {{ show("strip / lstrip / rstrip", '[' ~ '  a  '.strip() ~ '|' ~ '  a'.lstrip() ~ '|' ~ 'a  '.rstrip() ~ '|' ~ 'xxaxx'.strip('x') ~ ']') }}
-        UNION ALL {{ show("center / ljust / rjust / zfill", '[' ~ 'ab'.center(6, '*') ~ '|' ~ 'a'.ljust(3, '.') ~ '|' ~ 'a'.rjust(3) ~ '|' ~ '7'.zfill(3) ~ ']') }}
-        UNION ALL {{ show("partition / rpartition", 'k=v=w'.partition('=') ~ 'k=v=w'.rpartition('=')) }}
-        UNION ALL {{ show("removeprefix / removesuffix", 'v1.2'.removeprefix('v') ~ ' ' ~ 'a.sql'.removesuffix('.sql')) }}
-        UNION ALL {{ show("splitlines / expandtabs", 'a\nb\r\nc'.splitlines() ~ ' [' ~ 'a\tb'.expandtabs(4) ~ ']') }}
-        UNION ALL {{ show("isdigit isdecimal isnumeric isalpha isalnum isspace", '12'.isdigit() ~ '12'.isdecimal() ~ '12'.isnumeric() ~ 'ab'.isalpha() ~ 'a1'.isalnum() ~ ' '.isspace()) }}
-        UNION ALL {{ show("islower isupper istitle isidentifier isascii", 'ab'.islower() ~ 'AB'.isupper() ~ 'Ab Cd'.istitle() ~ 'a_1'.isidentifier() ~ 'é'.isascii()) }}
-        UNION ALL {{ show("'{} {}'.format(1, 2), '{a}'.format_map({'a': 3})", '{} {}'.format(1, 2) ~ ' ' ~ '{a}'.format_map({'a': 3})) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{{ 'a,b,c'.split(',') }} {{ 'a b'.split() }} {{ 'a,b,c'.rsplit(',', 1) }}{% endraw %}{% endset %}{% set o %}{{ 'a,b,c'.split(',') }} {{ 'a b'.split() }} {{ 'a,b,c'.rsplit(',', 1) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ '-'.join(['a', 'b']) }}{% endraw %}{% endset %}{% set o %}{{ '-'.join(['a', 'b']) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'abcb'.replace('b', 'x', 1) }}{% endraw %}{% endset %}{% set o %}{{ 'abcb'.replace('b', 'x', 1) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'abcb'.find('b') }} {{ 'abcb'.rfind('b') }} {{ 'abcb'.index('c') }} {{ 'abcb'.rindex('b') }} {{ 'abcb'.count('b') }}{% endraw %}{% endset %}{% set o %}{{ 'abcb'.find('b') }} {{ 'abcb'.rfind('b') }} {{ 'abcb'.index('c') }} {{ 'abcb'.rindex('b') }} {{ 'abcb'.count('b') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'abc'.startswith(('x', 'a')) }} {{ 'abc'.endswith('bc') }}{% endraw %}{% endset %}{% set o %}{{ 'abc'.startswith(('x', 'a')) }} {{ 'abc'.endswith('bc') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'aB'.upper() }} {{ 'aB'.lower() }} {{ 'ab cd'.title() }} {{ 'aB'.capitalize() }} {{ 'aB'.swapcase() }} {{ 'ẞ'.casefold() }}{% endraw %}{% endset %}{% set o %}{{ 'aB'.upper() }} {{ 'aB'.lower() }} {{ 'ab cd'.title() }} {{ 'aB'.capitalize() }} {{ 'aB'.swapcase() }} {{ 'ẞ'.casefold() }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}[{{ '  a  '.strip() }}|{{ '  a'.lstrip() }}|{{ 'a  '.rstrip() }}|{{ 'xxaxx'.strip('x') }}]{% endraw %}{% endset %}{% set o %}[{{ '  a  '.strip() }}|{{ '  a'.lstrip() }}|{{ 'a  '.rstrip() }}|{{ 'xxaxx'.strip('x') }}]{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}[{{ 'ab'.center(6, '*') }}|{{ 'a'.ljust(3, '.') }}|{{ 'a'.rjust(3) }}|{{ '7'.zfill(3) }}]{% endraw %}{% endset %}{% set o %}[{{ 'ab'.center(6, '*') }}|{{ 'a'.ljust(3, '.') }}|{{ 'a'.rjust(3) }}|{{ '7'.zfill(3) }}]{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'k=v=w'.partition('=') }} {{ 'k=v=w'.rpartition('=') }}{% endraw %}{% endset %}{% set o %}{{ 'k=v=w'.partition('=') }} {{ 'k=v=w'.rpartition('=') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'v1.2'.removeprefix('v') }} {{ 'a.sql'.removesuffix('.sql') }}{% endraw %}{% endset %}{% set o %}{{ 'v1.2'.removeprefix('v') }} {{ 'a.sql'.removesuffix('.sql') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'a\nb\r\nc'.splitlines() }} [{{ 'a\tb'.expandtabs(4) }}]{% endraw %}{% endset %}{% set o %}{{ 'a\nb\r\nc'.splitlines() }} [{{ 'a\tb'.expandtabs(4) }}]{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ '12'.isdigit() }} {{ '12'.isdecimal() }} {{ '12'.isnumeric() }} {{ 'ab'.isalpha() }} {{ 'a1'.isalnum() }} {{ ' '.isspace() }}{% endraw %}{% endset %}{% set o %}{{ '12'.isdigit() }} {{ '12'.isdecimal() }} {{ '12'.isnumeric() }} {{ 'ab'.isalpha() }} {{ 'a1'.isalnum() }} {{ ' '.isspace() }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'ab'.islower() }} {{ 'AB'.isupper() }} {{ 'Ab Cd'.istitle() }} {{ 'a_1'.isidentifier() }} {{ 'é'.isascii() }}{% endraw %}{% endset %}{% set o %}{{ 'ab'.islower() }} {{ 'AB'.isupper() }} {{ 'Ab Cd'.istitle() }} {{ 'a_1'.isidentifier() }} {{ 'é'.isascii() }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ '{} {}'.format(1, 2) }} {{ '{a}'.format_map({'a': 3}) }}{% endraw %}{% endset %}{% set o %}{{ '{} {}'.format(1, 2) }} {{ '{a}'.format_map({'a': 3}) }}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
       title: "strings"
-      span: 2
+      description: |
+        Every `str` method: splitting and joining, replacing, searching, case,
+        stripping, padding, partitioning, prefixes and suffixes, lines and tabs, the
+        `is...` tests, formatting.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
 
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {% set d = {'a': 1} %}
-        {{ show("d.keys() / values() / items()", d.keys() ~ d.values() ~ d.items()) }}
-        UNION ALL {{ show("d.get('a'), d.get('z', 0), d.copy()", d.get('a') ~ ' ' ~ d.get('z', 0) ~ ' ' ~ d.copy()) }}
-        {% do d.update({'b': 2}, c=3) %}
-        UNION ALL {{ show("d.update({'b': 2}, c=3)", d) }}
-        UNION ALL {{ show("d.pop('a'), d.pop('z', 'none')", d.pop('a') ~ ' ' ~ d.pop('z', 'none')) }}
-        UNION ALL {{ show("d.setdefault('e', 5)", d.setdefault('e', 5) ~ ' ' ~ d) }}
-        UNION ALL {{ show("d.popitem()", d.popitem()) }}
-        {% do d.clear() %}
-        UNION ALL {{ show("d.clear()", d) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{% set d = {'a': 1} %}{{ d.keys() }} {{ d.values() }} {{ d.items() }}{% endraw %}{% endset %}{% set o %}{% set d = {'a': 1} %}{{ d.keys() }} {{ d.values() }} {{ d.items() }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set d = {'a': 1} %}{{ d.get('a') }} {{ d.get('z', 0) }} {{ d.copy() }}{% endraw %}{% endset %}{% set o %}{% set d = {'a': 1} %}{{ d.get('a') }} {{ d.get('z', 0) }} {{ d.copy() }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set d = {'a': 1} %}{% do d.update({'b': 2}, c=3) %}{{ d }}{% endraw %}{% endset %}{% set o %}{% set d = {'a': 1} %}{% do d.update({'b': 2}, c=3) %}{{ d }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set d = {'a': 1, 'b': 2} %}{{ d.pop('a') }} {{ d.pop('z', 'none') }} {{ d }}{% endraw %}{% endset %}{% set o %}{% set d = {'a': 1, 'b': 2} %}{{ d.pop('a') }} {{ d.pop('z', 'none') }} {{ d }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set d = {'a': 1} %}{{ d.setdefault('e', 5) }} {{ d }}{% endraw %}{% endset %}{% set o %}{% set d = {'a': 1} %}{{ d.setdefault('e', 5) }} {{ d }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set d = {'a': 1, 'b': 2} %}{{ d.popitem() }} {{ d }}{% endraw %}{% endset %}{% set o %}{% set d = {'a': 1, 'b': 2} %}{{ d.popitem() }} {{ d }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set d = {'a': 1} %}{% do d.clear() %}{{ d }}{% endraw %}{% endset %}{% set o %}{% set d = {'a': 1} %}{% do d.clear() %}{{ d }}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
       title: "mappings"
+      description: |
+        Every `dict` method: keys, values, items, get, copy, update, pop, setdefault,
+        popitem, clear.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
 
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {% set l = [3, 1, 2] %}
-        {{ show("l.index(1), l.count(3)", l.index(1) ~ ' ' ~ l.count(3)) }}
-        {% do l.append(5) %}{% do l.extend([9, 0]) %}{% do l.insert(0, 7) %}
-        UNION ALL {{ show("append(5), extend([9, 0]), insert(0, 7)", l) }}
-        UNION ALL {{ show("l.pop(), l.pop(0)", l.pop() ~ ' ' ~ l.pop(0)) }}
-        {% do l.remove(9) %}{% do l.sort() %}
-        UNION ALL {{ show("remove(9), sort()", l) }}
-        {% do l.sort(reverse=true) %}{% set c = l.copy() %}{% do l.reverse() %}
-        UNION ALL {{ show("sort(reverse=true), copy(), reverse()", c ~ ' ' ~ l) }}
-        {% do l.clear() %}
-        UNION ALL {{ show("l.clear()", l) }}
-        UNION ALL {{ show("(1, 2, 1).count(1), (1, 2).index(2)", (1, 2, 1).count(1) ~ ' ' ~ (1, 2).index(2)) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{% set l = [3, 1, 2] %}{{ l.index(1) }} {{ l.count(3) }}{% endraw %}{% endset %}{% set o %}{% set l = [3, 1, 2] %}{{ l.index(1) }} {{ l.count(3) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set l = [3, 1, 2] %}{% do l.append(5) %}{% do l.extend([9, 0]) %}{% do l.insert(0, 7) %}{{ l }}{% endraw %}{% endset %}{% set o %}{% set l = [3, 1, 2] %}{% do l.append(5) %}{% do l.extend([9, 0]) %}{% do l.insert(0, 7) %}{{ l }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set l = [3, 1, 2] %}{{ l.pop() }} {{ l.pop(0) }} {{ l }}{% endraw %}{% endset %}{% set o %}{% set l = [3, 1, 2] %}{{ l.pop() }} {{ l.pop(0) }} {{ l }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set l = [3, 9, 1] %}{% do l.remove(9) %}{% do l.sort() %}{{ l }}{% endraw %}{% endset %}{% set o %}{% set l = [3, 9, 1] %}{% do l.remove(9) %}{% do l.sort() %}{{ l }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set l = [3, 1, 2] %}{% do l.sort(reverse=true) %}{% set c = l.copy() %}{% do l.reverse() %}{{ c }} {{ l }}{% endraw %}{% endset %}{% set o %}{% set l = [3, 1, 2] %}{% do l.sort(reverse=true) %}{% set c = l.copy() %}{% do l.reverse() %}{{ c }} {{ l }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set l = [3, 1, 2] %}{% do l.clear() %}{{ l }}{% endraw %}{% endset %}{% set o %}{% set l = [3, 1, 2] %}{% do l.clear() %}{{ l }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ (1, 2, 1).count(1) }} {{ (1, 2).index(2) }}{% endraw %}{% endset %}{% set o %}{{ (1, 2, 1).count(1) }} {{ (1, 2).index(2) }}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
       title: "lists and tuples"
+      description: |
+        Every `list` method (index, count, append, extend, insert, pop, remove, sort,
+        copy, reverse, clear) and the `tuple` ones.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
+

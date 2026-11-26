@@ -1,11 +1,16 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# Template statements (:help dbdash-templates): each panel is a table of what a statement
-# gives. The templates are Jinja2 (3.1), with trim_blocks / lstrip_blocks, undefined values
-# as errors, and the loopcontrols ({% break %}, {% continue %}) and do extensions built in.
-# parts/show.sql has the show(code, value) macro that makes one row.
+# Template statements (:help dbdash-templates).
+# Every row is one template exactly as written (the template column) and what it
+# rendered (the result column); tests/test_examples.lua renders each template again
+# and checks the result. The templates are Jinja2 (3.1): trim_blocks, lstrip_blocks,
+# undefined values are errors, and the loopcontrols and do extensions are built in.
+# parts/show.sql has the rows() macro that makes the table.
 
 title: "Template statements"
+description: |
+  Every statement of the templates (`:help dbdash-templates`): each row is a template
+  as written and what it gave.
 
 database:
   url: "sqlite:///:memory:"
@@ -14,94 +19,105 @@ args:
   - name: level
     type: int
     default: 2
-    description: "Used by if / elif / else"
+    description: "Used by the if row"
 
 show:
   interval: 1h
 
 layout:
-  columns: 2
+  columns: 1
 
 panels:
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {% if args.level > 3 %}{% set word = "high" %}{% elif args.level > 1 %}{% set word = "medium" %}{% else %}{% set word = "low" %}{% endif %}
-        {{ show("if / elif / else (args.level)", word) }}
-        UNION ALL {{ show("x if cond else y", "even" if args.level % 2 == 0 else "odd") }}
-        {% set out %}{% for x in [1, 2, 3, 4, 5, 6] if x is even %}{{ x }}{% endfor %}{% endset %}
-        UNION ALL {{ show("for ... if (filter the items)", out) }}
-        {% set out %}{% for x in [] %}{{ x }}{% else %}empty{% endfor %}{% endset %}
-        UNION ALL {{ show("for ... else (no items)", out) }}
-        {% set out %}{% for x in range(10) %}{% if x == 2 %}{% continue %}{% endif %}{% if x == 5 %}{% break %}{% endif %}{{ x }}{% endfor %}{% endset %}
-        UNION ALL {{ show("break / continue", out) }}
-        {% set out %}{% for a, b in [(1, 'x'), (2, 'y')] %}{{ a }}{{ b }} {% endfor %}{% endset %}
-        UNION ALL {{ show("for a, b in pairs", out | trim) }}
-        {% set out %}{% for k, v in {'one': 1, 'two': 2}.items() %}{{ k }}={{ v }};{% endfor %}{% endset %}
-        UNION ALL {{ show("for k, v in d.items()", out) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{% if 2 > 3 %}high{% elif 2 > 1 %}medium{% else %}low{% endif %}{% endraw %}{% endset %}{% set o %}{% if 2 > 3 %}high{% elif 2 > 1 %}medium{% else %}low{% endif %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'even' if 4 % 2 == 0 else 'odd' }}{% endraw %}{% endset %}{% set o %}{{ 'even' if 4 % 2 == 0 else 'odd' }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% for x in [1, 2, 3, 4, 5, 6] if x is even %}{{ x }}{% endfor %}{% endraw %}{% endset %}{% set o %}{% for x in [1, 2, 3, 4, 5, 6] if x is even %}{{ x }}{% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% for x in [] %}{{ x }}{% else %}empty{% endfor %}{% endraw %}{% endset %}{% set o %}{% for x in [] %}{{ x }}{% else %}empty{% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% for x in range(10) %}{% if x == 2 %}{% continue %}{% endif %}{% if x == 5 %}{% break %}{% endif %}{{ x }}{% endfor %}{% endraw %}{% endset %}{% set o %}{% for x in range(10) %}{% if x == 2 %}{% continue %}{% endif %}{% if x == 5 %}{% break %}{% endif %}{{ x }}{% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% for a, b in [(1, 'x'), (2, 'y')] %}{{ a }}{{ b }} {% endfor %}{% endraw %}{% endset %}{% set o %}{% for a, b in [(1, 'x'), (2, 'y')] %}{{ a }}{{ b }} {% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% for k, v in {'one': 1, 'two': 2}.items() %}{{ k }}={{ v }};{% endfor %}{% endraw %}{% endset %}{% set o %}{% for k, v in {'one': 1, 'two': 2}.items() %}{{ k }}={{ v }};{% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% if args.level > 1 %}level {{ args.level }}{% endif %}{% endraw %}{% endset %}{% set o %}{% if args.level > 1 %}level {{ args.level }}{% endif %}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
-      title: "if, for ... if / else, break, continue"
+      title: "if, for, break, continue"
+      description: |
+        Conditions and loops: `if` / `elif` / `else`, the inline `x if c else y`,
+        `for ... if` (filtered), `for ... else` (no items), `break` / `continue`,
+        unpacking pairs, and an argument (`args.level`).
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
 
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {% set out %}{% for x in ['a', 'b', 'c'] %}{{ loop.index }}{{ loop.index0 }}{{ loop.revindex }}{{ loop.revindex0 }}{{ loop.first | int }}{{ loop.last | int }}{{ loop.length }} {% endfor %}{% endset %}
-        {{ show("loop.index index0 revindex revindex0 first last length", out | trim) }}
-        {% set out %}{% for x in ['a', 'b', 'c'] %}{{ loop.cycle('odd', 'even') }} {% endfor %}{% endset %}
-        UNION ALL {{ show("loop.cycle('odd', 'even')", out | trim) }}
-        {% set out %}{% for x in [1, 1, 2, 2, 3] %}{{ loop.changed(x) | int }}{% endfor %}{% endset %}
-        UNION ALL {{ show("loop.changed(x)", out) }}
-        {% set out %}{% for x in [1, 2, 3] %}{{ loop.previtem | default('-') }}<{{ x }}>{{ loop.nextitem | default('-') }} {% endfor %}{% endset %}
-        UNION ALL {{ show("loop.previtem / loop.nextitem", out | trim) }}
-        {% set tree = [{'name': 'a', 'kids': [{'name': 'b', 'kids': [{'name': 'c', 'kids': []}]}]}, {'name': 'd', 'kids': []}] %}
-        {% set out %}{% for n in tree recursive %}{{ n.name }}{{ loop.depth }}{{ loop.depth0 }}{% if n.kids %}({{ loop(n.kids) }}){% endif %} {% endfor %}{% endset %}
-        UNION ALL {{ show("for ... recursive, loop(children), loop.depth / depth0", out | trim) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{% for x in 'abc' %}{{ loop.index }}{{ loop.index0 }}{{ loop.revindex }}{{ loop.revindex0 }} {% endfor %}{% endraw %}{% endset %}{% set o %}{% for x in 'abc' %}{{ loop.index }}{{ loop.index0 }}{{ loop.revindex }}{{ loop.revindex0 }} {% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% for x in 'abc' %}{{ loop.first }}/{{ loop.last }}/{{ loop.length }} {% endfor %}{% endraw %}{% endset %}{% set o %}{% for x in 'abc' %}{{ loop.first }}/{{ loop.last }}/{{ loop.length }} {% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% for x in 'abc' %}{{ loop.cycle('odd', 'even') }} {% endfor %}{% endraw %}{% endset %}{% set o %}{% for x in 'abc' %}{{ loop.cycle('odd', 'even') }} {% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% for x in [1, 1, 2, 2, 3] %}{{ loop.changed(x) | int }}{% endfor %}{% endraw %}{% endset %}{% set o %}{% for x in [1, 1, 2, 2, 3] %}{{ loop.changed(x) | int }}{% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% for x in [1, 2, 3] %}{{ loop.previtem | default('-') }}<{{ x }}>{{ loop.nextitem | default('-') }} {% endfor %}{% endraw %}{% endset %}{% set o %}{% for x in [1, 2, 3] %}{{ loop.previtem | default('-') }}<{{ x }}>{{ loop.nextitem | default('-') }} {% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% for n in [{'name': 'a', 'kids': [{'name': 'b', 'kids': []}]}, {'name': 'c', 'kids': []}] recursive %}{{ n.name }}{{ loop.depth }}{{ loop.depth0 }}{% if n.kids %}({{ loop(n.kids) }}){% endif %} {% endfor %}{% endraw %}{% endset %}{% set o %}{% for n in [{'name': 'a', 'kids': [{'name': 'b', 'kids': []}]}, {'name': 'c', 'kids': []}] recursive %}{{ n.name }}{{ loop.depth }}{{ loop.depth0 }}{% if n.kids %}({{ loop(n.kids) }}){% endif %} {% endfor %}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
-      title: "the loop variable and recursive loops"
+      title: "the loop variable, recursive loops"
+      description: |
+        Inside `for`: `loop.index` / `index0` / `revindex` / `revindex0`,
+        `first` / `last` / `length`, `cycle()`, `changed()`, `previtem` / `nextitem`;
+        `for ... recursive` with `loop(children)` and `loop.depth` / `depth0`.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
 
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {% set word = 'top' %}
-        {% set out %}{% with word = 'inside', n = 2 %}{{ word }} x{{ n }}{% endwith %}{% endset %}
-        {{ show("with (its own scope)", out ~ ', then ' ~ word) }}
-        {% set shout | upper %}set with a filter{% endset %}
-        UNION ALL {{ show("set name | filter ... endset", shout) }}
-        {% set out %}{% filter replace(' ', '_') | title %}a filter block{% endfilter %}{% endset %}
-        UNION ALL {{ show("filter ... endfilter", out) }}
-        {% set seen = [] %}{% do seen.append('do') %}{% do seen.extend(['runs', 'expressions']) %}
-        UNION ALL {{ show("do (an expression, no output)", seen | join(' ')) }}
-        {% set ns = namespace(total=0, names=[]) %}
-        {% for x in [3, 4, 5] %}{% set ns.total = ns.total + x %}{% endfor %}
-        UNION ALL {{ show("namespace(): set ns.total inside a loop", ns.total) }}
-        {% set out %}{% raw %}{{ not rendered }}{% endraw %}{% endset %}
-        UNION ALL {{ show("raw ... endraw", out) }}
-        {% set out %}{% autoescape true %}{{ "it's" }}{% endautoescape %}{% endset %}
-        UNION ALL {{ show("autoescape true ... (a SQL literal here)", out) }}
-        {# a comment: not in the output #}
-        UNION ALL {{ show("set a, b = 1, 2 (tuples)", (1, 2)) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{% set word = 'top' %}{% with word = 'inside', n = 2 %}{{ word }} x{{ n }}{% endwith %}, then {{ word }}{% endraw %}{% endset %}{% set o %}{% set word = 'top' %}{% with word = 'inside', n = 2 %}{{ word }} x{{ n }}{% endwith %}, then {{ word }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set shout | upper %}set with a filter{% endset %}{{ shout }}{% endraw %}{% endset %}{% set o %}{% set shout | upper %}set with a filter{% endset %}{{ shout }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set a, b = 1, 2 %}{{ a + b }}{% endraw %}{% endset %}{% set o %}{% set a, b = 1, 2 %}{{ a + b }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% filter replace(' ', '_') | title %}a filter block{% endfilter %}{% endraw %}{% endset %}{% set o %}{% filter replace(' ', '_') | title %}a filter block{% endfilter %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set seen = [] %}{% do seen.append('do') %}{% do seen.extend(['runs', 'expressions']) %}{{ seen | join(' ') }}{% endraw %}{% endset %}{% set o %}{% set seen = [] %}{% do seen.append('do') %}{% do seen.extend(['runs', 'expressions']) %}{{ seen | join(' ') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set ns = namespace(total=0) %}{% for x in [3, 4, 5] %}{% set ns.total = ns.total + x %}{% endfor %}{{ ns.total }}{% endraw %}{% endset %}{% set o %}{% set ns = namespace(total=0) %}{% for x in [3, 4, 5] %}{% set ns.total = ns.total + x %}{% endfor %}{{ ns.total }}{% endset %}{% do r.append([c, o]) %}
+        {% set c = "{% raw %}{{ not rendered }}{% endraw %}" %}{% set o %}{% raw %}{{ not rendered }}{% endraw %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% autoescape true %}{{ "it's" }}{% endautoescape %}{% endraw %}{% endset %}{% set o %}{% autoescape true %}{{ "it's" }}{% endautoescape %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}a{# a comment: not in the output #}b{% endraw %}{% endset %}{% set o %}a{# a comment: not in the output #}b{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
-      title: "with, set blocks, filter, do, namespace, raw, autoescape"
+      title: "set, with, filter, do, namespace, raw, autoescape"
+      description: |
+        Variables and blocks: `set` (also as a block with a filter, and unpacking),
+        `with` (its own scope), `filter` blocks, `do` (an expression without output),
+        `namespace()` (changed inside a loop), `raw`, `autoescape` (a SQL literal
+        here), comments.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
 
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {% macro tag(name, cls='plain', open=True) -%}
-          <{{ name }} class="{{ cls }}"{{ '' if open else ' /' }}>{{ varargs | join(',') }}{{ kwargs }}
-        {%- endmacro %}
-        {% macro list(items) -%}
-          {% for i in items %}[{{ caller(i, loop.index) }}]{% endfor %}
-        {%- endmacro %}
-        {{ show("macro with defaults", tag('b')) }}
-        UNION ALL {{ show("keyword arguments", tag('i', open=False)) }}
-        UNION ALL {{ show("extra arguments: varargs / kwargs", tag('a', 'x', 1, 2, href='/')) }}
-        UNION ALL {{ show("f(*list, **mapping)", tag(*['p', 'big'], **{'open': False})) }}
-        {% set out %}{% call(item, n) list(['x', 'y']) %}{{ n }}:{{ item }}{% endcall %}{% endset %}
-        UNION ALL {{ show("call(args) macro() ... endcall, caller(args)", out) }}
-        UNION ALL {{ show("macro attributes", tag.name ~ ' ' ~ tag.arguments | string ~ ' ' ~ tag.catch_varargs | string) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{% macro tag(name, cls='plain') %}<{{ name }} class="{{ cls }}">{% endmacro %}{{ tag('b') }} {{ tag('i', cls='x') }}{% endraw %}{% endset %}{% set o %}{% macro tag(name, cls='plain') %}<{{ name }} class="{{ cls }}">{% endmacro %}{{ tag('b') }} {{ tag('i', cls='x') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% macro f() %}{{ varargs | join(',') }} {{ kwargs }}{% endmacro %}{{ f(1, 2, k='v') }}{% endraw %}{% endset %}{% set o %}{% macro f() %}{{ varargs | join(',') }} {{ kwargs }}{% endmacro %}{{ f(1, 2, k='v') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% macro f(a, b) %}{{ a }}-{{ b }}{% endmacro %}{{ f(*[1, 2]) }} {{ f(**{'a': 3, 'b': 4}) }}{% endraw %}{% endset %}{% set o %}{% macro f(a, b) %}{{ a }}-{{ b }}{% endmacro %}{{ f(*[1, 2]) }} {{ f(**{'a': 3, 'b': 4}) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% macro list(items) %}{% for i in items %}[{{ caller(i, loop.index) }}]{% endfor %}{% endmacro %}{% call(item, n) list(['x', 'y']) %}{{ n }}:{{ item }}{% endcall %}{% endraw %}{% endset %}{% set o %}{% macro list(items) %}{% for i in items %}[{{ caller(i, loop.index) }}]{% endfor %}{% endmacro %}{% call(item, n) list(['x', 'y']) %}{{ n }}:{{ item }}{% endcall %}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% macro m(a, b=1) %}{% endmacro %}{{ m.name }} {{ m.arguments }} {{ m.catch_varargs }}{% endraw %}{% endset %}{% set o %}{% macro m(a, b=1) %}{% endmacro %}{{ m.name }} {{ m.arguments }} {{ m.catch_varargs }}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
       title: "macros, call blocks, *args / **kwargs"
+      description: |
+        `macro` with defaults and keyword arguments, `varargs` / `kwargs` for extra
+        arguments, `f(*list, **mapping)`, `call` blocks with `caller(args)`, and a
+        macro's attributes.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
+

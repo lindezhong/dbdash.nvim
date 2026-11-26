@@ -75,6 +75,46 @@ for _, f in ipairs(files) do
   end
 end
 
+-- The template cheat sheets: every row is a template as written and what it rendered.
+-- Rendering the template column again (same engine, arguments and SQL dialect) must give
+-- the result column, so the examples never show a template that is not the real one.
+for _, name in ipairs({ "statements", "filters", "tests_functions", "methods", "sql" }) do
+  T["templates/" .. name .. ".yaml: every template renders to its result"] = function()
+    local f = "example/templates/" .. name .. ".yaml"
+    local cfg = assert(config.load(f))
+    local map = require("dbdash.util.map")
+    local args = map.new()
+    for _, spec in ipairs(cfg.args) do
+      map.set(args, spec.name, spec.default)
+    end
+    sched.start(f, { no_show = true })
+    local d = assert(sched.get(sched.normalize(f)))
+    vim.wait(10000, function()
+      for _, p in ipairs(d.panels) do
+        if not (p.rs or p.error) or p.running then
+          return false
+        end
+      end
+      return true
+    end, 10)
+    local tpl = require("dbdash.template")
+    local env = tpl.env(require("dbdash.db.dialect").get("sqlite"), false, vim.fn.fnamemodify(f, ":h"))
+    local checked = 0
+    for _, p in ipairs(d.panels) do
+      eq(p.error, nil)
+      local ti, ri = p.rs:col_index("template"), p.rs:col_index("result")
+      if ti and ri then
+        for _, row in ipairs(p.rs.rows) do
+          local out, err = tpl.render(row[ti], { args = args, meta = map.new() }, { env = vim.deepcopy(env) })
+          eq({ row[ti], err and err.message or out }, { row[ti], row[ri] })
+          checked = checked + 1
+        end
+      end
+    end
+    eq(checked > 0, true)
+  end
+end
+
 T["examples cover every chart type and alternative style"] = function()
   local seen = {}
   for _, f in ipairs(files) do

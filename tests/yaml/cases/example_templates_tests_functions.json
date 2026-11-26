@@ -1,5 +1,6 @@
 {
  "title": "Tests, functions, expressions",
+ "description": "Tests, global functions and expressions (`:help dbdash-templates`): each row is a\ntemplate as written and what it gave.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
@@ -7,35 +8,67 @@
   "interval": "1h"
  },
  "layout": {
-  "columns": 2
+  "columns": 1
  },
  "panels": [
   {
    "query": {
-    "sql": "{% from 'parts/show.sql' import show %}\n{% macro m() %}{% endmacro %}\n{{ show(\"x is defined / undefined\", (args is defined) ~ ' ' ~ (nothing_here is undefined)) }}\nUNION ALL {{ show(\"none is none, true is true, false is false\", (none is none) ~ ' ' ~ (true is true) ~ ' ' ~ (false is false)) }}\nUNION ALL {{ show(\"true is boolean, 1 is boolean\", (true is boolean) ~ ' ' ~ (1 is boolean)) }}\nUNION ALL {{ show(\"1 is integer, 1.0 is float, 2 is number\", (1 is integer) ~ ' ' ~ (1.0 is float) ~ ' ' ~ (2 is number)) }}\nUNION ALL {{ show(\"3 is odd, 4 is even, 9 is divisibleby 3\", (3 is odd) ~ ' ' ~ (4 is even) ~ ' ' ~ (9 is divisibleby 3)) }}\nUNION ALL {{ show(\"'a' is string, {} is mapping, [] is sequence, 'x' is iterable\", ('a' is string) ~ ' ' ~ ({} is mapping) ~ ' ' ~ ([] is sequence) ~ ' ' ~ ('x' is iterable)) }}\nUNION ALL {{ show(\"'abc' is lower, 'ABC' is upper\", ('abc' is lower) ~ ' ' ~ ('ABC' is upper)) }}\nUNION ALL {{ show(\"m is callable, 'x' | safe is escaped\", (m is callable) ~ ' ' ~ ('x' | safe is escaped)) }}\nUNION ALL {{ show(\"none is sameas none, 2 is in [1, 2]\", (none is sameas none) ~ ' ' ~ (2 is in [1, 2])) }}\nUNION ALL {{ show(\"'upper' is filter, 'odd' is test\", ('upper' is filter) ~ ' ' ~ ('odd' is test)) }}\nUNION ALL {{ show(\"3 is eq 3, ne, gt, ge, lt, le\", (3 is eq 3) ~ (3 is ne 4) ~ (3 is gt 2) ~ (3 is ge 3) ~ (3 is lt 4) ~ (3 is le 3)) }}\nUNION ALL {{ show(\"3 is equalto 3, greaterthan 2, lessthan 4\", (3 is equalto 3) ~ (3 is greaterthan 2) ~ (3 is lessthan 4)) }}\nUNION ALL {{ show(\"x is not none\", 1 is not none) }}\nUNION ALL {{ show(\"range(6) | select('>', 2) / ('==', 1) / ('<=', 1) / ('!=', 0) / ('>=', 5) / ('<', 1)\", (range(6) | select('>', 2) | list) ~ (range(6) | select('==', 1) | list) ~ (range(6) | select('<=', 1) | list) ~ (range(3) | select('!=', 0) | list) ~ (range(6) | select('>=', 5) | list) ~ (range(6) | select('<', 1) | list)) }}\n"
+    "sql": "{% from 'parts/show.sql' import rows %}\n{% set r = [] %}\n{% set c %}{% raw %}{{ args is defined }} {{ nothing_here is undefined }}{% endraw %}{% endset %}{% set o %}{{ args is defined }} {{ nothing_here is undefined }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ none is none }} {{ true is true }} {{ false is false }}{% endraw %}{% endset %}{% set o %}{{ none is none }} {{ true is true }} {{ false is false }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ true is boolean }} {{ 1 is boolean }}{% endraw %}{% endset %}{% set o %}{{ true is boolean }} {{ 1 is boolean }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 1 is integer }} {{ 1.0 is float }} {{ 2 is number }}{% endraw %}{% endset %}{% set o %}{{ 1 is integer }} {{ 1.0 is float }} {{ 2 is number }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 3 is odd }} {{ 4 is even }} {{ 9 is divisibleby 3 }}{% endraw %}{% endset %}{% set o %}{{ 3 is odd }} {{ 4 is even }} {{ 9 is divisibleby 3 }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 'a' is string }} {{ {} is mapping }} {{ [] is sequence }} {{ 'x' is iterable }}{% endraw %}{% endset %}{% set o %}{{ 'a' is string }} {{ {} is mapping }} {{ [] is sequence }} {{ 'x' is iterable }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 'abc' is lower }} {{ 'ABC' is upper }}{% endraw %}{% endset %}{% set o %}{{ 'abc' is lower }} {{ 'ABC' is upper }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{% macro m() %}{% endmacro %}{{ m is callable }} {{ 'x' | safe is escaped }}{% endraw %}{% endset %}{% set o %}{% macro m() %}{% endmacro %}{{ m is callable }} {{ 'x' | safe is escaped }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ none is sameas none }} {{ 2 is in [1, 2] }}{% endraw %}{% endset %}{% set o %}{{ none is sameas none }} {{ 2 is in [1, 2] }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 'upper' is filter }} {{ 'odd' is test }}{% endraw %}{% endset %}{% set o %}{{ 'upper' is filter }} {{ 'odd' is test }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 3 is eq 3 }} {{ 3 is ne 4 }} {{ 3 is gt 2 }} {{ 3 is ge 3 }} {{ 3 is lt 4 }} {{ 3 is le 3 }}{% endraw %}{% endset %}{% set o %}{{ 3 is eq 3 }} {{ 3 is ne 4 }} {{ 3 is gt 2 }} {{ 3 is ge 3 }} {{ 3 is lt 4 }} {{ 3 is le 3 }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 3 is equalto 3 }} {{ 3 is greaterthan 2 }} {{ 3 is lessthan 4 }}{% endraw %}{% endset %}{% set o %}{{ 3 is equalto 3 }} {{ 3 is greaterthan 2 }} {{ 3 is lessthan 4 }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 1 is not none }}{% endraw %}{% endset %}{% set o %}{{ 1 is not none }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ range(6) | select('>', 2) | list }} {{ range(6) | select('==', 1) | list }} {{ range(6) | select('<=', 1) | list }}{% endraw %}{% endset %}{% set o %}{{ range(6) | select('>', 2) | list }} {{ range(6) | select('==', 1) | list }} {{ range(6) | select('<=', 1) | list }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ range(3) | select('!=', 0) | list }} {{ range(6) | select('>=', 5) | list }} {{ range(6) | select('<', 1) | list }}{% endraw %}{% endset %}{% set o %}{{ range(3) | select('!=', 0) | list }} {{ range(6) | select('>=', 5) | list }} {{ range(6) | select('<', 1) | list }}{% endset %}{% do r.append([c, o]) %}\n{{ rows(r) }}\n"
    },
    "show": {
     "type": "table",
     "title": "tests: x is name",
-    "span": 2
+    "description": "Every test, as `x is name` (and `is not`), and the comparison tests that\n`select` / `selectattr` take by name or symbol.\n",
+    "column_list": [
+     {
+      "column": "template",
+      "alias": "template (as written)"
+     },
+     {
+      "column": "result",
+      "alias": "result"
+     }
+    ]
    }
   },
   {
    "query": {
-    "sql": "{% from 'parts/show.sql' import show %}\n{{ show(\"range(3), range(1, 10, 3), range(3, 0, -1)\", (range(3) | list) ~ (range(1, 10, 3) | list) ~ (range(3, 0, -1) | list)) }}\nUNION ALL {{ show(\"dict(a=1, b=2)\", dict(a=1, b=2)) }}\n{% set c = cycler('red', 'green') %}\nUNION ALL {{ show(\"cycler: c.next(), c.next(), c.next(), c.current\", c.next() ~ ' ' ~ c.next() ~ ' ' ~ c.next() ~ ' ' ~ c.current) }}\n{% do c.reset() %}\nUNION ALL {{ show(\"c.reset(); c.current\", c.current) }}\n{% set j = joiner(' | ') %}\n{% set out %}{% for x in ['a', 'b', 'c'] %}{{ j() }}{{ x }}{% endfor %}{% endset %}\nUNION ALL {{ show(\"joiner(' | ')\", out) }}\n{% set ns = namespace(n=1) %}{% set ns.n = ns.n * 10 %}\nUNION ALL {{ show(\"namespace(n=1); set ns.n = ns.n * 10\", ns.n) }}\nUNION ALL {{ show(\"lipsum(1, html=false, min=5, max=6) | wordcount\", lipsum(1, html=false, min=5, max=6) | wordcount) }}\n"
+    "sql": "{% from 'parts/show.sql' import rows %}\n{% set r = [] %}\n{% set c %}{% raw %}{{ range(3) | list }} {{ range(1, 10, 3) | list }} {{ range(3, 0, -1) | list }}{% endraw %}{% endset %}{% set o %}{{ range(3) | list }} {{ range(1, 10, 3) | list }} {{ range(3, 0, -1) | list }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ dict(a=1, b=2) }}{% endraw %}{% endset %}{% set o %}{{ dict(a=1, b=2) }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{% set c = cycler('red', 'green') %}{{ c.next() }} {{ c.next() }} {{ c.next() }} {{ c.current }}{% endraw %}{% endset %}{% set o %}{% set c = cycler('red', 'green') %}{{ c.next() }} {{ c.next() }} {{ c.next() }} {{ c.current }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{% set c = cycler('red', 'green') %}{{ c.next() }}{% do c.reset() %} {{ c.current }}{% endraw %}{% endset %}{% set o %}{% set c = cycler('red', 'green') %}{{ c.next() }}{% do c.reset() %} {{ c.current }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{% set j = joiner(' | ') %}{% for x in ['a', 'b', 'c'] %}{{ j() }}{{ x }}{% endfor %}{% endraw %}{% endset %}{% set o %}{% set j = joiner(' | ') %}{% for x in ['a', 'b', 'c'] %}{{ j() }}{{ x }}{% endfor %}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{% set ns = namespace(n=1) %}{% set ns.n = ns.n * 10 %}{{ ns.n }}{% endraw %}{% endset %}{% set o %}{% set ns = namespace(n=1) %}{% set ns.n = ns.n * 10 %}{{ ns.n }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ lipsum(1, html=false, min=5, max=6) | wordcount in [5, 6] }}{% endraw %}{% endset %}{% set o %}{{ lipsum(1, html=false, min=5, max=6) | wordcount in [5, 6] }}{% endset %}{% do r.append([c, o]) %}\n{{ rows(r) }}\n"
    },
    "show": {
     "type": "table",
-    "title": "global functions"
+    "title": "global functions",
+    "description": "`range()`, `dict()`, `cycler()` (next, current, reset), `joiner()`,\n`namespace()` and `lipsum()`.\n",
+    "column_list": [
+     {
+      "column": "template",
+      "alias": "template (as written)"
+     },
+     {
+      "column": "result",
+      "alias": "result"
+     }
+    ]
    }
   },
   {
    "query": {
-    "sql": "{% from 'parts/show.sql' import show %}\n{{ show(\"7 // 2, -7 // 2, 7 % 3, 2 ** 10\", (7 // 2) ~ ' ' ~ (-7 // 2) ~ ' ' ~ (7 % 3) ~ ' ' ~ (2 ** 10)) }}\nUNION ALL {{ show(\"4 / 2 (a float), 1e3, 0x1f, 1_000\", (4 / 2) ~ ' ' ~ 1e3 ~ ' ' ~ 0x1f ~ ' ' ~ 1_000) }}\nUNION ALL {{ show(\"'a' ~ 1 ~ none, 'ab' * 2, [1] + [2]\", ('a' ~ 1 ~ none) ~ ' ' ~ ('ab' * 2) ~ ' ' ~ ([1] + [2])) }}\nUNION ALL {{ show(\"1 < 2 < 3, 'b' in 'abc', 1 not in [2]\", (1 < 2 < 3) ~ ' ' ~ ('b' in 'abc') ~ ' ' ~ (1 not in [2])) }}\nUNION ALL {{ show(\"none or 'x', 0 and 1, not ''\", (none or 'x') ~ ' ' ~ (0 and 1) ~ ' ' ~ (not '')) }}\nUNION ALL {{ show(\"(1, 2), (1,), {'k': [1, 2.0]}\", (1, 2) ~ ' ' ~ (1,) ~ ' ' ~ {'k': [1, 2.0]}) }}\nUNION ALL {{ show(\"'hello'[1:4], 'hello'[::-1], [1, 2, 3, 4][::2], [1, 2, 3][-1]\", 'hello'[1:4] ~ ' ' ~ 'hello'[::-1] ~ ' ' ~ [1, 2, 3, 4][::2] ~ ' ' ~ [1, 2, 3][-1]) }}\nUNION ALL {{ show(\"'%s=%05.1f|%-4s|%x' % ('a', 3.14159, 'b', 255)\", '%s=%05.1f|%-4s|%x' % ('a', 3.14159, 'b', 255)) }}\nUNION ALL {{ show(\"'%(n)d%%' % {'n': 50}\", '%(n)d%%' % {'n': 50}) }}\nUNION ALL {{ show(\"'{:>6}|{:<4}|{:^7}|{:,}|{:.1%}|{!r}'.format(...)\", '{:>6}|{:<4}|{:^7}|{:,}|{:.1%}|{!r}'.format('r', 'l', 'c', 1234567, 0.25, 'q')) }}\nUNION ALL {{ show(\"'{0}-{name}-{0}'.format('a', name='n')\", '{0}-{name}-{0}'.format('a', name='n')) }}\n"
+    "sql": "{% from 'parts/show.sql' import rows %}\n{% set r = [] %}\n{% set c %}{% raw %}{{ 7 // 2 }} {{ -7 // 2 }} {{ 7 % 3 }} {{ 2 ** 10 }}{% endraw %}{% endset %}{% set o %}{{ 7 // 2 }} {{ -7 // 2 }} {{ 7 % 3 }} {{ 2 ** 10 }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 4 / 2 }} {{ 1e3 }} {{ 0x1f }} {{ 1_000 }}{% endraw %}{% endset %}{% set o %}{{ 4 / 2 }} {{ 1e3 }} {{ 0x1f }} {{ 1_000 }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 'a' ~ 1 ~ none }} {{ 'ab' * 2 }} {{ [1] + [2] }}{% endraw %}{% endset %}{% set o %}{{ 'a' ~ 1 ~ none }} {{ 'ab' * 2 }} {{ [1] + [2] }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 1 < 2 < 3 }} {{ 'b' in 'abc' }} {{ 1 not in [2] }}{% endraw %}{% endset %}{% set o %}{{ 1 < 2 < 3 }} {{ 'b' in 'abc' }} {{ 1 not in [2] }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ none or 'x' }} {{ 0 and 1 }} {{ not '' }}{% endraw %}{% endset %}{% set o %}{{ none or 'x' }} {{ 0 and 1 }} {{ not '' }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ (1, 2) }} {{ (1,) }} {{ {'k': [1, 2.0]} }}{% endraw %}{% endset %}{% set o %}{{ (1, 2) }} {{ (1,) }} {{ {'k': [1, 2.0]} }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ 'hello'[1:4] }} {{ 'hello'[::-1] }} {{ [1, 2, 3, 4][::2] }} {{ [1, 2, 3][-1] }}{% endraw %}{% endset %}{% set o %}{{ 'hello'[1:4] }} {{ 'hello'[::-1] }} {{ [1, 2, 3, 4][::2] }} {{ [1, 2, 3][-1] }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ '%s=%05.1f|%-4s|%x' % ('a', 3.14159, 'b', 255) }}{% endraw %}{% endset %}{% set o %}{{ '%s=%05.1f|%-4s|%x' % ('a', 3.14159, 'b', 255) }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ '%(n)d%%' % {'n': 50} }}{% endraw %}{% endset %}{% set o %}{{ '%(n)d%%' % {'n': 50} }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ '{:>6}|{:<4}|{:^7}|{:,}|{:.1%}|{!r}'.format('r', 'l', 'c', 1234567, 0.25, 'q') }}{% endraw %}{% endset %}{% set o %}{{ '{:>6}|{:<4}|{:^7}|{:,}|{:.1%}|{!r}'.format('r', 'l', 'c', 1234567, 0.25, 'q') }}{% endset %}{% do r.append([c, o]) %}\n{% set c %}{% raw %}{{ '{0}-{name}-{0}'.format('a', name='n') }}{% endraw %}{% endset %}{% set o %}{{ '{0}-{name}-{0}'.format('a', name='n') }}{% endset %}{% do r.append([c, o]) %}\n{{ rows(r) }}\n"
    },
    "show": {
     "type": "table",
-    "title": "expressions: numbers, strings, tuples, slices, formatting"
+    "title": "expressions: numbers, strings, tuples, slices, formatting",
+    "description": "Operators (`//`, `%`, `**`, `~`, chained comparisons, `in`, `and` / `or` /\n`not`), literals (tuples, mappings, `1e3`, `0x1f`, `1_000`), slices, and\nformatting with `%` and `str.format()`.\n",
+    "column_list": [
+     {
+      "column": "template",
+      "alias": "template (as written)"
+     },
+     {
+      "column": "result",
+      "alias": "result"
+     }
+    ]
    }
   }
  ]

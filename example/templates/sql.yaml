@@ -28,25 +28,33 @@ show:
   interval: 1h
 
 layout:
-  columns: 2
+  columns: 1
 
 panels:
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {{ show("args.name | sql_quote", args.name | sql_quote) }}
-        UNION ALL {{ show("args.name | sql_escape (no quotes)", args.name | sql_escape) }}
-        UNION ALL {{ show("args.depts | sql_in, [] | sql_in", (args.depts | sql_in) ~ ' ' ~ ([] | sql_in)) }}
-        UNION ALL {{ show("args.column | sql_id", args.column | sql_id) }}
-        UNION ALL {{ show("args.limit | sql_limit, none | sql_limit", 'LIMIT ' ~ (args.limit | sql_limit) ~ '|' ~ (none | sql_limit)) }}
-        UNION ALL {{ show("none / true / 2.5 | sql_quote", (none | sql_quote) ~ ' ' ~ (true | sql_quote) ~ ' ' ~ (2.5 | sql_quote)) }}
-        UNION ALL {{ show("sql_case({'n > 10': '''big''', 'n > 0': '''small'''}, '''none''')", sql_case({'n > 10': "'big'", 'n > 0': "'small'"}, "'none'")) }}
-        UNION ALL {{ show("sql_concat('id-', 42)", sql_concat('id-', 42)) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{{ args.name | sql_quote }}{% endraw %}{% endset %}{% set o %}{{ args.name | sql_quote }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ args.name | sql_escape }}{% endraw %}{% endset %}{% set o %}{{ args.name | sql_escape }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ args.depts | sql_in }} {{ [] | sql_in }}{% endraw %}{% endset %}{% set o %}{{ args.depts | sql_in }} {{ [] | sql_in }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ args.column | sql_id }}{% endraw %}{% endset %}{% set o %}{{ args.column | sql_id }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}LIMIT {{ args.limit | sql_limit }}|{{ none | sql_limit }}{% endraw %}{% endset %}{% set o %}LIMIT {{ args.limit | sql_limit }}|{{ none | sql_limit }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ none | sql_quote }} {{ true | sql_quote }} {{ 2.5 | sql_quote }}{% endraw %}{% endset %}{% set o %}{{ none | sql_quote }} {{ true | sql_quote }} {{ 2.5 | sql_quote }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ sql_case({'n > 10': "'big'", 'n > 0': "'small'"}, "'none'") }}{% endraw %}{% endset %}{% set o %}{{ sql_case({'n > 10': "'big'", 'n > 0': "'small'"}, "'none'") }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ sql_concat('id-', 42) }}{% endraw %}{% endset %}{% set o %}{{ sql_concat('id-', 42) }}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
       title: "SQL filters and functions (the SQL they write)"
-      span: 2
-
+      description: |
+        The filters and functions that write SQL for the panel's database (SQLite here):
+        literals (`sql_quote`, `sql_escape`), lists (`sql_in`), identifiers (`sql_id`),
+        LIMIT values (`sql_limit`), `sql_case()` and `sql_concat()`. Each row is a
+        template as written and the SQL it gave.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
   - query:
       autoescape: true
       sql: |

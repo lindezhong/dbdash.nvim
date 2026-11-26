@@ -1,10 +1,18 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# Every built-in filter (:help dbdash-template-filters), as Jinja2 has them; each panel is a
-# table of what a filter gives. SQL filters are in sql.yaml. Filters that give a generator
-# in Jinja2 (map, select, reverse, ...) give a list here.
+# Every built-in filter (:help dbdash-template-filters), as Jinja2 has them.
+# Every row is one template exactly as written (the template column) and what it
+# rendered (the result column); tests/test_examples.lua renders each template again
+# and checks the result. The templates are Jinja2 (3.1): trim_blocks, lstrip_blocks,
+# undefined values are errors, and the loopcontrols and do extensions are built in.
+# parts/show.sql has the rows() macro that makes the table.
+# SQL filters are in sql.yaml. Filters that give a generator in Jinja2 (map, select,
+# reverse, ...) give a list here.
 
 title: "Template filters"
+description: |
+  Every built-in filter (`:help dbdash-template-filters`): each row is a template as
+  written and what it gave.
 
 database:
   url: "sqlite:///:memory:"
@@ -13,87 +21,119 @@ show:
   interval: 1h
 
 layout:
-  columns: 2
+  columns: 1
 
 panels:
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {{ show("'hello world' | capitalize", 'hello world' | capitalize) }}
-        UNION ALL {{ show("'they''re here' | title", "they're here" | title) }}
-        UNION ALL {{ show("'Mixed' | upper / lower", 'Mixed' | upper ~ ' ' ~ 'Mixed' | lower) }}
-        UNION ALL {{ show("'ab' | center(6)", '[' ~ 'ab' | center(6) ~ ']') }}
-        UNION ALL {{ show("'  x  ' | trim, 'xxaxx' | trim('x')", ('  x  ' | trim) ~ ',' ~ ('xxaxx' | trim('x'))) }}
-        UNION ALL {{ show("'a-b-c' | replace('-', '+', 1)", 'a-b-c' | replace('-', '+', 1)) }}
-        UNION ALL {{ show("'foo bar baz qux' | truncate(9)", 'foo bar baz qux' | truncate(9)) }}
-        UNION ALL {{ show("truncate(9, true, '~', 0)", 'foo bar baz qux' | truncate(9, true, '~', 0)) }}
-        UNION ALL {{ show("'a b c d e' | wordwrap(5)", 'a b c d e' | wordwrap(5) | replace('\n', '/')) }}
-        UNION ALL {{ show("'Hello, big world!' | wordcount", 'Hello, big world!' | wordcount) }}
-        UNION ALL {{ show("'a\\nb' | indent(2, first=true)", 'a\nb' | indent(2, first=true) | replace('\n', '/')) }}
-        UNION ALL {{ show("'%s: %d' | format('n', 3)", '%s: %d' | format('n', 3)) }}
-        UNION ALL {{ show("x | default('none'), '' | d('empty', true)", undefined_name | default('none') ~ ',' ~ '' | d('empty', true)) }}
-        UNION ALL {{ show("42 | string ~ '!'", 42 | string ~ '!') }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{{ 'hello world' | capitalize }}{% endraw %}{% endset %}{% set o %}{{ 'hello world' | capitalize }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ "they're here" | title }}{% endraw %}{% endset %}{% set o %}{{ "they're here" | title }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'Mixed' | upper }} {{ 'Mixed' | lower }}{% endraw %}{% endset %}{% set o %}{{ 'Mixed' | upper }} {{ 'Mixed' | lower }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}[{{ 'ab' | center(6) }}]{% endraw %}{% endset %}{% set o %}[{{ 'ab' | center(6) }}]{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ '  x  ' | trim }},{{ 'xxaxx' | trim('x') }}{% endraw %}{% endset %}{% set o %}{{ '  x  ' | trim }},{{ 'xxaxx' | trim('x') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'a-b-c' | replace('-', '+', 1) }}{% endraw %}{% endset %}{% set o %}{{ 'a-b-c' | replace('-', '+', 1) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'foo bar baz qux' | truncate(9) }}{% endraw %}{% endset %}{% set o %}{{ 'foo bar baz qux' | truncate(9) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'foo bar baz qux' | truncate(9, true, '~', 0) }}{% endraw %}{% endset %}{% set o %}{{ 'foo bar baz qux' | truncate(9, true, '~', 0) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'a b c d e' | wordwrap(5) | replace('\n', '/') }}{% endraw %}{% endset %}{% set o %}{{ 'a b c d e' | wordwrap(5) | replace('\n', '/') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'Hello, big world!' | wordcount }}{% endraw %}{% endset %}{% set o %}{{ 'Hello, big world!' | wordcount }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'a\nb' | indent(2, first=true) | replace('\n', '/') }}{% endraw %}{% endset %}{% set o %}{{ 'a\nb' | indent(2, first=true) | replace('\n', '/') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ '%s: %d' | format('n', 3) }}{% endraw %}{% endset %}{% set o %}{{ '%s: %d' | format('n', 3) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ undefined_name | default('none') }},{{ '' | d('empty', true) }}{% endraw %}{% endset %}{% set o %}{{ undefined_name | default('none') }},{{ '' | d('empty', true) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 42 | string ~ '!' }}{% endraw %}{% endset %}{% set o %}{{ 42 | string ~ '!' }}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
       title: "text"
+      description: |
+        Filters for text: case, padding, trimming, replacing, cutting, wrapping,
+        counting, indenting, formatting, defaults.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
 
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {{ show("'<b>a & b</b>' | striptags", '<b>a &amp; b</b> <!-- note -->' | striptags) }}
-        UNION ALL {{ show("'a b/c?' | urlencode", 'a b/c?' | urlencode) }}
-        UNION ALL {{ show("{'q': 'x y'} | urlencode", {'q': 'x y', 'n': 1} | urlencode) }}
-        UNION ALL {{ show("'see www.example.com' | urlize", 'see www.example.com' | urlize) }}
-        UNION ALL {{ show("{'id': 'x', 'k': none} | xmlattr", {'id': 'x', 'class': 'a b', 'k': none} | xmlattr) }}
-        UNION ALL {{ show("'<x>' | escape (here: a SQL literal)", '<x>' | escape) }}
-        UNION ALL {{ show("'<x>' | e, forceescape", ('<x>' | e) ~ ' ' ~ ('y' | safe | forceescape)) }}
-        UNION ALL {{ show("'raw' | safe", 'raw' | safe) }}
-        UNION ALL {{ show("{'b': 1, 'a': [1, none]} | tojson", {'b': 1, 'a': [1, none]} | tojson) }}
-        UNION ALL {{ show("{'a': 1} | tojson(2)", {'a': 1} | tojson(2) | replace('\n', '/')) }}
-        UNION ALL {{ show("{'b': 2, 'a': 1} | pprint", {'b': 2, 'a': 1} | pprint) }}
-        UNION ALL {{ show("1500000 | filesizeformat / (true)", (1500000 | filesizeformat) ~ ', ' ~ (2048 | filesizeformat(true))) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{{ '<b>a &amp; b</b> <!-- note -->' | striptags }}{% endraw %}{% endset %}{% set o %}{{ '<b>a &amp; b</b> <!-- note -->' | striptags }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'a b/c?' | urlencode }}{% endraw %}{% endset %}{% set o %}{{ 'a b/c?' | urlencode }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ {'q': 'x y', 'n': 1} | urlencode }}{% endraw %}{% endset %}{% set o %}{{ {'q': 'x y', 'n': 1} | urlencode }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'see www.example.com' | urlize }}{% endraw %}{% endset %}{% set o %}{{ 'see www.example.com' | urlize }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ {'id': 'x', 'class': 'a b', 'k': none} | xmlattr }}{% endraw %}{% endset %}{% set o %}{{ {'id': 'x', 'class': 'a b', 'k': none} | xmlattr }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ '<x>' | escape }} {{ '<x>' | e }}{% endraw %}{% endset %}{% set o %}{{ '<x>' | escape }} {{ '<x>' | e }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'y' | safe | forceescape }}{% endraw %}{% endset %}{% set o %}{{ 'y' | safe | forceescape }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'raw' | safe }}{% endraw %}{% endset %}{% set o %}{{ 'raw' | safe }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ {'b': 1, 'a': [1, none]} | tojson }}{% endraw %}{% endset %}{% set o %}{{ {'b': 1, 'a': [1, none]} | tojson }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ {'a': 1} | tojson(2) | replace('\n', '/') }}{% endraw %}{% endset %}{% set o %}{{ {'a': 1} | tojson(2) | replace('\n', '/') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ {'b': 2, 'a': 1} | pprint }}{% endraw %}{% endset %}{% set o %}{{ {'b': 2, 'a': 1} | pprint }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 1500000 | filesizeformat }}, {{ 2048 | filesizeformat(true) }}{% endraw %}{% endset %}{% set o %}{{ 1500000 | filesizeformat }}, {{ 2048 | filesizeformat(true) }}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
       title: "HTML, URLs, JSON, sizes"
+      description: |
+        Filters for markup and data: tags, URL encoding, links, attributes, escaping
+        (a SQL literal in these templates), JSON, pretty printing, file sizes.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
 
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {{ show("-3.5 | abs", -3.5 | abs) }}
-        UNION ALL {{ show("'42' | int, 'ff' | int(base=16), 'x' | int(7)", ('42' | int) ~ ' ' ~ ('ff' | int(base=16)) ~ ' ' ~ ('x' | int(7))) }}
-        UNION ALL {{ show("'1.5' | float, 3 | float", ('1.5' | float) ~ ' ' ~ (3 | float)) }}
-        UNION ALL {{ show("2.567 | round(2), round(1, 'floor'), 2.5 | round", (2.567 | round(2)) ~ ' ' ~ (2.567 | round(1, 'floor')) ~ ' ' ~ (2.5 | round)) }}
-        UNION ALL {{ show("[3, 1, 2] | sum, sum(start=10)", ([3, 1, 2] | sum) ~ ' ' ~ ([3, 1, 2] | sum(start=10))) }}
-        UNION ALL {{ show("[3, 1, 2] | min / max", ([3, 1, 2] | min) ~ ' ' ~ ([3, 1, 2] | max)) }}
-        UNION ALL {{ show("['b', 'A'] | max(case_sensitive=true)", ['b', 'A'] | max(case_sensitive=true)) }}
-        UNION ALL {{ show("[7] | random", [7] | random) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{{ -3.5 | abs }}{% endraw %}{% endset %}{% set o %}{{ -3.5 | abs }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ '42' | int }} {{ 'ff' | int(base=16) }} {{ 'x' | int(7) }}{% endraw %}{% endset %}{% set o %}{{ '42' | int }} {{ 'ff' | int(base=16) }} {{ 'x' | int(7) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ '1.5' | float }} {{ 3 | float }}{% endraw %}{% endset %}{% set o %}{{ '1.5' | float }} {{ 3 | float }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 2.567 | round(2) }} {{ 2.567 | round(1, 'floor') }} {{ 2.5 | round }}{% endraw %}{% endset %}{% set o %}{{ 2.567 | round(2) }} {{ 2.567 | round(1, 'floor') }} {{ 2.5 | round }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ [3, 1, 2] | sum }} {{ [3, 1, 2] | sum(start=10) }}{% endraw %}{% endset %}{% set o %}{{ [3, 1, 2] | sum }} {{ [3, 1, 2] | sum(start=10) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ [3, 1, 2] | min }} {{ [3, 1, 2] | max }}{% endraw %}{% endset %}{% set o %}{{ [3, 1, 2] | min }} {{ [3, 1, 2] | max }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ ['b', 'A'] | max(case_sensitive=true) }}{% endraw %}{% endset %}{% set o %}{{ ['b', 'A'] | max(case_sensitive=true) }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ [7] | random }}{% endraw %}{% endset %}{% set o %}{{ [7] | random }}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
       title: "numbers"
+      description: |
+        Filters for numbers: absolute value, conversions (with a base and a default),
+        rounding, sums, extremes, a random item.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
 
   - query:
       sql: |
-        {% from 'parts/show.sql' import show %}
-        {% set users = [{'name': 'ann', 'age': 31, 'city': 'NY'}, {'name': 'bob', 'age': 25, 'city': 'LA'}, {'name': 'cy', 'age': 40, 'city': 'ny'}] %}
-        {{ show("users | map(attribute='name') | join(', ')", users | map(attribute='name') | join(', ')) }}
-        UNION ALL {{ show("['a', 'b'] | map('upper') | list", ['a', 'b'] | map('upper') | list) }}
-        UNION ALL {{ show("users | selectattr('age', '>', 30) | map(attribute='name') | list", users | selectattr('age', '>', 30) | map(attribute='name') | list) }}
-        UNION ALL {{ show("users | rejectattr('city', 'eq', 'LA') | list | length", users | rejectattr('city', 'eq', 'LA') | list | length) }}
-        UNION ALL {{ show("range(10) | select('odd') | list", range(10) | select('odd') | list) }}
-        UNION ALL {{ show("range(10) | reject('divisibleby', 3) | list", range(10) | reject('divisibleby', 3) | list) }}
-        UNION ALL {{ show("users | sort(attribute='age', reverse=true) | map(attribute='name') | list", users | sort(attribute='age', reverse=true) | map(attribute='name') | list) }}
-        UNION ALL {{ show("users | groupby('city') (case-insensitive)", users | groupby('city') | map(attribute='grouper') | list) }}
-        UNION ALL {{ show("{'b': 2, 'a': 1} | dictsort", {'b': 2, 'a': 1} | dictsort) }}
-        UNION ALL {{ show("{'k': 'v'} | items | list", {'k': 'v'} | items | list) }}
-        UNION ALL {{ show("['a', 'A', 'b'] | unique | list", ['a', 'A', 'b'] | unique | list) }}
-        UNION ALL {{ show("[1, 2, 3] | reverse | list, 'abc' | reverse", ([1, 2, 3] | reverse | list) ~ ' ' ~ 'abc' | reverse) }}
-        UNION ALL {{ show("range(5) | batch(2) | list", range(5) | batch(2) | list) }}
-        UNION ALL {{ show("range(5) | slice(2) | list", range(5) | slice(2) | list) }}
-        UNION ALL {{ show("[4, 5] | first / last, 'abc' | first", ([4, 5] | first) ~ ([4, 5] | last) ~ ('abc' | first)) }}
-        UNION ALL {{ show("users | length, 'abc' | count", (users | length) ~ ' ' ~ ('abc' | count)) }}
-        UNION ALL {{ show("users[0] | attr('name') (an attribute, not a key)", users[0] | attr('name') is defined) }}
-        UNION ALL {{ show("'abc' | list", 'abc' | list) }}
+        {% from 'parts/show.sql' import rows %}
+        {% set r = [] %}
+        {% set c %}{% raw %}{% set users = [{'name': 'ann', 'age': 31}, {'name': 'bob', 'age': 25}] %}{{ users | map(attribute='name') | join(', ') }}{% endraw %}{% endset %}{% set o %}{% set users = [{'name': 'ann', 'age': 31}, {'name': 'bob', 'age': 25}] %}{{ users | map(attribute='name') | join(', ') }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ ['a', 'b'] | map('upper') | list }}{% endraw %}{% endset %}{% set o %}{{ ['a', 'b'] | map('upper') | list }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set users = [{'name': 'ann', 'age': 31}, {'name': 'bob', 'age': 25}] %}{{ users | selectattr('age', '>', 30) | map(attribute='name') | list }}{% endraw %}{% endset %}{% set o %}{% set users = [{'name': 'ann', 'age': 31}, {'name': 'bob', 'age': 25}] %}{{ users | selectattr('age', '>', 30) | map(attribute='name') | list }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set users = [{'name': 'ann', 'city': 'NY'}, {'name': 'bob', 'city': 'LA'}] %}{{ users | rejectattr('city', 'eq', 'LA') | list | length }}{% endraw %}{% endset %}{% set o %}{% set users = [{'name': 'ann', 'city': 'NY'}, {'name': 'bob', 'city': 'LA'}] %}{{ users | rejectattr('city', 'eq', 'LA') | list | length }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ range(10) | select('odd') | list }}{% endraw %}{% endset %}{% set o %}{{ range(10) | select('odd') | list }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ range(10) | reject('divisibleby', 3) | list }}{% endraw %}{% endset %}{% set o %}{{ range(10) | reject('divisibleby', 3) | list }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set users = [{'name': 'ann', 'age': 31}, {'name': 'bob', 'age': 25}] %}{{ users | sort(attribute='age', reverse=true) | map(attribute='name') | list }}{% endraw %}{% endset %}{% set o %}{% set users = [{'name': 'ann', 'age': 31}, {'name': 'bob', 'age': 25}] %}{{ users | sort(attribute='age', reverse=true) | map(attribute='name') | list }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{% set users = [{'name': 'ann', 'city': 'NY'}, {'name': 'cy', 'city': 'ny'}, {'name': 'bob', 'city': 'LA'}] %}{{ users | groupby('city') | map(attribute='grouper') | list }}{% endraw %}{% endset %}{% set o %}{% set users = [{'name': 'ann', 'city': 'NY'}, {'name': 'cy', 'city': 'ny'}, {'name': 'bob', 'city': 'LA'}] %}{{ users | groupby('city') | map(attribute='grouper') | list }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ {'b': 2, 'a': 1} | dictsort }}{% endraw %}{% endset %}{% set o %}{{ {'b': 2, 'a': 1} | dictsort }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ {'k': 'v'} | items | list }}{% endraw %}{% endset %}{% set o %}{{ {'k': 'v'} | items | list }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ ['a', 'A', 'b'] | unique | list }}{% endraw %}{% endset %}{% set o %}{{ ['a', 'A', 'b'] | unique | list }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ [1, 2, 3] | reverse | list }} {{ 'abc' | reverse }}{% endraw %}{% endset %}{% set o %}{{ [1, 2, 3] | reverse | list }} {{ 'abc' | reverse }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ range(5) | batch(2) | list }}{% endraw %}{% endset %}{% set o %}{{ range(5) | batch(2) | list }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ range(5) | slice(2) | list }}{% endraw %}{% endset %}{% set o %}{{ range(5) | slice(2) | list }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ [4, 5] | first }}{{ [4, 5] | last }}{{ 'abc' | first }}{% endraw %}{% endset %}{% set o %}{{ [4, 5] | first }}{{ [4, 5] | last }}{{ 'abc' | first }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ [1, 2] | length }} {{ 'abc' | count }}{% endraw %}{% endset %}{% set o %}{{ [1, 2] | length }} {{ 'abc' | count }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ {'name': 'x'} | attr('name') is defined }}{% endraw %}{% endset %}{% set o %}{{ {'name': 'x'} | attr('name') is defined }}{% endset %}{% do r.append([c, o]) %}
+        {% set c %}{% raw %}{{ 'abc' | list }}{% endraw %}{% endset %}{% set o %}{{ 'abc' | list }}{% endset %}{% do r.append([c, o]) %}
+        {{ rows(r) }}
     show:
       type: table
       title: "lists and mappings"
-      span: 2
+      description: |
+        Filters for lists and mappings: mapping and selecting (by test or attribute),
+        sorting, grouping, unique items, reversing, batches and slices, first and last,
+        length, attributes, conversion to a list.
+      column_list:
+        - { column: template, alias: "template (as written)" }
+        - { column: result, alias: "result" }
+
