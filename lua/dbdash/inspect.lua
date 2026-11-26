@@ -117,7 +117,7 @@ function M.open(d, tag)
   if not node then
     return vim.notify("dbdash: nothing to inspect", vim.log.levels.WARN)
   end
-  local box_node = node
+  local box_node, others = node, nil
   if tag then
     -- in the element under the cursor, else in its nearest ancestor that has one (the
     -- panel's title from its chart)
@@ -133,6 +133,14 @@ function M.open(d, tag)
     if not found then
       return vim.notify(("dbdash: no %s in %s"):format(tag, node:describe()), vim.log.levels.WARN)
     end
+    -- several of that name (rows, bars, legend items): say so, the first is shown
+    local count = 0
+    found.parent:walk(function(n)
+      if n.tag == tag and not (n.attrs and n.attrs.placeholder) then
+        count = count + 1
+      end
+    end)
+    others = count > 1 and count or nil
     node = found
   end
   local box = box_of(d, box_node)
@@ -157,7 +165,11 @@ function M.open(d, tag)
       end,
     })
   end
-  return require("dbdash.view.popup").open(M.report(node, box), { title = "DbDash inspect: " .. node:describe() })
+  local lines = M.report(node, box)
+  if others then
+    table.insert(lines, 2, ("(%d %s elements here: the first; put the cursor on another)"):format(others, tag))
+  end
+  return require("dbdash.view.popup").open(lines, { title = "DbDash inspect: " .. node:describe() })
 end
 
 ---Tags under the element at the cursor, for completion.
