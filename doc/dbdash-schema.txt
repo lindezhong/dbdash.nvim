@@ -821,6 +821,27 @@ configs (|dbdash-examples|). Every field has a tag:
                 - type: boolean
                 - const: percent
 <
+                                        *dbdash-schema-show.style.group* >yaml
+            group: { enum: [grouped, stacked], description: "bar: several series side by side (default) or stacked." }
+<
+                                    *dbdash-schema-show.style.bar_width* >yaml
+            bar_width: { type: integer, minimum: 1, description: "bar: columns (vertical) or lines (horizontal) per bar." }
+<
+                                      *dbdash-schema-show.style.bar_gap* >yaml
+            bar_gap: { type: integer, minimum: 0, description: "bar: columns or lines between categories." }
+<
+                                          *dbdash-schema-show.style.top* >yaml
+            top: { type: integer, minimum: 1, description: "bar: keep the first N bars (after sort)." }
+<
+                               *dbdash-schema-show.style.value_position* >yaml
+            value_position: { enum: [end, inside], description: "bar: the value after / above the bar (end) or inside its end." }
+<
+                                   *dbdash-schema-show.style.cumulative* >yaml
+            cumulative: { type: boolean, description: "histogram: add the bins up." }
+<
+                                    *dbdash-schema-show.style.normalize* >yaml
+            normalize: { enum: [count, percent, density], description: "histogram: counts, shares of all values, or density." }
+<
                                    *dbdash-schema-show.style.trend_line* >yaml
             trend_line: { const: linear, description: "scatter, bubble, line: a dashed least-squares line per series." }
 <
@@ -840,7 +861,7 @@ configs (|dbdash-examples|). Every field has a tag:
 <
                                          *dbdash-schema-show.style.sort* >yaml
             sort:
-              description: 'table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last.'
+              description: 'table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last. bar: asc or desc by value.'
               oneOf:
                 - type: string
                 - type: object
@@ -988,6 +1009,17 @@ configs (|dbdash-examples|). Every field has a tag:
                                                *dbdash-schema-show.bins* >yaml
         bins: { type: integer, minimum: 1 }
 <
+                                          *dbdash-schema-show.bin_width* >yaml
+        bin_width: { type: number, exclusiveMinimum: 0, description: "histogram: the width of every bin (Vega-Lite bin.step)." }
+<
+                                          *dbdash-schema-show.bin_range* >yaml
+        bin_range:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { type: number }
+          description: "histogram: where the bins start and end (Vega-Lite bin.extent)."
+<
                                              *dbdash-schema-show.format* >yaml
         format:
           type: string
@@ -1050,12 +1082,10 @@ configs (|dbdash-examples|). Every field has a tag:
                        *dbdash-schema-show.column_list.thresholds_below* >yaml
                   thresholds_below: { type: boolean, default: false }
       allOf:
-        - if: { properties: { type: { enum: [line, area] } }, required: [type] }
+        - if: { properties: { type: { enum: [line, area, bar] } }, required: [type] }
           then:
             required: [x_column]
             anyOf: [{ required: [y_column] }, { required: [y_columns] }]
-        - if: { properties: { type: { const: bar } }, required: [type] }
-          then: { required: [x_column, y_column] }
         - if: { properties: { type: { enum: [scatter, bubble] } }, required: [type] }
           then: { required: [x_column, y_column] }
         - if: { properties: { type: { enum: [histogram, boxplot] } }, required: [type] }

@@ -594,8 +594,12 @@ Chart fields:                                                  *dbdash-charts*
              format, scale, ticks, grid}, mark_lines, mark_points,
              style.trend_line
   area       the line fields, style.stacked (true or percent)
-  bar        x_column, y_column, style.{color, show_values}, colors
-  histogram  value_column, bins, style.color
+  bar        x_column, y_column (or y_columns, series_column), colors,
+             style.{color, show_values, group, bar_width, bar_gap, sort,
+             top, value_position}, axes.y_axis.{min_value, max_value,
+             format}, mark_lines
+  histogram  value_column, bins, bin_width, bin_range, style.{color,
+             show_values, cumulative, normalize}, mark_lines
   boxplot    category_column, value_column, style.{show_outliers, show_means}
   heatmap    x_column, y_column, value_column, style.show_values
   scatter    x_column, y_column, color_column, colors, style.{point,
@@ -694,6 +698,18 @@ a category); `mark_points: [max, min]` labels each series' extremes;
 percent` stacks areas to 100%; bubbles take `style.size_range: [min, max]`
 (radius in canvas pixels). `example/charts/line.yaml` and the area, scatter
 and bubble files show each option.
+
+Bar charts draw several series (`y_columns` or `series_column`) side by side
+or, with `style.group: stacked`, on top of each other (the value shown is the
+total). `style.bar_width` and `bar_gap` size the bars (columns when vertical,
+lines when horizontal), `style.sort: asc | desc` orders them by value and
+`style.top` keeps the first N, `style.value_position: inside` writes the
+value inside the bar, `axes.y_axis.min_value` / `max_value` set the value
+axis, and `mark_lines` draw reference lines on it. Histograms take `bin_width`
+and `bin_range: [from, to]` (values outside are left out), `style.cumulative`
+and `style.normalize: percent | density`; their `mark_lines` are values of
+the data, and the bin each falls in is colored (and labeled when
+horizontal).
 
 Styles                                                         *dbdash-styles*
 

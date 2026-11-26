@@ -1,39 +1,98 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# Histogram: distribution of 50 exam scores in 10 bins.
-# Horizontal bars with 1/8-cell precision; try `renderer: vertical`.
+# Histogram: every renderer and option, one panel each (press K on a panel). Options
+# follow Vega-Lite bins: how many, how wide, over which range, counts or shares,
+# cumulative, and marked values.
+
+title: "Histogram"
+description: |
+  A histogram counts the values of `value_column` in bins. `bins` sets how many
+  (default: Sturges' rule), `bin_width` and `bin_range` fix them. Horizontal by default;
+  `renderer: vertical` draws columns. See `:help dbdash-chart-types`.
 
 database:
   url: "sqlite:///:memory:"
 
-query:
-  sql: |
-    WITH RECURSIVE numbers AS (
-      SELECT 1 AS id, abs(random() % 100) AS score
-      UNION ALL
-      SELECT id + 1, abs(random() % 100) FROM numbers WHERE id < 50
-    )
-    SELECT
-      score,
-      CASE
-        WHEN score >= 90 THEN 'A'
-        WHEN score >= 80 THEN 'B'
-        WHEN score >= 70 THEN 'C'
-        WHEN score >= 60 THEN 'D'
-        ELSE 'F'
-      END AS grade
-    FROM numbers
-
 show:
-  type: histogram
-  title: "Score distribution"
-  interval: 45s
+  interval: 5m
 
-  value_column: score
-  bins: 10                           # default: Sturges' rule
+layout:
+  columns: 2
 
-  style:
-    color: "#3498db"
-
-  show_countdown: true
-  countdown_format: "Next update: {time}s"
+panels:
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 200)
+        SELECT round(50 + 15 * ((abs(random() % 1000) + abs(random() % 1000) + abs(random() % 1000)) / 1500.0 - 1) * 2.5) AS score
+        FROM n
+    show:
+      type: histogram
+      title: "horizontal (default): bins, color"
+      description: |
+        Horizontal bars, one per bin, labeled `[from, to)`; `bins: 10` asks for ten bins (the
+        default follows Sturges' rule); `style.color` colors them.
+      value_column: score
+      bins: 10
+      style: { color: "#c678dd" }
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 200)
+        SELECT round(50 + 15 * ((abs(random() % 1000) + abs(random() % 1000) + abs(random() % 1000)) / 1500.0 - 1) * 2.5) AS score
+        FROM n
+    show:
+      type: histogram
+      renderer: vertical
+      title: "renderer: vertical, show_values: false"
+      description: |
+        Columns labeled with their lower edge (`:DbDashStyle histogram vertical`);
+        `show_values: false` hides the counts.
+      value_column: score
+      bins: 12
+      style: { show_values: false }
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 200)
+        SELECT round(50 + 15 * ((abs(random() % 1000) + abs(random() % 1000) + abs(random() % 1000)) / 1500.0 - 1) * 2.5) AS score
+        FROM n
+    show:
+      type: histogram
+      title: "bin_width, bin_range"
+      description: |
+        `bin_width: 10` makes every bin 10 wide and `bin_range: [0, 100]` fixes where they
+        start and end (Vega-Lite `bin.step`, `bin.extent`); values outside are left out.
+      value_column: score
+      bin_width: 10
+      bin_range: [0, 100]
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 200)
+        SELECT round(50 + 15 * ((abs(random() % 1000) + abs(random() % 1000) + abs(random() % 1000)) / 1500.0 - 1) * 2.5) AS score
+        FROM n
+    show:
+      type: histogram
+      renderer: vertical
+      title: "normalize: percent, cumulative"
+      description: |
+        `normalize: percent` shows each bin's share of all values (`density`: per unit of the
+        value); `cumulative` adds the bins up, so the last one is 100%.
+      value_column: score
+      bin_width: 10
+      style: { normalize: percent, cumulative: true }
+      axes:
+        y_axis: { format: "{:.0f}%" }
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 200)
+        SELECT round(50 + 15 * ((abs(random() % 1000) + abs(random() % 1000) + abs(random() % 1000)) / 1500.0 - 1) * 2.5) AS score
+        FROM n
+    show:
+      type: histogram
+      title: "mark_lines: mean, a limit"
+      description: |
+        `mark_lines` are values of the data: the bin each falls in is colored and labeled
+        (here the mean, and a pass mark of 60).
+      value_column: score
+      bin_width: 10
+      mark_lines:
+        - { value: mean }
+        - { value: 60, label: "pass", color: "#98c379" }

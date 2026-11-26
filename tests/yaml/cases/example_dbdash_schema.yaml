@@ -578,6 +578,13 @@ definitions:
             oneOf:
               - type: boolean
               - const: percent
+          group: { enum: [grouped, stacked], description: "bar: several series side by side (default) or stacked." }
+          bar_width: { type: integer, minimum: 1, description: "bar: columns (vertical) or lines (horizontal) per bar." }
+          bar_gap: { type: integer, minimum: 0, description: "bar: columns or lines between categories." }
+          top: { type: integer, minimum: 1, description: "bar: keep the first N bars (after sort)." }
+          value_position: { enum: [end, inside], description: "bar: the value after / above the bar (end) or inside its end." }
+          cumulative: { type: boolean, description: "histogram: add the bins up." }
+          normalize: { enum: [count, percent, density], description: "histogram: counts, shares of all values, or density." }
           trend_line: { const: linear, description: "scatter, bubble, line: a dashed least-squares line per series." }
           point: { type: string, description: "scatter, bubble: a character for every point instead of a dot." }
           size_range:
@@ -588,7 +595,7 @@ definitions:
             description: "bubble: smallest and largest radius, in canvas pixels."
           caption: { enum: [top, bottom], description: "Where the title goes (CSS caption-side; default top)." }
           sort:
-            description: 'table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last.'
+            description: 'table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last. bar: asc or desc by value.'
             oneOf:
               - type: string
               - type: object
@@ -661,6 +668,13 @@ definitions:
       size_column: { type: string }
       color_column: { type: string }
       bins: { type: integer, minimum: 1 }
+      bin_width: { type: number, exclusiveMinimum: 0, description: "histogram: the width of every bin (Vega-Lite bin.step)." }
+      bin_range:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items: { type: number }
+        description: "histogram: where the bins start and end (Vega-Lite bin.extent)."
       format:
         type: string
         description: 'stat: Python format of the value, e.g. "{:,}", "{:.1f}", "{:.1%}".'
@@ -692,12 +706,10 @@ definitions:
                   description: Color the cells of this column by value (notify works as for stat).
                 thresholds_below: { type: boolean, default: false }
     allOf:
-      - if: { properties: { type: { enum: [line, area] } }, required: [type] }
+      - if: { properties: { type: { enum: [line, area, bar] } }, required: [type] }
         then:
           required: [x_column]
           anyOf: [{ required: [y_column] }, { required: [y_columns] }]
-      - if: { properties: { type: { const: bar } }, required: [type] }
-        then: { required: [x_column, y_column] }
       - if: { properties: { type: { enum: [scatter, bubble] } }, required: [type] }
         then: { required: [x_column, y_column] }
       - if: { properties: { type: { enum: [histogram, boxplot] } }, required: [type] }

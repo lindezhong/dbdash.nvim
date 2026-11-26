@@ -207,6 +207,56 @@ T["xy: subtitle under the title"] = function()
   eq({ vim.trim(out.lines[1]), vim.trim(out.lines[2]) }, { "T", "sub" })
 end
 
+-- bar and histogram options -------------------------------------------------------------
+
+local function bar_rs()
+  return resultset.new(
+    { { name = "c", type = "string" }, { name = "a", type = "integer" }, { name = "b", type = "integer" } },
+    { { "x", 5, 1 }, { "y", 9, 2 }, { "z", 2, 7 } }
+  )
+end
+
+local function text_of(out)
+  return table.concat(out.lines, "\n")
+end
+
+T["bar: grouped and stacked series, legend"] = function()
+  local show = { type = "bar", x_column = "c", y_columns = { "a", "b" } }
+  local text = text_of(render.render(bar_rs(), show, { width = 60, height = 20 }))
+  eq({ text:find("■ a", 1, true) ~= nil, text:find("■ b", 1, true) ~= nil }, { true, true })
+  local _, n = text:gsub("│■", "")
+  eq(n, 6) -- one line per series and category
+  show.style = { group = "stacked" }
+  text = text_of(render.render(bar_rs(), show, { width = 60, height = 20 }))
+  eq({ text:find("■ 6 ", 1, true) ~= nil, text:find("■ 11", 1, true) ~= nil }, { true, true }) -- totals
+end
+
+T["bar: sort, top, inside values, mark_lines labels"] = function()
+  local show = { type = "bar", x_column = "c", y_column = "a", style = { sort = "desc", top = 2 } }
+  local out = render.render(bar_rs(), show, { width = 50, height = 10 })
+  eq({ vim.trim(out.lines[2]):sub(1, 1), vim.trim(out.lines[3]):sub(1, 1) }, { "y", "x" })
+  eq(text_of(out):find("z", 1, true), nil)
+  show.mark_lines = { { value = 4, label = "four" } }
+  eq(text_of(render.render(bar_rs(), show, { width = 50, height = 10 })):find("four", 1, true) ~= nil, true)
+  show = { type = "bar", renderer = "vertical", x_column = "c", y_column = "a", mark_lines = { { value = "mean" } } }
+  eq(text_of(render.render(bar_rs(), show, { width = 50, height = 12 })):find("mean 5.33", 1, true) ~= nil, true)
+end
+
+T["histogram: bin_width, bin_range, cumulative, percent"] = function()
+  local rows = {}
+  for i = 1, 10 do
+    rows[i] = { i * 10 - 5 }
+  end
+  local rs = resultset.new({ { name = "v", type = "integer" } }, rows)
+  local B = require("dbdash.render.charts.bars")
+  local bins = B.histogram(rs, { value_column = "v", bin_width = 25, bin_range = { 0, 100 } }, render.ctx({ width = 40 }))
+  eq(vim.tbl_map(function(b)
+    return b.value
+  end, bins), { 2, 3, 2, 3 })
+  bins = B.histogram(rs, { value_column = "v", bin_width = 25, bin_range = { 0, 100 }, style = { cumulative = true, normalize = "percent" } }, render.ctx({ width = 40 }))
+  eq(bins[#bins].value, 100)
+end
+
 -- stat ----------------------------------------------------------------------------------
 
 local function stat_rs(v, typ)
