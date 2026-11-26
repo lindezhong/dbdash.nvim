@@ -53,7 +53,7 @@ T["request description: method, path, query, headers, JSON body, form"] = functi
     return json("[]")
   end)
   h.ok(base .. "/api/v1?key=k%201&tls=disable", vim.json.encode({
-    path = "search?x=1",
+    path = "/search?x=1",
     query = { limit = 5, tag = { "a", "b c" } },
     headers = { ["X-Token"] = "t" },
     body = { q = "neovim" },
@@ -62,7 +62,7 @@ T["request description: method, path, query, headers, JSON body, form"] = functi
   eq({ r.method, r.target }, { "POST", "/api/v1/search?key=k%201&x=1&limit=5&tag=a&tag=b%20c" })
   eq({ r.headers["x-token"], r.headers["content-type"], vim.json.decode(r.body) }, { "t", "application/json", { q = "neovim" } })
   h.ok(base .. "/api", vim.json.encode({ method = "put", path = "/abs", form = { a = "1&2" } }))
-  eq({ seen[2].method, seen[2].target, seen[2].body }, { "PUT", "/abs", "a=1%262" })
+  eq({ seen[2].method, seen[2].target, seen[2].body }, { "PUT", "/api/abs", "a=1%262" })
   eq(seen[2].headers["content-type"], "application/x-www-form-urlencoded")
   h.ok(base, '{"body": "raw text", "headers": {"Content-Type": "text/csv"}}')
   eq({ seen[3].method, seen[3].body, seen[3].headers["content-type"] }, { "POST", "raw text", "text/csv" })
@@ -108,7 +108,8 @@ T["errors: HTTP status, auth status, invalid JSON, compressed"] = function()
   eq({ e.phase, e.message }, { "query", "HTTP 404 Not Found from " .. base .. "/missing: no such x" })
   eq(h.query(base .. "/secret", "").err.phase, "auth")
   eq(h.query(base .. "/bad", "").err.message:find("the response is not valid JSON", 1, true) ~= nil, true)
-  eq(h.query(base .. "/gz", "").err.message, "compressed responses (gzip) are not supported")
+  -- Errors name the URL (the URL's path and the request's joined).
+  eq(h.query(base .. "/gz", "").err.message, "compressed responses (gzip) are not supported (" .. base .. "/gz)")
 end
 
 T["Basic auth from the URL; redirects keep it on the same host only"] = function()
@@ -145,7 +146,7 @@ T["too many redirects; redirects = 0 returns the 3xx as an error"] = function()
   local base = server(function()
     return response("302 Found", { "Location: /again", "Content-Length: 0" })
   end)
-  eq(h.query(base, "").err.message, "too many redirects (more than 5)")
+  eq(h.query(base, "").err.message, "too many redirects (more than 5) (" .. base .. "/)")
   eq(h.query(base, '{"redirects": 0}').err.message:find("^HTTP 302 Found") ~= nil, true)
 end
 
@@ -226,9 +227,29 @@ T["http:// cannot use tls; https:// defaults to verify-full"] = function()
   info = require("dbdash.db.drivers.http").parse_url(info)
   eq({ info.tls, info.base_path, info.base_query }, { "require", "/v1", "key=1" })
   info = require("dbdash.db.drivers.http").parse_url(require("dbdash.db.url").parse("https://api.example.com"))
-  eq({ info.tls, info.base_path, info.base_query }, { "verify-full", "/", nil })
+  eq({ info.tls, info.base_path, info.base_query }, { "verify-full", "", nil })
   eq(info.port, 443)
   eq(require("dbdash.db.credentials").keys(info)[1], "https://api.example.com:443")
+end
+
+T["path: the URL's path and the request's path are joined as they are"] = function()
+  local base, seen = server(function()
+    return json("[]")
+  end)
+  for _, c in ipairs({
+    { "/v1", "/search", "/v1/search" },
+    { "/v1", "search", "/v1search" }, -- no "/" added
+    { "/v1/", "/search", "/v1//search" }, -- none removed
+    { "", "/search", "/search" },
+    { "/v1", "", "/v1" },
+    { "", "", "/" },
+  }) do
+    h.ok(base .. c[1], vim.json.encode({ path = c[2] }))
+    eq({ c[1], c[2], seen[#seen].target }, { c[1], c[2], c[3] })
+  end
+  -- A full URL is joined like any path (no request to another host).
+  h.ok(base .. "/v1", '{"path": "http://other.example/x"}')
+  eq(seen[#seen].target, "/v1http://other.example/x")
 end
 
 return T

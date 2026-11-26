@@ -54,7 +54,7 @@ function M.parse_url(info)
     end
   end
   info.port = info.port or (info.scheme == "https" and 443 or 80) -- as passwords.json keys expect
-  info.base_path = path ~= "" and path or "/"
+  info.base_path = path -- joined with the request's path as it is
   info.base_query = #keep > 0 and table.concat(keep, "&") or nil
   return info
 end
@@ -66,33 +66,27 @@ function M.connect(info)
   return setmetatable({ info = info }, Conn)
 end
 
----The request URL: `path` appended to the base path (or absolute with a leading "/" or a
----scheme), then the base, path and `query` parameters.
+---The request URL: the URL's path and the request's `path` joined as they are (plain
+---string concatenation: "/v1" .. "/search" is "/v1/search", "/v1" .. "search" is
+---"/v1search"), then the URL's, the path's and `query` parameters.
 local function request_url(info, spec)
-  local base = {
+  local u = {
     scheme = info.scheme,
     host = info.host,
     port = info.port or (info.scheme == "https" and 443 or 80),
     path = info.base_path,
     query = info.base_query,
   }
-  local u = base
   local path = spec.path
   if path and path ~= "" then
-    if path:match("^%a[%w+.-]*://") then
-      u = http.parse_url(path)
-    else
-      local p, q = path:match("^([^?]*)%??(.*)$")
-      u = vim.deepcopy(base)
-      if p:sub(1, 1) == "/" then
-        u.path = p
-      elseif p ~= "" then
-        u.path = base.path:gsub("/$", "") .. "/" .. p
-      end
-      if q ~= "" then
-        u.query = u.query and (u.query .. "&" .. q) or q
-      end
+    local p, q = path:match("^([^?]*)%??(.*)$")
+    u.path = u.path .. p
+    if q ~= "" then
+      u.query = u.query and (u.query .. "&" .. q) or q
     end
+  end
+  if u.path == "" then
+    u.path = "/" -- no path at all: the root
   end
   if spec.query and next(spec.query) then
     local extra = http.encode_pairs(spec.query)
@@ -184,7 +178,7 @@ function Conn:execute(text, opts)
   if info.user and info.user ~= "" and not has("authorization") then
     auth = "Basic " .. vim.base64.encode(info.user .. ":" .. (info.password or ""))
   end
-  local res = http.request({
+  local ok, res = pcall(http.request, {
     method = (spec.method or (body and "POST" or "GET")):upper(),
     url = url,
     headers = headers,
@@ -204,6 +198,13 @@ function Conn:execute(text, opts)
     connect_timeout = info.connect_timeout,
     redirects = spec.redirects,
   })
+  if not ok then
+    -- Name the URL that failed (the URL and the request's path joined).
+    if type(res) == "table" and res.message then
+      res.message = ("%s (%s)"):format(res.message, http.format_url(url))
+    end
+    error(res, 0)
+  end
   if res.status < 200 or res.status > 299 then
     local excerpt = vim.trim(res.body:sub(1, 300):gsub("%s+", " "))
     dberr.raise(

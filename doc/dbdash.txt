@@ -1487,8 +1487,8 @@ request; an empty or missing `query.sql` GETs the URL: >yaml
 Fields (all optional):
 
   method     default POST when there is a body or form, else GET
-  path       appended to the URL's path; `/path` replaces it; a full URL
-             goes elsewhere; may carry `?a=1`
+  path       joined to the URL's path as written (plain concatenation:
+             `/v1` + `/search` is `/v1/search`); may carry `?a=1`
   query      parameters added to the URL (encoded; lists repeat the name)
   headers    request headers
   cookies    like curl's `-b`: "a=1; b=2", a file name without "=" (a
