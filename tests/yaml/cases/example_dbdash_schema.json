@@ -24,6 +24,10 @@
      "title": false,
      "description": false,
      "span": false,
+     "area": false,
+     "row": false,
+     "column": false,
+     "row_span": false,
      "column_list": false,
      "x_label": false,
      "y_label": false
@@ -96,16 +100,60 @@
    "additionalProperties": false,
    "properties": {
     "columns": {
-     "type": "integer",
-     "minimum": 1,
-     "default": 1,
-     "description": "Panels per row."
+     "description": "Column tracks (CSS grid-template-columns): a number of equal columns, a string (\"1fr 2fr 30\", \"repeat(3, 1fr)\") or a list. Tracks: an integer (display columns), \"N%\", \"Nfr\", auto (1fr) or \"minmax(a, b)\". Default 1, or the width of areas. See :help dbdash-layout.",
+     "oneOf": [
+      {
+       "type": "integer",
+       "minimum": 1
+      },
+      {
+       "type": "string"
+      },
+      {
+       "type": "array",
+       "minItems": 1,
+       "items": {
+        "$ref": "#/definitions/track"
+       }
+      }
+     ]
+    },
+    "rows": {
+     "description": "The first row tracks (CSS grid-template-rows): an integer (lines), \"Nfr\", auto (minmax(min-content, max-content)), min-content, max-content or \"minmax(a, b)\".",
+     "oneOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/track"
+       }
+      }
+     ]
+    },
+    "auto_rows": {
+     "$ref": "#/definitions/track",
+     "description": "Rows past layout.rows (CSS grid-auto-rows; default auto)."
     },
     "gap": {
      "type": "integer",
      "minimum": 0,
      "default": 2,
-     "description": "Spaces between panels."
+     "description": "Spaces between columns (column-gap)."
+    },
+    "row_gap": {
+     "type": "integer",
+     "minimum": 0,
+     "default": 1,
+     "description": "Blank lines between rows (row-gap)."
+    },
+    "areas": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "Named areas (CSS grid-template-areas): one string per row, names separated by spaces, \".\" for an empty cell; each name must be a rectangle. Panels go into one with show.area."
     }
    }
   },
@@ -460,6 +508,18 @@
     }
    ]
   },
+  "track": {
+   "description": "A grid track: an integer, \"N%\", \"Nfr\", auto, min-content, max-content or \"minmax(a, b)\".",
+   "oneOf": [
+    {
+     "type": "integer",
+     "minimum": 0
+    },
+    {
+     "type": "string"
+    }
+   ]
+  },
   "color": {
    "type": "string",
    "description": "Hex (\"#3498db\"), a color name (\"blue\", \"bright_blue\"), a style (\"bold blue on black\"), or an existing highlight group (\"DiagnosticOk\")."
@@ -537,6 +597,31 @@
      "minimum": 1,
      "default": 1,
      "description": "Grid columns this panel spans."
+    },
+    "row_span": {
+     "type": "integer",
+     "minimum": 1,
+     "default": 1,
+     "description": "Grid rows this panel spans."
+    },
+    "row": {
+     "type": "integer",
+     "minimum": 1,
+     "description": "Grid row of this panel (CSS grid-row; 1-based)."
+    },
+    "column": {
+     "type": "integer",
+     "minimum": 1,
+     "description": "Grid column of this panel (CSS grid-column; 1-based)."
+    },
+    "area": {
+     "type": "string",
+     "description": "A name of layout.areas to place this panel in (CSS grid-area)."
+    },
+    "min_height": {
+     "type": "integer",
+     "minimum": 1,
+     "description": "Smallest plot rows in a grid before it scrolls (default: setup defaults.min_height, else 8)."
     },
     "args_show": {
      "description": "Show argument values above this chart: true for the arguments its query reads (and its own query.args; not those with show: false), or a list of names.",

@@ -116,7 +116,19 @@ local Ctx = {}
 Ctx.__index = Ctx
 
 function Ctx:fail(path, msg, ...)
-  local p = self.pos[path]
+  -- Keys inside a flow mapping ({ a: 1 }) have no position: use the nearest parent's.
+  local p, at = self.pos[path], path
+  while not p do
+    local parent = at:gsub("%[%d+%]$", "", 1)
+    if parent == at then
+      parent = at:gsub("%.[^.%[]*$", "", 1)
+    end
+    if parent == at then
+      break
+    end
+    at = parent
+    p = self.pos[at]
+  end
   local where = p and (":%d:%d"):format(p.line, p.col) or ""
   error({ phase = "config", message = ("%s%s: %s"):format(self.file, where, msg:format(...)) }, 0)
 end
@@ -333,6 +345,14 @@ function Ctx:show(s, top_interval, prefix)
   if out.span < 1 then
     self:fail(prefix .. "show.span", "span must be at least 1")
   end
+  -- Grid placement (CSS grid-area, grid-row / grid-column) and the smallest plot.
+  out.area = self:expect(prefix .. "show.area", s.area, "string", true)
+  for _, k in ipairs({ "row", "column", "row_span", "min_height" }) do
+    out[k] = self:expect(prefix .. "show." .. k, s[k], "integer", true)
+    if out[k] and out[k] < 1 then
+      self:fail(prefix .. "show." .. k, "%s must be at least 1", k)
+    end
+  end
   return out
 end
 
@@ -357,6 +377,10 @@ local PANEL_ONLY = {
     title = true,
     description = true,
     span = true,
+    area = true,
+    row = true,
+    column = true,
+    row_span = true,
     column_list = true,
     x_label = true,
     y_label = true,
@@ -543,16 +567,75 @@ function M.validate(data, file, positions)
     cfg.layout = { columns = 1, gap = 2 }
     return cfg
   end
-  local layout = ctx:expect("layout", data.layout, "map", true) or map.new()
-  cfg.layout = {
-    columns = ctx:expect("layout.columns", layout.columns, "integer", true) or 1,
-    gap = ctx:expect("layout.gap", layout.gap, "integer", true) or 2,
-  }
-  if cfg.layout.columns < 1 then
-    ctx:fail("layout.columns", "columns must be at least 1")
-  end
+  cfg.layout = ctx:layout(data.layout, cfg.panels)
   return cfg
 end
+
+---layout: CSS Grid tracks, gaps and areas; the panels are placed here, so conflicts are
+---reported with the panel's line.
+---@return dbdash.LayoutConfig
+function Ctx:layout(raw, panels)
+  local L = require("dbdash.render.layout")
+  local layout = self:expect("layout", raw, "map", true) or map.new()
+  local out = {
+    gap = self:expect("layout.gap", layout.gap, "integer", true) or 2,
+    row_gap = self:expect("layout.row_gap", layout.row_gap, "integer", true) or 1,
+  }
+  if out.gap < 0 or out.row_gap < 0 then
+    self:fail(out.gap < 0 and "layout.gap" or "layout.row_gap", "gaps cannot be negative")
+  end
+  local areas, area_cols
+  local raw_areas = nn(layout.areas)
+  if raw_areas ~= nil then
+    local list = self:expect("layout.areas", raw_areas, "list")
+    for i, r in ipairs(list) do
+      self:expect(("layout.areas[%d]"):format(i), r, "string")
+    end
+    local err
+    areas, area_cols, err = L.parse_areas(list)
+    if not areas then
+      self:fail("layout.areas", "%s", err)
+    end
+  end
+  local function tracks(key, v, axis)
+    local t, err = L.parse_tracks(v, axis)
+    if not t then
+      self:fail("layout." .. key, "%s", err)
+    end
+    return t
+  end
+  local cols = nn(layout.columns)
+  out.columns = tracks("columns", cols == nil and (area_cols or 1) or cols, "columns")
+  if area_cols and #out.columns ~= area_cols then
+    self:fail("layout.columns", "%d columns, but layout.areas has %d", #out.columns, area_cols)
+  end
+  out.rows = nn(layout.rows) ~= nil and tracks("rows", layout.rows, "rows") or {}
+  out.auto_row = tracks("auto_rows", nn(layout.auto_rows) or "auto", "rows")[1]
+  out.areas = areas
+  local items = {}
+  for i, p in ipairs(panels) do
+    local sh = p.show
+    items[i] = { area = sh.area, row = sh.row, column = sh.column, span = sh.span, row_span = sh.row_span }
+    if sh.area and (sh.row or sh.column) then
+      self:fail(("panels[%d].show.area"):format(i), "area and row / column cannot be used together")
+    end
+  end
+  local places, err = L.place(items, #out.columns, areas)
+  if not places then
+    self:fail(("panels[%d].show.%s"):format(err.index, err.field), "%s", err.message)
+  end
+  out.places = places
+  return out
+end
+
+---@class dbdash.LayoutConfig
+---@field columns dbdash.layout.Track[]
+---@field rows dbdash.layout.Track[] declared rows
+---@field auto_row dbdash.layout.Track rows past the declared ones
+---@field gap integer
+---@field row_gap integer
+---@field areas table?
+---@field places dbdash.layout.Place[] where each panel goes
 
 ---Validate one panel: the same for the only panel of a one-chart config and for panels[i].
 ---@param raw { database: table?, query: table?, show: table? } after merging the defaults

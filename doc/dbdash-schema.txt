@@ -52,7 +52,7 @@ configs (|dbdash-examples|). Every field has a tag:
         properties: { sql: false, transform: false, args: false }
       show:
         properties:
-          { type: false, title: false, description: false, span: false, column_list: false, x_label: false, y_label: false }
+          { type: false, title: false, description: false, span: false, area: false, row: false, column: false, row_span: false, column_list: false, x_label: false, y_label: false }
         patternProperties: { "_columns?$": false }
   else:
     required: [database] # query too, except for http(s):// (a GET of the URL) and webhook://
@@ -134,10 +134,45 @@ configs (|dbdash-examples|). Every field has a tag:
       properties:
 <
                                           *dbdash-schema-layout.columns* >yaml
-        columns: { type: integer, minimum: 1, default: 1, description: Panels per row. }
+        columns:
+          description: >-
+            Column tracks (CSS grid-template-columns): a number of equal columns, a string
+            ("1fr 2fr 30", "repeat(3, 1fr)") or a list. Tracks: an integer (display columns),
+            "N%", "Nfr", auto (1fr) or "minmax(a, b)". Default 1, or the width of areas.
+            See :help dbdash-layout.
+          oneOf:
+            - { type: integer, minimum: 1 }
+            - { type: string }
+            - { type: array, minItems: 1, items: { $ref: "#/definitions/track" } }
+<
+                                             *dbdash-schema-layout.rows* >yaml
+        rows:
+          description: >-
+            The first row tracks (CSS grid-template-rows): an integer (lines), "Nfr", auto
+            (minmax(min-content, max-content)), min-content, max-content or "minmax(a, b)".
+          oneOf:
+            - { type: string }
+            - { type: array, items: { $ref: "#/definitions/track" } }
+<
+                                        *dbdash-schema-layout.auto_rows* >yaml
+        auto_rows:
+          $ref: "#/definitions/track"
+          description: Rows past layout.rows (CSS grid-auto-rows; default auto).
 <
                                               *dbdash-schema-layout.gap* >yaml
-        gap: { type: integer, minimum: 0, default: 2, description: Spaces between panels. }
+        gap: { type: integer, minimum: 0, default: 2, description: Spaces between columns (column-gap). }
+<
+                                          *dbdash-schema-layout.row_gap* >yaml
+        row_gap: { type: integer, minimum: 0, default: 1, description: Blank lines between rows (row-gap). }
+<
+                                            *dbdash-schema-layout.areas* >yaml
+        areas:
+          type: array
+          items: { type: string }
+          description: >-
+            Named areas (CSS grid-template-areas): one string per row, names separated by
+            spaces, "." for an empty cell; each name must be a rectangle. Panels go into one
+            with show.area.
 <
                                                   *dbdash-schema-panels* >yaml
     panels:
@@ -542,6 +577,14 @@ configs (|dbdash-examples|). Every field has a tag:
             color: { $ref: "#/definitions/color" }
 
 <
+                                               *dbdash-schema-def-track* >yaml
+    track:
+      description: 'A grid track: an integer, "N%", "Nfr", auto, min-content, max-content or "minmax(a, b)".'
+      oneOf:
+        - { type: integer, minimum: 0 }
+        - { type: string }
+
+<
                                                *dbdash-schema-def-color* >yaml
     color:
       type: string
@@ -625,6 +668,24 @@ configs (|dbdash-examples|). Every field has a tag:
 <
                                                *dbdash-schema-show.span* >yaml
         span: { type: integer, minimum: 1, default: 1, description: Grid columns this panel spans. }
+<
+                                           *dbdash-schema-show.row_span* >yaml
+        row_span: { type: integer, minimum: 1, default: 1, description: Grid rows this panel spans. }
+<
+                                                *dbdash-schema-show.row* >yaml
+        row: { type: integer, minimum: 1, description: "Grid row of this panel (CSS grid-row; 1-based)." }
+<
+                                             *dbdash-schema-show.column* >yaml
+        column: { type: integer, minimum: 1, description: "Grid column of this panel (CSS grid-column; 1-based)." }
+<
+                                               *dbdash-schema-show.area* >yaml
+        area: { type: string, description: "A name of layout.areas to place this panel in (CSS grid-area)." }
+<
+                                         *dbdash-schema-show.min_height* >yaml
+        min_height:
+          type: integer
+          minimum: 1
+          description: "Smallest plot rows in a grid before it scrolls (default: setup defaults.min_height, else 8)."
 <
                                           *dbdash-schema-show.args_show* >yaml
         args_show:

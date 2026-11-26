@@ -113,9 +113,14 @@ local function message(text, group)
 end
 
 ---Render one panel's chart (or a placeholder) at the given size.
-local function render_panel(p, show, width, height)
+local function render_panel(p, show, width, height, fill)
   if p.rs then
-    local ok, out = pcall(require("dbdash.render").render, p.rs, show, { width = width, height = height, history = p.values })
+    local ok, out = pcall(
+      require("dbdash.render").render,
+      p.rs,
+      show,
+      { width = width, height = height, history = p.values, fill = fill }
+    )
     if ok then
       return out
     end
@@ -127,7 +132,7 @@ local function render_panel(p, show, width, height)
 end
 
 ---Multi-panel cell: a header line (title, state, error) above the chart.
-local function panel_cell(p, width, height)
+local function panel_cell(p, width, height, fill)
   local show = vim.deepcopy(p:show_config())
   show.title = nil -- shown in the header line instead
   local name = p:title()
@@ -149,7 +154,7 @@ local function panel_cell(p, width, height)
     end
   end
   local args_line = M.args_line(p, width)
-  local body = render_panel(p, show, width, args_line and height - 1 or height)
+  local body = render_panel(p, show, width, height - 1 - (args_line and 1 or 0), fill)
   if args_line then
     body = prepend(body, { args_line })
   end
@@ -164,6 +169,71 @@ local function panel_cell(p, width, height)
     out.hl[#out.hl + 1] = { row = h.row + 1, col_s = h.col_s, col_e = h.col_e, group = h.group }
   end
   return out
+end
+
+---A panel's heights at `width` (CSS min-content / max-content): with its smallest plot
+---and with its full plot. Cached until its result, error, style or width change.
+---@return integer hmin, integer hmax
+local function measure(p, width)
+  local show = p:show_config()
+  local key = vim.json.encode({ width, show, p.error and true or false })
+  local m = p.measured
+  if not (m and m.rs == p.rs and m.key == key) then
+    m = {
+      rs = p.rs,
+      key = key,
+      hmin = #panel_cell(p, width, 0).lines,
+      hmax = #panel_cell(p, width, 100000).lines,
+    }
+    p.measured = m
+  end
+  return m.hmin, m.hmax
+end
+
+---The panels laid out on the grid (CSS Grid: column and row tracks, areas, placement;
+---render/layout.lua). Rows get at least their panels' min-content; free lines of the
+---window grow them; a grid taller than the window scrolls.
+---@param width integer
+---@param avail integer lines below the header
+function Dashboard:grid(width, avail)
+  local L = require("dbdash.render.layout")
+  local lay = self.cfg.layout
+  local cols = L.columns(lay.columns, width, lay.gap)
+  local nrows = 0
+  for _, pl in ipairs(lay.places) do
+    nrows = math.max(nrows, pl.row + pl.row_span - 1)
+  end
+  local tracks = {}
+  for r = 1, nrows do
+    tracks[r] = lay.rows[r] or lay.auto_row
+  end
+  local cells, items = {}, {}
+  for i, p in ipairs(self.panels) do
+    local pl = lay.places[i]
+    local first, last = cols[pl.col], cols[pl.col + pl.span - 1]
+    local w = last.x + last.width - first.x
+    local hmin, hmax = measure(p, w)
+    cells[i] = { x = first.x, width = w }
+    items[i] = { row = pl.row, row_span = pl.row_span, hmin = hmin, hmax = hmax }
+  end
+  local heights, fill = L.rows(tracks, items, avail - lay.row_gap * math.max(nrows - 1, 0), lay.row_gap)
+  local top, y = {}, 0
+  for r = 1, nrows do
+    top[r] = y
+    y = y + heights[r] + lay.row_gap
+  end
+  local outs = {}
+  for i, p in ipairs(self.panels) do
+    local pl, c = lay.places[i], cells[i]
+    local h, f = lay.row_gap * (pl.row_span - 1), false
+    for r = pl.row, pl.row + pl.row_span - 1 do
+      h = h + heights[r]
+      f = f or fill[r]
+    end
+    c.y, c.height = top[pl.row], h
+    outs[i] = panel_cell(p, c.width, h, f)
+  end
+  return L.compose(cells, outs)
 end
 
 ---Re-render cached results into the buffer (no query).
@@ -189,23 +259,7 @@ function Dashboard:redraw()
     end
     self.regions = nil
   else
-    local layout = require("dbdash.render.layout")
-    local lay = self.cfg.layout
-    local spans = {}
-    for i, p in ipairs(self.panels) do
-      spans[i] = p.cfg.show.span
-    end
-    local cells = layout.plan(spans, width, lay.columns, lay.gap)
-    local grid_rows = 0
-    for _, c in ipairs(cells) do
-      grid_rows = math.max(grid_rows, c.row)
-    end
-    local cell_h = math.max(8, math.floor((height - offset) / grid_rows) - 2)
-    local outs = {}
-    for i, p in ipairs(self.panels) do
-      outs[i] = panel_cell(p, cells[i].width, cell_h)
-    end
-    body = layout.compose(cells, outs)
+    body = self:grid(width, height - offset)
     self.regions = {}
     for i, r in ipairs(body.regions) do
       self.regions[i] = { row_s = r.row_s + offset, row_e = r.row_e + offset, x = r.x, width = r.width }

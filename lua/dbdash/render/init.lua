@@ -68,7 +68,7 @@ end
 ---Render a result set according to the show config.
 ---@param rs dbdash.db.ResultSet
 ---@param show table
----@param opts { width: integer, height: integer?, history: number[]? }
+---@param opts { width: integer, height: integer?, history: number[]?, fill: boolean? }
 ---@return dbdash.render.Output
 function M.render(rs, show, opts)
   local renderer, canvas = registry.resolve(show, options().styles)
@@ -78,10 +78,16 @@ function M.render(rs, show, opts)
     if w then
       ctx.width = math.min(ctx.width, w)
     end
-    local h = tonumber(show.height ~= vim.NIL and show.height or nil) or require("dbdash").options.defaults.height
+    -- Plot rows: show.height, else the whole cell (opts.fill: a fixed or fr grid row),
+    -- else setup's default (each chart's own when unset); never fewer than min_height
+    -- (CSS min-height), unless the plot is capped below that.
+    local defaults = require("dbdash").options.defaults
+    local h = tonumber(show.height ~= vim.NIL and show.height or nil) or (opts.fill and 10000) or defaults.height
     if h then
       ctx.plot_height = h
     end
+    local mh = tonumber(show.min_height ~= vim.NIL and show.min_height or nil) or defaults.min_height or 3
+    ctx.min_plot_height = math.min(mh, h or 15)
     ctx.history = opts.history
     local style = need("chart/" .. show.type .. "/" .. renderer)
     return (style.render or style)(rs, show, ctx)

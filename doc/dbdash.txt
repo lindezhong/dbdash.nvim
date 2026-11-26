@@ -73,6 +73,7 @@ defaults: >lua
       connect_timeout = "10s",  -- (URL `connect_timeout` wins)
       max_rows = 10000,
       height = nil,        -- plot rows; nil = each chart's own (15)
+      min_height = 8,      -- smallest plot rows in a grid (|dbdash-layout|)
       countdown_format = "Next update: {time}s",
       history = 20,        -- queries kept for |:DbDashStatus|
     },
@@ -353,7 +354,8 @@ Where a field is written says what it applies to, with one chart or many:
                        `countdown_format`, `args_show`, `refresh_hidden`,
                        `style`, `renderer`, `canvas`, `thresholds`, ...
   one panel only       `query.sql`, `transform`, `args`; `show.type`,
-                       `title`, `description`, `span`, `column_list`, the
+                       `title`, `description`, `span`, `area`, `row`,
+                       `column`, `row_span`, `column_list`, the
                        `*_column` fields, `x_label`, `y_label`
 
 Without `panels` the top level is the only panel, so every field is written
@@ -451,7 +453,8 @@ The `example/` directory of the plugin has runnable configs, one directory per
 topic (the sidebar shows them as a tree):
 
   charts/       one chart type per file, the alternative styles (styles.yaml)
-  dashboards/   several panels in a grid (multi_panel.yaml)
+  dashboards/   several panels in a grid (multi_panel.yaml), a grid laid
+                out like CSS Grid (grid.yaml)
   templates/    arguments; every statement, filter, test, function and
                 method; SQL filters and autoescape; macros; extends,
                 include and import; Lua in templates; every meta field
@@ -495,10 +498,69 @@ One config can hold several charts in a grid: >yaml
       show: { type: table, title: Latest }
 <
 Panels flow left to right and wrap; `show.span` widens a panel over several
-columns, and a single panel under `panels` is a grid too. `id` names a panel
+columns, and a single panel under `panels` is a grid too (|dbdash-layout| for
+sizes, rows, areas and placement). `id` names a panel
 for its arguments (|dbdash-arguments|). In the dashboard, `s` and
 |:DbDashStyle| act on the panel under the cursor (or ask which one); `r`
 refreshes all panels.
+
+Grid layout                                                    *dbdash-layout*
+
+`layout` works like CSS Grid: column and row tracks, gaps, named areas, and
+panels placed by area, by row and column, or in order into the next free
+cells. The short form `layout: { columns: 2, gap: 2 }` with `show.span` is
+the same grid with two equal columns. >yaml
+  layout:
+    columns: [1fr, 2fr, 30]  # or "1fr 2fr 30", "repeat(3, 1fr)", or 3
+    rows: [auto, 20, 1fr]    # the first rows; later rows use auto_rows
+    auto_rows: auto          # (default auto)
+    gap: 2                   # columns between panels (default 2)
+    row_gap: 1               # blank lines between rows (default 1)
+    areas:                   # optional; "." is an empty cell
+      - "trend trend kpi"
+      - "table table kpi"
+  panels:
+    - show: { area: trend }                      # by area name
+    - show: { row: 1, column: 3, row_span: 2 }   # by position (1-based)
+    - show: { span: 2 }                          # next free cells
+<
+CSS                          dbdash
+grid-template-columns        `layout.columns`
+grid-template-rows           `layout.rows`
+grid-auto-rows               `layout.auto_rows`
+column-gap / row-gap         `layout.gap` / `layout.row_gap`
+grid-template-areas          `layout.areas`
+grid-area                    `show.area`
+grid-row / grid-column       `show.row` / `show.column` with `row_span` /
+                             `span`
+min-height (of a chart)      `show.min_height`
+
+Tracks:
+  integer          a fixed size: display columns, or lines for rows
+  "N%"             columns: a share of the width
+  "Nfr"            a share of what is left (columns at least 10 wide, rows
+                   at least their panels' min-content)
+  auto             columns: 1fr; rows: minmax(min-content, max-content)
+  min-content      rows: as tall as the panels with their smallest plot
+                   (`show.min_height`, default `defaults.min_height`, 8)
+  max-content      rows: as tall as the panels with their full plot
+                   (`show.height`, default 15); tables, stat and text charts
+                   have one height
+  "minmax(a, b)"   at least a, at most b (b may be fr)
+
+Rows are sized like CSS: each row gets its panels' min-content, the lines of
+the window that are left grow the rows up to their limit (auto rows up to
+max-content, equally), and fr rows share what remains. Nothing is squeezed
+below its min-content: a grid taller than the window makes the buffer longer,
+and you scroll. A panel in a fixed or fr row fills its cell (its plot grows
+with the row, unless `show.height` is set). A panel over several rows that
+needs more than they give adds the difference to those rows.
+
+Placement follows CSS: panels with an area or a row and column go first,
+panels with only a row or a column go into the first free place there, and
+the rest flow in order into the next free cells. An unknown area, areas that
+are not rectangles, panels that overlap and positions past the last column
+are errors, reported with the line.
 
 Each panel queries its own database: `panels[].database` if it sets one,
 else the top-level `database`, which is only a default (a one-chart config is

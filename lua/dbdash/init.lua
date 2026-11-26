@@ -30,6 +30,7 @@ local M = {}
 ---@field connect_timeout string|number (default "10s")
 ---@field max_rows integer (default 10000)
 ---@field height integer? chart plot rows (default: each chart's own)
+---@field min_height integer smallest plot rows in a grid before it scrolls (default 8)
 ---@field countdown_format string (default "Next update: {time}s")
 ---@field history integer queries kept for :DbDashStatus (default 20)
 
@@ -97,6 +98,7 @@ local defaults = {
     connect_timeout = "10s",
     max_rows = 10000,
     height = nil,
+    min_height = 8,
     countdown_format = "Next update: {time}s",
     history = 20,
   },
@@ -253,6 +255,7 @@ local SPEC = {
     connect_timeout = dur(1),
     max_rows = int(1),
     height = optional(int(3)),
+    min_height = int(1),
     countdown_format = of_type("string"),
     history = int(1),
   },

@@ -1,0 +1,125 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# A grid laid out by hand, like CSS Grid (:help dbdash-layout):
+#   layout.columns   grid-template-columns: "Nfr" shares, fixed widths, "N%"
+#   layout.rows      grid-template-rows: auto, fixed lines, "Nfr", minmax(a, b)
+#   layout.areas     grid-template-areas: named rectangles, "." for an empty cell
+#   show.area        grid-area: a panel goes into a named area
+#   show.row / column / span / row_span   grid-row / grid-column
+# Panels without a place flow into the next free cells. Rows get at least their
+# panels' min-content (show.min_height), then share the window; a grid taller than the
+# window scrolls instead of squeezing the charts.
+
+title: "Grid layout"
+description: |
+  A dashboard laid out with **CSS Grid** terms: column and row tracks, named areas and
+  panels placed by name or by row and column. Resize the window to see the `fr` column
+  and the `1fr` row follow it. See `:help dbdash-layout`.
+
+database:
+  url: "sqlite:///:memory:"
+
+interval: 1m
+
+layout:
+  columns: "2fr 1fr 24"            # two shares of what is left, then 24 columns
+  rows: [auto, 9, "minmax(10, 1fr)"]
+  auto_rows: auto
+  gap: 2
+  row_gap: 1
+  areas:
+    - "trend trend kpi"
+    - "table share kpi"
+    - "wide  wide  wide"
+
+panels:
+  - query:
+      sql: |
+        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
+        SELECT printf('%02d', n) AS hour, 50 + abs(random() % 100) AS visits FROM h
+    show:
+      area: trend
+      type: line
+      title: "trend: area across two columns, row auto"
+      description: |
+        `show.area: trend` puts this panel in the **trend** area (CSS `grid-area`), which
+        spans the first two columns. Its row is `auto`: at least the plot's
+        `min_height` (6 rows here, 8 by default), growing up to its full height (15) when
+        the window has room.
+      x_column: hour
+      y_column: visits
+      min_height: 6                  # the smallest plot before the grid scrolls (default 8)
+
+  - query:
+      sql: SELECT abs(random() % 5000) AS orders
+    show:
+      area: kpi
+      type: stat
+      title: "kpi: two rows"
+      description: |
+        The **kpi** area is two rows tall (CSS `grid-row: span 2`) in the fixed
+        24-column track (`columns: "2fr 1fr 24"`).
+      format: "{:,}"
+
+  - query:
+      sql: |
+        SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80
+        UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      area: table
+      type: table
+      title: "table: a fixed row of 9 lines"
+      description: |
+        The second row is `9` lines (a fixed track, like `grid-template-rows: ... 9 ...`):
+        a fixed row keeps its size whatever the window.
+
+  - query:
+      sql: |
+        SELECT 'IT' AS dept, 42 AS people UNION ALL SELECT 'HR', 7
+        UNION ALL SELECT 'R&D', 120
+    show:
+      area: share
+      type: pie
+      title: "share"
+      description: "The **share** area: the `1fr` column of the second row."
+      label_column: dept
+      value_column: people
+
+  - query:
+      sql: |
+        WITH RECURSIVE d(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM d WHERE n < 30)
+        SELECT n AS day, abs(random() % 100) AS load FROM d
+    show:
+      area: wide
+      type: bar
+      renderer: vertical
+      title: "wide: minmax(10, 1fr) fills the rest of the window"
+      description: |
+        The third row is `minmax(10, 1fr)`: at least 10 lines, and whatever the window has
+        left (CSS `fr`). A chart in a fixed or `fr` row fills its cell, so this one grows
+        with the window.
+      x_column: day
+      y_column: load
+
+  - query:
+      sql: SELECT datetime('now') AS now
+    show:
+      row: 4
+      column: 2
+      span: 2
+      row_span: 2
+      type: table
+      title: "rows 4-5, columns 2-3: placed by position"
+      description: |
+        `row: 4`, `column: 2`, `span: 2`, `row_span: 2` (CSS
+        `grid-row: 4 / span 2; grid-column: 2 / span 2`). Rows 4 and 5 are past
+        `layout.rows`, so they use `auto_rows`.
+
+  - query:
+      sql: SELECT 'flows into the first free cell' AS note
+    show:
+      type: text
+      title: "auto-placed"
+      description: |
+        No area, row or column: the panel flows into the first free cell (CSS
+        auto-placement), here row 4, column 1.

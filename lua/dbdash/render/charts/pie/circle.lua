@@ -41,7 +41,9 @@ function M.render(rs, show, ctx)
   -- The legend sits right of the circle when a reasonable circle still fits, else below.
   local beside = cols_for(6) + 3 + lw <= ctx.width
   local room = beside and (ctx.width - 3 - lw) or ctx.width
+  -- The height left (at least min_height), then as wide as the room allows.
   local rows = math.min(ctx.plot_height or 12, ctx.height - 1 - (beside and 0 or #legend))
+  rows = math.max(rows, math.min(ctx.min_plot_height or 3, ctx.plot_height or 12))
   while rows > 3 and cols_for(rows) > room do
     rows = rows - 1
   end

@@ -161,6 +161,14 @@ defaults each panel can override (a panel's own `database`, `show.interval`, ...
 of one chart (`query.sql`, `show.type`, ...) belong in each panel. A panel's `query.args`
 are its own. See `:help dbdash-config`.
 
+`layout` works like CSS Grid: `columns` and `rows` take tracks (`30`, `"25%"`, `"2fr"`,
+`auto`, `"minmax(10, 1fr)"`), `areas` names rectangles, and a panel goes into an area
+(`show.area`), at a position (`show.row`, `column`, `span`, `row_span`) or into the next
+free cells. Rows get at least each chart's smallest readable plot (`show.min_height`) and
+share the rest of the window; a grid taller than the window scrolls instead of squeezing
+the charts. See `:help dbdash-layout` and
+[`example/dashboards/grid.yaml`](example/dashboards/grid.yaml).
+
 [`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a JSON Schema of the whole
 format (also in `:help dbdash-schema`, with a tag for every field); editors with
 yaml-language-server validate and complete a config that starts with:
@@ -169,14 +177,12 @@ yaml-language-server validate and complete a config that starts with:
 # yaml-language-server: $schema=/path/to/dbdash.nvim/example/dbdash.schema.yaml
 ```
 
-Examples, all runnable as they are:
-
 Examples are in [`example/`](example), one directory per topic (`:help dbdash-examples`):
 
 | Directory | Shows |
 | --- | --- |
 | [`charts/`](example/charts) | one chart type per file ([`line.yaml`](example/charts/line.yaml), [`bar.yaml`](example/charts/bar.yaml), [`table.yaml`](example/charts/table.yaml), [`stat.yaml`](example/charts/stat.yaml), ...), the alternative styles ([`styles.yaml`](example/charts/styles.yaml)) |
-| [`dashboards/`](example/dashboards) | several panels in a grid ([`multi_panel.yaml`](example/dashboards/multi_panel.yaml): defaults, intervals, a database per panel, title, countdown, descriptions, argument lines) |
+| [`dashboards/`](example/dashboards) | several panels in a grid ([`multi_panel.yaml`](example/dashboards/multi_panel.yaml): defaults, intervals, a database per panel, title, countdown, descriptions, argument lines); a grid laid out like CSS Grid ([`grid.yaml`](example/dashboards/grid.yaml): column and row tracks, areas, placement) |
 | [`templates/`](example/templates) | arguments ([`arguments.yaml`](example/templates/arguments.yaml)); every statement ([`statements.yaml`](example/templates/statements.yaml)), filter ([`filters.yaml`](example/templates/filters.yaml)), test, function and expression ([`tests_functions.yaml`](example/templates/tests_functions.yaml)) and method ([`methods.yaml`](example/templates/methods.yaml)); SQL filters and autoescape ([`sql.yaml`](example/templates/sql.yaml)); macros ([`macros.yaml`](example/templates/macros.yaml)); extends / include / import ([`inheritance.yaml`](example/templates/inheritance.yaml)); Lua in templates ([`template_lua.yaml`](example/templates/template_lua.yaml)); every `meta` field ([`meta.yaml`](example/templates/meta.yaml)) |
 | [`lua/`](example/lua) | a `lua://` source ([`lua.yaml`](example/lua/lua.yaml)), `query.transform` ([`transform.yaml`](example/lua/transform.yaml)), panel state, callbacks and run records ([`callback.yaml`](example/lua/callback.yaml)) |
 | [`push/`](example/push) | push sources: [`luastream.yaml`](example/push/luastream.yaml), [`exec.yaml`](example/push/exec.yaml), [`webhook.yaml`](example/push/webhook.yaml) (OpenAPI) |

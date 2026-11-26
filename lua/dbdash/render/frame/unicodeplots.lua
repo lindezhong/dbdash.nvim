@@ -75,7 +75,7 @@ function M.plot_size(ctx, spec)
     + ((spec.legend_position == "bottom" and spec.legend and #spec.legend > 0) and 1 or 0)
   local rows = ctx.height - extra
   rows = math.min(rows, spec.height or 15)
-  return math.max(cols, 10), math.max(rows, spec.min_rows or 3)
+  return math.max(cols, 10), math.max(rows, spec.min_rows or ctx.min_plot_height or 3)
 end
 
 ---Compose the frame around a plot body of exactly cols x rows characters.

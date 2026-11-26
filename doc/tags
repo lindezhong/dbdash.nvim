@@ -36,6 +36,7 @@ dbdash-highlights	dbdash.txt	/*dbdash-highlights*
 dbdash-http	dbdash.txt	/*dbdash-http*
 dbdash-interval	dbdash.txt	/*dbdash-interval*
 dbdash-intro	dbdash.txt	/*dbdash-intro*
+dbdash-layout	dbdash.txt	/*dbdash-layout*
 dbdash-lua	dbdash.txt	/*dbdash-lua*
 dbdash-luastream	dbdash.txt	/*dbdash-luastream*
 dbdash-mappings	dbdash.txt	/*dbdash-mappings*
@@ -92,11 +93,16 @@ dbdash-schema-def-query	dbdash-schema.txt	/*dbdash-schema-def-query*
 dbdash-schema-def-series	dbdash-schema.txt	/*dbdash-schema-def-series*
 dbdash-schema-def-show	dbdash-schema.txt	/*dbdash-schema-def-show*
 dbdash-schema-def-thresholds	dbdash-schema.txt	/*dbdash-schema-def-thresholds*
+dbdash-schema-def-track	dbdash-schema.txt	/*dbdash-schema-def-track*
 dbdash-schema-description	dbdash-schema.txt	/*dbdash-schema-description*
 dbdash-schema-interval	dbdash-schema.txt	/*dbdash-schema-interval*
 dbdash-schema-layout	dbdash-schema.txt	/*dbdash-schema-layout*
+dbdash-schema-layout.areas	dbdash-schema.txt	/*dbdash-schema-layout.areas*
+dbdash-schema-layout.auto_rows	dbdash-schema.txt	/*dbdash-schema-layout.auto_rows*
 dbdash-schema-layout.columns	dbdash-schema.txt	/*dbdash-schema-layout.columns*
 dbdash-schema-layout.gap	dbdash-schema.txt	/*dbdash-schema-layout.gap*
+dbdash-schema-layout.row_gap	dbdash-schema.txt	/*dbdash-schema-layout.row_gap*
+dbdash-schema-layout.rows	dbdash-schema.txt	/*dbdash-schema-layout.rows*
 dbdash-schema-panel.database	dbdash-schema.txt	/*dbdash-schema-panel.database*
 dbdash-schema-panel.id	dbdash-schema.txt	/*dbdash-schema-panel.id*
 dbdash-schema-panel.query	dbdash-schema.txt	/*dbdash-schema-panel.query*
@@ -113,6 +119,7 @@ dbdash-schema-series.color	dbdash-schema.txt	/*dbdash-schema-series.color*
 dbdash-schema-series.column	dbdash-schema.txt	/*dbdash-schema-series.column*
 dbdash-schema-series.label	dbdash-schema.txt	/*dbdash-schema-series.label*
 dbdash-schema-show	dbdash-schema.txt	/*dbdash-schema-show*
+dbdash-schema-show.area	dbdash-schema.txt	/*dbdash-schema-show.area*
 dbdash-schema-show.args_show	dbdash-schema.txt	/*dbdash-schema-show.args_show*
 dbdash-schema-show.axes	dbdash-schema.txt	/*dbdash-schema-show.axes*
 dbdash-schema-show.axes.x_axis	dbdash-schema.txt	/*dbdash-schema-show.axes.x_axis*
@@ -122,6 +129,7 @@ dbdash-schema-show.canvas	dbdash-schema.txt	/*dbdash-schema-show.canvas*
 dbdash-schema-show.category_column	dbdash-schema.txt	/*dbdash-schema-show.category_column*
 dbdash-schema-show.color_column	dbdash-schema.txt	/*dbdash-schema-show.color_column*
 dbdash-schema-show.colors	dbdash-schema.txt	/*dbdash-schema-show.colors*
+dbdash-schema-show.column	dbdash-schema.txt	/*dbdash-schema-show.column*
 dbdash-schema-show.column_list	dbdash-schema.txt	/*dbdash-schema-show.column_list*
 dbdash-schema-show.column_list.alias	dbdash-schema.txt	/*dbdash-schema-show.column_list.alias*
 dbdash-schema-show.column_list.column	dbdash-schema.txt	/*dbdash-schema-show.column_list.column*
@@ -142,9 +150,12 @@ dbdash-schema-show.legend.show	dbdash-schema.txt	/*dbdash-schema-show.legend.sho
 dbdash-schema-show.line_style	dbdash-schema.txt	/*dbdash-schema-show.line_style*
 dbdash-schema-show.line_style.fill_area	dbdash-schema.txt	/*dbdash-schema-show.line_style.fill_area*
 dbdash-schema-show.line_style.show_points	dbdash-schema.txt	/*dbdash-schema-show.line_style.show_points*
+dbdash-schema-show.min_height	dbdash-schema.txt	/*dbdash-schema-show.min_height*
 dbdash-schema-show.palette	dbdash-schema.txt	/*dbdash-schema-show.palette*
 dbdash-schema-show.refresh_hidden	dbdash-schema.txt	/*dbdash-schema-show.refresh_hidden*
 dbdash-schema-show.renderer	dbdash-schema.txt	/*dbdash-schema-show.renderer*
+dbdash-schema-show.row	dbdash-schema.txt	/*dbdash-schema-show.row*
+dbdash-schema-show.row_span	dbdash-schema.txt	/*dbdash-schema-show.row_span*
 dbdash-schema-show.show_countdown	dbdash-schema.txt	/*dbdash-schema-show.show_countdown*
 dbdash-schema-show.size_column	dbdash-schema.txt	/*dbdash-schema-show.size_column*
 dbdash-schema-show.span	dbdash-schema.txt	/*dbdash-schema-show.span*
