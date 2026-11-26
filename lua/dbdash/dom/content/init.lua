@@ -12,9 +12,20 @@ local M = {}
 ---Counters for tests: elements created and reused, builds skipped (nothing changed).
 M.stats = { created = 0, reused = 0, skipped = 0 }
 
+local CHART = "dbdash.dom.content.chart"
 local BUILDERS = {
   table = "dbdash.dom.content.table",
   text = "dbdash.dom.content.text",
+  line = CHART,
+  area = CHART,
+  scatter = CHART,
+  bubble = CHART,
+  bar = CHART,
+  histogram = CHART,
+  pie = CHART,
+  boxplot = CHART,
+  heatmap = CHART,
+  stat = CHART,
 }
 
 local function same_list(a, b)
@@ -90,7 +101,7 @@ function M.children(parent, tag, items, fields, fill)
       existing[#existing + 1] = c
     end
   end
-  local out = {}
+  local out, fresh = {}, {}
   for i, item in ipairs(items) do
     local f = fields(item, i)
     local node = existing[i]
@@ -107,9 +118,18 @@ function M.children(parent, tag, items, fields, fill)
       if fill then
         fill(node, item, i)
       end
-      parent:append(node)
+      fresh[#fresh + 1] = node
     end
     out[i] = node
+  end
+  -- many new elements are inserted as one fragment (one restyle of the parent's subtree),
+  -- a few one by one (only they restyle)
+  if #fresh > 16 then
+    parent:append_many(fresh)
+  else
+    for _, node in ipairs(fresh) do
+      parent:append(node)
+    end
   end
   parent:truncate(tag, #items)
   return out
@@ -147,7 +167,7 @@ function M.build(chart, rs, show)
   if built and built.type ~= show.type then
     -- another chart type (:DbDashStyle): all of the chart's elements go
     chart:set_children({})
-    chart.css_parts = {}
+    chart.css_parts, chart.content_items, chart.content_sigs = {}, nil, nil
   end
   local root = require(mod).build(chart, rs, show)
   chart.content = { rs = rs, key = key, type = show.type, root = root }

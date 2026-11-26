@@ -23,6 +23,7 @@ return {
   ["axis-title"] = { color = "DbDashLabel" },
   ["label"] = { color = "DbDashLabel" },
   ["legend"] = { color = "DbDashLegend" },
+  ["legend-item label"] = { color = "DbDashLegend" }, -- a pie legend's labels
   ["grid"] = { color = "DbDashGrid" },
   ["grid.x, grid.y"] = { display = "none" }, -- grid lines of xy charts
   ["chart.line point, chart.area point"] = { display = "none" }, -- markers on lines

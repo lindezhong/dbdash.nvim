@@ -145,7 +145,7 @@ function M.render(rs, show, ctx)
 
   -- Cell texts (a NULL cell's is its content) and natural widths; colors are each cell's
   -- computed color (inherited from its row: row.danger colors the row's cells).
-  local cells, row_bg, bg_groups = {}, {}, {}
+  local cells, row_bg, bg_groups, hits = {}, {}, {}, {}
   local widths, data_w = {}, {}
   for c, col in ipairs(cols) do
     widths[c] = col.width or W.width(col.label)
@@ -323,6 +323,7 @@ function M.render(rs, show, ctx)
         add(rule(chars.lt, chars.h, chars.x, chars.rt))
       end
     end
+    local first_line = #lines
     local parts, groups, n = {}, {}, 1
     for c, cell in ipairs(row) do
       parts[c] = cell_lines(cell, c)
@@ -343,6 +344,8 @@ function M.render(rs, show, ctx)
         table.insert(hl_spans, { row = #lines - 1, col_s = 0, col_e = #lines[#lines], group = row_bg[r], priority = 50 })
       end
     end
+    -- the row element's lines (hit testing: :DbDashInspect on a row)
+    hits[#hits + 1] = { row_s = first_line, row_e = #lines - 1, node = row_nodes[r] }
   end
   if border then
     if rich then
@@ -363,7 +366,7 @@ function M.render(rs, show, ctx)
   if note then
     add(note, { { 0, #note, ctx.css:hl("note") } })
   end
-  return { lines = lines, hl = hl_spans }
+  return { lines = lines, hl = hl_spans, hits = hits }
 end
 
 return M

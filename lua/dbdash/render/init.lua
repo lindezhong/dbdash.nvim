@@ -142,6 +142,10 @@ function M.render(rs, show, opts)
     ctx.min_plot_height = math.min(plot["min-height"] or 8, h or 15)
     ctx.history = opts.history
     local style = need("chart/" .. show.type .. "/" .. renderer)
+    -- the chart's content as DOM (dom/content): in a dashboard already built before
+    -- styles were computed; a chart rendered on its own builds it here
+    -- (a result the content cannot use is left to the renderer to report)
+    pcall(require("dbdash.dom.content").build, css.node, rs, show)
     -- The title is drawn here for every chart type; the chart gets the rest of the height.
     local title = nn(show.title)
     if css:get("title").display == "none" then

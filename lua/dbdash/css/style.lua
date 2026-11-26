@@ -127,16 +127,28 @@ end
 -- same scoped sheets, and the same result for each structural pseudo-class the sheets use
 -- (:nth-child(even) and the like). Rows and cells of a table mostly share a handful.
 
----The structural pseudo-classes used anywhere in the document's sheets.
+---The structural pseudo-classes used anywhere in the document's sheets, and the names of
+---the attributes their selectors test (Stylo's attribute dependencies: only those can
+---make two otherwise alike elements style differently).
 local function used_pseudos(doc)
   local key = doc.sheets
   if doc.pseudo_cache and doc.pseudo_cache.key == key and doc.pseudo_cache.n == #key then
-    return doc.pseudo_cache.list
+    local pc = doc.pseudo_cache
+    return pc.list, pc.attrs, pc.classes, pc.ids
   end
-  local seen, list = {}, {}
+  local seen, list, attrs, classes, ids = {}, {}, {}, {}, {}
   for _, sheet in ipairs(doc.sheets) do
     for _, r in ipairs(sheet.rules) do
       for _, c in ipairs(r.selector.parts) do
+        for _, a in ipairs(c.attrs) do
+          attrs[a.name] = true
+        end
+        for _, cl in ipairs(c.classes) do
+          classes[cl] = true
+        end
+        if c.id then
+          ids[c.id] = true
+        end
         for _, p in ipairs(c.pseudos) do
           local id = p.name .. "(" .. tostring(p.arg) .. ")"
           if not seen[id] then
@@ -147,26 +159,33 @@ local function used_pseudos(doc)
       end
     end
   end
-  doc.pseudo_cache = { key = key, n = #key, list = list }
-  return list
+  doc.pseudo_cache = { key = key, n = #key, list = list, attrs = attrs, classes = classes, ids = ids }
+  return list, attrs, classes, ids
 end
 
-local function sharing_key(doc, n, parent_computed, pseudos, scoped)
-  local key = tostring(parent_computed) .. "\0" .. n.tag .. "\0" .. (n.id or "")
-  local cls = n.classes
-  if #cls == 1 then
-    key = key .. "\0." .. cls[1]
-  elseif #cls > 1 then
-    key = key .. "\0." .. table.concat(cls, ".")
+local function sharing_key(doc, n, parent_computed, pseudos, scoped, used_attrs, used_classes, used_ids)
+  -- only ids, classes and attributes some selector tests can tell elements apart
+  local key = tostring(parent_computed) .. "\0" .. n.tag
+  if n.id and used_ids[n.id] then
+    key = key .. "\0#" .. n.id
+  end
+  for _, cl in ipairs(n.classes) do
+    if used_classes[cl] then
+      key = key .. "\0." .. cl
+    end
   end
   local k1, v1 = next(n.attrs)
   if k1 ~= nil then
     if next(n.attrs, k1) == nil then
-      key = key .. "\0[" .. k1 .. "=" .. tostring(v1)
+      if used_attrs[k1] then
+        key = key .. "\0[" .. k1 .. "=" .. tostring(v1)
+      end
     else
       local names = {}
       for k in pairs(n.attrs) do
-        names[#names + 1] = k
+        if used_attrs[k] then
+          names[#names + 1] = k
+        end
       end
       table.sort(names)
       for _, k in ipairs(names) do
@@ -207,10 +226,11 @@ local function restyle_subtree(doc, n, parent_computed, stats)
         scoped[#scoped + 1] = { scope = sheet.scope, index = si }
       end
     end
-    share = { cache = {}, pseudos = used_pseudos(doc), scoped = scoped }
+    local pseudos, attrs, classes, ids = used_pseudos(doc)
+    share = { cache = {}, pseudos = pseudos, attrs = attrs, classes = classes, ids = ids, scoped = scoped }
     stats.share = share
   end
-  local key = sharing_key(doc, n, parent_computed, share.pseudos, share.scoped)
+  local key = sharing_key(doc, n, parent_computed, share.pseudos, share.scoped, share.attrs, share.classes, share.ids)
   local hit = share.cache[key]
   local computed, matched
   if hit then

@@ -42,7 +42,35 @@ end
 
 ---Every bar's segments (a plain bar is one segment).
 local function segments(b)
-  return b.segments or { { value = b.value, group = b.group } }
+  return b.segments or { { value = b.value, group = b.group, item = b.item } }
+end
+
+---A bar's element (dom/content/chart.lua: bar[category][series], in result order).
+local function bar_node(ctx, k)
+  return k and require("dbdash.dom.content.chart").item(ctx.css.node, "bars", k) or nil
+end
+
+---The color of a bar: its own element's (bar.<category>, bar[category=...]), else its
+---series'.
+local function bar_group(ctx, k, series_group)
+  local node = bar_node(ctx, k)
+  local own = node and require("dbdash.css.style").get(node).color
+  if own then
+    return require("dbdash.css").hl_of(node)
+  end
+  return series_group
+end
+
+---The group of a segment's value label, or false when its value element is hidden.
+local function value_group(ctx, seg)
+  local node = require("dbdash.dom.content.chart").child(bar_node(ctx, seg and seg.item), "value")
+  if not node then
+    return ctx.css:hl("value")
+  end
+  if require("dbdash.css.style").get(node).display == "none" then
+    return false
+  end
+  return require("dbdash.css").hl_of(node)
 end
 
 ---The values shown along the value axis, and their range.
@@ -75,7 +103,7 @@ end
 ---Reference line values (numbers, or mean / min / max of `all`).
 local function mark_values(marks, all)
   local out = {}
-  for _, m in ipairs(marks or {}) do
+  for k, m in ipairs(marks or {}) do
     local v = nn(m.value)
     local x = tonumber(v)
     if not x and #all > 0 then
@@ -92,11 +120,17 @@ local function mark_values(marks, all)
       end
     end
     if x then
-      out[#out + 1] = { value = x, label = nn(m.label) or (type(v) == "string" and ("%s %s"):format(v, fmt.number(x))), class = nn(m.class) }
+      out[#out + 1] = { value = x, label = nn(m.label) or (type(v) == "string" and ("%s %s"):format(v, fmt.number(x))), class = nn(m.class), index = k }
     end
   end
   return out
 end
+
+---The group of the k-th mark line: its element's color (mark.<class>, mark[label=...]).
+local function mark_group(ctx, m)
+  return C.item_hl(ctx, "marks", m.index, "mark") or ctx.css:hl("mark", { classes = m.class and { m.class } or nil })
+end
+M.mark_group = mark_group
 
 ---Horizontal bars: one row (or bar_width rows) per bar, labels on the left, values after.
 ---@param bars dbdash.render.Bar[]
@@ -191,17 +225,18 @@ function M.horizontal(ctx, bars, o)
         hl[#hl + 1] = { row = i - 1, col_s = before, col_e = #line, group = c[3] }
         pos = pos + W.width(c[2])
       end
-      if o.show_values and r.first and texts[i] then
+      local vg = o.show_values and r.first and texts[i] and value_group(ctx, r.segs[1])
+      if vg then
         local t = texts[i]
         if o.inside and pos >= W.width(t) + 1 then
           -- the value inside the end of the bar (ECharts label.position: insideRight)
           local keep = W.truncate(line, pos - W.width(t) - 1, "")
           line = keep .. " " .. t
-          hl[#hl + 1] = { row = i - 1, col_s = #keep, col_e = #line, group = ctx.css:hl("value"), priority = 110 }
+          hl[#hl + 1] = { row = i - 1, col_s = #keep, col_e = #line, group = vg, priority = 110 }
         else
           local before = #line
           line = line .. " " .. t
-          hl[#hl + 1] = { row = i - 1, col_s = before + 1, col_e = #line, group = ctx.css:hl("value") }
+          hl[#hl + 1] = { row = i - 1, col_s = before + 1, col_e = #line, group = vg }
         end
       end
     end
@@ -224,7 +259,7 @@ function M.horizontal(ctx, bars, o)
   local label_line, label_hl = "", {}
   for _, m in ipairs(marks) do
     local c = col_of(m.value)
-    local group = ctx.css:hl("mark", { classes = m.class and { m.class } or nil })
+    local group = mark_group(ctx, m)
     for i = 1, #lines do
       local l = lines[i]
       local w = W.width(l)
@@ -334,22 +369,24 @@ function M.vertical(ctx, bars, o)
       end
       total = total + s.value
       top_h = to
-      if o.show_values and not stacked then
+      local vg = o.show_values and not stacked and value_group(ctx, s)
+      if vg then
         local text = fmt.value(s.value, o.value_format)
         local r = o.inside and (rows - math.floor(to)) or (rows - 1 - math.min(math.ceil(to), rows - 1))
         local at = start_c + math.floor((bw - W.width(text)) / 2)
         -- above the bar only when that cell is free (inside: over the bar)
         if W.width(text) <= bw + 1 and r >= 0 and r < rows and (o.inside or not grid[r][at]) then
-          put_text(r, at, text, ctx.css:hl("value"))
+          put_text(r, at, text, vg)
         end
       end
     end
-    if o.show_values and stacked then
+    local svg = o.show_values and stacked and value_group(ctx, segs[1])
+    if svg then
       local text = fmt.value(total, o.value_format)
       local r = o.inside and (rows - math.floor(top_h)) or (rows - 1 - math.min(math.ceil(top_h), rows - 1))
       local at = c0 + math.floor((bw - W.width(text)) / 2)
       if W.width(text) <= slot and r >= 0 and r < rows and (o.inside or not grid[r][at]) then
-        put_text(r, at, text, ctx.css:hl("value"))
+        put_text(r, at, text, svg)
       end
     end
   end
@@ -357,7 +394,7 @@ function M.vertical(ctx, bars, o)
   for _, m in ipairs(mark_values(o.marks, all)) do
     local r = rows - 1 - math.floor(height_of(m.value))
     if r >= 0 and r < rows then
-      local group = ctx.css:hl("mark", { classes = m.class and { m.class } or nil })
+      local group = mark_group(ctx, m)
       for c = 0, cols - 1 do
         if not grid[r][c] then
           grid[r][c] = "┄"
@@ -401,7 +438,7 @@ function M.from_show(rs, show, ctx)
     local xaxis, long = C.long(rs, show)
     legend = {}
     for i, s in ipairs(long) do
-      legend[i] = { label = s.label, group = C.color(ctx, show, i, nil, s.label) }
+      legend[i] = { label = s.label, group = C.color(ctx, show, i, nil, s.label), label_group = C.item_hl(ctx, "legend", i, "legend") }
     end
     for ci, label in ipairs(xaxis.labels) do
       local segs = {}
@@ -412,7 +449,8 @@ function M.from_show(rs, show, ctx)
             v = p.y
           end
         end
-        segs[si] = { value = v, group = legend[si].group, series = s.label }
+        local k = (ci - 1) * #long + si
+        segs[si] = { value = v, group = bar_group(ctx, k, legend[si].group), series = s.label, item = k }
       end
       bars[ci] = { label = label, segments = segs }
     end
@@ -422,7 +460,7 @@ function M.from_show(rs, show, ctx)
     if #series > 1 then
       legend = {}
       for i, s in ipairs(series) do
-        legend[i] = { label = s.label, group = C.color(ctx, show, i, nil, s.label) }
+        legend[i] = { label = s.label, group = C.color(ctx, show, i, nil, s.label), label_group = C.item_hl(ctx, "legend", i, "legend") }
       end
     end
     for _, row in ipairs(rs.rows) do
@@ -430,12 +468,14 @@ function M.from_show(rs, show, ctx)
       if #series == 1 then
         local v = C.num(row[series[1].index])
         if v then
-          bars[#bars + 1] = { label = label, value = v, group = C.color(ctx, show, 1, nil, label) }
+          local k = #bars + 1
+          bars[k] = { label = label, value = v, group = bar_group(ctx, k, C.color(ctx, show, 1, nil, label)), item = k }
         end
       else
         local segs = {}
+        local base = #bars * #series
         for i, s in ipairs(series) do
-          segs[i] = { value = C.num(row[s.index]) or 0, group = legend[i].group, series = s.label }
+          segs[i] = { value = C.num(row[s.index]) or 0, group = bar_group(ctx, base + i, legend[i].group), series = s.label, item = base + i }
         end
         bars[#bars + 1] = { label = label, segments = segs }
       end
@@ -487,7 +527,33 @@ end
 ---Histogram bins from value_column. bins defaults to Sturges' rule; bin_width and
 ---bin_range fix the bins (Vega-Lite bin.step / extent); cumulative adds up; normalize:
 ---percent (of all values) or density (per unit of the value).
+-- bins by result: the DOM build (dom/content/chart.lua) and the renderer share them
+local bin_cache = setmetatable({}, { __mode = "k" })
+
+---The bins of a result (without colors), computed once per result and settings.
+function M.bins(rs, show)
+  local key = vim.json.encode({ show.value_column, show.bins, show.bin_width, show.bin_range, show.cumulative, show.normalize })
+  local hit = bin_cache[rs]
+  if hit and hit.key == key then
+    return hit.bins, hit.vals
+  end
+  local bins, vals = M.compute_bins(rs, show)
+  bin_cache[rs] = { key = key, bins = bins, vals = vals }
+  return bins, vals
+end
+
+---Bins colored for a chart (each bin a copy: renderers annotate them).
 function M.histogram(rs, show, ctx)
+  local bins, vals = M.bins(rs, show)
+  local group = C.color(ctx, show, 1)
+  local out = {}
+  for i, b in ipairs(bins) do
+    out[i] = { lower = b.lower, upper = b.upper, label = b.label, value = b.value, group = ctx and bar_group(ctx, i, group) or group, item = i }
+  end
+  return out, vals
+end
+
+function M.compute_bins(rs, show)
   local vi = C.col(rs, nn(show.value_column), "value_column")
   local vals = {}
   for _, row in ipairs(rs.rows) do
@@ -542,7 +608,6 @@ function M.histogram(rs, show, ctx)
       counts[i] = bw > 0 and counts[i] / (#vals * bw) or 0
     end
   end
-  local group = C.color(ctx, show, 1)
   local bins = {}
   for i = 1, nb do
     local a, b = lo + (i - 1) * bw, lo + i * bw
@@ -551,7 +616,6 @@ function M.histogram(rs, show, ctx)
       upper = b,
       label = ("[%s, %s%s"):format(fmt.number(a), fmt.number(b), i == nb and "]" or ")"),
       value = counts[i],
-      group = group,
     }
   end
   return bins, vals
@@ -564,7 +628,7 @@ function M.histogram_marks(show, bins, vals)
   for _, m in ipairs(mark_values(nn(show.mark_lines), vals)) do
     for _, b in ipairs(bins) do
       if m.value >= b.lower and m.value <= b.upper then
-        out[#out + 1] = { bin = b, label = m.label or fmt.number(m.value), class = m.class }
+        out[#out + 1] = { bin = b, label = m.label or fmt.number(m.value), class = m.class, index = m.index }
         break
       end
     end

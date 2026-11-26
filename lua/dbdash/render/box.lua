@@ -74,7 +74,12 @@ local function shift(out, cols, rows)
     e.row, e.col_s, e.col_e = h.row + rows, h.col_s + #pad, h.col_e + #pad
     hl[#hl + 1] = e
   end
-  return { lines = lines, hl = hl }
+  local hits
+  for _, h in ipairs(out.hits or {}) do
+    hits = hits or {}
+    hits[#hits + 1] = { row_s = h.row_s + rows, row_e = h.row_e + rows, node = h.node }
+  end
+  return { lines = lines, hl = hl, hits = hits }
 end
 
 ---Place `body` in a `width` x `height` area by justify / align.

@@ -277,7 +277,7 @@ function M.render(rs, show, ctx, kind)
   local legend_pos = C.legend_position(ctx, #series)
   local legend = {}
   for i, s in ipairs(series) do
-    legend[i] = { label = s.label, group = s.group }
+    legend[i] = { label = s.label, group = s.group, label_group = C.item_hl(ctx, "legend", i, "legend") }
   end
   local spec = {
     xlabel = axes.xlabel,
@@ -321,14 +321,10 @@ function M.render(rs, show, ctx, kind)
     end
   end
 
-  -- point markers: content is the marker character; on lines and areas they show with
-  -- display: block (hidden by the UA sheet), scatter and bubble always draw them
-  local point = ctx.css:get("point")
-  local show_points = point.display ~= "none"
-  local marker = point.content
-  if kind == "line" or kind == "area" then
-    marker = show_points and marker or nil
-  end
+  -- point markers, each series' own point element: content is the marker character; on
+  -- lines and areas they show with display: block (hidden by the UA sheet), scatter and
+  -- bubble always draw them
+  local show_points, marker
   local size_range = nn(show.size_range)
   local CURVE = { step = "before", ["step-before"] = "before", ["step-after"] = "after", ["step-middle"] = "middle" }
 
@@ -340,7 +336,13 @@ function M.render(rs, show, ctx, kind)
   for si = #series, 1, -1 do
     local s = series[si]
     local pts = s.points
-    local sc = ctx.css:get("series", C.series_spec(si, s.label))
+    local sc = C.item_style(ctx, "series", si, "series")
+    local point = C.item_style(ctx, "series", si, "point", "point")
+    show_points = point.display ~= "none"
+    marker = point.content
+    if kind == "line" or kind == "area" then
+      marker = show_points and marker or nil
+    end
     local fill = kind == "area" or sc.fill == true
     local stepped = CURVE[sc.curve]
     if kind == "scatter" then
@@ -442,8 +444,8 @@ function M.render(rs, show, ctx, kind)
       return math.max(unpack(all_y))
     end
   end
-  for _, m in ipairs(nn(show.mark_lines) or {}) do
-    local group = ctx.css:hl("mark", { classes = nn(m.class) and { m.class } or nil })
+  for k, m in ipairs(nn(show.mark_lines) or {}) do
+    local group = C.item_hl(ctx, "marks", k, "mark") or ctx.css:hl("mark", { classes = nn(m.class) and { m.class } or nil })
     local axis = nn(m.axis) or "y"
     local v = nn(m.value)
     if axis == "x" then

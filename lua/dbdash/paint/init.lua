@@ -15,6 +15,11 @@ local function stack(parts)
     for _, h in ipairs(part.hl) do
       out.hl[#out.hl + 1] = { row = h.row + off, col_s = h.col_s, col_e = h.col_e, group = h.group, priority = h.priority }
     end
+    -- the rows of elements inside a part (a table's rows, a text's lines) move with it
+    for _, h in ipairs(part.hits or {}) do
+      out.hits = out.hits or {}
+      out.hits[#out.hits + 1] = { row_s = h.row_s + off, row_e = h.row_e + off, node = h.node }
+    end
   end
   return out
 end
@@ -36,6 +41,9 @@ function M.fragment(frag)
   local function add(part, node)
     if node and #part.lines > 0 then
       hits[#hits + 1] = { row_s = top, row_e = top + #part.lines - 1, x = left, width = inner_w, node = node }
+    end
+    for _, h in ipairs(part.hits or {}) do -- elements inside the part, by rows
+      hits[#hits + 1] = { row_s = top + h.row_s, row_e = top + h.row_e, x = left, width = inner_w, node = h.node }
     end
     top = top + #part.lines
     parts[#parts + 1] = part

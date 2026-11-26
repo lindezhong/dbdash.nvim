@@ -39,7 +39,8 @@ function M.items(rs, show, ctx)
     items[#items + 1] = { label = C.nn(show.other_label) or "Other", value = rest, other = true }
   end
   for i, it in ipairs(items) do
-    it.group = it.other and ctx.css:hl("series", { classes = { "other" } }) or C.color(ctx, show, i, nil, it.label)
+    -- the slice's series element (series.other for the rest)
+    it.group = C.color(ctx, show, i, nil, it.label)
   end
   return items, sum
 end
@@ -54,9 +55,6 @@ end
 ---@param max_label integer? label width cap (default 30)
 ---@return { text: string, spans: { [1]: integer, [2]: integer, [3]: string }[] }[]
 function M.legend(items, sum, show, max_label, ctx)
-  local show_labels = ctx.css:get("label").display ~= "none"
-  local show_values = ctx.css:get("value").display ~= "none"
-  local show_pct = ctx.css:get("percent").display ~= "none"
   local lw, vw = 0, 0
   for _, it in ipairs(items) do
     lw = math.max(lw, W.width(it.label))
@@ -64,7 +62,11 @@ function M.legend(items, sum, show, max_label, ctx)
   end
   lw = math.min(lw, max_label or 30)
   local out = {}
-  for _, it in ipairs(items) do
+  for i, it in ipairs(items) do
+    -- the legend item's own label, value and percent elements
+    local show_labels, g_label = C.item_part(ctx, "legend", i, "label", ctx.css:hl("legend"))
+    local show_values, g_value = C.item_part(ctx, "legend", i, "value", ctx.css:hl("value"))
+    local show_pct, g_pct = C.item_part(ctx, "legend", i, "percent", ctx.css:hl("percent"))
     local b, sp, p = {}, {}, 0
     local function put(s, g)
       if g then
@@ -75,13 +77,13 @@ function M.legend(items, sum, show, max_label, ctx)
     end
     put("■", it.group)
     if show_labels then
-      put(" " .. W.pad(it.label, lw), ctx.css:hl("legend"))
+      put(" " .. W.pad(it.label, lw), g_label)
     end
     if show_values then
-      put("  " .. W.pad(fmt.value(it.value, C.nn(show.format)), vw, "right"), ctx.css:hl("value"))
+      put("  " .. W.pad(fmt.value(it.value, C.nn(show.format)), vw, "right"), g_value)
     end
     if show_pct then
-      put(("  %5.1f%%"):format(it.value / sum * 100), ctx.css:hl("percent"))
+      put(("  %5.1f%%"):format(it.value / sum * 100), g_pct)
     end
     out[#out + 1] = { text = table.concat(b), spans = sp }
   end

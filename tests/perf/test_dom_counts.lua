@@ -29,8 +29,9 @@ local function built(kind, size, seed)
   return doc, chart, r
 end
 
--- kinds with a content DOM so far, and the elements per item
-local KINDS = { table = 8, text = 1 } -- a row and its 6 cells (+ header), a line
+-- kinds whose elements grow with the rows, and the elements per row: a row, its 6 cells
+-- (and a header each); a line; 3 bars with a value each
+local KINDS = { table = 8, text = 1, bar = 6 }
 
 for kind, per in pairs(KINDS) do
   T[kind .. ": elements and restyles grow linearly"] = function()
@@ -51,18 +52,33 @@ for kind, per in pairs(KINDS) do
   T[kind .. ": a new result of the same shape reuses every element"] = function()
     local doc, chart = built(kind, 1000)
     local before = vim.deepcopy(content.stats)
+    local items = chart.content_items and chart.content_items.bars
     local rs, show = H.SCENARIOS[kind](1000, 1)
     content.build(chart, rs, show)
     style.restyle(doc)
     local created = content.stats.created - before.created
     local reused = content.stats.reused - before.reused
-    eq({ kind, created, reused >= 1000 }, { kind, 0, true })
+    -- reused one by one, or (plotted charts) kept as a whole: the items' names did not change
+    local kept = items ~= nil and chart.content_items.bars == items
+    eq({ kind, created, reused >= 1000 or kept }, { kind, 0, true })
     -- only elements whose classes changed (thresholds, highlights) restyle
-    eq({ kind, doc.restyled.nodes < 0.3 * count(chart) }, { kind, true })
+    eq({ kind, (doc.restyled and doc.restyled.nodes or 0) < 0.3 * count(chart) }, { kind, true })
     -- the same result again: nothing to build at all
     local skipped = content.stats.skipped
     content.build(chart, rs, show)
     eq(content.stats.skipped, skipped + 1)
+  end
+end
+
+for kind in pairs(H.SIZES) do
+  T[kind .. ": a new result of the same shape creates no element"] = function()
+    local size = H.SIZES[kind][2]
+    local doc, chart = built(kind, size)
+    local before = vim.deepcopy(content.stats)
+    local rs, show = H.SCENARIOS[kind](size, 1)
+    content.build(chart, rs, show)
+    style.restyle(doc)
+    eq({ kind, content.stats.created - before.created }, { kind, 0 })
   end
 end
 

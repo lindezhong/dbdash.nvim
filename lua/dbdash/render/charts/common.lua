@@ -151,10 +151,56 @@ function M.series_spec(i, name, classes)
   return { index = i, classes = cls, attrs = name and { name = tostring(name) } or nil }
 end
 
----Highlight group for the i-th series / named category: its element's color in the style
----sheets, else the palette's i-th color.
+---Highlight group for the i-th series / named category: the color of its series element
+---(dom/content/chart.lua) in the style sheets, else the palette's i-th color. Without a
+---context (building the DOM) there is none.
 function M.color(ctx, _, i, _, name)
+  if not ctx then
+    return nil
+  end
+  local node = require("dbdash.dom.content.chart").item(ctx.css.node, "series", i)
+  if node then
+    return require("dbdash.css").hl_of(node) or ctx.palette(i)
+  end
   return ctx.css:hl("series", M.series_spec(i, name)) or ctx.palette(i)
+end
+
+---Highlight group of an item's element (dom/content/chart.lua: "legend", "marks", ...),
+---else of the chart's part `tag` (charts drawn without their content).
+function M.item_hl(ctx, kind, i, tag, child)
+  local chart = require("dbdash.dom.content.chart")
+  local node = chart.item(ctx.css.node, kind, i)
+  if child then
+    node = chart.child(node, child)
+  end
+  if node then
+    return require("dbdash.css").hl_of(node)
+  end
+  return ctx.css:hl(tag)
+end
+
+---A part of the i-th box / item (`child` of its element): shown?, and its highlight
+---group (else `fallback`, e.g. the series color).
+function M.item_part(ctx, kind, i, child, fallback)
+  local st = M.item_style(ctx, kind, i, child, child)
+  if st.display == "none" then
+    return false
+  end
+  local g = st.color and M.item_hl(ctx, kind, i, child, child) or nil
+  return true, g or fallback
+end
+
+---Computed style of an item's element (or of the chart's part `tag`).
+function M.item_style(ctx, kind, i, tag, child)
+  local chart = require("dbdash.dom.content.chart")
+  local node = chart.item(ctx.css.node, kind, i)
+  if child then
+    node = chart.child(node, child)
+  end
+  if node then
+    return require("dbdash.css.style").get(node)
+  end
+  return ctx.css:get(tag)
 end
 
 ---Axis settings from show.axes.{x_axis,y_axis} or x_label/y_label.

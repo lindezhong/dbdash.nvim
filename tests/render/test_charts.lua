@@ -145,6 +145,31 @@ T["registry: custom renderers; renderer and canvas from computed styles"] = func
   eq(registry.names("chart/bar/"), { "horizontal", "mine", "vertical" })
 end
 
+T["per-item selectors: one bar, one legend item"] = function()
+  local rs = resultset.new({ { name = "k", type = "string" }, { name = "v", type = "integer" } }, { { "Books", 2 }, { "Food", 7 } })
+  local out = render.render(rs, { type = "bar", x_column = "k", y_column = "v" }, {
+    width = 50,
+    height = 10,
+    style = { ["bar[category=Books]"] = { color = "Special" }, ["bar[category=Food] value"] = { display = "none" } },
+  })
+  local special = vim.tbl_filter(function(h)
+    return h.group == "Special"
+  end, out.hl)
+  eq(#special, 1) -- the Books bar only
+  eq(table.concat(out.lines, "\n"):find(" 7", 1, true), nil) -- Food's value hidden
+  rs = resultset.new({ { name = "l", type = "string" }, { name = "v", type = "integer" } }, { { "a", 5 }, { "b", 3 }, { "c", 2 } })
+  out = render.render(rs, { type = "pie", label_column = "l", value_column = "v" }, {
+    width = 50,
+    height = 10,
+    style = { ["legend-item:nth-child(2) label"] = { color = "Special" } },
+  })
+  special = vim.tbl_filter(function(h)
+    return h.group == "Special"
+  end, out.hl)
+  eq(#special, 1)
+  eq(out.lines[special[1].row + 1]:find("b", 1, true) ~= nil, true)
+end
+
 T["nice ticks"] = function()
   local nice = require("dbdash.render.ticks.nice")
   eq({ nice.ticks(0, 150, 4) }, { { 0, 50, 100, 150 }, { "0", "50", "100", "150" } })

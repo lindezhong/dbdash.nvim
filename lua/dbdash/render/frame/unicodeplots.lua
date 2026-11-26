@@ -142,7 +142,7 @@ function M.render(ctx, spec, body)
     if legend_right and e then
       b.put(" ")
       b.put(e.symbol or "■", e.group)
-      b.put(" " .. W.truncate(e.label, 24), g_legend)
+      b.put(" " .. W.truncate(e.label, 24), e.label_group or g_legend)
     end
   end
 
@@ -232,7 +232,7 @@ function M.render(ctx, spec, body)
         b.put("  ")
       end
       b.put(e.symbol or "■", e.group)
-      b.put(" " .. e.label, g_legend)
+      b.put(" " .. e.label, e.label_group or g_legend)
     end
     add(b.done())
   end

@@ -103,6 +103,23 @@ T["inspect: path, rules by origin and specificity, computed style, box"] = funct
   eq(#vim.api.nvim_buf_get_extmarks(d.buf, require("dbdash.inspect").ns, 0, -1, {}) > 0, true)
 end
 
+T["inspect: a table row under the cursor is the row element"] = function()
+  local d = start()
+  local row
+  for _, h in ipairs(d.hits) do
+    if h.node.tag == "row" then
+      row = h.node
+      break
+    end
+  end
+  assert(row, "no row element in the hit regions")
+  cursor_on(d, row)
+  vim.cmd("DbDashInspect")
+  local text = float_text()
+  eq(text:find("dashboard > panel#a.table > chart.table > table > row", 1, true) ~= nil, true)
+  eq(text:find("Children: cell", 1, true) ~= nil, true)
+end
+
 T[":DbDashStyle set adds a runtime rule over every other origin; reset drops it"] = function()
   local d = start()
   vim.cmd("DbDashStyle set panel-title color DiagnosticOk")

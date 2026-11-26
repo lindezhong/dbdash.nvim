@@ -87,7 +87,7 @@ function M.render(rs, show, ctx)
         pieces = { W.truncate(line, width, require("dbdash.render").ellipsis(ls)) }
       end
       for _, piece in ipairs(pieces) do
-        body[#body + 1] = { text = piece, group = group, n = first and n or nil, align = align }
+        body[#body + 1] = { text = piece, group = group, n = first and n or nil, align = align, node = ln }
         first = false
       end
     end
@@ -98,7 +98,15 @@ function M.render(rs, show, ctx)
     hidden = #body - max
     body = { unpack(body, 1, max) }
   end
+  local hits = {}
   for _, b in ipairs(body) do
+    -- the line element's screen lines (hit testing)
+    local last = hits[#hits]
+    if last and last.node == b.node then
+      last.row_e = #lines
+    else
+      hits[#hits + 1] = { row_s = #lines, row_e = #lines, node = b.node }
+    end
     local prefix = ""
     if numbers then
       prefix = b.n and (string.rep(" ", nw - 1 - #tostring(b.n)) .. b.n .. " ") or string.rep(" ", nw)
@@ -124,7 +132,7 @@ function M.render(rs, show, ctx)
     lines[#lines + 1] = note
     hls[#hls + 1] = { row = #lines - 1, col_s = 0, col_e = #note, group = ctx.css:hl("note") }
   end
-  return { lines = lines, hl = hls }
+  return { lines = lines, hl = hls, hits = hits }
 end
 
 return M

@@ -633,9 +633,11 @@ definitions:
     description: |-
       A style sheet (:help dbdash-css): selector -> properties, as in CSS. Selectors: an
       element (dashboard, header, header-title, countdown, panel, panel-title, args, error,
-      chart, title, subtitle, plot, axis, axis-title, label, legend, grid, mark, series,
-      point, bar, value, percent, unit, delta, sparkline, table, header, row, cell, rule,
-      line, line-number, outlier, mean, ...), #id, .class, [attr] / [attr=value],
+      chart, title, subtitle, plot, axis, axis-title, label, legend, legend-item, grid,
+      mark, series, point, bar, value, percent, unit, stat, delta, sparkline, table,
+      header, row, cell, rule, lines, line, line-number, outlier, mean, ...; a chart's
+      content has one element per item: a row, a cell, a bar, a legend item, ...), #id,
+      .class, [attr] / [attr=value],
       :nth-child(odd | even | N), :first-child, :last-child, descendants ("panel title"),
       ::part(name) and comma lists. Later and more specific rules win; style sheets cascade
       default < setup({ style }) < the dashboard's style < a panel's style < :DbDashStyle.

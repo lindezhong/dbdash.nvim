@@ -59,8 +59,60 @@ local function big(s)
   }
 end
 
----One value: the number (big or normal), its label, the change and the sparkline.
-local function one(rs, show, ctx, history)
+---The show config of each value: the show itself, or one per show.value_columns entry
+---(names or { column, label, format, unit, prefix }).
+function M.values(show)
+  local cols = show.value_columns ~= vim.NIL and show.value_columns or nil
+  if not cols or #cols == 0 then
+    return { show }
+  end
+  local out = {}
+  for i, spec in ipairs(cols) do
+    local sub = {}
+    for k, v in pairs(show) do
+      sub[k] = v
+    end
+    sub.title, sub.value_columns = vim.NIL, vim.NIL
+    if type(spec) == "table" then
+      for k, v in pairs(spec) do
+        sub[k] = v
+      end
+      sub.value_column = spec.column
+      sub.label = spec.label ~= nil and spec.label or spec.column
+    else
+      sub.value_column, sub.label = spec, spec
+    end
+    out[i] = sub
+  end
+  return out
+end
+
+---The threshold classes of a value (show.thresholds).
+function M.classes(v, show)
+  if show.thresholds and show.thresholds ~= vim.NIL then
+    local T = require("dbdash.render.thresholds")
+    local below = show.thresholds_below == true
+    local _, step = T.level(v, T.steps(show.thresholds, below), below)
+    return T.classes(step)
+  end
+  return {}
+end
+
+---One value: the number (big or normal), its label, the change and the sparkline. Its
+---parts are the elements of the i-th stat (dom/content/chart.lua).
+local function one(rs, show, ctx, history, i)
+  local chart = require("dbdash.dom.content.chart")
+  local style = require("dbdash.css.style")
+  local hl_of = require("dbdash.css").hl_of
+  local stat = chart.item(ctx.css.node, "stats", i or 1)
+  ---the computed style and group of a part of this stat (or of the chart's part)
+  local function part(tag)
+    local node = chart.child(stat, tag)
+    if node then
+      return style.get(node), hl_of(node), node
+    end
+    return ctx.css:get(tag), ctx.css:hl(tag)
+  end
   local lines, hl = {}, {}
   local function add(s, spans)
     lines[#lines + 1] = s
@@ -80,17 +132,13 @@ local function one(rs, show, ctx, history)
     return { lines = lines, hl = hl }
   end
   local text, unit = C.text(v, show)
-  -- the value element: its threshold class colors it (Grafana colorMode is a rule:
-  -- value.danger { background-color: ... })
-  local classes = {}
-  if show.thresholds and show.thresholds ~= vim.NIL then
-    local T = require("dbdash.render.thresholds")
-    local below = show.thresholds_below == true
-    local _, step = T.level(v, T.steps(show.thresholds, below), below)
-    classes = T.classes(step)
+  -- the value element: its threshold class (set when the DOM was built) colors it
+  -- (Grafana colorMode is a rule: value.danger { background-color: ... })
+  local vstyle, group = part("value")
+  if not chart.child(stat, "value") then
+    local classes = M.classes(v, show)
+    vstyle, group = ctx.css:get("value", { classes = classes }), ctx.css:hl("value", { classes = classes })
   end
-  local vstyle = ctx.css:get("value", { classes = classes })
-  local group = ctx.css:hl("value", { classes = classes })
 
   local size = vstyle["font-size"]
   local rows = size ~= "normal" and big(text) or nil
@@ -100,7 +148,7 @@ local function one(rs, show, ctx, history)
       local s = rows[r]
       local spans = { { 0, #s, group } }
       if r == 3 and unit then
-        spans[#spans + 1] = { #s + 1, #s + 1 + #unit, ctx.css:hl("unit") }
+        spans[#spans + 1] = { #s + 1, #s + 1 + #unit, select(2, part("unit")) }
         s = s .. " " .. unit
       end
       add(s, spans)
@@ -112,7 +160,7 @@ local function one(rs, show, ctx, history)
   local label = show.label ~= vim.NIL and show.label or nil
   if label then -- a muted line under the value (Grafana stat text)
     local l = W.truncate(tostring(label), ctx.width)
-    add(l, { { 0, #l, ctx.css:hl("label") } })
+    add(l, { { 0, #l, select(2, part("label")) } })
   end
 
   -- change and sparkline
@@ -123,13 +171,21 @@ local function one(rs, show, ctx, history)
     parts[#parts + 1] = s
     pos = pos + #s
   end
-  if ctx.css:get("delta").display ~= "none" then
+  local delta_style, _, delta_node = part("delta")
+  if delta_style.display ~= "none" then
     local d = C.delta(history, show.delta_mode ~= vim.NIL and show.delta_mode or nil)
     if d then
-      put(d.text, ctx.css:hl("delta", { classes = { d.dir } }))
+      -- the direction comes from the panel's history, known here: set it on the element
+      -- (the class restyles it) before reading its color
+      if delta_node then
+        delta_node:set_classes({ d.dir })
+        put(d.text, hl_of(delta_node))
+      else
+        put(d.text, ctx.css:hl("delta", { classes = { d.dir } }))
+      end
     end
   end
-  if ctx.css:get("sparkline").display ~= "none" then
+  if part("sparkline").display ~= "none" then
     local len = tonumber(show.sparkline_length ~= vim.NIL and show.sparkline_length or nil) or C.HISTORY
     local room = ctx.width - (pos > 0 and (W.width(table.concat(parts)) + 2) or 0)
     local spark = C.sparkline(history, math.min(len, room))
@@ -138,7 +194,7 @@ local function one(rs, show, ctx, history)
         parts[#parts + 1] = "  "
         pos = pos + 2
       end
-      put(spark, ctx.css:hl("sparkline"))
+      put(spark, select(2, part("sparkline")))
     end
   end
   if #parts > 0 then
@@ -151,29 +207,15 @@ end
 ---unit, prefix }, like a Grafana stat with several fields); the change and sparkline
 ---follow the first value only.
 function M.render(rs, show, ctx)
-  local cols = show.value_columns ~= vim.NIL and show.value_columns or nil
-  if not cols or #cols == 0 then
-    return one(rs, show, ctx, ctx.history)
+  local subs = M.values(show)
+  if #subs == 1 and subs[1] == show then
+    return one(rs, show, ctx, ctx.history, 1)
   end
   local outs, cells, x, gap = {}, {}, 0, 4
-  local w = math.max(8, math.floor((ctx.width - gap * (#cols - 1)) / #cols))
-  for i, spec in ipairs(cols) do
-    local sub = {}
-    for k, v in pairs(show) do
-      sub[k] = v
-    end
-    sub.title, sub.value_columns = vim.NIL, vim.NIL
-    if type(spec) == "table" then
-      for k, v in pairs(spec) do
-        sub[k] = v
-      end
-      sub.value_column = spec.column
-      sub.label = spec.label ~= nil and spec.label or spec.column
-    else
-      sub.value_column, sub.label = spec, spec
-    end
+  local w = math.max(8, math.floor((ctx.width - gap * (#subs - 1)) / #subs))
+  for i, sub in ipairs(subs) do
     local sctx = setmetatable({ width = w }, { __index = ctx })
-    outs[i] = one(rs, sub, sctx, i == 1 and ctx.history or {})
+    outs[i] = one(rs, sub, sctx, i == 1 and ctx.history or {}, i)
     cells[i] = { x = x, width = w, y = 0, height = #outs[i].lines }
     x = x + w + gap
   end

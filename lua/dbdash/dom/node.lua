@@ -87,6 +87,23 @@ function Node:append(child)
   return child
 end
 
+---Insert several children at the end at once (a script appending a fragment): the parent
+---is marked for a restyle of its subtree once, instead of every child on its own.
+---@param children dbdash.dom.Node[]
+function Node:append_many(children)
+  for _, child in ipairs(children) do
+    child.parent = self
+    self.children[#self.children + 1] = child
+    place(self, child)
+    if self.document then
+      child:adopt(self.document)
+    end
+  end
+  if self.document and #children > 0 then
+    self:dirty(M.OTHER)
+  end
+end
+
 ---Set the document of a subtree.
 function Node:adopt(doc)
   self.document = doc

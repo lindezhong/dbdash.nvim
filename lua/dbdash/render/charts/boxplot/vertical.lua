@@ -61,12 +61,13 @@ function M.render(rs, show, ctx)
   end
   local slot = math.max(5, math.floor(cols / #order))
   local half = math.max(1, math.min(3, math.floor((slot - 2) / 2)))
-  local show_outliers = ctx.css:get("outlier").display ~= "none"
-  local show_means = ctx.css:get("mean").display ~= "none" -- hidden by the UA sheet
-  local show_values = ctx.css:get("value").display ~= "none" -- hidden by the UA sheet
   spec.xticks = {}
   for i, s in ipairs(stats) do
     local g = C.color(ctx, show, i, nil, order[i])
+    -- the box's own value, outlier and mean elements
+    local show_means, g_mean = C.item_part(ctx, "series", i, "mean", g)
+    local show_outliers, g_out = C.item_part(ctx, "series", i, "outlier", g)
+    local show_values, g_value = C.item_part(ctx, "series", i, "value", ctx.css:hl("value"))
     local c = (i - 1) * slot + math.floor(slot / 2)
     local a, q1, m, q3, b = row(s.wlo), row(s.q1), row(s.median), row(s.q3), row(s.whi)
     for r = b + 1, q3 - 1 do
@@ -97,17 +98,17 @@ function M.render(rs, show, ctx)
     put(m, c - half, "├", g)
     put(m, c + half, "┤", g)
     if show_means then
-      put(row(s.mean), c, "+", g)
+      put(row(s.mean), c, "+", g_mean)
     end
     if show_outliers then
       for _, v in ipairs(s.outliers) do
-        put(row(v), c, "•", g, true)
+        put(row(v), c, "•", g_out, true)
       end
     end
     if show_values then -- the median beside the box
       local text = fmt.number(s.median)
       for k = 1, #text do
-        put(m, c + half + 1 + k, text:sub(k, k), ctx.css:hl("value"), true)
+        put(m, c + half + 1 + k, text:sub(k, k), g_value, true)
       end
     end
     spec.xticks[i] = { col = c, label = W.truncate(order[i], slot - 1) }

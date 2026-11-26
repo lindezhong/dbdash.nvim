@@ -728,7 +728,13 @@ a mapping of selectors to properties: >yaml
     value.danger: { background-color: DiagnosticError }
 <
 A dashboard is a tree of elements (|dbdash-css-elements|), and every rule
-whose selector matches an element applies to it.
+whose selector matches an element applies to it. A chart's content is
+elements too, one per item of the data, as an SVG chart or an HTML table
+would be: a row and its cells, a line of text, a series, a bar, a legend
+item. So rules can pick one item: `"row:last-child"`, `"cell:first-child"`,
+`"legend-item:nth-child(2)"`, `"bar[category=Books] value"`. The screen
+lines a long row wraps into, ticks and the canvas pixels are layout, not
+elements.
 
 Cascade                                                   *dbdash-css-cascade*
 
@@ -782,13 +788,23 @@ Elements                                                 *dbdash-css-elements*
       chart          the chart; classes and [type]: its type
         title, subtitle   the chart's title (one-chart dashboards)
         plot         the plot area (border, height, min-height)
-        axis, axis-title, label, grid (.x, .y), legend, mark (.<class>)
-        series       one per series or category: series:nth-child(N),
-                     series.<name>, series[name=...]; series.other
-        point, bar, value, percent, unit, outlier, mean
-        delta (.up, .down, .same), sparkline        stat
-        table, header, row, cell, rule              table
-        line, line-number, cell                     text
+        axis, axis-title, label, grid (.x, .y), rule, note
+        legend       > legend-item[name] (> label, value, percent: pie)
+        series[name] one per series, slice or box, in order:
+                     series:nth-child(N), series.<name>, series.other;
+                     > point (lines, scatter: the markers), > value,
+                     outlier, mean (box plots)
+        mark[label]  one per mark_lines entry (.<class>)
+        bar[category][series]  one per bar (.<category>) > value
+        cell[x][y]   one per heat map cell
+        stat         one per value (value_columns) > value (.<threshold
+                     class>), unit, label, delta (.up, .down, .same),
+                     sparkline
+        table        > header[column] (one per column), row (one per
+                     result row; .<row threshold class>) > cell[column]
+                     (.null, .<threshold class>)
+        lines        > line (one per result row; .<highlight class>);
+                     line-number: the lines' numbers
   note, warning      notes ("… 3 more rows") and warnings
 
 The sidebar is a document of its own: sidebar-dir, sidebar-item (.running,
@@ -846,10 +862,13 @@ Rendering                                                 *dbdash-rendering*
 A dashboard is drawn the way a browser draws a page (after Servo):
 
   DOM          the dashboard, its header, panels and charts as elements; a
-               query result, an error or a new argument value changes them
-               and marks them dirty
-  style        the cascade computes each element's style, restyling from
-               the dirty part; each property says what a change of it costs:
+               query result builds the chart's content elements (reusing
+               them by position: a new result of the same shape only
+               changes values); an error or a new argument value changes
+               them; changes mark them dirty
+  style        the cascade computes each element's style, restyling only
+               what changed; elements alike for every selector share one
+               computed style; each property says what a change of it costs:
                repaint (colors), relayout (sizes) or rebuild (renderer)
   layout       the grid places the panels; a chart is a replaced element,
                sized by layout and drawn by its renderer; a panel's layout

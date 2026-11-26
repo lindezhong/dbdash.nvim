@@ -124,8 +124,22 @@ local function keys(rs, i)
   return labels
 end
 
+-- grids by result: the DOM build (dom/content/chart.lua) and the renderer share one
+local grids = setmetatable({}, { __mode = "k" })
+
 ---@return { xs: string[], ys: string[], values: table<string, number>, lo: number, hi: number }
 function M.grid(rs, show)
+  local key = tostring(show.x_column) .. "\0" .. tostring(show.y_column) .. "\0" .. tostring(show.value_column)
+  local hit = grids[rs]
+  if hit and hit.key == key then
+    return hit.grid
+  end
+  local g = M.compute_grid(rs, show)
+  grids[rs] = { key = key, grid = g }
+  return g
+end
+
+function M.compute_grid(rs, show)
   local xi = C.col(rs, C.nn(show.x_column), "x_column")
   local yi = C.col(rs, C.nn(show.y_column), "y_column")
   local vi = C.col(rs, C.nn(show.value_column), "value_column")

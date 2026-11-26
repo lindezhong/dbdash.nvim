@@ -85,7 +85,12 @@ function M.render(rs, show, ctx)
   end
   lo, hi = C.limits(ctx, lo, hi, axes.xmin or axes.ymin, axes.xmax or axes.ymax)
 
-  local show_values = ctx.css:get("value").display ~= "none" -- hidden by the UA sheet
+  -- each box's value, outlier and mean elements (dom/content/chart.lua); the values take
+  -- a line under the boxes when any box shows them (hidden by the UA sheet)
+  local show_values = false
+  for i = 1, #order do
+    show_values = show_values or (C.item_part(ctx, "series", i, "value"))
+  end
   local rows_needed = #order * 4 - (show_values and 0 or 1)
   local spec = {
     title = C.nn(show.title),
@@ -108,11 +113,12 @@ function M.render(rs, show, ctx)
       grid[r][c], colors[r][c] = ch, g
     end
   end
-  local show_outliers = ctx.css:get("outlier").display ~= "none"
-  local show_means = ctx.css:get("mean").display ~= "none" -- hidden by the UA sheet
   spec.yticks = {}
   for i, s in ipairs(stats) do
     local g = C.color(ctx, show, i, nil, order[i])
+    local show_means, g_mean = C.item_part(ctx, "series", i, "mean", g)
+    local show_outliers, g_out = C.item_part(ctx, "series", i, "outlier", g)
+    local box_values, g_value = C.item_part(ctx, "series", i, "value", ctx.css:hl("value"))
     local top = (i - 1) * 4
     local mid, bot = top + 1, top + 2
     local a, q1, m, q3, b = col(s.wlo), col(s.q1), col(s.median), col(s.q3), col(s.whi)
@@ -142,21 +148,21 @@ function M.render(rs, show, ctx)
     put(mid, m, "│", g)
     put(bot, m, "┴", g)
     if show_means then
-      put(mid, col(s.mean), "+", g, true)
+      put(mid, col(s.mean), "+", g_mean, true)
     end
     if show_outliers then
       for _, v in ipairs(s.outliers) do
-        put(mid, col(v), "•", g, true)
+        put(mid, col(v), "•", g_out, true)
       end
     end
-    if show_values then -- q1, median, q3 under the box, where they fit
+    if box_values then -- q1, median, q3 under the box, where they fit
       local used = -1
       for _, v in ipairs({ s.q1, s.median, s.q3 }) do
         local text = require("dbdash.render.format").number(v)
         local start = math.max(col(v) - math.floor(#text / 2), used + 1)
         if start + #text <= cols then
           for k = 1, #text do
-            put(bot + 1, start + k - 1, text:sub(k, k), ctx.css:hl("value"))
+            put(bot + 1, start + k - 1, text:sub(k, k), g_value)
           end
           used = start + #text
         end

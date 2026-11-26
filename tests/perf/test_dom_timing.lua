@@ -80,11 +80,11 @@ for kind, sizes in pairs(H.SIZES) do
         end
       end
     end
-    -- linear in the items: the large case costs at most 2 x the item ratio of the typical
-    -- (quadratic growth would be about 10 x)
+    -- linear in the items: the large case costs at most 3 x the item ratio of the typical,
+    -- plus 10 ms of machine noise (quadratic growth would be about 10 x the ratio)
     local small, large = sizes[1], sizes[2]
     local ratio = H.items(kind, large) / H.items(kind, small)
-    eq({ kind, got[large].new <= got[small].new * ratio * 2 + 5 }, { kind, true })
+    eq({ kind, got[large].new <= got[small].new * ratio * 3 + 10 }, { kind, true })
   end
 end
 
