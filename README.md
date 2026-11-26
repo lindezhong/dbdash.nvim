@@ -180,7 +180,7 @@ Examples are in [`example/`](example), one directory per topic (`:help dbdash-ex
 | [`lua/`](example/lua) | a `lua://` source ([`lua.yaml`](example/lua/lua.yaml)), `query.transform` ([`transform.yaml`](example/lua/transform.yaml)), panel state, callbacks and run records ([`callback.yaml`](example/lua/callback.yaml)) |
 | [`push/`](example/push) | push sources: [`luastream.yaml`](example/push/luastream.yaml), [`exec.yaml`](example/push/exec.yaml), [`webhook.yaml`](example/push/webhook.yaml) (OpenAPI) |
 | [`databases/`](example/databases) | a SQLite file ([`sqlite_file.yaml`](example/databases/sqlite_file.yaml)); after `make it-up` (the test services in docker): [`postgres.yaml`](example/databases/postgres.yaml), [`mysql.yaml`](example/databases/mysql.yaml), [`redis.yaml`](example/databases/redis.yaml), [`mongodb.yaml`](example/databases/mongodb.yaml), [`cassandra.yaml`](example/databases/cassandra.yaml), [`mssql.yaml`](example/databases/mssql.yaml), [`http.yaml`](example/databases/http.yaml) |
-| [`connections/`](example/connections) | an HTTPS API ([`github.yaml`](example/connections/github.yaml), needs network) |
+| [`connections/`](example/connections) | after `make it-up`: TLS modes ([`tls.yaml`](example/connections/tls.yaml)), passwords outside the config ([`passwords.yaml`](example/connections/passwords.yaml)), cancelling a slow query ([`cancel.yaml`](example/connections/cancel.yaml)); an HTTPS API ([`github.yaml`](example/connections/github.yaml), needs network) |
 
 ### Connection URLs
 

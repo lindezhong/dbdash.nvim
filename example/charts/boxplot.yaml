@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
 # Box plot: value distribution per group (median, quartiles, whiskers at 1.5 IQR).
+# The boxes take their colors from the tableau palette.
 
 database:
   url: "sqlite:///:memory:"
@@ -31,6 +32,8 @@ show:
   style:
     show_outliers: true              # points beyond the whiskers
     show_means: true                 # "+" at the mean
+
+  palette: tableau                   # box colors: theme (the colorscheme's, default) or tableau
 
   show_countdown: true
   countdown_format: "Next update: {time}s"

@@ -3,7 +3,9 @@
 # SQL in templates (:help dbdash-template-filters, dbdash-template-autoescape,
 # dbdash-template-dialects): filters and functions that write SQL for the panel's
 # database (SQLite here; the files in ../databases/ use them on the others), and
-# query.autoescape, which writes every {{ value }} as a literal.
+# query.autoescape, which writes every {{ value }} as a literal (a {% lua %} block's
+# result too, unless it returns dbdash.safe(...)). It runs Lua, so dbdash asks whether you
+# trust this file first.
 
 title: "SQL filters, functions and autoescape"
 
@@ -49,12 +51,13 @@ panels:
       autoescape: true
       sql: |
         -- query.autoescape: every value written with {% raw %}{{ }}{% endraw %} is a literal of the database; SQL from
-        -- the filters, | safe and macros is not escaped again.
+        -- the filters, | safe, macros and dbdash.safe() is not escaped again.
         WITH t(name) AS (VALUES ('O''Neil'))
         SELECT {{ args.name }} AS arg,
                {{ args.depts | length }} AS depts,
                {{ 'name' | safe }} = {{ args.name }} AS same,
-               {% autoescape false %}'{{ args.limit }}'{% endautoescape %} AS autoescape_off
+               {% autoescape false %}'{{ args.limit }}'{% endautoescape %} AS autoescape_off,
+               {% lua %}return dbdash.safe("upper(name)"){% endlua %} AS from_lua
         FROM t
     show:
       type: table

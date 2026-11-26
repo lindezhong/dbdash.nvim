@@ -7,7 +7,7 @@
 # A string from lua:// or HTTP needs query.transform: return { { text = rs } }.
 
 database:
-  url: "sqlite:///:memory:"
+  url: "sqlite3:///:memory:"        # sqlite3:// is the same as sqlite://
 
 query:
   sql: |

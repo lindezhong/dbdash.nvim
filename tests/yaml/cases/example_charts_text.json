@@ -1,6 +1,6 @@
 {
  "database": {
-  "url": "sqlite:///:memory:"
+  "url": "sqlite3:///:memory:"
  },
  "query": {
   "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 6)\nSELECT time('now', '-' || (6 - i) || ' minutes') AS at,\n       CASE abs(random() % 3) WHEN 0 THEN 'WARN ' ELSE 'INFO ' END AS level,\n       'request ' || i || ' served in ' || (20 + abs(random() % 200)) || ' ms' AS message\nFROM n\nUNION ALL\nSELECT time('now'), 'ERROR', 'upstream failed:' || char(10) || '    timeout after 30s'\n"

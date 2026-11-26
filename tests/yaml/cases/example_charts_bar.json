@@ -9,6 +9,7 @@
   "type": "bar",
   "title": "Sales by category",
   "interval": "45s",
+  "height": 12,
   "x_column": "category",
   "y_column": "sales",
   "style": {

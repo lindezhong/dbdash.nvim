@@ -1,0 +1,72 @@
+{
+ "title": "TLS",
+ "layout": {
+  "columns": 2
+ },
+ "show": {
+  "interval": "1m"
+ },
+ "panels": [
+  {
+   "database": {
+    "url": "postgres://dbdash:dbdash_pw@localhost:15432/dbdash_test?tls=verify-full&ca=../../tests/fixtures/pki/root.pem"
+   },
+   "query": {
+    "sql": "SELECT version AS tls, cipher, bits FROM pg_stat_ssl WHERE pid = pg_backend_pid()"
+   },
+   "show": {
+    "type": "table",
+    "title": "PostgreSQL, tls=verify-full with ca="
+   }
+  },
+  {
+   "database": {
+    "url": "postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test?tls=pin&fingerprint=sha256:3D:58:A4:52:C7:22:7E:C5:12:28:DB:DA:EC:28:95:D5:CD:B4:AD:AF:6F:4D:77:57:72:EE:FE:45:43:D0:1A:BC"
+   },
+   "query": {
+    "sql": "SELECT ssl, version FROM pg_stat_ssl WHERE pid = pg_backend_pid()"
+   },
+   "show": {
+    "type": "table",
+    "title": "PostgreSQL, tls=pin"
+   }
+  },
+  {
+   "database": {
+    "url": "mysql://dbdash:dbdash_pw@127.0.0.1:13306/dbdash_test?tls=require"
+   },
+   "query": {
+    "sql": "SHOW SESSION STATUS WHERE Variable_name IN ('Ssl_version', 'Ssl_cipher')"
+   },
+   "show": {
+    "type": "table",
+    "title": "MySQL, tls=require"
+   }
+  },
+  {
+   "database": {
+    "url": "redis://:dbdash_pw@127.0.0.1:16380/0?tls=pin&fingerprint=sha256:9B:B6:9C:47:01:E8:B8:C7:29:C5:D5:37:A0:F1:FA:92:3F:78:38:DB:43:B5:83:94:C7:E5:D4:31:7E:D6:E2:52"
+   },
+   "query": {
+    "sql": "INFO server"
+   },
+   "show": {
+    "type": "table",
+    "title": "Redis, tls=pin"
+   }
+  },
+  {
+   "database": {
+    "url": "https://localhost:18443?ca=../../tests/fixtures/pki/root.pem"
+   },
+   "query": {
+    "sql": "{\"path\": \"/items\"}"
+   },
+   "show": {
+    "type": "table",
+    "title": "HTTPS (verify-full by default) with ca=",
+    "span": 2
+   }
+  }
+ ]
+}

@@ -30,6 +30,12 @@
   "style": {
    "stacked": true
   },
+  "axes": {
+   "y_axis": {
+    "min_value": 0,
+    "max_value": 250
+   }
+  },
   "show_countdown": true,
   "countdown_format": "Next update: {time}s"
  }

@@ -15,6 +15,7 @@
    "show_outliers": true,
    "show_means": true
   },
+  "palette": "tableau",
   "show_countdown": true,
   "countdown_format": "Next update: {time}s"
  }

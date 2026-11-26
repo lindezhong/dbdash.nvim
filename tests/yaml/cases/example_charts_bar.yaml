@@ -2,6 +2,7 @@
 #
 # Bar chart: sales per product category.
 # Horizontal bars by default; try `renderer: vertical` or :DbDashStyle bar vertical.
+# height sets the rows of the plot.
 
 database:
   url: "sqlite:///:memory:"
@@ -24,6 +25,7 @@ show:
   type: bar
   title: "Sales by category"
   interval: 45s
+  height: 12                         # rows of the plot (default 15)
 
   x_column: category                 # bar labels
   y_column: sales                    # bar lengths

@@ -36,6 +36,8 @@ show:
 
   x_column: ad_spend
   y_column: sales
+  x_label: "Advertising"             # axis titles (short for axes.x_axis.title / y_axis.title)
+  y_label: "Sales"
   color_column: profit_category
 
   colors:

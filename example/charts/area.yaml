@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
 # Area chart: users per device type over a year, stacked.
-# Set style.stacked to false to draw overlapping areas.
+# Set style.stacked to false to draw overlapping areas. The y axis has a fixed range.
 
 database:
   url: "sqlite:///:memory:"
@@ -46,6 +46,11 @@ show:
 
   style:
     stacked: true
+
+  axes:
+    y_axis:
+      min_value: 0
+      max_value: 250                 # a fixed scale: refreshes do not rescale it
 
   show_countdown: true
   countdown_format: "Next update: {time}s"

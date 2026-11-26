@@ -11,6 +11,8 @@
   "interval": "50s",
   "x_column": "ad_spend",
   "y_column": "sales",
+  "x_label": "Advertising",
+  "y_label": "Sales",
   "color_column": "profit_category",
   "colors": {
    "High": "#2ecc71",

@@ -451,7 +451,9 @@ topic (the sidebar shows them as a tree):
   databases/    a SQLite file; after `make it-up` (the test services in
                 docker): postgres, mysql, redis, mongodb, cassandra, mssql
                 and http
-  connections/  an HTTPS API (github.yaml, needs network)
+  connections/  after `make it-up`: TLS modes, passwords outside the
+                config, cancelling a slow query; an HTTPS API (github.yaml,
+                needs network)
 
 Most use an in-memory SQLite database and run as they are. Those that run Lua
 or a script ask for trust first (|dbdash-lua|).

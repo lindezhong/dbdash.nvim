@@ -64,7 +64,7 @@ panels:
       timeout: 5s
       sql: |
         SELECT pid, usename AS user, application_name AS app, state,
-               date_trunc('second', now() - backend_start) AS connected
+               date_trunc('second', now() - backend_start)::text AS connected
         FROM pg_stat_activity
         WHERE datname = current_database()
         ORDER BY backend_start

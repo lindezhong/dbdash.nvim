@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Cancelling queries (:help dbdash-cancel). Runs against `make it-up`. The first panel's
+# query sleeps on the server; while it runs (the panel shows a spinner):
+# - r refreshes the panel: the running query is cancelled and a new one starts;
+# - changing an argument (:DbDashArgs, or :DbDashStart cancel.yaml seconds=20) does the
+#   same; closing the dashboard (:DbDashStop) cancels it too;
+# - a query running past query.timeout is cancelled and reported as a timeout.
+# Timer refreshes do not cancel: they are skipped while a query runs. Cancelling stops
+# waiting at once, then stops the query on the server (PostgreSQL: a CancelRequest, MySQL:
+# KILL QUERY, SQL Server: an attention, MongoDB: killOp). The second panel shows the sleeping query while it runs. A cancelled refresh
+# keeps the previous result; :DbDashStatus lists it.
+
+title: "Cancel"
+
+database:
+  url: "postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test"
+
+args:
+  - name: seconds
+    type: number
+    default: 2
+    description: "How long the query sleeps"
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      timeout: 30s
+      sql: SELECT now()::time(0) AS started, clock_timestamp()::time(0) AS ended FROM pg_sleep({{ args.seconds }})
+    show:
+      type: table
+      title: "A slow query (press r while it runs)"
+      interval: 15s
+      args_show: true
+
+  - query:
+      sql: |
+        SELECT pid, state, date_trunc('second', now() - query_start)::text AS running, left(query, 40) AS query
+        FROM pg_stat_activity
+        WHERE datname = current_database() AND pid <> pg_backend_pid()
+    show:
+      type: table
+      title: "Other sessions (the sleep shows here while it runs)"
+      interval: 1s

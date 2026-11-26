@@ -59,7 +59,7 @@
    "query": {
     "max_rows": 50,
     "timeout": "5s",
-    "sql": "SELECT pid, usename AS user, application_name AS app, state,\n       date_trunc('second', now() - backend_start) AS connected\nFROM pg_stat_activity\nWHERE datname = current_database()\nORDER BY backend_start\n"
+    "sql": "SELECT pid, usename AS user, application_name AS app, state,\n       date_trunc('second', now() - backend_start)::text AS connected\nFROM pg_stat_activity\nWHERE datname = current_database()\nORDER BY backend_start\n"
    },
    "show": {
     "type": "table",

@@ -36,9 +36,11 @@ query:
     {% if args.wave %}
       load = load + math.floor(30 * math.sin(i / 2))
     {% endif %}
-      rows[#rows + 1] = { os.date("%m-%d", t), load, host }
+      rows[#rows + 1] = { os.date("%m-%d", t), load, host, i == 0 and dbdash.null or i }
+      dbdash.checkpoint()                       -- let the editor run during long loops
     end
-    return { columns = { "day", "load", "host" }, rows = rows }
+    -- dbdash.null is NULL inside a row (nil would end a Lua list early).
+    return { columns = { "day", "load", "host", "days_ago" }, rows = rows }
 
 show:
   args_show: true
