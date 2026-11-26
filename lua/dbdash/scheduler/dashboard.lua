@@ -185,6 +185,10 @@ function Dashboard:resume()
       end
     end
   end
+  if self.render_skipped then
+    self.render_skipped = false
+    self:request_render()
+  end
   self:update_status()
   require("dbdash.view.sidebar").refresh()
 end

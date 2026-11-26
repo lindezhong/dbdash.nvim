@@ -5,10 +5,15 @@ local parser = require("dbdash.css.parser")
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set({
   hooks = {
+    pre_case = function()
+      -- dashboards without a window are paused (and not rendered) unless this is off
+      require("dbdash").setup({ dashboard = { pause_hidden = false } })
+    end,
     post_case = function()
       for _, d in ipairs(sched.list()) do
         sched.stop(d.path)
       end
+      require("dbdash").setup({})
     end,
   },
 })
@@ -26,6 +31,9 @@ local function start(lines)
     end
     return true
   end, 10)
+  vim.wait(1000, function() -- the result's rendering update is coalesced
+    return not d.render_pending
+  end, 5)
   return d
 end
 

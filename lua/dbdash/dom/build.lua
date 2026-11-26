@@ -9,6 +9,17 @@ local dom = require("dbdash.dom.node")
 
 local M = {}
 
+-- dashboard.keys actions (events) -> the command that is their default action
+M.ACTIONS = {
+  modify = "modify_variable",
+  show_args = "show_variables",
+  refresh = "restart",
+  reset = "reset_variables",
+  show_sql = "show_sql",
+  export = "export",
+  describe = "describe",
+}
+
 ---Build (or rebuild) the document of a dashboard: d.doc, d.header_node, and for every
 ---panel p.node and p.chart_node.
 ---@param d table the dashboard (scheduler)
@@ -16,6 +27,17 @@ function M.dashboard(d)
   local doc = css.document("dashboard")
   d.doc = doc
   d.header_node = doc.root:append(dom.new("header"))
+  -- the dashboard keys are events at the cursor; their default actions listen on the root
+  for action, fn in pairs(M.ACTIONS) do
+    doc.root:on(action, function(ev)
+      local commands = require("dbdash.commands")
+      if action == "export" then
+        commands.export({}, false, ev.detail and ev.detail.register) -- "xe: register x
+      else
+        commands[fn]()
+      end
+    end)
+  end
   for _, p in ipairs(d.panels) do
     local t = p.cfg.show.type
     p.node = doc.root:append(dom.new("panel", { id = p.cfg.id, classes = { t } }))

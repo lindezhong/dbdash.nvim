@@ -80,11 +80,11 @@ function Panel:stream_start()
       end, function(e)
         self:stream_end(st, e)
       end)
-      self.d:redraw()
+      self.d:request_render()
     end)
   end)
   self:start_draw_timer()
-  self.d:redraw()
+  self.d:request_render()
 end
 
 ---Stop the push source (dashboard stopped, restarted): items still queued are dropped.
@@ -194,7 +194,7 @@ function Panel:stream_finish(st)
   close_timer(self.timer)
   self.timer = nil
   self.dirty = false
-  self.d:redraw()
+  self.d:request_render()
 end
 
 ---The redraw timer of a push panel: on its interval, draw when something is new.
@@ -212,7 +212,7 @@ function Panel:start_draw_timer(first)
     vim.schedule(function()
       if self.timer and self.dirty then
         self.dirty = false
-        self.d:redraw()
+        self.d:request_render()
       end
     end)
   end)
@@ -221,7 +221,7 @@ function Panel:start_draw_timer(first)
     vim.schedule(function()
       if self.dirty and self:active() then
         self.dirty = false
-        self.d:redraw()
+        self.d:request_render()
       end
     end)
   end

@@ -113,11 +113,52 @@ local function title_line(p, st, iw)
   return head, spans
 end
 
+local layout_panel
+
+---The cache key of a panel's layout: what it depends on (Servo keys its layout caches on
+---the containing block; here also the data, the panel's subtree version and its show
+---config, which still carries per-panel overrides).
+local function panel_key(p, width, height, fill, exact)
+  return table.concat({
+    width,
+    height or "",
+    tostring(fill),
+    tostring(exact),
+    p.node and p.node.version or 0,
+    p.values and #p.values or 0,
+    vim.json.encode(p:show_config()),
+  }, "|")
+end
+
 ---Lay out a panel of a grid in a `width` x `height` cell. `fill`: the chart fills the
 ---cell (a fixed or fr row); `exact`: the box is `height` lines (else as tall as its
----content, for measuring min-content / max-content).
+---content, for measuring min-content / max-content). The fragment is reused while
+---nothing it depends on changed.
 ---@return dbdash.layout.Fragment
 function M.panel(p, width, height, fill, exact)
+  p.layout_cache = p.layout_cache or { n = 0, entries = {} }
+  local cache = p.layout_cache
+  local key = panel_key(p, width, height, fill, exact)
+  local hit = cache.entries[key]
+  if hit and hit.rs == p.rs then
+    M.stats.hits = M.stats.hits + 1
+    return hit.frag
+  end
+  M.stats.misses = M.stats.misses + 1
+  local frag = layout_panel(p, width, height, fill, exact)
+  if cache.n > 16 then -- sizes come and go with the window: keep the cache small
+    cache.entries, cache.n = {}, 0
+  end
+  -- keyed on the version after layout: styling parts the first time bumps it
+  cache.entries[panel_key(p, width, height, fill, exact)] = { rs = p.rs, frag = frag }
+  cache.n = cache.n + 1
+  return frag
+end
+
+---Layout cache counters (tests).
+M.stats = { hits = 0, misses = 0 }
+
+layout_panel = function(p, width, height, fill, exact)
   local show = vim.deepcopy(p:show_config())
   local st = box.settings(show, css.scope(p.node))
   show.title = nil -- in the title line (or the box's top border) instead
@@ -190,7 +231,7 @@ end
 function M.measure(p, width)
   local paint = require("dbdash.paint")
   local show = p:show_config()
-  local key = vim.json.encode({ width, show, p.error and true or false })
+  local key = vim.json.encode({ width, show, p.error and true or false, p.node and p.node.layout_version or 0 })
   local m = p.measured
   if not (m and m.rs == p.rs and m.key == key) then
     m = {

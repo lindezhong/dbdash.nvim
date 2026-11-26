@@ -24,17 +24,34 @@ M.stack = stack
 ---@param frag dbdash.layout.Fragment
 ---@return dbdash.render.Output
 function M.fragment(frag)
-  local parts = {}
+  if frag.painted then -- a fragment reused from the layout cache paints the same
+    return frag.painted
+  end
+  local parts, hits = {}, {}
+  -- hit-test regions of the parts, relative to the box (inside its border and padding)
+  local st = frag.box or { pad = { 0, 0, 0, 0 } }
+  local b = st.border and 1 or 0
+  local top, left = b + st.pad[1], b + st.pad[4]
+  local inner_w = frag.width - left - b - st.pad[2]
+  local function add(part, node)
+    if node and #part.lines > 0 then
+      hits[#hits + 1] = { row_s = top, row_e = top + #part.lines - 1, x = left, width = inner_w, node = node }
+    end
+    top = top + #part.lines
+    parts[#parts + 1] = part
+  end
   for _, r in ipairs(frag.rows or {}) do
-    parts[#parts + 1] = r.out
+    add(r.out, r.node)
   end
   if frag.chart then
-    parts[#parts + 1] = frag.chart.out
+    add(frag.chart.out, frag.chart.node)
   end
   if frag.after then
-    parts[#parts + 1] = frag.after.out
+    add(frag.after.out, frag.after.node)
   end
-  return box.wrap(stack(parts), frag.box, frag.width, frag.height, frag.border_title)
+  frag.painted = box.wrap(stack(parts), frag.box, frag.width, frag.height, frag.border_title)
+  frag.painted.hits = hits
+  return frag.painted
 end
 
 ---The display list of a view: layers with their position (cells), in painting order.
@@ -42,14 +59,28 @@ end
 function M.view(tree)
   local list = { header = tree.header, layers = {} }
   if tree.single then
-    local body = M.fragment(tree.single)
+    local painted = M.fragment(tree.single)
+    local body, shift = painted, 0
     if tree.args then
-      body = stack({ tree.args, { lines = { "" }, hl = {} }, body })
+      body = stack({ tree.args, { lines = { "" }, hl = {} }, painted })
+      shift = 2
     end
     list.body = body
+    list.hits = {}
+    for _, h in ipairs(painted.hits or {}) do
+      list.hits[#list.hits + 1] = { row_s = h.row_s + shift, row_e = h.row_e + shift, x = h.x, width = h.width, node = h.node }
+    end
+    list.hits[#list.hits + 1] = { row_s = 0, row_e = #body.lines - 1, x = 0, width = tree.single.width, node = tree.single.node }
   else
     for _, f in ipairs(tree.grid.fragments) do
       list.layers[#list.layers + 1] = { x = f.x, y = f.y, width = f.width, height = f.height, out = M.fragment(f), node = f.node }
+    end
+    list.hits = {}
+    for _, l in ipairs(list.layers) do
+      list.hits[#list.hits + 1] = { row_s = l.y, row_e = l.y + l.height - 1, x = l.x, width = l.width, node = l.node }
+      for _, h in ipairs(l.out.hits or {}) do
+        list.hits[#list.hits + 1] = { row_s = l.y + h.row_s, row_e = l.y + h.row_e, x = l.x + h.x, width = h.width, node = h.node }
+      end
     end
   end
   return list

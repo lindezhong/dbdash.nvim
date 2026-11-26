@@ -51,10 +51,15 @@ function M.apply_keys(buf)
     local lhs = keys[action]
     if lhs then
       vim.keymap.set("n", lhs, function()
-        if action == "export" then
-          return require("dbdash.commands").export({}, false, vim.v.register) -- "xe: register x
+        -- an event at the cursor: hit test, then capture and bubble (events/); the
+        -- default action listens on the document root
+        local register = vim.v.register
+        for _, d in ipairs(require("dbdash.scheduler").list()) do
+          if d.buf == buf and d.doc then
+            require("dbdash.events").at_cursor(d, action, { register = register })
+            return
+          end
         end
-        require("dbdash.commands")[def[1]]()
       end, { buffer = buf, nowait = true, silent = true, desc = "dbdash: " .. def[2] })
       mapped[#mapped + 1] = lhs
     end
@@ -89,26 +94,82 @@ function M.create(path, buf)
   return buf
 end
 
----Replace buffer content and highlights.
----@param buf integer
----@param lines string[]
----@param hl { row: integer, col_s: integer, col_e: integer, group: string }[]
-function M.draw(buf, lines, hl)
-  if not vim.api.nvim_buf_is_valid(buf) then
-    return
-  end
-  vim.bo[buf].modifiable = true
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.bo[buf].modifiable = false
-  vim.bo[buf].modified = false
-  vim.api.nvim_buf_clear_namespace(buf, M.ns, 0, -1)
-  for _, h in ipairs(hl) do
+-- What each buffer shows (for the diff): row -> signature (text + highlights).
+local shown = {}
+
+---Counters of written rows (tests): stats[buf] = { rows = n, draws = n }.
+M.stats = {}
+
+local function add_marks(buf, list)
+  for _, h in ipairs(list or {}) do
     pcall(vim.api.nvim_buf_set_extmark, buf, M.ns, h.row, h.col_s, {
       end_col = h.col_e,
       hl_group = h.group,
       priority = h.priority or 100, -- backgrounds (style.background) lie below
     })
   end
+end
+
+---Replace buffer content and highlights, writing only the rows that changed (the
+---compositor's diff: unchanged lines keep their text and extmarks).
+---@param buf integer
+---@param lines string[]
+---@param hl { row: integer, col_s: integer, col_e: integer, group: string, priority: integer? }[]
+function M.draw(buf, lines, hl)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+  local by_row = {}
+  for _, h in ipairs(hl) do
+    by_row[h.row] = by_row[h.row] or {}
+    table.insert(by_row[h.row], h)
+  end
+  local sig = {}
+  for r = 0, #lines - 1 do
+    local parts = { lines[r + 1] }
+    for _, h in ipairs(by_row[r] or {}) do
+      parts[#parts + 1] = ("%d:%d:%s:%s"):format(h.col_s, h.col_e, h.group, tostring(h.priority))
+    end
+    sig[r] = table.concat(parts, "\0")
+  end
+  local prev = shown[buf]
+  local st = M.stats[buf] or { rows = 0, draws = 0 }
+  M.stats[buf] = st
+  st.draws = st.draws + 1
+  vim.bo[buf].modifiable = true
+  if not prev or prev.n ~= #lines or vim.api.nvim_buf_line_count(buf) ~= #lines then
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.api.nvim_buf_clear_namespace(buf, M.ns, 0, -1)
+    add_marks(buf, hl)
+    st.rows = st.rows + #lines
+  else
+    local r = 0
+    while r < #lines do
+      if sig[r] ~= prev.sig[r] then
+        local e = r
+        while e + 1 < #lines and sig[e + 1] ~= prev.sig[e + 1] do
+          e = e + 1
+        end
+        vim.api.nvim_buf_set_lines(buf, r, e + 1, false, { unpack(lines, r + 1, e + 1) })
+        vim.api.nvim_buf_clear_namespace(buf, M.ns, r, e + 1)
+        for row = r, e do
+          add_marks(buf, by_row[row])
+        end
+        st.rows = st.rows + (e - r + 1)
+        r = e + 1
+      else
+        r = r + 1
+      end
+    end
+  end
+  vim.bo[buf].modifiable = false
+  vim.bo[buf].modified = false
+  shown[buf] = { n = #lines, sig = sig }
+end
+
+---Forget what a buffer shows (its next draw writes everything).
+function M.forget(buf)
+  shown[buf] = nil
 end
 
 ---Countdown and error display.

@@ -45,6 +45,7 @@ end
 ---Record a dirty node (Servo: Element::restyle + note_dirty_element).
 function Document:note_dirty(n, kind)
   self.version = self.version + 1
+  n:bump()
   local prev = self.pending[n]
   -- the strongest kind wins: other > content > style
   local rank = { style = 1, content = 2, other = 3 }

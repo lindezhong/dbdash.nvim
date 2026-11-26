@@ -306,7 +306,8 @@ function M.on_resize()
   for _, d in pairs(M.dashboards) do
     local w, h = buffer.size(d.buf)
     if not d.last_size or d.last_size[1] ~= w or d.last_size[2] ~= h then
-      d:redraw()
+      d.doc:note_reason("viewport") -- Servo: RestyleReason::ViewportChanged
+      d:request_render()
     end
   end
 end

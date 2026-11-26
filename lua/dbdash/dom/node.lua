@@ -20,6 +20,10 @@ local M = {}
 ---@field layout_data table? the box of the last layout
 ---@field handlers table<string, fun(ev: table)[]>?
 ---@field scope boolean? the root of an inline style sheet's scope (a panel)
+---@field version integer bumped when the node or a descendant changes (Servo's
+---  inclusive_descendants_version): caches of a subtree's layout and paint key on it
+---@field layout_version integer bumped only by changes that can change sizes (DOM changes,
+---  relayout or rebuild damage); caches of intrinsic sizes key on it
 local Node = {}
 Node.__index = Node
 
@@ -36,6 +40,8 @@ function M.new(tag, opts)
     text = opts.text,
     children = {},
     dirty_descendants = false,
+    version = 0,
+    layout_version = 0,
   }, Node)
 end
 
@@ -145,6 +151,19 @@ function Node:dirty(kind)
   doc:note_dirty(self, kind or M.OTHER)
 end
 
+---Bump the version of the node and its ancestors; `paint_only` (repaint damage) leaves
+---the layout version alone.
+function Node:bump(paint_only)
+  local n = self
+  while n do
+    n.version = n.version + 1
+    if not paint_only then
+      n.layout_version = n.layout_version + 1
+    end
+    n = n.parent
+  end
+end
+
 ---Walk the subtree depth first (pre-order).
 ---@param fn fun(n: dbdash.dom.Node): boolean? return false to skip the children
 function Node:walk(fn)
@@ -195,11 +214,12 @@ end
 
 ---Event listeners (dispatched by events/: capture and bubble along the ancestors).
 ---@param event string
----@param fn fun(ev: table)
-function Node:on(event, fn)
+---@param fn fun(ev: dbdash.events.Event)
+---@param opts { capture: boolean? }?
+function Node:on(event, fn, opts)
   self.handlers = self.handlers or {}
   self.handlers[event] = self.handlers[event] or {}
-  table.insert(self.handlers[event], fn)
+  table.insert(self.handlers[event], { fn = fn, capture = opts and opts.capture or false })
 end
 
 M.Node = Node

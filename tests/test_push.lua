@@ -124,7 +124,8 @@ show: { type: table, interval: 1s }
   -- ~1 s of items: about two interval ticks and the final draw (no draw per item).
   eq(draws <= 5, true)
   eq(rows(p), { { 40 } })
-  -- Nothing new: no draws.
+  -- Nothing new: no draws (after the end's own draw, which is coalesced like any other).
+  vim.wait(50)
   draws = 0
   d.redraw = function(self)
     draws = draws + 1

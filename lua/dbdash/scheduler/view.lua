@@ -53,6 +53,9 @@ function Dashboard:render_view(width, height)
     format_error = M.format_error,
     header_icon = self:header_icon(),
   })
+  -- style phase: restyle from the dirty root before layout reads computed styles and
+  -- decides what it can reuse
+  self.last_restyle = require("dbdash.css.style").restyle(self.doc)
   local tree = require("dbdash.layout.view").reflow(self, width, height)
   local list = require("dbdash.paint").view(tree)
   local lines, hl = vim.deepcopy(list.header.lines), vim.deepcopy(list.header.hl)
@@ -72,7 +75,34 @@ function Dashboard:render_view(width, height)
       regions[i] = { row_s = r.row_s + offset, row_e = r.row_e + offset, x = r.x, width = r.width }
     end
   end
+  -- hit-test regions in buffer rows (events/)
+  self.hits = {}
+  for _, h in ipairs(list.hits or {}) do
+    self.hits[#self.hits + 1] = { row_s = h.row_s + offset, row_e = h.row_e + offset, x = h.x, width = h.width, node = h.node }
+  end
   return lines, hl, body, offset, regions
+end
+
+---Ask for a rendering update (Servo: a task marks state dirty and the event loop runs
+---"update the rendering" once): every request until it runs is one update, at most one
+---every 20 ms. User actions call redraw() directly.
+function Dashboard:request_render()
+  if self.render_pending then
+    return
+  end
+  self.render_pending = true
+  local since = vim.uv.now() - (self.last_render_at or 0)
+  vim.defer_fn(function()
+    self.render_pending = false
+    if require("dbdash.scheduler").get(self.path) ~= self then
+      return
+    end
+    if self.paused then
+      self.render_skipped = true -- hidden: drawn when shown again (resume)
+      return
+    end
+    self:redraw()
+  end, math.max(0, 20 - since))
 end
 
 ---Re-render cached results into the buffer (no query).
@@ -82,6 +112,7 @@ function Dashboard:redraw()
   end
   local width, height = buffer.size(self.buf)
   self.last_size = { width, height }
+  self.last_render_at = vim.uv.now()
   local lines, hl, body, offset, regions = self:render_view(width, height)
   self.regions = regions
   vim.list_extend(lines, body.lines)
@@ -153,9 +184,7 @@ function Dashboard:panel_at(lnum, dcol)
   if not self.cfg.grid then
     return self.panels[1]
   end
-  for i, r in ipairs(self.regions or {}) do
-    if lnum - 1 >= r.row_s and lnum - 1 <= r.row_e and (dcol or 0) >= r.x and (dcol or 0) < r.x + r.width then
-      return self.panels[i]
-    end
-  end
+  -- hit test: the node at the position, then its panel (events/)
+  local events = require("dbdash.events")
+  return events.panel_of(self, events.hit_test(self, lnum, dcol))
 end

@@ -123,6 +123,11 @@ local function restyle_subtree(doc, n, parent_computed, stats)
   local computed, matched = M.compute(doc, n, parent_computed)
   local damage = M.damage(old, computed)
   n.style_data = { computed = computed, damage = damage, rules = matched }
+  if damage > D.none then
+    -- what was painted with the old style is stale; what was laid out only when sizes can
+    -- change (Servo: repaint vs relayout damage)
+    n:bump(damage == D.repaint)
+  end
   stats.nodes = stats.nodes + 1
   stats.damage = math.max(stats.damage, damage)
   for _, c in ipairs(n.children) do

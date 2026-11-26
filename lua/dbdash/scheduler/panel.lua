@@ -177,7 +177,7 @@ function Panel:fail(err)
     end
   end
   if self.d.cfg.grid then
-    self.d:redraw() -- the error shows in the panel header
+    self.d:request_render() -- the error shows in the panel header
   else
     self.d:update_status()
   end
@@ -310,7 +310,7 @@ function Panel:finish_refresh(qerr, rs, run)
   self:track(rs)
   self:check_thresholds(rs)
   self.error = nil
-  self.d:redraw()
+  self.d:request_render()
 end
 
 ---(Re)start the panel's own timer. Panels the global refresh (cfg.refresh_all) comes for
