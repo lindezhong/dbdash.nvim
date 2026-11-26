@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Line chart: website visits over 24 hours, three series.
+# Shows y_columns with labels and colors, line_style, axis titles and limits, a Python
+# number format, and the legend. Try :DbDashStyle line asciichart or canvas quadrant.
+
+database:
+  url: "sqlite:///:memory:"
+
+query:
+  sql: |
+    WITH RECURSIVE time_series AS (
+      SELECT 0 AS hour, abs(random() % 100) + 50 AS visitors
+      UNION ALL
+      SELECT hour + 1,
+             abs(random() % 50) + visitors + CASE WHEN hour % 6 = 0 THEN 20 ELSE 0 END
+      FROM time_series
+      WHERE hour < 23
+    )
+    SELECT
+      printf('%02d:00', hour) AS time_label,
+      visitors,
+      visitors * 0.8 AS mobile_visitors,
+      visitors * 0.2 AS desktop_visitors
+    FROM time_series
+
+show:
+  type: line
+  title: "Website visits (24 hours)"
+  interval: 60s
+
+  x_column: time_label
+  y_columns:
+    - column: visitors
+      label: "All visits"
+      color: "#3498db"
+    - column: mobile_visitors
+      label: "Mobile"
+      color: "#e74c3c"
+    - column: desktop_visitors
+      label: "Desktop"
+      color: "#2ecc71"
+
+  line_style:
+    fill_area: false                 # fill below the lines
+    show_points: true
+
+  axes:
+    x_axis:
+      title: "Time"
+    y_axis:
+      title: "Visits"
+      min_value: 0
+      format: "{:,.0f}"              # Python format for the y labels
+
+  legend:
+    show: true
+    position: right                  # right or bottom
+
+  show_countdown: true
+  countdown_format: "Next update: {time}s"

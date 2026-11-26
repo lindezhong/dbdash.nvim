@@ -1,0 +1,8 @@
+# Schemas used by example/push/webhook.yaml ($ref: "openapi/events.schema.yaml#/Event").
+Event:
+  type: object
+  required: [user, action]
+  properties:
+    user: { type: string, minLength: 1 }
+    action: { type: string, enum: [login, logout, purchase] }
+    amount: { type: number, minimum: 0 }

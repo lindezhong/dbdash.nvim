@@ -20,20 +20,26 @@ local T = MiniTest.new_set({
   },
 })
 
+-- The configs: one directory per topic (example/<topic>/<name>.yaml); deeper files and
+-- *.schema.yaml are not configs.
 local files = vim.tbl_filter(function(f)
   return not f:match("%.schema%.yaml$")
-end, vim.fn.globpath("example", "*.yaml", false, true))
+end, vim.fn.globpath("example", "*/*.yaml", false, true))
+table.sort(files)
+
+---Databases that need `make it-up` (docker) or the network: only with DBDASH_IT.
+local LOCAL = { sqlite = true, lua = true, luastream = true, exec = true, webhook = true }
 
 for _, f in ipairs(files) do
-  T[vim.fs.basename(f)] = function()
+  T[f:gsub("^example/", "")] = function()
     local cfg, err = config.load(f)
     eq(err, nil)
     for _, p in ipairs(cfg.panels) do
-      -- Examples run anywhere, except http ones (network access): only with DBDASH_IT.
-      if p.database.type == "http" then
+      -- Examples run anywhere, except the ones on the docker services (make it-up) or the
+      -- network: only with DBDASH_IT.
+      if not LOCAL[p.database.type] then
         h.require_it()
       end
-      eq(({ sqlite = true, lua = true, http = true, luastream = true, exec = true, webhook = true })[p.database.type], true)
     end
     sched.start(f, { no_show = true })
     local d = assert(sched.get(sched.normalize(f)), "dashboard did not start")

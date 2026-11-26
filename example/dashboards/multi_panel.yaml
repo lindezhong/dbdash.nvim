@@ -1,0 +1,120 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Several panels in one dashboard (layout.columns per row; show.span to widen a panel).
+# Top-level bare fields are dashboard-wide (interval, args, layout); the top-level
+# database, query and show are defaults that each panel can override (:help dbdash-config).
+# - interval refreshes every panel; each panel also refreshes on its show.interval (its
+#   own, else the top-level show.interval below).
+# - The top-level database is the default; a panel may set its own (panels[].database).
+#   Panels can mix data sources: the last one asks the GitHub API over https:// (needs
+#   network).
+# - args are shared; a panel's query.args are its own. args_show shows, on each panel, the
+#   arguments its query reads.
+title: "Overview"
+# Descriptions are templates shown as Markdown: ⓘ marks them, K shows the one under the
+# cursor (on this title line: the dashboard's).
+description: |
+  # Overview
+  Sample data from an in-memory SQLite database, plus the GitHub API.
+
+  | Panel           | Source             | Refresh |
+  |-----------------|--------------------|---------|
+  | Visits per hour | SQLite, generated  | 10s     |
+  | Contributors    | api.github.com     | 10m     |
+
+  History shown: **{{ args.hours }} hours** (`:DbDashUpdateVariable hours 48`).
+
+database:
+  url: "sqlite:///:memory:"
+
+interval: 10m # every panel, so the GitHub panel stays within the API's hourly limit
+show_countdown: true # countdown to that refresh, right of the title
+countdown_format: "all in {clock}"
+
+args:
+  - name: hours
+    type: int
+    default: 24
+    description: "Hours of history"
+
+show:                               # defaults of every panel's show
+  interval: 60s
+  show_countdown: true
+  countdown_format: "{time}s"
+  args_show: true
+
+layout:
+  columns: 2
+  gap: 3
+
+panels:
+  - query:
+      sql: |
+        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < {{ args.hours }} - 1)
+        SELECT printf('%02d:00', n % 24) AS hour,
+               50 + abs(random() % 100) AS visits
+        FROM h
+    show:
+      type: line
+      title: "Visits per hour"
+      description: |
+        Random visits for each of the last **{{ args.hours }}** hours, from
+        `{{ meta.db_type }}` (panel {{ meta.panel_index }}, every {{ meta.interval // 1000 }}s).
+      x_column: hour
+      y_column: visits
+      interval: 10s
+      span: 2
+
+  - query:
+      sql: |
+        SELECT 'IT' AS dept, 42 AS people UNION ALL SELECT 'HR', 7
+        UNION ALL SELECT 'Finance', 15 UNION ALL SELECT 'R&D', 120
+    show:
+      type: pie
+      renderer: circle
+      title: "Headcount"
+      label_column: dept
+      value_column: people
+
+  - query:
+      sql: |
+        SELECT datetime('now') AS now, abs(random() % 1000) AS orders
+    show:
+      type: table
+      title: "Now"
+
+  - database:                       # this panel's own database (e.g. another server)
+      url: "sqlite:///:memory:"
+    query:
+      sql: |
+        SELECT abs(random() % 5000) AS orders
+    show:
+      type: stat
+      title: "Orders today"
+      format: "{:,}"
+      interval: 10s
+
+  - database:                       # another data source: an HTTPS JSON API
+      url: "https://api.github.com"
+    query:
+      # A GET with parameters (:help dbdash-http). The response is a list of flat records,
+      # which are rows as they are: no transform needed.
+      sql: |
+        {
+          "path": "/repos/neovim/neovim/contributors",
+          "query": {"per_page": 8},
+          "headers": {"Accept": "application/vnd.github+json"}
+        }
+    show:
+      type: bar
+      title: "Top Neovim contributors"
+      description: |
+        Commits of the top 8 contributors to
+        [neovim/neovim](https://github.com/neovim/neovim), from `{{ meta.db_url }}`.
+        Unauthenticated API calls are limited to 60 an hour, hence the 10m interval.
+      x_column: login
+      y_column: contributions
+      span: 2
+      interval: 10m                 # unauthenticated GitHub API calls: 60 an hour
+      style:
+        show_values: true

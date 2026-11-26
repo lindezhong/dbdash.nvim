@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Text chart: the result as plain text, without a table. Each row is its cells joined by
+# style.separator (a space), so a one-column query shows one line per row. Strings are
+# shown as they are: newlines in a cell start new lines (the last row below). NULL shows
+# as style.null_text (empty), and long lines wrap (style.wrap: false cuts them).
+# A string from lua:// or HTTP needs query.transform: return { { text = rs } }.
+
+database:
+  url: "sqlite:///:memory:"
+
+query:
+  sql: |
+    WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 6)
+    SELECT time('now', '-' || (6 - i) || ' minutes') AS at,
+           CASE abs(random() % 3) WHEN 0 THEN 'WARN ' ELSE 'INFO ' END AS level,
+           'request ' || i || ' served in ' || (20 + abs(random() % 200)) || ' ms' AS message
+    FROM n
+    UNION ALL
+    SELECT time('now'), 'ERROR', 'upstream failed:' || char(10) || '    timeout after 30s'
+
+show:
+  type: text
+  title: "Recent log lines"
+  interval: 10s

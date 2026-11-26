@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# luastream:// - Lua whose output is the data (:help dbdash-luastream, dbdash-push).
+# - print() / io.write() text is cut into items at database.options.delimiter (a newline by
+#   default); dbdash.emit(value) passes one item as it is (a table here).
+# - Each item goes through query.transform one at a time (rs is the item); the panel is
+#   drawn on show.interval when something is new. When the code returns, the panel ends.
+# - database.options.cwd is the code's directory for files and commands.
+# It runs Lua, so dbdash asks whether you trust this file first.
+
+title: "luastream://"
+
+layout:
+  columns: 2
+
+panels:
+  - database: { url: "luastream://" }
+    query:
+      sql: |
+        -- One reading per second for a minute, as JSON lines.
+        for i = 1, 60 do
+          print(vim.json.encode({ at = os.date("%H:%M:%S"), load = 40 + math.random(0, 30) }))
+          dbdash.sleep(1000)
+        end
+      transform: |
+        -- Each item is one line; keep the last 30 readings in store to draw them.
+        store.points = store.points or {}
+        table.insert(store.points, vim.json.decode(rs))
+        while #store.points > 30 do table.remove(store.points, 1) end
+        return store.points
+    show:
+      type: line
+      title: "print(): one reading per second"
+      x_column: at
+      y_column: load
+      interval: 2s
+
+  - database:
+      url: "luastream://"
+      options:
+        cwd: "openapi"          # files and commands of the code are here
+        delimiter: ";"          # io.write("a;b;") gives two items
+    query:
+      sql: |
+        -- Count the lines of a file in cwd, written as items separated by ";".
+        local n = 0
+        for _ in io.lines("events.schema.yaml") do n = n + 1 end
+        io.write("lines=" .. n .. ";")
+        io.write("dir=" .. dbdash.cwd .. ";")
+        -- dbdash.emit: one item as it is, no cutting (the last item: the code ends).
+        dbdash.emit({ { key = "done", value = os.date("%H:%M:%S") } })
+      transform: |
+        store.rows = store.rows or {}
+        if type(rs) == "string" then
+          local k, v = rs:match("^(%w+)=(.*)$")
+          table.insert(store.rows, { key = k, value = v })
+        else
+          vim.list_extend(store.rows, rs) -- the emitted table
+        end
+        return { columns = { "key", "value" }, rows = vim.tbl_map(function(r)
+          return { r.key, r.value }
+        end, store.rows) }
+    show:
+      type: table
+      title: "io.write() with a delimiter, dbdash.emit(), cwd"
+      interval: 1s

@@ -1,0 +1,63 @@
+{
+ "title": "exec://",
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "database": {
+    "url": "exec://",
+    "options": {
+     "interpreter": [
+      "nvim",
+      "--clean",
+      "-l",
+      "modules/run.lua"
+     ],
+     "capture": "both"
+    }
+   },
+   "query": {
+    "sql": "-- Log lines (stdout) and warnings (stderr) for 30 seconds.\nfor i = 1, 30 do\n  if i % 7 == 0 then\n    io.stderr:write((\"disk %d%% full\\n\"):format(80 + i % 20))\n  else\n    io.write((\"job %d done in %d ms\\n\"):format(i, math.random(5, 90)))\n  end\n  io.stdout:flush()\n  vim.uv.sleep(1000)\nend\n",
+    "transform": "store.lines = store.lines or {}\ntable.insert(store.lines, 1, { at = os.date(\"%H:%M:%S\"), stream = stream, line = rs })\nwhile #store.lines > 10 do table.remove(store.lines) end\nreturn { columns = { \"at\", \"stream\", \"line\" }, rows = vim.tbl_map(function(l)\n  return { l.at, l.stream, l.line }\nend, store.lines) }\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "stdout and stderr of a script",
+    "interval": "1s"
+   }
+  },
+  {
+   "database": {
+    "url": "exec://",
+    "options": {
+     "interpreter": [
+      "nvim",
+      "--clean",
+      "-l",
+      "run.lua"
+     ],
+     "cwd": "modules",
+     "env": {
+      "GREETING": "hello"
+     },
+     "stdin": "a,b,c",
+     "delimiter": "|",
+     "ok_codes": [
+      0,
+      2
+     ]
+    }
+   },
+   "query": {
+    "sql": "-- Items separated by \"|\": the environment, stdin and the directory; exit code 2.\nio.write(\"env=\" .. os.getenv(\"GREETING\") .. \"|\")\nio.write(\"stdin=\" .. io.read(\"*a\") .. \"|\")\nio.write(\"cwd=\" .. vim.fn.fnamemodify(vim.uv.cwd(), \":t\") .. \"|\")\nos.exit(2)\n",
+    "transform": "-- Each item is \"key=value\": collect them into rows.\nstore.rows = store.rows or {}\nlocal k, v = rs:match(\"^(%w+)=(.*)$\")\ntable.insert(store.rows, { k, v })\nreturn { columns = { \"key\", \"value\" }, rows = store.rows }\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "env, stdin, cwd, delimiter, ok_codes",
+    "interval": "1s"
+   }
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Box plot: value distribution per group (median, quartiles, whiskers at 1.5 IQR).
+
+database:
+  url: "sqlite:///:memory:"
+
+query:
+  sql: |
+    WITH RECURSIVE data_points AS (
+      SELECT 1 AS id,
+             CASE abs(random() % 3) WHEN 0 THEN 'Group A' WHEN 1 THEN 'Group B' ELSE 'Group C' END AS category,
+             abs(random() % 100) + 20 AS value
+      UNION ALL
+      SELECT id + 1,
+             CASE abs(random() % 3) WHEN 0 THEN 'Group A' WHEN 1 THEN 'Group B' ELSE 'Group C' END,
+             abs(random() % 100) + 20
+      FROM data_points
+      WHERE id < 30
+    )
+    SELECT category, value FROM data_points
+
+show:
+  type: boxplot
+  title: "Distribution per group"
+  interval: 55s
+
+  category_column: category          # one box per category (optional)
+  value_column: value
+
+  style:
+    show_outliers: true              # points beyond the whiskers
+    show_means: true                 # "+" at the mean
+
+  show_countdown: true
+  countdown_format: "Next update: {time}s"

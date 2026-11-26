@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# query.transform - Lua that reshapes the query result before it is shown, for any
+# database (SQLite here). It gets rs (rs.columns, rs.types, rs.rows with nil for NULL)
+# and args, and returns rows like a lua:// query. Here: amounts in cents become dollars,
+# with a running total. dbdash asks whether you trust this file first (:help dbdash-lua).
+
+database:
+  url: "sqlite:///:memory:"
+
+query:
+  args:
+    - name: rate
+      type: number
+      default: 1.0
+      description: "Exchange rate applied to the amounts"
+  sql: |
+    WITH RECURSIVE d(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM d WHERE i < 10)
+    SELECT date('now', '-' || (10 - i) || ' days') AS day, abs(random() % 50000) AS cents
+    FROM d
+  transform: |
+    local out, total = {}, 0
+    for _, r in ipairs(rs.rows) do
+      local amount = r[2] / 100 * args.rate
+      total = total + amount
+      out[#out + 1] = { day = r[1]:sub(6), amount = amount, total = total }
+    end
+    return { columns = { "day", "amount", "total" }, rows = out }
+
+show:
+  type: table
+  title: "Sales in dollars (transformed)"
+  column_list:
+    - column: day
+    - column: amount
+      alias: "Amount"
+    - column: total
+      alias: "Running total"

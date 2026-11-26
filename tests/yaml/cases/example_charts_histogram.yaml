@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Histogram: distribution of 50 exam scores in 10 bins.
+# Horizontal bars with 1/8-cell precision; try `renderer: vertical`.
+
+database:
+  url: "sqlite:///:memory:"
+
+query:
+  sql: |
+    WITH RECURSIVE numbers AS (
+      SELECT 1 AS id, abs(random() % 100) AS score
+      UNION ALL
+      SELECT id + 1, abs(random() % 100) FROM numbers WHERE id < 50
+    )
+    SELECT
+      score,
+      CASE
+        WHEN score >= 90 THEN 'A'
+        WHEN score >= 80 THEN 'B'
+        WHEN score >= 70 THEN 'C'
+        WHEN score >= 60 THEN 'D'
+        ELSE 'F'
+      END AS grade
+    FROM numbers
+
+show:
+  type: histogram
+  title: "Score distribution"
+  interval: 45s
+
+  value_column: score
+  bins: 10                           # default: Sturges' rule
+
+  style:
+    color: "#3498db"
+
+  show_countdown: true
+  countdown_format: "Next update: {time}s"

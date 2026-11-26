@@ -106,8 +106,9 @@ of the current directory as a tree: `<CR>` on a directory expands it, on a file 
 dashboard; `●` marks running dashboards, `◐` paused ones (not on screen), `○` the others
 (closing a dashboard's last window stops it).
 
-To try it without a database server, open any file in [`example/`](example): most use an
-in-memory SQLite database (`http.yaml` and `multi_panel.yaml` also call the GitHub API).
+To try it without a database server, open a file in [`example/`](example): most use an
+in-memory SQLite database (`connections/github.yaml` and `dashboards/multi_panel.yaml` also
+call the GitHub API).
 
 ## Usage
 
@@ -169,22 +170,17 @@ yaml-language-server validate and complete a config that starts with:
 
 Examples, all runnable as they are:
 
-| File | Shows |
+Examples are in [`example/`](example), one directory per topic (`:help dbdash-examples`):
+
+| Directory | Shows |
 | --- | --- |
-| [`table.yaml`](example/table.yaml) | table columns, aliases, widths, styles |
-| [`line.yaml`](example/line.yaml), [`area.yaml`](example/area.yaml), [`bar.yaml`](example/bar.yaml), [`histogram.yaml`](example/histogram.yaml), [`boxplot.yaml`](example/boxplot.yaml), [`heatmap.yaml`](example/heatmap.yaml), [`scatter.yaml`](example/scatter.yaml), [`bubble.yaml`](example/bubble.yaml), [`pie.yaml`](example/pie.yaml), [`stat.yaml`](example/stat.yaml), [`text.yaml`](example/text.yaml) | one chart type each |
-| [`styles.yaml`](example/styles.yaml) | the alternative styles and canvases |
-| [`multi_panel.yaml`](example/multi_panel.yaml) | several panels in a grid: top-level defaults, per-panel intervals and databases (SQLite and an HTTPS API, needs network), title, global countdown, descriptions, argument lines |
-| [`template_example.yaml`](example/template_example.yaml) | every argument type and the template syntax |
-| [`macros.yaml`](example/macros.yaml) | macros, imports, autoescape |
-| [`templates.yaml`](example/templates.yaml) | extends and blocks, include, call, namespace, set blocks, filters |
-| [`sqlite_file.yaml`](example/sqlite_file.yaml) | a SQLite file database |
-| [`lua.yaml`](example/lua.yaml) | a `lua://` data source (Lua code, a command's output) |
-| [`transform.yaml`](example/transform.yaml) | `query.transform` reshaping a query result with Lua |
-| [`push.yaml`](example/push.yaml) | push sources: `luastream://`, `exec://`, `webhook://` with OpenAPI |
-| [`template_lua.yaml`](example/template_lua.yaml) | Lua in templates: `{% lua %}` blocks and an imported module ([`lua/helpers.lua`](example/lua/helpers.lua)) |
-| [`callback.yaml`](example/callback.yaml) | panel state in Lua: `store` (a counter, a history of results drawn as a line), `meta.prev_ok.result`, `dbdash.run()` callbacks from `query.transform`, `{% lua %}` and an imported module ([`lua/callbacks.lua`](example/lua/callbacks.lua)), assigning arguments, `show.refresh_hidden`, run records (`meta.prev_runs`: a refresh and its callbacks with ids, callers, times) |
-| [`http.yaml`](example/http.yaml) | an HTTPS API (GitHub releases) turned into rows by a transform (needs network) |
+| [`charts/`](example/charts) | one chart type per file ([`line.yaml`](example/charts/line.yaml), [`bar.yaml`](example/charts/bar.yaml), [`table.yaml`](example/charts/table.yaml), [`stat.yaml`](example/charts/stat.yaml), ...), the alternative styles ([`styles.yaml`](example/charts/styles.yaml)) |
+| [`dashboards/`](example/dashboards) | several panels in a grid ([`multi_panel.yaml`](example/dashboards/multi_panel.yaml): defaults, intervals, a database per panel, title, countdown, descriptions, argument lines) |
+| [`templates/`](example/templates) | arguments ([`arguments.yaml`](example/templates/arguments.yaml)), macros and autoescape ([`macros.yaml`](example/templates/macros.yaml)), extends / include / call ([`inheritance.yaml`](example/templates/inheritance.yaml)), Lua in templates ([`template_lua.yaml`](example/templates/template_lua.yaml)) |
+| [`lua/`](example/lua) | a `lua://` source ([`lua.yaml`](example/lua/lua.yaml)), `query.transform` ([`transform.yaml`](example/lua/transform.yaml)), panel state, callbacks and run records ([`callback.yaml`](example/lua/callback.yaml)) |
+| [`push/`](example/push) | push sources: [`luastream.yaml`](example/push/luastream.yaml), [`exec.yaml`](example/push/exec.yaml), [`webhook.yaml`](example/push/webhook.yaml) (OpenAPI) |
+| [`databases/`](example/databases) | a SQLite file ([`sqlite_file.yaml`](example/databases/sqlite_file.yaml)) |
+| [`connections/`](example/connections) | an HTTPS API ([`github.yaml`](example/connections/github.yaml), needs network) |
 
 ### Connection URLs
 
@@ -334,7 +330,7 @@ Integration tests run against the services in `tests/docker/compose.yaml`: Redis
 PostgreSQL, MySQL, MongoDB, Cassandra, SQL Server and nginx (HTTP/HTTPS), all official
 images with the configs and test certificates (`tests/fixtures/`) mounted read-only. They
 are skipped unless `DBDASH_IT=1` is set. With `DBDASH_IT=1` the examples test also runs
-`example/http.yaml` and `example/multi_panel.yaml`, which call the public GitHub API
+`example/connections/github.yaml` and `example/dashboards/multi_panel.yaml`, which call the public GitHub API
 (network access needed).
 
 **On one machine** with Docker (your user needs access to it, e.g. in the `docker` group,

@@ -1,0 +1,33 @@
+{
+ "title": "webhook://",
+ "database": {
+  "url": "webhook://127.0.0.1:8765/hooks",
+  "options": {
+   "tokens": {
+    "bearer": "demo-token"
+   },
+   "delimiter": "\n",
+   "stream_types": [
+    "text/x-log"
+   ],
+   "max_body": "1MB",
+   "max_connections": 8,
+   "timeout": "5s",
+   "allowed_origins": [
+    "http://localhost:3000"
+   ],
+   "allowed_hosts": [
+    "dashboard.local"
+   ]
+  }
+ },
+ "query": {
+  "sql": "openapi: 3.1.0\ninfo: { title: events, version: \"1\" }\nsecurity: [ { bearer: [] } ]\npaths:\n  /events/{source}:\n    post:\n      operationId: events\n      parameters:\n        - { name: source, in: path, required: true, schema: { type: string, enum: [web, app] } }\n        - { name: X-Request-Id, in: header, schema: { type: string } }\n        - { name: region, in: cookie, schema: { type: string, default: \"us\" } }\n      requestBody:\n        required: true\n        content:\n          application/x-ndjson:\n            schema: { $ref: \"openapi/events.schema.yaml#/Event\" }\n      responses: { \"202\": { description: queued } }\n  /ping:\n    get:\n      operationId: ping\n      security: []\n      parameters:\n        - { name: n, in: query, schema: { type: integer, minimum: 0, default: 1 } }\n        - { name: tags, in: query, style: form, explode: false, schema: { type: array, items: { type: string } } }\n      responses:\n        \"200\":\n          description: pong\n          content: { application/json: { example: { pong: true } } }\n  /forms:\n    post:\n      operationId: forms\n      requestBody:\n        content:\n          application/x-www-form-urlencoded: { schema: { $ref: \"openapi/events.schema.yaml#/Event\" } }\n          multipart/form-data: { schema: { $ref: \"openapi/events.schema.yaml#/Event\" } }\n      responses: { \"202\": { description: queued } }\n  /logs:\n    post:\n      operationId: logs\n      requestBody:\n        content:\n          text/x-log: { schema: { type: string, pattern: \"^\\\\w+ \\\\w+$\" } }\n      responses: { \"202\": { description: queued } }\ncomponents:\n  securitySchemes:\n    bearer: { type: http, scheme: bearer }\n",
+  "transform": "-- rs: one item; params: { path, query, header, cookie }; request: method, path,\n-- operation_id, content_type, headers (without credentials).\nstore.events = store.events or {}\nlocal what\nif request.operation_id == \"ping\" then\n  what = (\"ping n=%d tags=%s\"):format(rs.n, table.concat(rs.tags or {}, \"+\"))\nelseif request.operation_id == \"logs\" then\n  what = rs\nelse\n  what = (\"%s %s%s\"):format(rs.user, rs.action, rs.amount and (\" \" .. rs.amount) or \"\")\nend\nlocal from = params.path.source or request.operation_id\nlocal region = params.cookie.region or \"\"\ntable.insert(store.events, 1, { os.date(\"%H:%M:%S\"), from, region, what })\nwhile #store.events > 12 do table.remove(store.events) end\nreturn { columns = { \"at\", \"from\", \"region\", \"event\" }, rows = store.events }\n"
+ },
+ "show": {
+  "type": "table",
+  "title": "Events pushed over HTTP",
+  "interval": "1s"
+ }
+}

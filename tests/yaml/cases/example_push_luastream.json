@@ -1,0 +1,42 @@
+{
+ "title": "luastream://",
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "database": {
+    "url": "luastream://"
+   },
+   "query": {
+    "sql": "-- One reading per second for a minute, as JSON lines.\nfor i = 1, 60 do\n  print(vim.json.encode({ at = os.date(\"%H:%M:%S\"), load = 40 + math.random(0, 30) }))\n  dbdash.sleep(1000)\nend\n",
+    "transform": "-- Each item is one line; keep the last 30 readings in store to draw them.\nstore.points = store.points or {}\ntable.insert(store.points, vim.json.decode(rs))\nwhile #store.points > 30 do table.remove(store.points, 1) end\nreturn store.points\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "print(): one reading per second",
+    "x_column": "at",
+    "y_column": "load",
+    "interval": "2s"
+   }
+  },
+  {
+   "database": {
+    "url": "luastream://",
+    "options": {
+     "cwd": "openapi",
+     "delimiter": ";"
+    }
+   },
+   "query": {
+    "sql": "-- Count the lines of a file in cwd, written as items separated by \";\".\nlocal n = 0\nfor _ in io.lines(\"events.schema.yaml\") do n = n + 1 end\nio.write(\"lines=\" .. n .. \";\")\nio.write(\"dir=\" .. dbdash.cwd .. \";\")\n-- dbdash.emit: one item as it is, no cutting (the last item: the code ends).\ndbdash.emit({ { key = \"done\", value = os.date(\"%H:%M:%S\") } })\n",
+    "transform": "store.rows = store.rows or {}\nif type(rs) == \"string\" then\n  local k, v = rs:match(\"^(%w+)=(.*)$\")\n  table.insert(store.rows, { key = k, value = v })\nelse\n  vim.list_extend(store.rows, rs) -- the emitted table\nend\nreturn { columns = { \"key\", \"value\" }, rows = vim.tbl_map(function(r)\n  return { r.key, r.value }\nend, store.rows) }\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "io.write() with a delimiter, dbdash.emit(), cwd",
+    "interval": "1s"
+   }
+  }
+ ]
+}

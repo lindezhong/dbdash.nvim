@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# exec:// - a script whose output is the data (:help dbdash-exec, dbdash-push).
+# query.sql is only the script; everything else is in database.options:
+#   interpreter  runs the script, given as its last argument (default ["sh", "-c"], on
+#                Windows ["cmd.exe", "/d", "/s", "/c"]; ["bash", "-c"], ["python3", "-c"]
+#                ...). Here Neovim runs it (modules/run.lua) so the example works everywhere.
+#   capture      stdout (default), stderr or both; each item knows its `stream`
+#   delimiter    what separates items (default a newline)
+#   ok_codes     exit codes that end normally (default [0]); others end with an error
+#   cwd          the working directory (default: this file's directory)
+#   env          variables added to Neovim's environment
+#   stdin        text written to the script's stdin
+# With the default interpreter a panel would simply be, e.g.:
+#   query: { sql: "tail -n 0 -F /var/log/app.log" }
+# It runs a script, so dbdash asks whether you trust this file first.
+
+title: "exec://"
+
+layout:
+  columns: 2
+
+panels:
+  - database:
+      url: "exec://"
+      options:
+        interpreter: ["nvim", "--clean", "-l", "modules/run.lua"]
+        capture: both
+    query:
+      sql: |
+        -- Log lines (stdout) and warnings (stderr) for 30 seconds.
+        for i = 1, 30 do
+          if i % 7 == 0 then
+            io.stderr:write(("disk %d%% full\n"):format(80 + i % 20))
+          else
+            io.write(("job %d done in %d ms\n"):format(i, math.random(5, 90)))
+          end
+          io.stdout:flush()
+          vim.uv.sleep(1000)
+        end
+      transform: |
+        store.lines = store.lines or {}
+        table.insert(store.lines, 1, { at = os.date("%H:%M:%S"), stream = stream, line = rs })
+        while #store.lines > 10 do table.remove(store.lines) end
+        return { columns = { "at", "stream", "line" }, rows = vim.tbl_map(function(l)
+          return { l.at, l.stream, l.line }
+        end, store.lines) }
+    show:
+      type: table
+      title: "stdout and stderr of a script"
+      interval: 1s
+
+  - database:
+      url: "exec://"
+      options:
+        interpreter: ["nvim", "--clean", "-l", "run.lua"]
+        cwd: "modules"                     # (run.lua is found here)
+        env: { GREETING: "hello" }
+        stdin: "a,b,c"
+        delimiter: "|"
+        ok_codes: [0, 2]                   # 2 counts as a normal end
+    query:
+      sql: |
+        -- Items separated by "|": the environment, stdin and the directory; exit code 2.
+        io.write("env=" .. os.getenv("GREETING") .. "|")
+        io.write("stdin=" .. io.read("*a") .. "|")
+        io.write("cwd=" .. vim.fn.fnamemodify(vim.uv.cwd(), ":t") .. "|")
+        os.exit(2)
+      transform: |
+        -- Each item is "key=value": collect them into rows.
+        store.rows = store.rows or {}
+        local k, v = rs:match("^(%w+)=(.*)$")
+        table.insert(store.rows, { k, v })
+        return { columns = { "key", "value" }, rows = store.rows }
+    show:
+      type: table
+      title: "env, stdin, cwd, delimiter, ok_codes"
+      interval: 1s

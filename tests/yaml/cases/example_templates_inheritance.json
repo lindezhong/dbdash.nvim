@@ -1,0 +1,57 @@
+{
+ "title": "Jinja2 templates",
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "args": [
+  {
+   "name": "teams",
+   "type": "list",
+   "default": [
+    "red",
+    "blue",
+    "green"
+   ]
+  },
+  {
+   "name": "min_score",
+   "type": "int",
+   "default": 20
+  }
+ ],
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "{% extends 'parts/report.sql' %}\n{% set min_score = args.min_score %}\n{% block columns %}team, count(*) AS players, {{ super() }}{% endblock %}\n{% block where %}{% include 'parts/filters.sql' %}{% endblock %}\n{% block rest %}GROUP BY team ORDER BY team{% endblock %}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "extends, block, include"
+   }
+  },
+  {
+   "query": {
+    "sql": "{% import 'parts/helpers.sql' as h %}\n{% set ns = namespace(counted=[]) %}\n{% set columns %}\n{% for team in args.teams | sort if team != 'green' %}\n  {% do ns.counted.append(team) %}\n  {{ h.count_if('team', team) }} AS {{ team }},\n{% endfor %}\n{% endset %}\n{% include 'parts/players.sql' +%}\nSELECT {{ columns }}\n       {% call h.column('all_players') %}count(*){% endcall %},\n       {{ ns.counted | map('upper') | join('/') | sql_quote }} AS counted,\n       {{ '%d team(s)' | format(ns.counted | length) | sql_quote }} AS teams\nFROM players\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "call, namespace, set block, filters"
+   }
+  },
+  {
+   "query": {
+    "sql": "{% set ranks = [{'name': 'gold', 'min': 80}, {'name': 'silver', 'min': 50},\n                {'name': 'bronze', 'min': 0}] %}\n{% include 'parts/players.sql' +%}\nSELECT CASE\n  {% for r in ranks | sort(attribute='min', reverse=true) %}\n  WHEN score >= {{ r.min }} THEN {{ r.name | title | sql_quote }}\n  {% endfor %}\n  END AS rank, count(*) AS players\nFROM players\nGROUP BY rank\nORDER BY min(score) DESC\n"
+   },
+   "show": {
+    "type": "bar",
+    "title": "Players per rank (a loop over sorted mappings)",
+    "x_column": "rank",
+    "y_column": "players",
+    "span": 2
+   }
+  }
+ ]
+}

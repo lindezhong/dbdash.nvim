@@ -437,19 +437,21 @@ the top-level one (SQLite's quoting without one).
 
 Examples and schema                                          *dbdash-examples*
 
-The `example/` directory of the plugin has a runnable config (SQLite, no
-setup) for every chart type, the alternative styles (`styles.yaml`), several
-panels with their own databases (`multi_panel.yaml`, SQLite and the GitHub
-API, needs network), arguments and templates
-(`template_example.yaml`), macros and autoescape (`macros.yaml`), a SQLite
-file (`sqlite_file.yaml`), a Lua data source (`lua.yaml`), a Lua transform
-(`transform.yaml`), Lua in templates with an imported module
-(`template_lua.yaml` and `lua/helpers.lua`), panel state in Lua (`store`,
-run records, `dbdash.run()` from `query.transform`, `{% lua %}` and
-an imported module, assigned arguments: `callback.yaml` and
-`lua/callbacks.lua`) and
-an HTTPS API (`http.yaml`, GitHub releases, needs network); the last five
-ask for trust (|dbdash-lua|).
+The `example/` directory of the plugin has runnable configs, one directory per
+topic (the sidebar shows them as a tree):
+
+  charts/       one chart type per file, the alternative styles (styles.yaml)
+  dashboards/   several panels in a grid (multi_panel.yaml)
+  templates/    arguments, macros and autoescape, extends / include / call,
+                Lua in templates
+  lua/          a lua:// source, query.transform, store, callbacks, run
+                records
+  push/         luastream://, exec:// and webhook:// (|dbdash-push|)
+  databases/    a SQLite file
+  connections/  an HTTPS API (github.yaml, needs network)
+
+Most use an in-memory SQLite database and run as they are. Those that run Lua
+or a script ask for trust first (|dbdash-lua|).
 
 `example/dbdash.schema.yaml` is a JSON Schema for config files. It lists every
 field and the URL format of each database; |dbdash-schema| shows it, with a

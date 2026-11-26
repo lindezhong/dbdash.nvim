@@ -807,7 +807,7 @@ T[":DbDashExport: register, named register, file, overwrite with !"] = function(
 end
 
 T["export key picks a format; with panels the one under the cursor"] = function()
-  child.cmd("DbDashStart " .. ROOT .. "/example/multi_panel.yaml")
+  child.cmd("DbDashStart " .. ROOT .. "/example/dashboards/multi_panel.yaml")
   child.lua([[_G.wait_for(function()
     local d = require("dbdash.scheduler").list()[1]
     for _, p in ipairs(d.panels) do if not p.rs then return false end end
@@ -1025,7 +1025,7 @@ T["query.transform: shown by :DbDashShowSQL, exported as transformed"] = functio
 end
 
 T[":DbDashStyle re-renders cached data with another style"] = function()
-  child.cmd("DbDashStart " .. ROOT .. "/example/line.yaml")
+  child.cmd("DbDashStart " .. ROOT .. "/example/charts/line.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("┌") end)]])
   local function text()
     return table.concat(lines(), "\n")
@@ -1142,7 +1142,7 @@ T["multi-panel: commands act on the panel under the cursor"] = function()
 end
 
 T["example table.yaml runs"] = function()
-  child.cmd("DbDashStart " .. ROOT .. "/example/table.yaml")
+  child.cmd("DbDashStart " .. ROOT .. "/example/charts/table.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("value1") end)]])
   eq(find_line("Time") ~= nil, true)
   eq(find_line("value1") ~= nil, true)

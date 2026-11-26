@@ -1,0 +1,119 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Query templates and arguments: every argument type, defaults, required arguments,
+# choices, args_show, and the template syntax (if, for, filters, tests, methods).
+#
+# Arguments can be set when starting:
+#   :DbDashStart template_example.yaml min_age=30 departments=IT,HR filters=region:EU,level:senior
+#   :DbDashStart! template_example.yaml        (asks for every argument)
+# and changed in the dashboard with a (modify), A (show), R (reset).
+
+database:
+  url: "sqlite:///:memory:"
+
+query:
+
+  args:
+    - name: user_status              # string (the default type)
+      type: string
+      default: "active"
+      choices: [active, inactive]    # completion and a picker in prompts
+      description: "Status filter"
+
+    - name: min_age                  # number
+      type: number
+      default: 18
+      description: "Minimum age"
+
+    - name: max_age
+      type: int                      # integer only
+      default: 65
+      show: false                    # hidden from the args_show line
+      description: "Maximum age"
+
+    - name: include_inactive         # boolean: true/false/1/0/yes/no
+      type: boolean
+      default: false
+      description: "Also list inactive users"
+
+    - name: departments              # list: IT,HR,Finance
+      type: list
+      default: ["IT", "HR", "Finance"]
+      description: "Departments"
+
+    - name: user_ids                 # list of numbers (numeric default -> numbers)
+      type: list
+      default: [1, 2, 3, 4, 5, 6, 7]
+      show: false
+      description: "User ids"
+
+    - name: filters                  # map: region:EU,level:senior
+      type: map
+      default:
+        region: "Asia"
+        level: "senior"
+      description: "Extra filters"
+
+    - name: search_keyword           # no default: the value is none until set
+      type: string
+      description: "Search in names and departments"
+
+    - name: limit
+      type: int
+      default: 100
+      required: true                 # asked for at start if it had no value
+      description: "Row limit"
+
+  sql: |
+    WITH sample_users AS (
+      SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'IT' AS department, 'active' AS status,
+             datetime('now', '-30 days') AS created_at
+      UNION ALL SELECT 2, 'Bob', 32, 'HR', 'active', datetime('now', '-25 days')
+      UNION ALL SELECT 3, 'Charlie', 28, 'Finance', 'inactive', datetime('now', '-20 days')
+      UNION ALL SELECT 4, 'Diana', 35, 'IT', 'active', datetime('now', '-15 days')
+      UNION ALL SELECT 5, 'Eve', 29, 'HR', 'active', datetime('now', '-10 days')
+      UNION ALL SELECT 6, 'Frank', 42, 'Finance', 'inactive', datetime('now', '-5 days')
+      UNION ALL SELECT 7, 'Grace', 26, 'IT', 'active', datetime('now', '-2 days')
+    )
+    SELECT id, name, age, department, status, created_at,
+           {{ (args.search_keyword or '') | sql_quote }} AS search_term
+    FROM sample_users
+    WHERE 1 = 1
+    {% if not args.include_inactive %}
+      AND status = {{ args.user_status | sql_quote }}
+    {% endif %}
+      AND age BETWEEN {{ args.min_age }} AND {{ args.max_age }}
+    {% if args.departments %}
+      AND department IN {{ args.departments | sql_in }}
+    {% endif %}
+    {% if args.user_ids %}
+      AND id IN {{ args.user_ids | sql_in }}
+    {% endif %}
+    {% for key, value in args.filters.items() %}
+      -- filter {{ loop.index }}: {{ key }} = {{ value }} (illustration only)
+    {% endfor %}
+    {% if args.search_keyword is not none and args.search_keyword | trim %}
+      AND (name LIKE {{ ('%' ~ args.search_keyword ~ '%') | sql_quote }}
+           OR department LIKE {{ ('%' ~ args.search_keyword ~ '%') | sql_quote }})
+    {% endif %}
+    ORDER BY created_at DESC
+    LIMIT {{ args.limit | sql_limit }}
+
+show:
+  args_show: true                    # show the argument values above the chart
+  type: table
+  title: "Users"
+  interval: 30s
+  column_list:
+    - column: id
+      alias: "ID"
+    - column: name
+      alias: "Name"
+    - column: age
+      alias: "Age"
+    - column: department
+      alias: "Department"
+    - column: status
+      alias: "Status"
+    - column: created_at
+      alias: "Created"

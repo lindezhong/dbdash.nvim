@@ -1,0 +1,108 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# webhook:// - an HTTP endpoint described by an OpenAPI 3.1 document in query.sql
+# (:help dbdash-webhook, dbdash-webhook-security, dbdash-push). Try:
+#
+#   # application/x-ndjson: one item per line, each checked against the Event schema
+#   curl -H "Authorization: Bearer demo-token" -H "Content-Type: application/x-ndjson" \
+#        -H "X-Request-Id: r1" --cookie "region=eu" \
+#        --data-binary $'{"user": "ann", "action": "login"}\n{"user": "bob", "action": "purchase", "amount": 9.5}\n' \
+#        http://127.0.0.1:8765/hooks/events/web
+#   # no body: the query parameters are the item (and the reply is the documented example)
+#   curl "http://127.0.0.1:8765/hooks/ping?n=3&tags=a,b"
+#   # a form (urlencoded or multipart) is one item
+#   curl -H "Authorization: Bearer demo-token" -d "user=cat&action=logout" http://127.0.0.1:8765/hooks/forms
+#   curl -H "Authorization: Bearer demo-token" -F user=dan -F action=login http://127.0.0.1:8765/hooks/forms
+#   # text/x-log is streamed too (options.stream_types): one item per line
+#   curl -H "Authorization: Bearer demo-token" -H "Content-Type: text/x-log" \
+#        --data-binary $'eve login\nfay logout\n' http://127.0.0.1:8765/hooks/logs
+#
+# Rejected requests get application/problem+json (401 without the token, 400 for an
+# invalid event, 403 for an Origin not in allowed_origins, ...). A real token belongs in the
+# environment: tokens: { bearer: "${EVENTS_TOKEN}" }. The document's paths are appended to
+# the URL's path (/hooks).
+
+title: "webhook://"
+
+database:
+  url: "webhook://127.0.0.1:8765/hooks"
+  options:
+    tokens: { bearer: "demo-token" }
+    delimiter: "\n"
+    stream_types: ["text/x-log"]
+    max_body: "1MB"
+    max_connections: 8
+    timeout: 5s
+    allowed_origins: ["http://localhost:3000"]   # a local web app may post from a browser
+    allowed_hosts: ["dashboard.local"]
+
+query:
+  sql: |
+    openapi: 3.1.0
+    info: { title: events, version: "1" }
+    security: [ { bearer: [] } ]
+    paths:
+      /events/{source}:
+        post:
+          operationId: events
+          parameters:
+            - { name: source, in: path, required: true, schema: { type: string, enum: [web, app] } }
+            - { name: X-Request-Id, in: header, schema: { type: string } }
+            - { name: region, in: cookie, schema: { type: string, default: "us" } }
+          requestBody:
+            required: true
+            content:
+              application/x-ndjson:
+                schema: { $ref: "openapi/events.schema.yaml#/Event" }
+          responses: { "202": { description: queued } }
+      /ping:
+        get:
+          operationId: ping
+          security: []
+          parameters:
+            - { name: n, in: query, schema: { type: integer, minimum: 0, default: 1 } }
+            - { name: tags, in: query, style: form, explode: false, schema: { type: array, items: { type: string } } }
+          responses:
+            "200":
+              description: pong
+              content: { application/json: { example: { pong: true } } }
+      /forms:
+        post:
+          operationId: forms
+          requestBody:
+            content:
+              application/x-www-form-urlencoded: { schema: { $ref: "openapi/events.schema.yaml#/Event" } }
+              multipart/form-data: { schema: { $ref: "openapi/events.schema.yaml#/Event" } }
+          responses: { "202": { description: queued } }
+      /logs:
+        post:
+          operationId: logs
+          requestBody:
+            content:
+              text/x-log: { schema: { type: string, pattern: "^\\w+ \\w+$" } }
+          responses: { "202": { description: queued } }
+    components:
+      securitySchemes:
+        bearer: { type: http, scheme: bearer }
+  transform: |
+    -- rs: one item; params: { path, query, header, cookie }; request: method, path,
+    -- operation_id, content_type, headers (without credentials).
+    store.events = store.events or {}
+    local what
+    if request.operation_id == "ping" then
+      what = ("ping n=%d tags=%s"):format(rs.n, table.concat(rs.tags or {}, "+"))
+    elseif request.operation_id == "logs" then
+      what = rs
+    else
+      what = ("%s %s%s"):format(rs.user, rs.action, rs.amount and (" " .. rs.amount) or "")
+    end
+    local from = params.path.source or request.operation_id
+    local region = params.cookie.region or ""
+    table.insert(store.events, 1, { os.date("%H:%M:%S"), from, region, what })
+    while #store.events > 12 do table.remove(store.events) end
+    return { columns = { "at", "from", "region", "event" }, rows = store.events }
+
+show:
+  type: table
+  title: "Events pushed over HTTP"
+  interval: 1s
