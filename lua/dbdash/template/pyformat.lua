@@ -361,12 +361,12 @@ function M.conversion(typ, key, flags, width, prec, mapping, next_arg, on_mappin
   end
   local o = { percent = true, align = ">" }
   if width == "*" then
-    o.width = R.num(next_arg())
+    o.width = (R.num(next_arg()))
   else
     o.width = tonumber(width)
   end
   if prec == ".*" then
-    o.prec = R.num(next_arg())
+    o.prec = (R.num(next_arg()))
   elseif prec ~= "" then
     o.prec = tonumber(prec:sub(2)) or 0
   end

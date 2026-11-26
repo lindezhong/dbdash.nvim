@@ -177,6 +177,15 @@ function R.is_tuple(v)
   return getmetatable(v) == Tuple
 end
 
+-- Named tuples (groupby's (grouper, list)): fields readable as attributes.
+local tuple_names = setmetatable({}, { __mode = "k" })
+
+---A tuple whose items are also attributes `fields` (it prints as a tuple).
+function R.named_tuple(name, fields, values)
+  tuple_names[values] = { name = name, fields = fields }
+  return R.tuple(values)
+end
+
 -- Dictionary views (d.keys(), d.values(), d.items()): sequences shown as dict_keys([...])
 
 local View = {}
@@ -605,6 +614,15 @@ end
 
 ---Attributes of other value types by metatable (namespace, cycler, self, ...).
 R.getattr_hook = {}
+
+R.getattr_hook[Tuple] = function(t, name)
+  local named = tuple_names[t]
+  for i, f in ipairs(named and named.fields or {}) do
+    if f == name then
+      return t[i]
+    end
+  end
+end
 
 -- Methods ------------------------------------------------------------------------------------
 
@@ -1575,8 +1593,8 @@ R.tests = {}
 
 function R.filter(env, name, v, args, kwargs)
   local f = R.filters[name]
-  if name ~= "default" and name ~= "d" then
-    check(v)
+  if name ~= "default" and name ~= "d" and name ~= "items" then
+    check(v) -- (default and items take an undefined value)
   end
   for i = 1, #args do
     check(args[i])

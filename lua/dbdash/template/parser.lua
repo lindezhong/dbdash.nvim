@@ -815,10 +815,10 @@ function P:p_filter_expr(n)
         self:next()
         args, kwargs = self:p_args()
       elseif
-        TEST_ARG_START[nx.t]
+        (TEST_ARG_START[nx.t] or (nx.t == "op" and (nx.v == "[" or nx.v == "{")))
         and not (nx.t == "name" and (nx.v == "else" or nx.v == "or" or nx.v == "and" or nx.v == "if"))
       then
-        args = { self:p_primary() }
+        args = { self:p_postfix(self:p_primary()) }
       end
       n = node("Test", t, { node = n, name = t.v, args = args, kwargs = kwargs, neg = neg })
     elseif self:is_op("(") then

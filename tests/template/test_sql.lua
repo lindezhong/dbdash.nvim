@@ -99,4 +99,15 @@ T["autoescape with blocks: template text stays SQL, values are literals"] = func
   eq(render(src, ctx, "postgres", true), [[SELECT "t"."a" FROM t WHERE name = 10 AND X = 'IT''S' it's 'it''s']])
 end
 
+T["escape in SQL is the dialect's literal; HTML filters stay under SQL autoescape"] = function()
+  eq(render("{{ name | e }} {{ name | escape }} {{ 'x' | safe | forceescape }}", ctx, "postgres"), "'it''s' 'it''s' 'x'")
+  eq(render("{{ 'é' | e }}", ctx, "mssql"), "N'é'")
+  -- The output of escape is not escaped again by autoescape.
+  eq(render("{{ name | e }}", ctx, "postgres", true), "'it''s'")
+  eq(render("{{ {'k': name} | xmlattr }}", ctx, "postgres", true), [[' k="it&#39;s"']])
+  eq(render("{{ 'see www.example.com' | urlize }}", ctx, "postgres", true), [['see <a href="https://www.example.com" rel="noopener">www.example.com</a>']])
+  -- Outside SQL (no dialect) escape is HTML, as in Jinja.
+  eq(template.render("{{ '<a>' | e }}", {}), "&lt;a&gt;")
+end
+
 return T

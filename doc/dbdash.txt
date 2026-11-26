@@ -835,22 +835,47 @@ are false.
 
 Filters                                              *dbdash-template-filters*
 
+All of Jinja's built-in filters, with Jinja's arguments:
+
   default(value, boolean=false)  (alias d) value when x is undefined; with
                          boolean=true also when x is false/empty/none
   length                 (alias count) items of a list, mapping or string
-  upper, lower           change case
+  upper, lower, capitalize, title   change case
   trim(chars)            strip whitespace (or the given characters)
   replace(old, new, count)
   join(sep, attribute=)  join items; attribute picks a key of each mapping
   first, last            first / last item
   int(default=0, base=10)  to integer ("ff"|int(base=16) is 255)
-  float(default=0.0)     to number
+  float(default=0.0)     to float
   string                 to text
   abs                    absolute value
   round(precision=0, method='common')  'common' rounds half to even like
                          Python, 'ceil' and 'floor' round up or down
   tojson(indent)         JSON text (use it to put values into MongoDB queries)
   safe                   mark as SQL so autoescape leaves it alone
+  escape (alias e), forceescape   in SQL templates the database's literal
+                         (what autoescape writes), elsewhere HTML escaping
+  format(*args, **kw)    printf-style: '%s=%d'|format(name, n)
+  center(width=80), indent(width=4, first=false, blank=false),
+  truncate(length=255, killwords=false, end='...', leeway=5),
+  wordwrap(width=79, break_long_words=true, wrapstring, break_on_hyphens),
+  wordcount, striptags, filesizeformat(binary=false), pprint, urlencode,
+  urlize(trim_url_limit, nofollow, target, rel, extra_schemes),
+  xmlattr(autospace=true)   text helpers as in Jinja; in SQL templates the
+                         output of urlize and xmlattr is still autoescaped
+  list, items, reverse, unique(case_sensitive, attribute),
+  sort(reverse=false, case_sensitive=false, attribute=),
+  dictsort(case_sensitive=false, by='key', reverse=false),
+  min, max (case_sensitive, attribute), sum(attribute, start=0),
+  batch(count, fill_with), slice(count, fill_with), random,
+  groupby(attribute, default, case_sensitive)   rows by a key: (grouper, list)
+  map('filter', ...), map(attribute='x', default=)
+  select('test', ...), reject('test', ...), selectattr('x', 'test', ...),
+  rejectattr('x', 'test', ...)   keep or drop items by a test
+  attr(name)             an attribute (not a mapping's key)
+
+Filters that give a generator in Jinja (map, select, reverse, ...) give a
+list here, so `{{ xs|map('upper') }}` prints the list.
 
 SQL filters, quoted for the panel's database (|dbdash-template-dialects|):
 
@@ -879,8 +904,12 @@ Functions:
   sql_concat(a, b, ...)  CONCAT(...) (SQLite: a || b); strings become quoted
                          literals, other values are inserted as text
 
-Tests (`x is name`, `x is not name`): defined, undefined, none, number,
-string, mapping, sequence, true, false.
+Tests (`x is name`, `x is not name`, `x is name(arg)`): defined, undefined,
+none, boolean, true, false, number, integer, float, string, mapping,
+sequence, iterable, callable, escaped, lower, upper, odd, even,
+divisibleby(n), sameas(x), in(seq), filter, test, and the comparisons eq
+(== equalto), ne (!=), gt (> greaterthan), ge (>=), lt (< lessthan),
+le (<=), which select('>', 3) also takes.
 
 Methods, as in Python (`'a,b'.split(',')`, `'{:.2f}'.format(x)`):
 

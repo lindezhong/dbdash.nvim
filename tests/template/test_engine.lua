@@ -39,9 +39,12 @@ T["syntax errors carry a column"] = function()
   eq({ e.kind, e.line, e.col }, { "syntax", 2, 10 })
 end
 
-T["unsupported constructs are explained"] = function()
+T["unknown filters and tests are explained"] = function()
   local cases = {
-    ["{{ x is odd }}"] = "No test named 'odd'",
+    ["{{ x | nope }}"] = "No filter named 'nope'.",
+    ["{{ x is nope }}"] = "No test named 'nope'.",
+    ["{{ [1] | map('nope') | list }}"] = "No filter named 'nope'.",
+    ["{{ [1] | select('nope') | list }}"] = "No test named 'nope'.",
   }
   for src, want in pairs(cases) do
     local e = err_of(src, { x = 1 })

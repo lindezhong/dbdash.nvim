@@ -172,8 +172,18 @@ local function json_string(s)
   return '"' .. table.concat(out) .. '"'
 end
 
-local function to_json(v)
+---JSON text of a value; with `indent` (a number of spaces or a string) pretty printed
+---like Python's json.dumps(indent=...).
+local function to_json(v, indent, level)
   R.check(v)
+  level = level or 0
+  local nl, pad, pad_end, sep = "", "", "", ", "
+  if indent then
+    nl = "\n"
+    pad = indent:rep(level + 1)
+    pad_end = indent:rep(level)
+    sep = ","
+  end
   local t = type(v)
   if v == NONE or v == nil then
     return "null"
@@ -203,15 +213,21 @@ local function to_json(v)
     end)
     local parts = {}
     for i, k in ipairs(keys) do
-      parts[i] = json_string(k.s) .. ": " .. to_json(v[k.k])
+      parts[i] = pad .. json_string(k.s) .. ": " .. to_json(v[k.k], indent, level + 1)
     end
-    return "{" .. table.concat(parts, ", ") .. "}"
+    if #parts == 0 then
+      return "{}"
+    end
+    return "{" .. nl .. table.concat(parts, sep .. nl) .. nl .. pad_end .. "}"
   elseif R.is_list(v) then
     local parts = {}
     for i = 1, #v do
-      parts[i] = to_json(v[i])
+      parts[i] = pad .. to_json(v[i], indent, level + 1)
     end
-    return "[" .. table.concat(parts, ", ") .. "]"
+    if #parts == 0 then
+      return "[]"
+    end
+    return "[" .. nl .. table.concat(parts, sep .. nl) .. nl .. pad_end .. "]"
   end
   raise("type", "Object of type %s is not JSON serializable", R.typename(v))
 end
@@ -372,10 +388,11 @@ end
 
 F.tojson = function(_, v, args, kw)
   local indent = bind("tojson", args, kw, { { "indent", NONE } })
-  if indent ~= NONE then
-    raise("value", "tojson(indent=...) is not supported")
+  if indent == NONE then
+    return R.safe(to_json(v))
   end
-  return R.safe(to_json(v))
+  local ind = (type(indent) == "string" or R.is_safe(indent)) and R.str(indent) or (" "):rep((R.num(indent)) or 0)
+  return R.safe(to_json(v, ind))
 end
 
 F.safe = function(_, v, args, kw)
@@ -417,6 +434,78 @@ end
 T["false"] = function(_, v)
   return R.check(v) == false
 end
+T.boolean = function(_, v)
+  return type(R.check(v)) == "boolean"
+end
+T.integer = function(_, v)
+  return type(R.check(v)) == "number" and not R.is_float(v)
+end
+T.float = function(_, v)
+  return R.is_float(R.check(v))
+end
+local function int_mod(v, n)
+  local x = R.num(R.check(v))
+  if not x then
+    raise("type", "unsupported operand type(s) for %%: '%s' and 'int'", R.typename(v))
+  end
+  return R.num(R.mod(v, n))
+end
+T.odd = function(_, v)
+  return int_mod(v, 2) == 1
+end
+T.even = function(_, v)
+  return int_mod(v, 2) == 0
+end
+T.divisibleby = function(_, v, args)
+  return R.num(R.mod(R.check(v), R.check(args[1]))) == 0
+end
+T.lower = function(_, v)
+  local _, out = require("dbdash.template.methods").call(R.str(v), "islower", {}, {})
+  return out
+end
+T.upper = function(_, v)
+  local _, out = require("dbdash.template.methods").call(R.str(v), "isupper", {}, {})
+  return out
+end
+T.iterable = function(_, v)
+  R.check(v)
+  return type(v) == "string" or R.is_safe(v) or map.is_map(v) or R.is_list(v)
+end
+T.callable = function(_, v)
+  R.check(v)
+  if type(v) == "function" or R.is_macro(v) then
+    return true
+  end
+  local mt = getmetatable(v)
+  return mt ~= nil and mt.__call ~= nil and (R.callable_types[mt] or R.typename(v) == "LoopContext") or false
+end
+T.sameas = function(_, v, args)
+  local o = R.check(args[1])
+  R.check(v)
+  if R.num(v) and R.num(o) and type(v) ~= "boolean" and type(o) ~= "boolean" then
+    return R.num(v) == R.num(o) and R.is_float(v) == R.is_float(o)
+  end
+  return rawequal(v, o)
+end
+T.escaped = function(_, v)
+  return R.is_safe(R.check(v))
+end
+T["in"] = function(_, v, args)
+  return R.contains(args[1], v)
+end
+T.filter = function(_, v)
+  return R.filters[R.str(v)] ~= nil
+end
+T.test = function(_, v)
+  return R.tests[R.str(v)] ~= nil
+end
+for names, op in pairs({ ["eq ==  equalto"] = "==", ["ne !="] = "!=", ["gt > greaterthan"] = ">", ["ge >="] = ">=", ["lt < lessthan"] = "<", ["le <="] = "<=" }) do
+  for name in names:gmatch("%S+") do
+    T[name] = function(_, v, args)
+      return R.cmp(op, v, args[1])
+    end
+  end
+end
 
 local G = {}
 
@@ -453,6 +542,8 @@ end
 
 ---Register everything into the runtime.
 function M.install()
+  require("dbdash.template.filters_seq").install()
+  require("dbdash.template.filters_text").install()
   for k, v in pairs(F) do
     R.filters[k] = v
   end
