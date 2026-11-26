@@ -22,7 +22,7 @@ function Dashboard:start_global_timer(first)
 end
 
 ---Refresh every panel now and restart the timers. User actions (refresh key, changed
----arguments) queue a refresh behind a running query; timer ticks (`o.timer`) skip it.
+---arguments) cancel a running refresh and start again; timer ticks (`o.timer`) skip it.
 ---@param o { timer: boolean? }?
 function Dashboard:restart(o)
   local tick = o and o.timer
@@ -80,6 +80,14 @@ function Dashboard:start_timers()
     end)
   end)
   self:restart()
+end
+
+---Cancel the refreshes running in the dashboard's panels (Panel:cancel).
+---@param reason string
+function Dashboard:cancel(reason)
+  for _, p in ipairs(self.panels) do
+    p:cancel(reason)
+  end
 end
 
 function Dashboard:stop_timers()

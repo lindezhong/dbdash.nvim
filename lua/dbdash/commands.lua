@@ -170,6 +170,8 @@ function M.status()
       local when = os.date("%H:%M:%S", h.at)
       if h.skipped then
         lines[#lines + 1] = ("  %s  skipped (previous query still running)"):format(when)
+      elseif h.cancelled then
+        lines[#lines + 1] = ("  %s  cancelled (%s)"):format(when, h.cancelled)
       elseif h.error then
         lines[#lines + 1] = ("  %s  error: %s"):format(when, h.error:gsub("\n", " "))
       else

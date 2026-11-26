@@ -589,7 +589,7 @@ end
 ---Run Lua with env.timeout; Lua errors become template errors at their own line when they
 ---come from this template's code (chunk `chunk_name`), else at the current line.
 function R.run_lua(env, fn, chunk_name, source)
-  local ok, ret = require("dbdash.db.lua_env").guard(fn, env.timeout)
+  local ok, ret = require("dbdash.db.lua_env").guard(fn, env.timeout, env.cancel)
   if ok then
     -- Arguments the code assigned (args.x = v) apply now: later template text sees them.
     local after = env.lua and env.lua.after

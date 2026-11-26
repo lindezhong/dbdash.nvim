@@ -8,6 +8,7 @@ local M = {}
 ---@field rows integer?
 ---@field error string?
 ---@field skipped boolean?
+---@field cancelled string? why the refresh was cancelled
 
 ---@class dbdash.Panel
 ---@field d dbdash.Dashboard
@@ -15,6 +16,7 @@ local M = {}
 ---@field cfg dbdash.PanelConfig
 ---@field timer uv.uv_timer_t?
 ---@field running boolean
+---@field current dbdash.Run? the refresh running now (its result is dropped once it is not)
 ---@field next_at integer loop time (ms) of the next refresh
 ---@field rs dbdash.db.ResultSet? last successful result
 ---@field sql string? last rendered query
@@ -34,7 +36,6 @@ Panel.__index = Panel
 ---@field ctimer uv.uv_timer_t? countdown display timer
 ---@field regions table[]? buffer regions of the panels (multi-panel)
 ---@field last_size integer[]?
----@field generation integer incremented on stop, to drop late query results
 ---@field cookie_jar dbdash.http.Jar cookies servers set for http(s):// panels (in memory)
 local Dashboard = {}
 Dashboard.__index = Dashboard

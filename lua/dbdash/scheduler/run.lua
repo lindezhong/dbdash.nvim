@@ -34,6 +34,7 @@ function Panel:render_templates(run)
       self:set_arg(run, name, v)
     end,
     timeout = q.timeout,
+    cancel = run.life.cancel,
     on_allow = function()
       self:refresh({ queue = true })
     end,
@@ -47,8 +48,9 @@ end
 ---@field values table<string, any> the arguments by name
 ---@field args table what Lua code sees as `args`
 ---@field depth integer 0 for a refresh, n for a callback n levels deep (meta.run.depth)
----@field counter { n: integer, runs: table[] } the refresh's life: dbdash.run() calls so
----  far and the run records (meta.runs), shared by its callbacks (= run.life)
+---@field counter { n: integer, runs: table[], cancel: dbdash.db.CancelToken } the refresh's
+---  life: dbdash.run() calls so far, the run records (meta.runs) and the token that cancels
+---  the refresh, shared by its callbacks (= run.life)
 ---@field record table this run's record (meta.run): id, kind, depth, parent_id, refresh_id,
 ---  args, started_at, finished_at, elapsed_ms, ok, error, sql, query, result
 ---@field lua { store: table, helpers: table } globals of all Lua code of the run
@@ -63,7 +65,8 @@ function Panel:new_run(values, parent, kind)
   local run = {
     values = values or args.resolve_panel(self.cfg, self.d.state),
     depth = parent and parent.depth + 1 or 0,
-    counter = parent and parent.counter or { n = 0, runs = {}, version = 0 },
+    -- The life: callbacks so far, records, and the cancel token of the refresh.
+    counter = parent and parent.counter or { n = 0, runs = {}, version = 0, cancel = require("dbdash.db.cancel").new() },
   }
   run.life = run.counter
   -- The run record: meta.run, and in meta.runs (meta.prev_runs ... once the life is over).
@@ -216,7 +219,7 @@ end
 ---Render template `text` (at `line` of the config) of dashboard `d`. Templates see exactly
 ---two names: args.<name> (o.specs with o.values) and meta.<name> (o.meta); imported
 ---templates and Lua in templates too. Inside a util.async task; raises template errors.
----@param o { dialect: table?, autoescape: boolean?, specs: dbdash.ArgSpec[], values: table, meta: table, lua: table?, timeout: integer?, on_allow: fun()? }
+---@param o { dialect: table?, autoescape: boolean?, specs: dbdash.ArgSpec[], values: table, meta: table, lua: table?, timeout: integer?, cancel: dbdash.db.CancelToken?, on_allow: fun()? }
 ---  lua: { store, helpers } globals of Lua in the template ({% lua %}, imported .lua);
 ---  run: the run whose `args` mapping this is; set_arg: {% set args.x = v %}
 function M.render_text(d, text, line, o)
@@ -246,6 +249,7 @@ function M.render_text(d, text, line, o)
     after = o.lua and o.lua.after,
   }
   env.timeout = o.timeout or require("dbdash").default_ms("timeout")
+  env.cancel = o.cancel -- cancelling the refresh stops Lua in the template
   env.set_arg = o.set_arg
   env.check_file = function(path, t, kind)
     M.check_file(d, path, t, kind, o.on_allow)

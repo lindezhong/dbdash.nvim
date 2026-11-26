@@ -117,7 +117,6 @@ function M.start(path, o)
       cfg = cfg,
       state = state,
       panels = {},
-      generation = 0,
       cookie_jar = require("dbdash.net.http_cookie").new(),
     }, Dashboard)
     for i, pc in ipairs(cfg.panels) do
@@ -187,8 +186,8 @@ function M.stop(path, o)
     return false
   end
   M.dashboards[path] = nil
-  d.generation = d.generation + 1
   d:stop_timers()
+  d:cancel("dashboard stopped")
   if not (o and o.keep_buffer) and vim.api.nvim_buf_is_valid(d.buf) then
     -- Keep windows open: show the alternate buffer (or an empty one) first.
     for _, win in ipairs(vim.fn.win_findbuf(d.buf)) do
@@ -239,8 +238,6 @@ function M.trusted(path, cfg, on_viewed)
   return trust.check(path, files, on_viewed)
 end
 
----On exit: stop timers and ignore queries still running, but keep the dashboards and
----their arguments so session hooks that run later (VimLeave) can still save them.
 ---Pause dashboards that no window of the current tab page shows, resume the others
 ---(setup({ dashboard = { pause_hidden = true } }), the default).
 function M.update_visibility()
@@ -258,11 +255,18 @@ function M.update_visibility()
   end
 end
 
+---On exit: stop timers and cancel running queries (waiting up to a second for the cancels
+---to reach the servers), but keep the dashboards and their arguments so session hooks
+---that run later (VimLeave) can still save them.
 function M.freeze_all()
   for _, d in pairs(M.dashboards) do
-    d.generation = d.generation + 1
     d:stop_timers()
+    d:cancel("Neovim exits")
   end
+  local db = require("dbdash.db")
+  vim.wait(1000, function()
+    return db.pending_cancels() == 0
+  end, 10)
 end
 
 ---A window closes (WinClosed: it still shows its buffer). Closing the last window of a

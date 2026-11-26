@@ -2,8 +2,8 @@
 --
 -- A dashboard has one or more panels. Each panel refreshes on its own interval: render
 -- template -> db.query -> render chart -> redraw. A refresh that comes due while the
--- panel's query is still running is skipped (and recorded). On error the panel keeps its
--- last good content and shows the error.
+-- panel's query is still running is skipped (and recorded); one the user asks for cancels
+-- it (Panel:cancel). On error the panel keeps its last good content and shows the error.
 --
 -- Multi-panel configs with a top-level `interval` also have a global timer that refreshes
 -- every panel and restarts the panels' own timers.
@@ -22,6 +22,9 @@ M.dashboards = {}
 function M.format_error(err)
   if type(err) ~= "table" then
     return tostring(err)
+  end
+  if err.phase == "cancelled" then
+    return err.message -- "query cancelled: <reason>"
   end
   local phase = err.phase or "error"
   local msg = getmetatable(err) and getmetatable(err).__tostring and tostring(err) or err.message

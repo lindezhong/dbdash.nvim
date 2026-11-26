@@ -121,6 +121,7 @@ function Panel:pipeline(run)
     line = q.sql_line,
     raw = code ~= nil, -- the transform gets the raw result; checked after it
     cookie_jar = self.d.cookie_jar,
+    cancel = run.life.cancel, -- cancelling the refresh stops the query
   })
   -- The query's own result (before query.transform): rows as Lua data, or the raw value.
   local lua_result = require("dbdash.db.lua_result")
@@ -134,6 +135,7 @@ function Panel:pipeline(run)
       lua = run.lua,
       timeout = q.timeout or require("dbdash").default_ms("timeout"),
       max_rows = q.max_rows or require("dbdash").options.defaults.max_rows,
+      cancel = run.life.cancel,
     })
     out.elapsed_ms = rs.elapsed_ms
     rs = out
@@ -177,35 +179,52 @@ function Panel:fail(err)
   end
 end
 
----Run the panel's query now (unless one is in flight).
----Run the panel's query. While the previous query still runs, a timer refresh is
----skipped (and recorded); a requested one (`o.queue`: manual refresh, changed
----arguments) runs again as soon as the previous query finishes.
+---Run the panel's query. While the previous refresh still runs, a timer refresh is
+---skipped (and recorded); a requested one (`o.queue`: manual refresh, changed arguments)
+---cancels it (its queries stop on the server too) and starts at once.
 ---@param o { queue: boolean? }?
 function Panel:refresh(o)
   if self.running then
-    if o and o.queue then
-      self.rerun = true
-    else
+    if not (o and o.queue) then
       self:push_history({ skipped = true })
+      return
     end
-    return
+    self:cancel("replaced by a new refresh")
   end
   self.running = true
   self.refresh_count = (self.refresh_count or 0) + 1 -- meta.refresh_count
   self.d:update_status()
-  local gen = self.d.generation
   -- One task: the whole pipeline (callbacks of dbdash.run() run inside it too).
   local run = self:new_run()
+  self.current = run
   require("dbdash.util.async").run(function()
     return self:pipeline(run)
   end, function(err, rs)
     vim.schedule(function()
-      if gen == self.d.generation then
-        self:finish_refresh(gen, err and as_error(err) or nil, rs, run)
+      -- Not when the refresh was cancelled (replaced, the dashboard stopped).
+      if self.current == run then
+        self:finish_refresh(err and as_error(err) or nil, rs, run)
       end
     end)
   end)
+end
+
+---Cancel the refresh that is running (if any): its queries and Lua code stop (on the
+---server too, see db.query), its result is dropped. Its record is closed as failed with
+---the reason and becomes meta.prev; the panel shows no error.
+---@param reason string
+function Panel:cancel(reason)
+  local run = self.current
+  if not run then
+    return
+  end
+  self.current = nil
+  self.running = false
+  run.life.cancel:cancel(reason)
+  self:finish_record(run, require("dbdash.db.error").new({ phase = "cancelled", message = "query cancelled: " .. reason }))
+  self.prev, self.prev_runs = run.record, run.life.runs
+  self:push_history({ cancelled = reason })
+  run.life.cancel:release()
 end
 
 ---Run query.transform on a query result and check its value as rows. `rs` is a result set
@@ -229,6 +248,7 @@ function M.transform(code, rs, o)
     lua = o.lua,
     vars = vars,
     timeout = o.timeout,
+    cancel = o.cancel,
   })
   return lua_result.normalize(value, { max_rows = o.max_rows, phase = "transform" })
 end
@@ -244,16 +264,10 @@ function Panel:finish_record(run, err)
   run.life.version = run.life.version + 1
 end
 
-function Panel:finish_refresh(gen, qerr, rs, run)
+function Panel:finish_refresh(qerr, rs, run)
   self.running = false
-  if self.rerun then
-    self.rerun = false
-    vim.schedule(function()
-      if gen == self.d.generation then
-        self:refresh({ queue = true })
-      end
-    end)
-  end
+  self.current = nil
+  run.life.cancel:release()
   -- The refresh's record and life become meta.prev / prev_runs (prev_ok / prev_ok_runs
   -- when it succeeded).
   if run then
