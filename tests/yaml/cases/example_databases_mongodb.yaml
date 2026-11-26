@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# MongoDB (:help dbdash-databases). Runs against `make it-up` (port 17017, user dbdash,
+# password dbdash_pw, authSource=admin; readPreference=nearest also works before the
+# test suite has made the single-node replica set primary). The query is a JSON document:
+#   {"collection": ..., "operation": "find" | "aggregate" | "count" | "distinct" | "command",
+#    "filter", "projection", "sort", "limit", "pipeline", "field", "command", "flatten"}
+# "aggregate" without a collection runs on the database ($documents, $currentOp). Nested
+# documents become columns with "flatten": n levels (a.b).
+
+title: "MongoDB"
+
+database:
+  url: "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin&readPreference=nearest"
+
+args:
+  - name: region
+    default: "eu"
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        {"operation": "aggregate", "pipeline": [
+          {"$documents": [
+            {"region": "eu", "shop": {"city": "Paris", "size": "L"}, "sales": 120},
+            {"region": "eu", "shop": {"city": "Berlin", "size": "M"}, "sales": 80},
+            {"region": "us", "shop": {"city": "Austin", "size": "S"}, "sales": 95},
+            {"region": "asia", "shop": {"city": "Osaka", "size": "M"}, "sales": 60}
+          ]},
+          {"$match": {"region": {{ args.region | tojson }}}}
+        ], "flatten": 1}
+    show:
+      type: table
+      title: "$documents, $match on an argument, flatten (shop.city)"
+      interval: 1m
+
+  - query:
+      sql: |
+        {"operation": "aggregate", "pipeline": [
+          {"$documents": [{"r": "eu", "n": 3}, {"r": "us", "n": 5}, {"r": "eu", "n": 4}, {"r": "asia", "n": 2}]},
+          {"$group": {"_id": "$r", "total": {"$sum": "$n"}}},
+          {"$sort": {"total": -1}}
+        ]}
+    show:
+      type: pie
+      title: "$group"
+      label_column: _id
+      value_column: total
+      interval: 1m
+
+  - query:
+      sql: |
+        {"operation": "command", "command": {"serverStatus": 1}}
+      transform: |
+        -- rs.columns are the names, rs.rows[1] the one reply document.
+        local s = rs.rows[1]
+        local get = function(name)
+          for i, c in ipairs(rs.columns) do if c == name then return s[i] end end
+        end
+        local conn = get("connections")
+        return { { version = get("version"), uptime_s = get("uptime"),
+                   connections = type(conn) == "table" and conn.current or conn } }
+    show:
+      type: table
+      title: "command: serverStatus"
+      interval: 10s
+
+  - query:
+      sql: |
+        {"operation": "aggregate", "pipeline": [
+          {"$currentOp": {"allUsers": true, "idleConnections": false}},
+          {"$project": {"op": 1, "ns": 1, "secs_running": 1, "desc": 1}}
+        ]}
+    show:
+      type: table
+      title: "$currentOp (what runs now)"
+      interval: 10s

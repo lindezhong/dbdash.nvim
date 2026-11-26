@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# MySQL / MariaDB (:help dbdash-databases). Runs against `make it-up` (port 13306, user
+# dbdash, password dbdash_pw, database dbdash_test); the data is made in the queries. For
+# your own server: mysql://user:pass@host:3306/db (mariadb:// too). Authentication:
+# caching_sha2_password and mysql_native_password; ?tls=require for TLS. The filters quote
+# for MySQL ('it\'s'-style escapes, `ident`).
+
+title: "MySQL"
+
+database:
+  url: "mysql://dbdash:dbdash_pw@127.0.0.1:13306/dbdash_test"
+  type: mariadb                      # (an alias of mysql: the same driver)
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
+        SELECT LPAD(n, 2, '0') AS hour, FLOOR(50 + 30 * SIN(n / 4) + RAND() * 20) AS orders
+        FROM h
+    show:
+      type: area
+      title: "Orders per hour (recursive CTE)"
+      x_column: hour
+      y_column: orders
+      interval: 1m
+
+  - query:
+      sql: |
+        SELECT table_schema AS db, COUNT(*) AS tables, SUM(table_rows) AS approx_rows
+        FROM information_schema.tables
+        GROUP BY table_schema ORDER BY tables DESC
+    show:
+      type: table
+      title: "Tables per schema (information_schema)"
+      interval: 1m
+
+  - query:
+      sql: |
+        SHOW GLOBAL STATUS WHERE Variable_name IN
+          ('Threads_connected', 'Uptime', 'Questions', 'Bytes_received', 'Bytes_sent')
+    show:
+      type: table
+      title: "SHOW GLOBAL STATUS"
+      interval: 10s
+      span: 2

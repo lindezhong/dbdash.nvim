@@ -1,0 +1,72 @@
+{
+ "title": "PostgreSQL",
+ "database": {
+  "url": "postgresql://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test",
+  "type": "postgres"
+ },
+ "args": [
+  {
+   "name": "days",
+   "type": "int",
+   "default": 14,
+   "description": "Days drawn"
+  },
+  {
+   "name": "kinds",
+   "type": "list",
+   "default": [
+    "web",
+    "app",
+    "api"
+   ]
+  },
+  {
+   "name": "top",
+   "type": "int",
+   "default": 5
+  }
+ ],
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "SELECT to_char(d, 'MM-DD') AS day, k AS kind,\n       (100 + 40 * sin(extract(doy FROM d) / 3.0 + length(k)) + random() * 20)::int AS requests\nFROM generate_series(current_date - {{ args.days - 1 }}, current_date, interval '1 day') AS d,\n     unnest(ARRAY{{ args.kinds | list }}::text[]) AS k\nORDER BY d, k\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "Requests per kind (generate_series)",
+    "x_column": "day",
+    "y_column": "requests",
+    "series_column": "kind",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT k AS kind, sum(n) AS total\nFROM (SELECT k, (random() * 100)::int AS n\n      FROM unnest(ARRAY['web', 'app', 'api', 'cli', 'bot']) AS k, generate_series(1, 20)) s\nWHERE k IN {{ args.kinds | sql_in }}\nGROUP BY k ORDER BY total DESC\nLIMIT {{ args.top | sql_limit }}\n"
+   },
+   "show": {
+    "type": "bar",
+    "title": "Totals of the chosen kinds (sql_in, sql_limit)",
+    "x_column": "kind",
+    "y_column": "total",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "max_rows": 50,
+    "timeout": "5s",
+    "sql": "SELECT pid, usename AS user, application_name AS app, state,\n       date_trunc('second', now() - backend_start) AS connected\nFROM pg_stat_activity\nWHERE datname = current_database()\nORDER BY backend_start\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "Sessions (pg_stat_activity; this one is dbdash.nvim)",
+    "interval": "10s",
+    "span": 2
+   }
+  }
+ ]
+}

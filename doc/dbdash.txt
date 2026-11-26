@@ -448,7 +448,9 @@ topic (the sidebar shows them as a tree):
   lua/          a lua:// source, query.transform, store, callbacks, run
                 records
   push/         luastream://, exec:// and webhook:// (|dbdash-push|)
-  databases/    a SQLite file
+  databases/    a SQLite file; after `make it-up` (the test services in
+                docker): postgres, mysql, redis, mongodb, cassandra, mssql
+                and http
   connections/  an HTTPS API (github.yaml, needs network)
 
 Most use an in-memory SQLite database and run as they are. Those that run Lua

@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Redis (:help dbdash-databases). Runs against `make it-up` (port 16379, password
+# dbdash_pw; 16380 is the same server with TLS). The query is one command, written as for
+# redis-cli; replies become rows (INFO as section / key / value, HGETALL as field / value,
+# lists and sets one value per row, ...). For your own server: redis://[user]:pass@host:6379/0,
+# rediss:// for TLS.
+
+title: "Redis"
+
+database:
+  url: "redis://:dbdash_pw@127.0.0.1:16379/0"
+
+layout:
+  columns: 2
+
+panels:
+  - query: { sql: "DBSIZE" }
+    show:
+      type: stat
+      title: "Keys (DBSIZE)"
+      interval: 10s
+
+  - query:
+      sql: "INFO memory"
+      transform: |
+        -- INFO gives rows of { section, key, value }: keep a few, as numbers.
+        local keep = { used_memory = true, used_memory_peak = true, used_memory_rss = true }
+        local out = {}
+        for _, r in ipairs(rs.rows) do
+          if keep[r[2]] then out[#out + 1] = { metric = r[2], bytes = tonumber(r[3]) } end
+        end
+        return out
+    show:
+      type: bar
+      title: "Memory (INFO memory)"
+      x_column: metric
+      y_column: bytes
+      interval: 10s
+
+  - query: { sql: "INFO clients" }
+    show:
+      type: table
+      title: "INFO clients"
+      interval: 10s
+
+  - database:
+      url: "rediss://:dbdash_pw@127.0.0.1:16380/0?tls=require"
+      type: rediss
+    query: { sql: "CONFIG GET maxmemory*" }
+    show:
+      type: table
+      title: "CONFIG GET maxmemory* (over TLS: rediss://)"
+      interval: 1m

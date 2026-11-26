@@ -1,0 +1,53 @@
+{
+ "title": "HTTP",
+ "database": {
+  "url": "http://127.0.0.1:18080"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "{\"path\": \"/items\"}"
+   },
+   "show": {
+    "type": "table",
+    "title": "A JSON list of objects: rows as they are",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "{\"path\": \"/wrapped\", \"query\": {\"page\": 1}}",
+    "transform": "-- rs is the decoded body; response has status, headers, body and url.\nlocal out = {}\nfor _, it in ipairs(rs.data.items) do\n  out[#out + 1] = { name = it.name, n = it.n, total = rs.total, status = response.status }\nend\nreturn out\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "A wrapped list: query.transform takes it out",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "{\"path\": \"/old\"}"
+   },
+   "show": {
+    "type": "table",
+    "title": "A redirect (301) followed",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "{% if meta.refresh_count == 1 %}{\"path\": \"/login\"}{% else %}{\"path\": \"/whoami\", \"cookies\": \"lang=zh\"}{% endif %}\n",
+    "transform": "-- The first refresh logs in (the server sets a cookie), later ones show what is sent.\nif response.url:find(\"/login\") then return { { cookie = \"(logged in; refresh with r)\" } } end\nreturn rs\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "Cookies kept between refreshes",
+    "interval": "5s"
+   }
+  }
+ ]
+}

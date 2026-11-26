@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# HTTP APIs (:help dbdash-http). Runs against the nginx of `make it-up` (port 18080; 18443
+# is HTTPS, see ../connections/tls.yaml). query.sql describes the request as JSON; its
+# "path" is appended to the URL's path as written. JSON responses are decoded: a list of
+# objects shows as it is, anything else needs query.transform (it gets rs and response).
+# Cookies the server sets are kept for the dashboard and sent on later requests.
+
+title: "HTTP"
+
+database:
+  url: "http://127.0.0.1:18080"
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: '{"path": "/items"}'
+    show:
+      type: table
+      title: "A JSON list of objects: rows as they are"
+      interval: 1m
+
+  - query:
+      sql: '{"path": "/wrapped", "query": {"page": 1}}'
+      transform: |
+        -- rs is the decoded body; response has status, headers, body and url.
+        local out = {}
+        for _, it in ipairs(rs.data.items) do
+          out[#out + 1] = { name = it.name, n = it.n, total = rs.total, status = response.status }
+        end
+        return out
+    show:
+      type: table
+      title: "A wrapped list: query.transform takes it out"
+      interval: 1m
+
+  - query:
+      sql: '{"path": "/old"}'
+    show:
+      type: table
+      title: "A redirect (301) followed"
+      interval: 1m
+
+  - query:
+      sql: |
+        {% if meta.refresh_count == 1 %}{"path": "/login"}{% else %}{"path": "/whoami", "cookies": "lang=zh"}{% endif %}
+      transform: |
+        -- The first refresh logs in (the server sets a cookie), later ones show what is sent.
+        if response.url:find("/login") then return { { cookie = "(logged in; refresh with r)" } } end
+        return rs
+    show:
+      type: table
+      title: "Cookies kept between refreshes"
+      interval: 5s

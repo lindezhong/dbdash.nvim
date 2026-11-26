@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# SQL Server (:help dbdash-databases). Runs against `make it-up` (port 11433, user sa,
+# password Dbdash_pw1). The query is T-SQL; the filters quote for SQL Server (N'...' for
+# text with non-ASCII characters, [ident], 1/0 for booleans). For your own server:
+#   mssql://user:pass@host:1433/db  (sqlserver:// too; TLS is negotiated inside TDS,
+#   &encrypt=strict for TDS 8)
+
+title: "SQL Server"
+
+database:
+  url: "sqlserver://sa:Dbdash_pw1@127.0.0.1:11433/master"
+  type: mssql
+
+args:
+  - name: city
+    default: "Zürich"
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        WITH n AS (SELECT 1 AS i UNION ALL SELECT i + 1 FROM n WHERE i < 12)
+        SELECT FORMAT(DATEFROMPARTS(YEAR(GETDATE()), i, 1), 'MMM') AS month,
+               ABS(CHECKSUM(NEWID())) % 100 + 50 AS sales
+        FROM n
+    show:
+      type: bar
+      title: "Sales per month (recursive CTE)"
+      x_column: month
+      y_column: sales
+      interval: 1m
+
+  - query:
+      sql: |
+        SELECT city, people FROM (VALUES (N'Zürich', 421000), (N'Genève', 203000), (N'Basel', 177000)) AS t(city, people)
+        WHERE city = {{ args.city | sql_quote }} OR people < 200000
+    show:
+      type: table
+      title: "VALUES and an N'...' literal from sql_quote"
+      interval: 1m
+
+  - query:
+      sql: |
+        SELECT session_id, login_name, program_name, status
+        FROM sys.dm_exec_sessions WHERE is_user_process = 1
+    show:
+      type: table
+      title: "Sessions (sys.dm_exec_sessions)"
+      interval: 10s
+
+  - query:
+      sql: SELECT @@VERSION AS version
+    show:
+      type: text
+      title: "@@VERSION"
+      interval: 1h

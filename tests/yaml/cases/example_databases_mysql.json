@@ -1,0 +1,45 @@
+{
+ "title": "MySQL",
+ "database": {
+  "url": "mysql://dbdash:dbdash_pw@127.0.0.1:13306/dbdash_test",
+  "type": "mariadb"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)\nSELECT LPAD(n, 2, '0') AS hour, FLOOR(50 + 30 * SIN(n / 4) + RAND() * 20) AS orders\nFROM h\n"
+   },
+   "show": {
+    "type": "area",
+    "title": "Orders per hour (recursive CTE)",
+    "x_column": "hour",
+    "y_column": "orders",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT table_schema AS db, COUNT(*) AS tables, SUM(table_rows) AS approx_rows\nFROM information_schema.tables\nGROUP BY table_schema ORDER BY tables DESC\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "Tables per schema (information_schema)",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN\n  ('Threads_connected', 'Uptime', 'Questions', 'Bytes_received', 'Bytes_sent')\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "SHOW GLOBAL STATUS",
+    "interval": "10s",
+    "span": 2
+   }
+  }
+ ]
+}

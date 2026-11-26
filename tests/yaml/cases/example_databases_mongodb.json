@@ -1,0 +1,60 @@
+{
+ "title": "MongoDB",
+ "database": {
+  "url": "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin&readPreference=nearest"
+ },
+ "args": [
+  {
+   "name": "region",
+   "default": "eu"
+  }
+ ],
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "{\"operation\": \"aggregate\", \"pipeline\": [\n  {\"$documents\": [\n    {\"region\": \"eu\", \"shop\": {\"city\": \"Paris\", \"size\": \"L\"}, \"sales\": 120},\n    {\"region\": \"eu\", \"shop\": {\"city\": \"Berlin\", \"size\": \"M\"}, \"sales\": 80},\n    {\"region\": \"us\", \"shop\": {\"city\": \"Austin\", \"size\": \"S\"}, \"sales\": 95},\n    {\"region\": \"asia\", \"shop\": {\"city\": \"Osaka\", \"size\": \"M\"}, \"sales\": 60}\n  ]},\n  {\"$match\": {\"region\": {{ args.region | tojson }}}}\n], \"flatten\": 1}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "$documents, $match on an argument, flatten (shop.city)",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "{\"operation\": \"aggregate\", \"pipeline\": [\n  {\"$documents\": [{\"r\": \"eu\", \"n\": 3}, {\"r\": \"us\", \"n\": 5}, {\"r\": \"eu\", \"n\": 4}, {\"r\": \"asia\", \"n\": 2}]},\n  {\"$group\": {\"_id\": \"$r\", \"total\": {\"$sum\": \"$n\"}}},\n  {\"$sort\": {\"total\": -1}}\n]}\n"
+   },
+   "show": {
+    "type": "pie",
+    "title": "$group",
+    "label_column": "_id",
+    "value_column": "total",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "{\"operation\": \"command\", \"command\": {\"serverStatus\": 1}}\n",
+    "transform": "-- rs.columns are the names, rs.rows[1] the one reply document.\nlocal s = rs.rows[1]\nlocal get = function(name)\n  for i, c in ipairs(rs.columns) do if c == name then return s[i] end end\nend\nlocal conn = get(\"connections\")\nreturn { { version = get(\"version\"), uptime_s = get(\"uptime\"),\n           connections = type(conn) == \"table\" and conn.current or conn } }\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "command: serverStatus",
+    "interval": "10s"
+   }
+  },
+  {
+   "query": {
+    "sql": "{\"operation\": \"aggregate\", \"pipeline\": [\n  {\"$currentOp\": {\"allUsers\": true, \"idleConnections\": false}},\n  {\"$project\": {\"op\": 1, \"ns\": 1, \"secs_running\": 1, \"desc\": 1}}\n]}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "$currentOp (what runs now)",
+    "interval": "10s"
+   }
+  }
+ ]
+}

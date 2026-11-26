@@ -1,0 +1,46 @@
+{
+ "title": "Cassandra",
+ "database": {
+  "url": "cql://cassandra:cassandra@127.0.0.1:19042/system?consistency=ONE",
+  "type": "cassandra"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "SELECT cluster_name, release_version, cql_version, data_center, rack FROM system.local"
+   },
+   "show": {
+    "type": "table",
+    "title": "system.local",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT keyspace_name, durable_writes FROM system_schema.keyspaces"
+   },
+   "show": {
+    "type": "table",
+    "title": "Keyspaces (system_schema)",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT keyspace_name, table_name FROM system_schema.tables",
+    "transform": "-- Tables per keyspace (CQL has no GROUP BY across partitions here).\nlocal count = {}\nfor _, r in ipairs(rs.rows) do count[r[1]] = (count[r[1]] or 0) + 1 end\nlocal out = {}\nfor k, n in pairs(count) do out[#out + 1] = { keyspace = k, tables = n } end\ntable.sort(out, function(a, b) return a.tables > b.tables end)\nreturn out\n"
+   },
+   "show": {
+    "type": "bar",
+    "title": "Tables per keyspace",
+    "x_column": "keyspace",
+    "y_column": "tables",
+    "interval": "1m",
+    "span": 2
+   }
+  }
+ ]
+}

@@ -1,0 +1,58 @@
+{
+ "title": "Redis",
+ "database": {
+  "url": "redis://:dbdash_pw@127.0.0.1:16379/0"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "DBSIZE"
+   },
+   "show": {
+    "type": "stat",
+    "title": "Keys (DBSIZE)",
+    "interval": "10s"
+   }
+  },
+  {
+   "query": {
+    "sql": "INFO memory",
+    "transform": "-- INFO gives rows of { section, key, value }: keep a few, as numbers.\nlocal keep = { used_memory = true, used_memory_peak = true, used_memory_rss = true }\nlocal out = {}\nfor _, r in ipairs(rs.rows) do\n  if keep[r[2]] then out[#out + 1] = { metric = r[2], bytes = tonumber(r[3]) } end\nend\nreturn out\n"
+   },
+   "show": {
+    "type": "bar",
+    "title": "Memory (INFO memory)",
+    "x_column": "metric",
+    "y_column": "bytes",
+    "interval": "10s"
+   }
+  },
+  {
+   "query": {
+    "sql": "INFO clients"
+   },
+   "show": {
+    "type": "table",
+    "title": "INFO clients",
+    "interval": "10s"
+   }
+  },
+  {
+   "database": {
+    "url": "rediss://:dbdash_pw@127.0.0.1:16380/0?tls=require",
+    "type": "rediss"
+   },
+   "query": {
+    "sql": "CONFIG GET maxmemory*"
+   },
+   "show": {
+    "type": "table",
+    "title": "CONFIG GET maxmemory* (over TLS: rediss://)",
+    "interval": "1m"
+   }
+  }
+ ]
+}

@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# PostgreSQL (:help dbdash-databases). Runs against the test database of `make it-up`
+# (tests/docker/compose.yaml: port 15432, user dbdash, password dbdash_pw); the data is
+# made in the queries, nothing has to be created first. For your own server:
+#   postgres://user:pass@host:5432/db  (postgresql:// too; ?tls=verify-full, see
+#   ../connections/tls.yaml; a password not in the URL: ../connections/passwords.yaml)
+# The query is SQL; the filters quote values for PostgreSQL ('it''s', "ident", TRUE).
+
+title: "PostgreSQL"
+
+database:
+  url: "postgresql://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test"
+  type: postgres                     # (inferred from the URL; written here to show it)
+
+args:
+  - name: days
+    type: int
+    default: 14
+    description: "Days drawn"
+  - name: kinds
+    type: list
+    default: [web, app, api]
+  - name: top
+    type: int
+    default: 5
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        SELECT to_char(d, 'MM-DD') AS day, k AS kind,
+               (100 + 40 * sin(extract(doy FROM d) / 3.0 + length(k)) + random() * 20)::int AS requests
+        FROM generate_series(current_date - {{ args.days - 1 }}, current_date, interval '1 day') AS d,
+             unnest(ARRAY{{ args.kinds | list }}::text[]) AS k
+        ORDER BY d, k
+    show:
+      type: line
+      title: "Requests per kind (generate_series)"
+      x_column: day
+      y_column: requests
+      series_column: kind
+      interval: 1m
+
+  - query:
+      sql: |
+        SELECT k AS kind, sum(n) AS total
+        FROM (SELECT k, (random() * 100)::int AS n
+              FROM unnest(ARRAY['web', 'app', 'api', 'cli', 'bot']) AS k, generate_series(1, 20)) s
+        WHERE k IN {{ args.kinds | sql_in }}
+        GROUP BY k ORDER BY total DESC
+        LIMIT {{ args.top | sql_limit }}
+    show:
+      type: bar
+      title: "Totals of the chosen kinds (sql_in, sql_limit)"
+      x_column: kind
+      y_column: total
+      interval: 1m
+
+  - query:
+      max_rows: 50
+      timeout: 5s
+      sql: |
+        SELECT pid, usename AS user, application_name AS app, state,
+               date_trunc('second', now() - backend_start) AS connected
+        FROM pg_stat_activity
+        WHERE datname = current_database()
+        ORDER BY backend_start
+    show:
+      type: table
+      title: "Sessions (pg_stat_activity; this one is dbdash.nvim)"
+      interval: 10s
+      span: 2
