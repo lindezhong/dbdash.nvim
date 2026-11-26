@@ -9,8 +9,6 @@ local db = require("dbdash.db")
 local template = require("dbdash.template")
 local W = require("dbdash.util.width")
 
-local W = require("dbdash.util.width")
-
 ---Render query.sql and query.transform for the current arguments: one template path for
 ---both (same variables, imports and helpers); the transform is Lua, so never autoescaped.
 ---Runs inside a util.async task (template Lua may wait on dbdash.* helpers); raises a
@@ -19,11 +17,20 @@ local W = require("dbdash.util.width")
 ---@param run dbdash.Run
 function Panel:render_templates(run)
   local q = self.cfg.query
+  local o = self:template_opts(run)
+  local sql = M.render_text(self.d, q.sql, q.sql_line, vim.tbl_extend("force", o, { autoescape = q.autoescape }))
+  local code = q.transform and M.render_text(self.d, q.transform, q.transform_line, o) or nil
+  return sql, code
+end
+
+---The options of M.render_text for the templates of `run` (and its `meta`, set on it).
+function Panel:template_opts(run)
+  local q = self.cfg.query
   run.meta = require("dbdash.metadata").values(self, run) -- `meta` of templates and Lua
   if run.depth == 0 then
     self.meta = run.meta
   end
-  local o = {
+  return {
     dialect = db.driver(self.cfg.database.type).dialect,
     specs = self.cfg.visible_args,
     values = run.args,
@@ -39,9 +46,6 @@ function Panel:render_templates(run)
       self:refresh({ queue = true })
     end,
   }
-  local sql = M.render_text(self.d, q.sql, q.sql_line, vim.tbl_extend("force", o, { autoescape = q.autoescape }))
-  local code = q.transform and M.render_text(self.d, q.transform, q.transform_line, o) or nil
-  return sql, code
 end
 
 ---@class dbdash.Run one run of a panel's pipeline: a refresh (depth 0) or a callback
@@ -59,14 +63,16 @@ end
 ---A run of the panel's pipeline with `values` (default: the current arguments).
 ---@param parent dbdash.Run? the run this one is a callback of
 ---@return dbdash.Run
----@param kind "refresh"|"callback"|"render"? render: :DbDashShowSQL and descriptions (not a
----  run of the life; default refresh, or callback with a parent)
+---@param kind "refresh"|"callback"|"push"|"render"? render: :DbDashShowSQL and descriptions
+---  (not a run of the life); push: an item of a push source; default refresh, or callback
+---  with a parent
 function Panel:new_run(values, parent, kind)
   local run = {
     values = values or args.resolve_panel(self.cfg, self.d.state),
     depth = parent and parent.depth + 1 or 0,
     -- The life: callbacks so far, records, and the cancel token of the refresh.
     counter = parent and parent.counter or { n = 0, runs = {}, version = 0, cancel = require("dbdash.db.cancel").new() },
+    item = parent and parent.item or nil, -- push sources: the item a callback works on too
   }
   run.life = run.counter
   -- The run record: meta.run, and in meta.runs (meta.prev_runs ... once the life is over).

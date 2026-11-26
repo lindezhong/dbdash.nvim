@@ -125,6 +125,7 @@ function M.start(path, o)
         index = i,
         cfg = pc,
         running = false,
+        push = config.PUSH_TYPES[pc.database.type] or nil, -- a push source (scheduler/stream.lua)
         next_at = now(),
         history = {},
         style = {},

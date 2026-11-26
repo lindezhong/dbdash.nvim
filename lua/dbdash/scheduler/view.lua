@@ -244,6 +244,9 @@ function Dashboard:update_status()
     if show.show_countdown then
       countdown = M.countdown_text(show.countdown_format, p:remaining(), p.running)
     end
+    if p.push then
+      countdown = p:push_state() .. (countdown and p:push_state() ~= "ended" and ("  " .. countdown) or "")
+    end
     buffer.set_status(self.buf, {
       header = header,
       countdown = countdown,
@@ -257,8 +260,11 @@ function Dashboard:update_status()
   for i, p in ipairs(self.panels) do
     local r = self.regions and self.regions[i]
     local show = p.cfg.show
-    if r and (show.show_countdown or p.running) then
+    if r and (show.show_countdown or p.running or p.push) then
       local text = M.countdown_text(show.countdown_format, p:remaining(), p.running)
+      if p.push then
+        text = p:push_state() .. (show.show_countdown and p:push_state() ~= "ended" and ("  " .. text) or "")
+      end
       marks[#marks + 1] = { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text), text = text }
     end
   end

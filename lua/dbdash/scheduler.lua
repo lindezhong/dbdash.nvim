@@ -10,7 +10,8 @@
 --
 -- This module is the scheduler's interface; the work is split over lua/dbdash/scheduler/:
 -- shared (classes, helpers), run (runs, records, templates), panel (refresh pipeline,
--- timers), view (drawing), dashboard (global timer, pause/resume), lifecycle (start/stop).
+-- timers), stream (push sources), view (drawing), dashboard (global timer, pause/resume),
+-- lifecycle (start/stop).
 local M = {}
 -- The modules below add their functions to this table (and require it while it loads).
 package.loaded["dbdash.scheduler"] = M
@@ -66,6 +67,7 @@ end
 local S = require("dbdash.scheduler.shared")
 require("dbdash.scheduler.run")
 require("dbdash.scheduler.panel")
+require("dbdash.scheduler.stream")
 require("dbdash.scheduler.view")
 require("dbdash.scheduler.dashboard")
 require("dbdash.scheduler.lifecycle")

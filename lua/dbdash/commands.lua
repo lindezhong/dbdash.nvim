@@ -151,7 +151,25 @@ function M.status()
       lines[#lines + 1] = ("Panel %d: %s"):format(p.index, p:title())
     end
     lines[#lines + 1] = "Database:  " .. p.cfg.database.type .. "  " .. url.redact(p.cfg.database.url)
-    lines[#lines + 1] = ("Interval:  %ds, next refresh in %ds"):format(p.cfg.show.interval / 1000, p:remaining())
+    if p.push then
+      local st = p.stream or { received = 0, processed = 0, dropped = 0, queue = {} }
+      lines[#lines + 1] = ("Interval:  drawn every %ds, next in %ds"):format(p.cfg.show.interval / 1000, p:remaining())
+      lines[#lines + 1] = ("Push:      %s; %d received, %d processed, %d queued, %d dropped"):format(p:push_state(), st.received, st.processed, #st.queue, st.dropped)
+      local h = st.handle
+      if h and h.stats.truncated > 0 then
+        lines[#lines + 1] = ("           %d item(s) cut at push.max_record"):format(h.stats.truncated)
+      end
+      local rejected = {}
+      for code, n in pairs(h and h.stats.rejected or {}) do
+        rejected[#rejected + 1] = ("%d x %d"):format(n, code)
+      end
+      if #rejected > 0 then
+        table.sort(rejected)
+        lines[#lines + 1] = "Rejected:  " .. table.concat(rejected, ", ")
+      end
+    else
+      lines[#lines + 1] = ("Interval:  %ds, next refresh in %ds"):format(p.cfg.show.interval / 1000, p:remaining())
+    end
     if p.error then
       lines[#lines + 1] = "Error:     " .. sched.format_error(p.error):gsub("\n", " ")
     end

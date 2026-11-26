@@ -101,6 +101,9 @@ end
 ---@param run dbdash.Run
 ---@return dbdash.db.ResultSet
 function Panel:pipeline(run)
+  if run.item then
+    return self:push_pipeline(run) -- a push source's item (and its callbacks)
+  end
   local q = self.cfg.query
   local source = vim.fn.fnamemodify(self.d.path, ":~:.")
   local sql, code = self:render_templates(run)
@@ -184,6 +187,14 @@ end
 ---cancels it (its queries stop on the server too) and starts at once.
 ---@param o { queue: boolean? }?
 function Panel:refresh(o)
+  if self.push then
+    -- A push source starts (again) when asked: start, r, changed arguments; timer ticks
+    -- only redraw it.
+    if o and o.queue then
+      self:stream_start()
+    end
+    return
+  end
   if self.running then
     if not (o and o.queue) then
       self:push_history({ skipped = true })
@@ -214,6 +225,10 @@ end
 ---the reason and becomes meta.prev; the panel shows no error.
 ---@param reason string
 function Panel:cancel(reason)
+  if self.push then
+    self:stream_stop(reason)
+    return
+  end
   local run = self.current
   if not run then
     return
@@ -301,6 +316,9 @@ end
 ---as often as their own interval have no timer of their own: the global timer drives them.
 ---@param first integer? ms until the first tick (default: the interval), used on resume
 function Panel:start_timer(first)
+  if self.push then
+    return self:start_draw_timer(first)
+  end
   local interval = self.cfg.show.interval
   first = first or interval
   self.next_at = now() + first
