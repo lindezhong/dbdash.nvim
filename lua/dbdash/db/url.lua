@@ -102,7 +102,8 @@ function M.parse(raw)
       local entry = { host = host ~= "" and M.decode(host) or nil }
       if port ~= "" then
         entry.port = tonumber(port)
-        if entry.port < 1 or entry.port > 65535 then
+        -- (0 only for webhook://: listen on any free port)
+        if entry.port < (u.scheme == "webhook" and 0 or 1) or entry.port > 65535 then
           fail("port out of range: %s", port)
         end
       end

@@ -127,6 +127,7 @@ end
 ---   otherwise it is checked and turned into a result set
 ---@field cookie_jar dbdash.http.Jar? cookies kept between http(s):// queries (one per dashboard)
 ---@field cancel dbdash.db.CancelToken? cancelling it stops the query (see M.query)
+---@field on_status fun(text: string)? push sources: their status changed (M.stream)
 
 -- Server-side cancels still being sent (see M.pending_cancels).
 local pending = 0
@@ -319,6 +320,9 @@ end
 ---   written is cut at `delimiter` (default "\n"), each piece is one item
 ---@field emit fun(value: any, vars: table?) one item as it is
 ---@field cancel dbdash.db.CancelToken cancelled when the stream stops
+---@field stats { items: integer, truncated: integer, rejected: table<integer, integer> }
+---@field set_status fun(text: string) what the source is doing ("listening 127.0.0.1:8765"),
+---   shown in the panel (handle.status, opts.on_status)
 ---@field on_stop fun(fn: fun()) cleanup when the stream ends or stops (kill a process, ...)
 ---@field base_dir string? the config file's directory
 ---@field options table database.options
@@ -385,7 +389,7 @@ end
 function M.stream(raw_url, query, opts, on_item, on_end)
   opts = opts or {}
   local token = require("dbdash.db.cancel").new(opts.cancel)
-  local stats = { items = 0, truncated = 0 }
+  local stats = { items = 0, truncated = 0, rejected = {} } -- rejected: count by HTTP status
   local handle = {
     stats = stats,
     stop = function(_, reason)
@@ -456,6 +460,17 @@ function M.stream(raw_url, query, opts, on_item, on_end)
       return write
     end,
     cancel = token,
+    stats = stats,
+    set_status = function(text)
+      handle.status = text
+      if opts.on_status then
+        vim.schedule(function()
+          if not done then
+            opts.on_status(text)
+          end
+        end)
+      end
+    end,
     on_stop = function(fn)
       stops[#stops + 1] = fn
     end,

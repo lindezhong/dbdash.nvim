@@ -90,6 +90,49 @@ function M.connect(host, port, opts)
   )
 end
 
+---A Socket over an accepted connection (the HTTP server's side).
+---@param tcp uv.uv_tcp_t
+---@param timeout integer ms for each read or write
+---@return dbdash.net.Socket
+function M.wrap(tcp, host, port, timeout)
+  tcp:nodelay(true)
+  return setmetatable({
+    tcp = tcp,
+    host = host,
+    port = port,
+    timeout = timeout,
+    buf = "",
+    bpos = 1,
+    raw = "",
+    rpos = 1,
+    rawq = {},
+    rawq_bytes = 0,
+    eof = false,
+    closed = false,
+  }, Socket)
+end
+
+---Plaintext bytes received and not read yet.
+function Socket:buffered()
+  return #self.buf - self.bpos + 1
+end
+
+---Read whatever arrives next (at least one byte), up to `max` bytes; "" at EOF.
+function Socket:read_some(max)
+  async.checkpoint()
+  if self:buffered() <= 0 then
+    local ok, err = pcall(self.fill, self)
+    if not ok then
+      if self.eof then
+        return ""
+      end
+      error(err, 0)
+    end
+  end
+  local n = math.min(max, self:buffered())
+  return self:read_exact(n)
+end
+
 ---Install a transport filter (TLS). `pending` is plaintext already buffered before.
 function Socket:set_filter(filter)
   self.filter = filter
