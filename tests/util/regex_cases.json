@@ -1,0 +1,514 @@
+[
+ {
+  "pattern": "^a*$",
+  "input": "",
+  "match": true
+ },
+ {
+  "pattern": "^a*$",
+  "input": "aaa",
+  "match": true
+ },
+ {
+  "pattern": "^a*$",
+  "input": "ab",
+  "match": false
+ },
+ {
+  "pattern": "a+?b",
+  "input": "aab",
+  "match": true
+ },
+ {
+  "pattern": "a+?b",
+  "input": "b",
+  "match": false
+ },
+ {
+  "pattern": "^[0-9]{3}-[0-9]{4}$",
+  "input": "555-1212",
+  "match": true
+ },
+ {
+  "pattern": "^[0-9]{3}-[0-9]{4}$",
+  "input": "5551212",
+  "match": false
+ },
+ {
+  "pattern": "^[0-9]{3}-[0-9]{4}$",
+  "input": "(888)555-1212",
+  "match": false
+ },
+ {
+  "pattern": "^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$",
+  "input": "555-1212",
+  "match": true
+ },
+ {
+  "pattern": "^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$",
+  "input": "(888)555-1212",
+  "match": true
+ },
+ {
+  "pattern": "^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$",
+  "input": "(888)555-1212 ext. 532",
+  "match": false
+ },
+ {
+  "pattern": "^[a-z]+(?:-[a-z]+)*$",
+  "input": "abc-def",
+  "match": true
+ },
+ {
+  "pattern": "^[a-z]+(?:-[a-z]+)*$",
+  "input": "abc-",
+  "match": false
+ },
+ {
+  "pattern": "^[a-z]+(?:-[a-z]+)*$",
+  "input": "-abc",
+  "match": false
+ },
+ {
+  "pattern": "\\bfoo\\b",
+  "input": "a foo b",
+  "match": true
+ },
+ {
+  "pattern": "\\bfoo\\b",
+  "input": "afoob",
+  "match": false
+ },
+ {
+  "pattern": "\\bfoo\\b",
+  "input": "foo",
+  "match": true
+ },
+ {
+  "pattern": "\\Bfoo",
+  "input": "afoo",
+  "match": true
+ },
+ {
+  "pattern": "\\Bfoo",
+  "input": "foo",
+  "match": false
+ },
+ {
+  "pattern": "^\\d+\\.\\d{2}$",
+  "input": "12.34",
+  "match": true
+ },
+ {
+  "pattern": "^\\d+\\.\\d{2}$",
+  "input": "12.3",
+  "match": false
+ },
+ {
+  "pattern": "^\\d+\\.\\d{2}$",
+  "input": "１２.34",
+  "match": false
+ },
+ {
+  "pattern": "[^\\s]+",
+  "input": "   ",
+  "match": false
+ },
+ {
+  "pattern": "[^\\s]+",
+  "input": " x ",
+  "match": true
+ },
+ {
+  "pattern": "[^\\s]+",
+  "input": " 　",
+  "match": false
+ },
+ {
+  "pattern": "^\\w+$",
+  "input": "héllo",
+  "match": false
+ },
+ {
+  "pattern": "^\\w+$",
+  "input": "hello_1",
+  "match": true
+ },
+ {
+  "pattern": "^.$",
+  "input": "é",
+  "match": true
+ },
+ {
+  "pattern": "^.$",
+  "input": "\n",
+  "match": false
+ },
+ {
+  "pattern": "^.$",
+  "input": "😀",
+  "match": true
+ },
+ {
+  "pattern": "^.$",
+  "input": "\r",
+  "match": false
+ },
+ {
+  "pattern": "^.$",
+  "input": " ",
+  "match": false
+ },
+ {
+  "pattern": "^(a|ab)(c|bcd)(d*)$",
+  "input": "abcd",
+  "match": true
+ },
+ {
+  "pattern": "x{2,}",
+  "input": "x",
+  "match": false
+ },
+ {
+  "pattern": "x{2,}",
+  "input": "xx",
+  "match": true
+ },
+ {
+  "pattern": "^x{1,2}$",
+  "input": "x",
+  "match": true
+ },
+ {
+  "pattern": "^x{1,2}$",
+  "input": "xxx",
+  "match": false
+ },
+ {
+  "pattern": "^\\u00e9$",
+  "input": "é",
+  "match": true
+ },
+ {
+  "pattern": "^\\x41\\t$",
+  "input": "A\t",
+  "match": true
+ },
+ {
+  "pattern": "^[\\u0041-\\u005A]+$",
+  "input": "ABC",
+  "match": true
+ },
+ {
+  "pattern": "^[\\u0041-\\u005A]+$",
+  "input": "aBC",
+  "match": false
+ },
+ {
+  "pattern": "^(?<y>\\d{4})$",
+  "input": "2024",
+  "match": true
+ },
+ {
+  "pattern": "^(?<y>\\d{4})$",
+  "input": "24",
+  "match": false
+ },
+ {
+  "pattern": "^(a+)+$",
+  "input": "aaaa",
+  "match": true
+ },
+ {
+  "pattern": "^(a+)+$",
+  "input": "aab",
+  "match": false
+ },
+ {
+  "pattern": "^[\\d-]+$",
+  "input": "1-2",
+  "match": true
+ },
+ {
+  "pattern": "^[\\d-]+$",
+  "input": "a",
+  "match": false
+ },
+ {
+  "pattern": "^\\cJ$",
+  "input": "\n",
+  "match": true
+ },
+ {
+  "pattern": "^[\\b]$",
+  "input": "\b",
+  "match": true
+ },
+ {
+  "pattern": "^\\/\\.$",
+  "input": "/.",
+  "match": true
+ },
+ {
+  "pattern": "^(?:a|)+$",
+  "input": "aaa",
+  "match": true
+ },
+ {
+  "pattern": "^(?:a|)+$",
+  "input": "",
+  "match": true
+ },
+ {
+  "pattern": "^.*?x",
+  "input": "abxcx",
+  "match": true
+ },
+ {
+  "pattern": "^.*?x",
+  "input": "abc",
+  "match": false
+ },
+ {
+  "pattern": "^\\u{1F600}$",
+  "input": "😀",
+  "match": true
+ },
+ {
+  "pattern": "^[😀-😂]$",
+  "input": "😁",
+  "match": true
+ },
+ {
+  "pattern": "^[😀-😂]$",
+  "input": "😃",
+  "match": false
+ },
+ {
+  "pattern": "^\\ud83d\\ude00$",
+  "input": "😀",
+  "match": true
+ },
+ {
+  "pattern": "^[^a-c]$",
+  "input": "d",
+  "match": true
+ },
+ {
+  "pattern": "^[^a-c]$",
+  "input": "b",
+  "match": false
+ },
+ {
+  "pattern": "a|b|",
+  "input": "",
+  "match": true
+ },
+ {
+  "pattern": "a|b|",
+  "input": "z",
+  "match": true
+ },
+ {
+  "pattern": "^(ab|a)(bc|c)?$",
+  "input": "abc",
+  "match": true
+ },
+ {
+  "pattern": "^(ab|a)(bc|c)?$",
+  "input": "ab",
+  "match": true
+ },
+ {
+  "pattern": "^(ab|a)(bc|c)?$",
+  "input": "a",
+  "match": true
+ },
+ {
+  "pattern": "^[\\w-]+@[\\w-]+\\.[a-z]{2,}$",
+  "input": "joe@example.com",
+  "match": true
+ },
+ {
+  "pattern": "^[\\w-]+@[\\w-]+\\.[a-z]{2,}$",
+  "input": "joe@example",
+  "match": false
+ },
+ {
+  "pattern": "^\\S+$",
+  "input": "a\tb",
+  "match": false
+ },
+ {
+  "pattern": "^\\S+$",
+  "input": "ab",
+  "match": true
+ },
+ {
+  "pattern": "^\\0$",
+  "input": "\u0000",
+  "match": true
+ },
+ {
+  "pattern": "^\\p{Letter}+$",
+  "input": "héllo",
+  "match": true
+ },
+ {
+  "pattern": "^\\p{Letter}+$",
+  "input": "a1",
+  "match": false
+ },
+ {
+  "pattern": "^\\p{Letter}+$",
+  "input": "中文",
+  "match": true
+ },
+ {
+  "pattern": "^\\p{L}\\p{Nd}$",
+  "input": "a٣",
+  "match": true
+ },
+ {
+  "pattern": "^\\p{L}\\p{Nd}$",
+  "input": "aa",
+  "match": false
+ },
+ {
+  "pattern": "^\\P{L}$",
+  "input": "1",
+  "match": true
+ },
+ {
+  "pattern": "^\\P{L}$",
+  "input": "x",
+  "match": false
+ },
+ {
+  "pattern": "^[\\p{Lu}\\d]+$",
+  "input": "AB1",
+  "match": true
+ },
+ {
+  "pattern": "^[\\p{Lu}\\d]+$",
+  "input": "aB",
+  "match": false
+ },
+ {
+  "pattern": "^\\p{gc=Zs}$",
+  "input": "　",
+  "match": true
+ },
+ {
+  "pattern": "^\\p{gc=Zs}$",
+  "input": "\t",
+  "match": false
+ },
+ {
+  "pattern": "^\\p{Sc}$",
+  "input": "€",
+  "match": true
+ },
+ {
+  "pattern": "^\\p{Sc}$",
+  "input": "e",
+  "match": false
+ },
+ {
+  "pattern": "^\\W$",
+  "input": "!",
+  "match": true
+ },
+ {
+  "pattern": "^\\W$",
+  "input": "a",
+  "match": false
+ },
+ {
+  "pattern": "^\\D\\s\\S$",
+  "input": "a b",
+  "match": true
+ },
+ {
+  "pattern": "^\\D\\s\\S$",
+  "input": "1 b",
+  "match": false
+ },
+ {
+  "pattern": "^[.]$",
+  "input": ".",
+  "match": true
+ },
+ {
+  "pattern": "^[.]$",
+  "input": "a",
+  "match": false
+ },
+ {
+  "pattern": "^a{0}b$",
+  "input": "b",
+  "match": true
+ },
+ {
+  "pattern": "^a{0}b$",
+  "input": "ab",
+  "match": false
+ },
+ {
+  "pattern": "^(x*)*$",
+  "input": "xxx",
+  "match": true
+ },
+ {
+  "pattern": "^\\p{Script=Greek}$",
+  "error": true
+ },
+ {
+  "pattern": "(?=a)",
+  "error": true
+ },
+ {
+  "pattern": "(?!a)",
+  "error": true
+ },
+ {
+  "pattern": "(?<=a)b",
+  "error": true
+ },
+ {
+  "pattern": "(?<!a)b",
+  "error": true
+ },
+ {
+  "pattern": "(a)\\1",
+  "error": true
+ },
+ {
+  "pattern": "[b-a]",
+  "error": true
+ },
+ {
+  "pattern": "a{2,1}",
+  "error": true
+ },
+ {
+  "pattern": "*a",
+  "error": true
+ },
+ {
+  "pattern": "(a",
+  "error": true
+ },
+ {
+  "pattern": "a)",
+  "error": true
+ },
+ {
+  "pattern": "[a",
+  "error": true
+ },
+ {
+  "pattern": "\\k<x>",
+  "error": true
+ }
+]
