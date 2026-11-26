@@ -104,7 +104,7 @@ function P:subparse(ends, ends_desc)
       body[#body + 1] = { k = "Data", v = t.v }
     elseif t.t == "var_begin" then
       self:next()
-      local e = self:expression()
+      local e = self:tuple_expression()
       local te = self:peek()
       if te.t ~= "var_end" then
         self:fail(te, "expected token 'end of print statement', got '%s'", describe(te))
@@ -215,7 +215,7 @@ function P:parse_for(tok)
     self:fail(t, "expected token 'in', got '%s'", describe(t))
   end
   self:next()
-  local iter = self:expression(false)
+  local iter = self:tuple_expression(false)
   if self:is_name("if") then
     self:fail(self:peek(), "loop filtering ('for ... if ...') is not supported")
   elseif self:is_name("recursive") then
@@ -249,9 +249,9 @@ function P:parse_set(tok)
   end
   local targets = self:targets()
   if not self:skip_op("=") then
-    self:fail(tok, "block set ({%% set x %%}...{%% endset %%}) is not supported")
+    self:fail(tok, "block set ({% set x %}...{% endset %}) is not supported")
   end
-  local e = self:expression()
+  local e = self:tuple_expression()
   self:expect_block_end()
   return { k = "Set", targets = targets, expr = e, line = tok.line }
 end
@@ -289,15 +289,14 @@ function P:parse_macro(tok)
   return { k = "Macro", name = nt.v, params = params, body = body, line = tok.line }
 end
 
-local function skip_context_clause(self)
+---"with context" / "without context" after an import or include: true for with.
+local function context_clause(self, default)
   if (self:is_name("with") or self:is_name("without")) and self:is_name("context", 1) then
-    local t = self:peek()
-    if t.v == "with" then
-      self:fail(t, "importing 'with context' is not supported")
-    end
+    local with = self:next().v == "with"
     self:next()
-    self:next()
+    return with
   end
+  return default
 end
 
 ---{% import 'file' as name %}
@@ -311,9 +310,9 @@ function P:parse_import(tok)
   if alias.t ~= "name" then
     self:fail(alias, "expected a name after 'as'")
   end
-  skip_context_clause(self)
+  local with_context = context_clause(self, false)
   self:expect_block_end()
-  return { k = "Import", target = target, alias = alias.v, line = tok.line }
+  return { k = "Import", target = target, alias = alias.v, with_context = with_context, line = tok.line }
 end
 
 ---{% from 'file' import a, b as c %}
@@ -343,9 +342,9 @@ function P:parse_from(tok)
     end
     names[#names + 1] = { name = nt.v, alias = alias }
   until not self:skip_op(",")
-  skip_context_clause(self)
+  local with_context = context_clause(self, false)
   self:expect_block_end()
-  return { k = "FromImport", target = target, names = names, line = tok.line }
+  return { k = "FromImport", target = target, names = names, with_context = with_context, line = tok.line }
 end
 
 -- Expressions ------------------------------------------------------------------------------
@@ -355,6 +354,28 @@ local function node(k, tok, fields)
   fields.line = tok.line
   fields.col = tok.col
   return fields
+end
+
+local TUPLE_END = { var_end = true, block_end = true, eof = true }
+
+---An expression, or several separated by commas: a tuple without parentheses
+---({{ 1, 2 }}, {% set a, b = 1, 2 %}, {% for x in 1, 2 %}).
+---@param with_cond boolean? false disables "a if b else c" (loop iterables)
+function P:tuple_expression(with_cond)
+  local t = self:peek()
+  local e = self:expression(with_cond)
+  if not self:is_op(",") then
+    return e
+  end
+  local items = { e }
+  while self:skip_op(",") do
+    local nt = self:peek()
+    if TUPLE_END[nt.t] or (nt.t == "name" and (nt.v == "if" or nt.v == "recursive")) then
+      break
+    end
+    items[#items + 1] = self:expression(with_cond)
+  end
+  return node("List", t, { items = items, tuple = true })
 end
 
 ---@param with_cond boolean? false disables "a if b else c" (used for loop iterables)
@@ -487,11 +508,13 @@ function P:p_primary()
       parts[#parts + 1] = self:next().v
     end
     return node("Const", t, { v = table.concat(parts) })
-  elseif t.t == "int" or t.t == "float" then
+  elseif t.t == "int" then
     return node("Const", t, { v = t.v })
+  elseif t.t == "float" then
+    return node("Const", t, { v = t.v, float = true })
   elseif t.t == "op" and t.v == "(" then
     if self:skip_op(")") then
-      return node("List", t, { items = {} })
+      return node("List", t, { items = {}, tuple = true })
     end
     local e = self:expression()
     if self:is_op(",") then
@@ -502,7 +525,7 @@ function P:p_primary()
         end
         items[#items + 1] = self:expression()
       end
-      e = node("List", t, { items = items })
+      e = node("List", t, { items = items, tuple = true })
     end
     self:expect_op(")")
     return e

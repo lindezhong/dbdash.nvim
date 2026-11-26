@@ -86,6 +86,9 @@ end
 function C:expr(n)
   local k = n.k
   if k == "Const" then
+    if n.float then
+      return ("rt.float(%s)"):format(const(n.v))
+    end
     return const(n.v)
   elseif k == "Name" then
     local b = self:lookup(n.name)
@@ -94,6 +97,9 @@ function C:expr(n)
     end
     return ("rt.lookup(ctx, %q)"):format(n.name)
   elseif k == "List" then
+    if n.tuple then
+      return ("rt.tuple(%s)"):format(self:list(n.items))
+    end
     return self:list(n.items)
   elseif k == "Dict" then
     local flat = {}
@@ -261,6 +267,30 @@ function C:close_scope()
   self.scopes[#self.scopes] = nil
 end
 
+---Lua table constructor of the template variables visible here (set, for, macro args):
+---{ ["name"] = lua_var, ... } (values may be rt.MISSING).
+function C:visible_locals()
+  local fields, seen = {}, {}
+  for i = #self.scopes, 1, -1 do
+    for name, b in pairs(self.scopes[i]) do
+      if not seen[name] and not name:match("^%$") then
+        seen[name] = true
+        fields[#fields + 1] = ("[%q] = %s"):format(name, b.lua)
+      end
+    end
+  end
+  table.sort(fields)
+  return "{ " .. table.concat(fields, ", ") .. " }"
+end
+
+---Record a top-level variable for {% import %} (Jinja: names starting with "_" are private).
+function C:export(name, lua)
+  if #self.scopes == 1 and not name:match("^_") and not self.exported[name] then
+    self.exported[name] = true
+    self.exports[#self.exports + 1] = { name, lua }
+  end
+end
+
 function C:line(n)
   self:emit(("L.l = %d"):format(n.line))
 end
@@ -278,20 +308,10 @@ function C:stmt(st)
   elseif k == "Lua" then
     self:line(st)
     -- The template variables visible here (set, for, macro arguments), for `vars`.
-    local fields, seen = {}, {}
-    for i = #self.scopes, 1, -1 do
-      for name, b in pairs(self.scopes[i]) do
-        if not seen[name] then
-          seen[name] = true
-          fields[#fields + 1] = ("[%q] = %s"):format(name, b.lua)
-        end
-      end
-    end
-    table.sort(fields)
-    self:emit(("o[#o + 1] = rt.lua_block(env, %q, %d, function() return { %s } end)"):format(
+    self:emit(("o[#o + 1] = rt.lua_block(env, %q, %d, function() return %s end)"):format(
       st.code,
       st.line,
-      table.concat(fields, ", ")
+      self:visible_locals()
     ))
   elseif k == "Output" then
     self:line(st)
@@ -349,6 +369,7 @@ function C:stmt(st)
     for j, name in ipairs(st.targets) do
       local b = self.scopes[#self.scopes][name]
       lhs[j] = b.lua
+      self:export(name, b.lua)
     end
     if #lhs == 1 then
       self:emit(("%s = %s"):format(lhs[1], self:expr(st.expr)))
@@ -388,17 +409,15 @@ function C:stmt(st)
     self:emit("return table.concat(o)")
     self.depth = self.depth - 1
     self:emit("end)")
-    if #self.scopes == 1 then
-      self.exports[#self.exports + 1] = { st.name, b.lua }
-    end
+    self:export(st.name, b.lua)
   elseif k == "Import" then
     self:line(st)
     local b = self.scopes[#self.scopes][st.alias]
-    self:emit(("%s = rt.import(env, %s)"):format(b.lua, self:expr(st.target)))
+    self:emit(("%s = rt.import(env, %s, %s)"):format(b.lua, self:expr(st.target), self:import_context(st)))
   elseif k == "FromImport" then
     self:line(st)
     local mod = self:tmp()
-    self:emit(("local %s = rt.import(env, %s)"):format(mod, self:expr(st.target)))
+    self:emit(("local %s = rt.import(env, %s, %s)"):format(mod, self:expr(st.target), self:import_context(st)))
     for _, n in ipairs(st.names) do
       local b = self.scopes[#self.scopes][n.alias]
       self:emit(("%s = rt.import_name(%s, %q)"):format(b.lua, mod, n.name))
@@ -406,6 +425,15 @@ function C:stmt(st)
   else
     error("unknown statement node " .. tostring(k))
   end
+end
+
+---The context an import runs with: "with context" gives the caller's context and
+---variables; otherwise nil (only the globals: a dashboard's args and meta).
+function C:import_context(st)
+  if st.with_context then
+    return ("rt.layer(ctx, %s)"):format(self:visible_locals())
+  end
+  return "nil"
 end
 
 function C:if_chain(st, idx)
@@ -434,7 +462,7 @@ end
 ---@return string
 function M.compile(body)
   check_reserved(body)
-  local c = setmetatable({ buf = {}, depth = 0, n = 0, scopes = {}, exports = {} }, C)
+  local c = setmetatable({ buf = {}, depth = 0, n = 0, scopes = {}, exports = {}, exported = {} }, C)
   c:emit("local rt = ...")
   c:emit("return function(ctx, env, L)")
   c.depth = 1
@@ -442,7 +470,7 @@ function M.compile(body)
   c:open_scope(body)
   c:body(body)
   c:close_scope()
-  -- The second return value lists top-level macros, used by {% import %}.
+  -- The second return value lists the top-level variables and macros, for {% import %}.
   local ex = {}
   for _, e in ipairs(c.exports) do
     ex[#ex + 1] = ("{ %q, %s }"):format(e[1], e[2])

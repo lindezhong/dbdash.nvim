@@ -40,7 +40,13 @@ T["every template filter, test and global is documented"] = function()
     end
   end
   eq(missing(names, "%s"), {})
-  eq(missing(R.METHOD_NAMES, "%s("), {})
+  local methods = {}
+  for _, fns in pairs(require("dbdash.template.methods").by_type) do
+    for k in pairs(fns) do
+      methods[#methods + 1] = k
+    end
+  end
+  eq(missing(methods, "%s()"), {})
 end
 
 T["every setup option is documented"] = function()

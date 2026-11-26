@@ -46,10 +46,8 @@ T["unsupported constructs are explained"] = function()
     ["{% for i in [1] if i %}{% endfor %}"] = "loop filtering",
     ["{% set x %}y{% endset %}"] = "block set",
     ["{{ [1, 2][0:1] }}"] = "slices are not supported",
-    ["{{ 'a'.replace('a', 'b') }}"] = "calling '.replace()' is not supported",
     ["{{ x is odd }}"] = "No test named 'odd'",
-    ["{% for i in [1] %}{{ loop.cycle('a') }}{% endfor %}"] = "calling '.cycle()' is not supported",
-    ["{{ '%s' % 1 }}"] = "string formatting",
+    ["{% for i in [1] %}{{ loop.cycle('a') }}{% endfor %}"] = "loop.cycle is not supported",
     ["{{ f(*a) }}"] = "*args",
   }
   for src, want in pairs(cases) do
@@ -124,6 +122,37 @@ end
 T["macros render safe output under autoescape"] = function()
   local env = template.env(require("dbdash.db.dialect").get("postgres"), true)
   eq(template.render([[{% macro m(v) %}x = {{ v }}{% endmacro %}{{ m("it's") }}]], {}, { env = env }), "x = 'it''s'")
+end
+
+T["args and meta are read-only for methods; set args.x still works"] = function()
+  local map = require("dbdash.util.map")
+  local args = map.from_pairs({ { "ids", { 1, 2 } }, { "m", map.from_pairs({ { "k", 1 } }) } })
+  local meta = map.from_pairs({ { "run", map.new() } })
+  local ctx = { args = R.freeze(args, "args"), meta = R.freeze(meta, "meta") }
+  for _, src in ipairs({
+    "{% set _ = args.ids.append(3) %}",
+    "{% set _ = args.m.update({'k': 2}) %}",
+    "{% set _ = args.m.pop('k') %}",
+    "{% set _ = meta.run.clear() %}",
+  }) do
+    local e = err_of(src, ctx)
+    eq({ src, e.message:find("is read-only", 1, true) ~= nil }, { src, true })
+  end
+  -- Reading methods and copies are fine.
+  eq(template.render("{{ args.ids.index(2) }} {{ args.m.get('k') }} {% set c = args.m.copy() %}{% set _ = c.update({'k': 5}) %}{{ c.k }} {{ args.m.k }}", ctx), "1 1 5 1")
+end
+
+T["imported templates see args and meta (globals) with and without context"] = function()
+  local map = require("dbdash.util.map")
+  local ctx = { args = map.from_pairs({ { "days", 7 } }), meta = map.from_pairs({ { "os", "linux" } }) }
+  local env = {
+    context = ctx,
+    load_template = require("dbdash.template.loader").dict({
+      ["m.sql"] = "{% macro f() %}{{ args.days }} {{ meta.os }} {{ y is defined }}{% endmacro %}",
+    }),
+  }
+  local src = "{% set y = 1 %}{% import 'm.sql' as a %}{% import 'm.sql' as b with context %}{{ a.f() }}|{{ b.f() }}"
+  eq(template.render(src, ctx, { env = env }), "7 linux False|7 linux True")
 end
 
 return T

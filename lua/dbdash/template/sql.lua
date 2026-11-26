@@ -60,7 +60,7 @@ F.sql_quote = function(env, v, args, kw)
   filters.bind("sql_quote", args, kw, {})
   v = plain(v)
   local d = dialect_of(env)
-  if type(v) == "string" or v == NONE or type(v) == "boolean" or type(v) == "number" then
+  if type(v) == "string" or v == NONE or type(v) == "boolean" or type(v) == "number" or R.is_float_box(v) then
     return call(d.literal, v)
   end
   return R.str(v)
@@ -102,7 +102,10 @@ F.sql_limit = function(_, v, args, kw)
   if v == NONE then
     return ""
   end
-  local n = type(v) == "number" and v or tonumber(type(v) == "string" and vim.trim(v) or nil)
+  local n = R.num(v) or tonumber(type(v) == "string" and vim.trim(v) or nil)
+  if type(v) == "boolean" then
+    n = nil
+  end
   if not n or n ~= math.floor(n) then
     raise("value", "Invalid LIMIT value: %s", R.str(v))
   end

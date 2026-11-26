@@ -164,6 +164,12 @@ function M.tokenize(src)
       if name then
         push("name", name, p)
         p = p + #name
+      elseif src:match("^0[xXoObB]", p) and src:match("^0[xX][%x_]+", p) or src:match("^0[oO][0-7_]+", p) or src:match("^0[bB][01_]+", p) then
+        -- 0x1f, 0o17, 0b101 (underscores allowed, like Python)
+        local lit = src:match("^0[xX][%x_]+", p) or src:match("^0[oO][0-7_]+", p) or src:match("^0[bB][01_]+", p)
+        local base = ({ x = 16, o = 8, b = 2 })[lit:sub(2, 2):lower()]
+        push("int", tonumber((lit:sub(3):gsub("_", "")), base), p)
+        p = p + #lit
       elseif c:match("%d") then
         local num = src:match("^%d[%d_]*%.%d[%d_]*[eE][-+]?%d+", p)
           or src:match("^%d[%d_]*%.%d[%d_]*", p)

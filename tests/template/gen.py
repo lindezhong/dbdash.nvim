@@ -4,8 +4,7 @@ Usage: python3 -I tests/template/gen.py  ->  tests/template/cases.json
 
 Each case: {name, template, ctx (JSON text, parsed by the Lua YAML parser to keep key
 order), expected | error: {type, line}}. Known, documented deviations of the Lua engine
-are given as "lua_expected" (integral floats render without ".0" because Lua numbers do
-not distinguish int from float).
+would be given as "lua_expected" (there are none at the moment).
 """
 import json
 import pathlib
@@ -62,7 +61,7 @@ CASES = [
     # --- literals -----------------------------------------------------------------------
     ("int literal", "{{ 42 }}", None, None),
     ("float literal", "{{ 1.5 }} {{ 0.1 }} {{ 1e-05 }} {{ 1_000 }}", None, None),
-    ("integral float literal", "{{ 2.0 }}", None, "2"),
+    ("integral float literal", "{{ 2.0 }}", None, None),
     ("string escapes", "{{ 'a\\tb' }}|{{ \"it's\" }}|{{ 'x\\'y' }}", None, None),
     ("adjacent strings", "{{ 'a' 'b' \"c\" }}", None, None),
     ("constants", "{{ true }} {{ True }} {{ false }} {{ none }} {{ None }}", None, None),
@@ -75,7 +74,7 @@ CASES = [
     ("power left assoc", "{{ 2 ** 3 ** 2 }}", None, None),
     ("floor div and mod", "{{ 7 // 2 }} {{ -7 // 2 }} {{ 7 % 3 }} {{ -7 % 3 }} {{ 7 % -3 }}", None, None),
     ("true division", "{{ 1 / 4 }} {{ 7 / 2 }}", None, None),
-    ("true division integral", "{{ 4 / 2 }}", None, "2"),
+    ("true division integral", "{{ 4 / 2 }}", None, None),
     ("unary", "{{ -x }} {{ +x }} {{ - -x }} {{ -1|abs }}", None, None),
     ("string plus", "{{ 'a' + 'b' }} {{ s + '!' }}", None, None),
     ("list plus", "{{ [1] + [2, 3] }}", None, None),
@@ -120,11 +119,11 @@ CASES = [
     ("first last", "{{ items|first }} {{ items|last }} {{ s|first }} {{ s|last }}", None, None),
     ("int filter", "{{ '3'|int }} {{ '3.7'|int }} {{ 'x'|int }} {{ 'x'|int(5) }} {{ 'ff'|int(base=16) }} {{ 3.9|int }} {{ -3.9|int }}", None, None),
     ("float filter", "{{ '1.5'|float }} {{ 'x'|float(2.5) }}", None, None),
-    ("float filter integral", "{{ '3'|float }}", None, "3"),
+    ("float filter integral", "{{ '3'|float }}", None, None),
     ("string filter", "{{ 1|string ~ 'x' }} {{ none|string }} {{ [1]|string }}", None, None),
     ("abs", "{{ -3|abs }} {{ (-2.5)|abs }}", None, None),
     ("round", "{{ 2.567|round(2) }} {{ 2.561|round(2, 'floor') }} {{ 2.561|round(1, 'ceil') }}", None, None),
-    ("round integral", "{{ 2.5|round }} {{ 3.5|round }} {{ 2.1|round(method='ceil') }}", None, "2 4 3"),
+    ("round integral", "{{ 2.5|round }} {{ 3.5|round }} {{ 2.1|round(method='ceil') }} {{ 3|round }}", None, None),
     ("tojson", "{{ d|tojson }}", None, None),
     ("tojson escapes", "{{ {'k': \"<a & b> it's é\", 'l': [1, none, true]}|tojson }}", None, None),
     ("tojson scalars", "{{ 'x'|tojson }} {{ 1|tojson }} {{ none|tojson }} {{ empty_map|tojson }} {{ empty_list|tojson }}", None, None),
@@ -181,6 +180,55 @@ CASES = [
     ("syntax unclosed variable", "{{ x ", None, None),
     ("syntax stray endfor", "{% endfor %}", None, None),
     ("syntax else without if", "{% else %}", None, None),
+    # --- numbers: int and float ------------------------------------------------------------
+    ("float results", "{{ 4 / 2 }} {{ 1e3 }} {{ 2.0 + 1 }} {{ 3 * 1.0 }} {{ 2 ** -1 }} {{ 2 ** 2 }} {{ 7.0 // 2 }} {{ 7.5 % 2 }} {{ 7 % 2.0 }} {{ -2.0 }} {{ 10 / 4 }}", None, None),
+    ("float repr", "{{ 1e16 }} {{ 1.0e15 }} {{ [1.0, 2] }} {{ 0.5 * 4 }} {{ -0.0 + 0 }}", None, None),
+    ("float compare and truth", "{{ 2 == 2.0 }} {{ 0.0 or 'z' }} {{ 1.0 in [1] }} {{ [2.0][0] }} {{ {'a': 1.0}.a }}", None, None),
+    ("float filters", "{{ (2.0)|int }} {{ 2|float }} {{ (2.0)|abs }} {{ -3|abs }} {{ 2.0|string }} {{ 2.0|tojson }} {{ 7|round }} {{ 2.25|round(1) }} {{ 2|round(1, 'floor') }}", None, None),
+    ("float type names", "{{ 2.0 is number }} {{ 2.0 is string }}", None, None),
+    ("float in string concat", "{{ 'x' ~ 4 / 2 }} {{ 'n=' ~ 1.0 }}", None, None),
+    ("float index is an error", "{{ items[1.0] }}", None, None),
+    ("range needs ints", "{{ range(2.0) }}", None, None),
+    # --- integer literals ----------------------------------------------------------------
+    ("hex octal binary literals", "{{ 0x1f }} {{ 0o17 }} {{ 0b101 }} {{ 0x_ff }} {{ 0XAB }} {{ 1_0.5 }}", None, None),
+    # --- tuples --------------------------------------------------------------------------
+    ("tuple repr", "{{ (1, 2) }} {{ (1,) }} {{ () }} {{ ('a', none, true) }}", None, None),
+    ("tuple operations", "{{ (1, 2) + (3,) }} {{ (1, 2) * 2 }} {{ [1] == (1,) }} {{ (1, 2) == (1, 2) }} {{ (1, 2)|tojson }} {{ (1, 2)|length }} {{ 2 in (1, 2) }}", None, None),
+    ("tuple plus list is an error", "{{ (1,) + [2] }}", None, None),
+    ("implicit tuples", "{% set a, b = 1, 2 %}{{ a }}{{ b }} {% set t = 1, 2 %}{{ t }} {{ 1, 2 }} {% for x in 1, 2 %}{{ x }}{% endfor %}", None, None),
+    ("dict views", "{{ d.keys() }} {{ d.values() }} {{ d.items() }} {{ 'a' in d.keys() }} {{ d.items()|length }} {% for k, v in d.items() %}{{ k }}{% endfor %}", None, None),
+    # --- str methods ----------------------------------------------------------------------
+    ("str split", "{{ 'a,b'.split(',') }} {{ 'a b  c '.split() }} {{ ' a b c'.split(None, 1) }} {{ 'a,b,c'.rsplit(',', 1) }} {{ 'a b c'.rsplit(maxsplit=1) }} {{ 'a,b,c'.split(',', maxsplit=1) }}", None, None),
+    ("str join replace find", "{{ '-'.join(['a', 'b']) }} {{ 'abcb'.replace('b', 'x') }} {{ 'abcb'.replace('b', 'x', 1) }} {{ 'abcb'.find('b') }} {{ 'abcb'.rfind('b') }} {{ 'abc'.find('z') }} {{ 'abc'.index('c') }} {{ '中文字'.find('字') }}", None, None),
+    ("str case", "{{ 'hello world'.title() }} {{ \"they're bill's\".title() }} {{ 'aBC'.capitalize() }} {{ 'AbC'.swapcase() }} {{ 'ẞ'.casefold() }} {{ 'Hello'.lower() }} {{ 'Hello'.upper() }}", None, None),
+    ("str padding", "[{{ 'ab'.center(6, '*') }}] [{{ 'ab'.center(5) }}] [{{ 'abc'.center(6) }}] [{{ 'x'.ljust(3, '.') }}] [{{ 'x'.rjust(3) }}] {{ '5'.zfill(3) }} {{ '-5'.zfill(4) }} [{{ 'a\tb'.expandtabs(4) }}]", None, None),
+    ("str tests", "{{ '12'.isdigit() }} {{ 'a1'.isalnum() }} {{ 'ab'.isalpha() }} {{ 'a b'.isalpha() }} {{ ' '.isspace() }} {{ 'Ab Cd'.istitle() }} {{ 'ab'.islower() }} {{ 'AB'.isupper() }} {{ 'a_1'.isidentifier() }} {{ ''.isdigit() }} {{ 'é'.isascii() }}", None, None),
+    ("str partition strip affixes", "{{ 'a=b=c'.partition('=') }} {{ 'a=b=c'.rpartition('=') }} {{ 'abc'.partition('x') }} [{{ '  a '.lstrip() }}] [{{ '  a '.rstrip() }}] [{{ 'xxaxx'.strip('x') }}] {{ 'abc'.removeprefix('a') }} {{ 'abc'.removesuffix('c') }} {{ 'abc'.startswith(('x', 'a')) }} {{ 'abc'.endswith('bc') }} {{ 'abc'.startswith('b', 1) }}", None, None),
+    ("str count splitlines", "{{ 'abcabc'.count('bc') }} {{ 'abc'.count('') }} {{ 'ab\ncd\r\nef'.splitlines() }} {{ 'ab\ncd'.splitlines(true) }}", None, None),
+    ("str.format", "{{ '{} {}'.format(1, 2) }} {{ '{0}{name}{0}'.format('a', name='n') }} {{ '{:>5}|{:<5}|{:^7}|{:.2f}|{:,}|{!r}'.format(1, 2, 3, 3.14159, 1234567, 'q') }}", None, None),
+    ("str.format numbers", "{{ '{:08.3f}|{:x}|{:#x}|{:X}|{:b}|{:o}|{:.1%}|{:e}|{:+d}|{:_}|{: d}|{:=+8.2f}'.format(-3.14159, 255, 255, 255, 5, 8, 0.25, 1234.5, 5, 10000, 7, 3.14159) }}", None, None),
+    ("str.format general", "{{ '{:g}|{:.3g}|{:.3}|{}|{}|{:.10g}'.format(1234.5, 0.000123456, 3.14159, 2.0, 1e20, 0.1) }}", None, None),
+    ("str.format fields", "{{ '{0[1]}|{d[b]}|{1:*^9}|{1:{w}}|'.format(items, 'mid', d=d, w=4) }}{{ '{{}}'.format() }}", None, None),
+    ("str.format attribute of a dict", "{{ '{d.a}'.format(d=d) }}", None, None),
+    ("str.format errors", "{{ '{} {0}'.format(1) }}", None, None),
+    ("str.format missing", "{{ '{} {}'.format(1) }}", None, None),
+    ("format_map", "{{ '{a}-{b}'.format_map({'a': 1, 'b': 2}) }}", None, None),
+    # --- printf-style formatting -------------------------------------------------------------
+    ("percent formatting", "{{ '%s-%d-%.2f-%5s|%-5s|%r %x %o %e %g %%' % ('a', 3, 2.5, 'r', 'l', 'q', 255, 8, 1234.5, 0.0001) }}", None, None),
+    ("percent single and mapping", "{{ '%(a)s and %(b)05.1f' % {'a': 1, 'b': 2.25} }} {{ '%s' % 1 }} {{ '%s' % [1, 2] }} {{ '%d%%' % 50 }} {{ '%5.1f|%-6d|%+d|%#x|%#o|%c|%c' % (3.14159, 42, 5, 255, 8, 65, 'z') }}", None, None),
+    ("percent with star", "{{ '%*d|%.*f|%3s' % (5, 42, 2, 3.14159, 'ab') }} {{ '%i %u' % (3.9, -2.5) }}", None, None),
+    ("percent too few", "{{ '%s %s' % ('a',) }}", None, None),
+    ("percent too many", "{{ '%s' % ('a', 'b') }}", None, None),
+    ("percent bad number", "{{ '%d' % 'x' }}", None, None),
+    # --- dict and list methods ----------------------------------------------------------
+    ("dict methods", "{% set e = {'a': 1} %}{{ e.copy() }} {{ e.get('a') }} {{ e.get('z', 0) }} {% set _ = e.update({'b': 2}, c=3) %}{{ e }} {{ e.pop('a') }} {{ e.pop('z', 'none') }} {{ e }} {{ e.setdefault('c', 9) }} {{ e.setdefault('f', 4) }} {{ e }} {{ e.popitem() }} {% set _ = e.clear() %}{{ e }}", None, None),
+    ("dict pop missing", "{% set e = {} %}{{ e.pop('k') }}", None, None),
+    ("list methods", "{% set l = [3, 1, 2] %}{{ l.index(1) }} {{ l.count(3) }} {% set _ = l.sort() %}{{ l }} {% set _ = l.sort(reverse=true) %}{{ l }} {% set _ = l.reverse() %}{{ l }} {{ l.pop() }} {{ l.pop(0) }} {% set _ = l.insert(0, 9) %}{{ l }} {% set _ = l.extend([7, 8]) %}{{ l }} {% set _ = l.remove(9) %}{{ l }} {{ l.copy() }} {% set _ = l.append((1, 2)) %}{{ l }} {% set _ = l.clear() %}{{ l }}", None, None),
+    ("list method errors", "{{ [1].index(5) }}", None, None),
+    ("sort mixed types", "{% set l = [1, 'a'] %}{{ l.sort() }}", None, None),
+    ("tuple methods", "{{ (1, 2, 1).count(1) }} {{ (1, 2).index(2) }}", None, None),
+    ("tuple has no append", "{{ (1,).append(2) }}", None, None),
+    ("unknown method", "{{ 'x'.nope() }}", None, None),
 ]
 
 
@@ -202,6 +250,12 @@ MACRO_CASES = [
     ("macro unknown keyword", "{% macro m(a) %}{{ a }}{% endmacro %}{{ m(b=1) }}", {}, None),
     ("macro missing argument", "{% macro m(a) %}{{ a }}{% endmacro %}{{ m() }}", {}, None),
     ("import missing name", "{% from 'h.sql' import nope %}", {"h.sql": "{% macro m() %}{% endmacro %}"}, None),
+    ("import exports top-level variables", "{% import 'm.sql' as m %}{{ m.v }} {{ m._p is defined }} {{ m.n is defined }} {{ m.inloop is defined }} {{ m.inif }} {{ m._m is defined }} {{ m.f() }}", {"m.sql": "{% set v = 3 %}{% set _p = 1 %}{% import 'n.sql' as n %}{% macro _m() %}{% endmacro %}{% macro f() %}F{% endmacro %}{% for i in [1] %}{% set inloop = 1 %}{% endfor %}{% if true %}{% set inif = 2 %}{% endif %}", "n.sql": ""}, None),
+    ("from import a variable", "{% from 'm.sql' import v, w %}{{ v }}{{ w }}", {"m.sql": "{% set v = 3 %}{% set w = v * 2 %}"}, None),
+    ("import with context sees the caller", "{% set y = 1 %}{% import 'm.sql' as m with context %}{{ m.f() }} {% from 'm.sql' import f with context %}{{ f() }}", {"m.sql": "{% macro f() %}{{ y }}-{{ x }}{% endmacro %}"}, None),
+    ("import with context sees loop variables", "{% for y in [7] %}{% import 'm.sql' as m with context %}{{ m.f() }}{% endfor %}", {"m.sql": "{% macro f() %}{{ y }}{% endmacro %}"}, None),
+    ("import without context", "{% set y = 1 %}{% import 'm.sql' as m without context %}{{ m.f() }}", {"m.sql": "{% macro f() %}{{ y is defined }}{{ x is defined }}{% endmacro %}"}, None),
+    ("from import without context", "{% from 'm.sql' import f without context %}{{ f() }}", {"m.sql": "{% macro f() %}{{ x is defined }}{% endmacro %}"}, None),
 ]
 
 
@@ -221,7 +275,7 @@ def error_type(e):
         return "syntax"
     if isinstance(e, jinja2.UndefinedError):
         return "undefined"
-    if isinstance(e, (TypeError, ZeroDivisionError, ValueError)):
+    if isinstance(e, (TypeError, ZeroDivisionError, ValueError, LookupError, AttributeError)):
         return "type" if isinstance(e, TypeError) else "value"
     return "error"
 

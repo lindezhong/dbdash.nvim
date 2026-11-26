@@ -1,9 +1,10 @@
 -- Template runtime: Python/Jinja value semantics for compiled templates.
 --
--- Value model: none = vim.NIL, lists = plain tables, mappings = dbdash.util.map tables,
--- undefined = Undefined objects (StrictUndefined: any use other than `is defined` and
--- `default` raises). Lua numbers do not distinguish int from float, so integral floats
--- print without ".0" (a documented deviation from Jinja).
+-- Value model: none = vim.NIL, lists = plain tables, tuples = tables with the Tuple
+-- metatable, mappings = dbdash.util.map tables, undefined = Undefined objects
+-- (StrictUndefined: any use other than `is defined` and `default` raises). Numbers: a Lua
+-- number is an int when it is integral and a float otherwise; a float with an integral
+-- value (2.0) is boxed (Float), so it prints as Python does.
 local map = require("dbdash.util.map")
 local errors = require("dbdash.template.errors")
 
@@ -71,6 +72,82 @@ function R.loop(i, n)
   }, Loop)
 end
 
+-- Floats with an integral value ------------------------------------------------------------
+
+local Float = {}
+Float.__index = Float
+
+---A float: boxed when its value is integral (2.0), else the plain number.
+---@param x number
+function R.float(x)
+  if x == x and x ~= math.huge and x ~= -math.huge and x == math.floor(x) then
+    return setmetatable({ v = x }, Float)
+  end
+  return x
+end
+
+---True for a boxed integral float.
+function R.is_float_box(v)
+  return getmetatable(v) == Float
+end
+
+---True for any float (boxed, non-integral, inf or nan).
+function R.is_float(v)
+  if type(v) == "number" then
+    return v ~= math.floor(v) or v ~= v or v == math.huge or v == -math.huge
+  end
+  return getmetatable(v) == Float
+end
+
+---A number result: a float when `isf` (or not integral), else an int.
+local function mknum(x, isf)
+  if isf then
+    return R.float(x)
+  end
+  return x
+end
+R.mknum = mknum
+
+-- Tuples -----------------------------------------------------------------------------------
+
+local Tuple = {}
+Tuple.__index = Tuple
+
+---Mark a Lua array as a tuple.
+function R.tuple(t)
+  return setmetatable(t, Tuple)
+end
+
+function R.is_tuple(v)
+  return getmetatable(v) == Tuple
+end
+
+-- Dictionary views (d.keys(), d.values(), d.items()): sequences shown as dict_keys([...])
+
+local View = {}
+View.__index = View
+local view_names = setmetatable({}, { __mode = "k" })
+
+function R.view(list, name)
+  view_names[list] = name
+  return setmetatable(list, View)
+end
+
+-- Read-only values (args, meta): mutating methods refuse them --------------------------
+
+R.frozen = setmetatable({}, { __mode = "k" }) -- table -> name shown in the error
+
+---Mark `v` and the tables in it read-only (`name` for messages).
+function R.freeze(v, name)
+  if type(v) == "table" and v ~= vim.NIL and not R.frozen[v] then
+    R.frozen[v] = name
+    for _, x in pairs(v) do
+      R.freeze(x, name)
+    end
+  end
+  return v
+end
+
 -- Type helpers -----------------------------------------------------------------------------
 
 ---Python type name used in error messages.
@@ -81,7 +158,13 @@ function R.typename(v)
   elseif t == "boolean" then
     return "bool"
   elseif t == "number" then
-    return v == math.floor(v) and "int" or "float"
+    return R.is_float(v) and "float" or "int"
+  elseif getmetatable(v) == Float then
+    return "float"
+  elseif getmetatable(v) == Tuple then
+    return "tuple"
+  elseif getmetatable(v) == View then
+    return view_names[v] or "dict_keys"
   elseif t == "string" then
     return "str"
   elseif getmetatable(v) == Safe then
@@ -101,21 +184,29 @@ function R.typename(v)
 end
 local typename = R.typename
 
+---Lists and tuples (sequences of values).
 local function is_list(v)
-  return type(v) == "table" and v ~= R.NONE and getmetatable(v) == nil
+  if type(v) ~= "table" or v == R.NONE then
+    return false
+  end
+  local mt = getmetatable(v)
+  return mt == nil or mt == Tuple or mt == View
 end
 R.is_list = is_list
 
----Numbers, with booleans as 0/1 like Python. Returns nil for non-numbers.
+---Numbers, with booleans as 0/1 like Python. Returns nil for non-numbers; the second
+---value is true for floats.
 local function num(v)
-  if type(v) == "number" then
-    return v
-  elseif v == true then
-    return 1
-  elseif v == false then
-    return 0
+  local t = type(v)
+  if t == "number" then
+    return v, v ~= math.floor(v) or v ~= v or v == math.huge or v == -math.huge
+  elseif t == "boolean" then
+    return v and 1 or 0, false
+  elseif getmetatable(v) == Float then
+    return v.v, true
   end
 end
+R.num = num
 
 local CHAR = "[%z\1-\127\192-\247][\128-\191]*"
 
@@ -137,7 +228,9 @@ function R.truthy(v)
   elseif v == 0 or v == "" then
     return false
   elseif type(v) == "table" then
-    if getmetatable(v) == Safe then
+    if getmetatable(v) == Float then
+      return v.v ~= 0
+    elseif getmetatable(v) == Safe then
       return v.s ~= ""
     elseif getmetatable(v) == Loop then
       return true
@@ -147,8 +240,22 @@ function R.truthy(v)
   return true
 end
 
+---Python repr() of a float (boxed or plain).
+function R.floatstr(v)
+  if getmetatable(v) == Float then
+    v = v.v
+  end
+  if v == math.floor(v) and math.abs(v) < 1e16 then
+    return ("%.0f"):format(v) .. ".0"
+  end
+  return R.numstr(v)
+end
+
 ---Python repr() of a float/int.
 function R.numstr(v)
+  if getmetatable(v) == Float then
+    return R.floatstr(v)
+  end
   if v ~= v then
     return "nan"
   elseif v == math.huge then
@@ -225,10 +332,20 @@ function R.repr(v)
     for i = 1, #v do
       parts[i] = R.repr(v[i])
     end
+    if getmetatable(v) == Tuple then
+      return "(" .. table.concat(parts, ", ") .. (#v == 1 and ",)" or ")")
+    elseif getmetatable(v) == View then
+      return (view_names[v] or "dict_keys") .. "([" .. table.concat(parts, ", ") .. "])"
+    end
     return "[" .. table.concat(parts, ", ") .. "]"
+  elseif R.repr_hook[getmetatable(v) or false] then
+    return R.repr_hook[getmetatable(v)](v)
   end
   return R.str(v)
 end
+
+---repr() of other value types by metatable (namespace, cycler, ...).
+R.repr_hook = {}
 
 ---Python str().
 function R.str(v)
@@ -238,6 +355,8 @@ function R.str(v)
     return v
   elseif t == "number" then
     return R.numstr(v)
+  elseif getmetatable(v) == Float then
+    return R.floatstr(v)
   elseif v == true then
     return "True"
   elseif v == false then
@@ -270,6 +389,18 @@ end
 -- Lookup and access ------------------------------------------------------------------------
 
 R.globals = {}
+
+---A context with `vars` (template variables: name -> value, R.MISSING skipped) over `ctx`:
+---what an include or an import "with context" sees.
+function R.layer(ctx, vars)
+  local t = {}
+  for k, v in pairs(vars) do
+    if v ~= R.MISSING then
+      t[k] = v
+    end
+  end
+  return setmetatable(t, { __index = ctx })
+end
 
 function R.lookup(ctx, name)
   local v = ctx[name]
@@ -312,8 +443,8 @@ function R.v(val, ctx, name)
 end
 
 local function index(seq_len, i)
-  local n = num(i)
-  if not n or n ~= math.floor(n) then
+  local n, isf = num(i)
+  if not n or isf then
     return nil
   end
   if n < 0 then
@@ -326,10 +457,20 @@ local function index(seq_len, i)
 end
 
 ---obj[key]
+---A mapping key: floats with an integral value are the same key as the int (2.0 == 2).
+local function key_of(k)
+  if getmetatable(k) == Float then
+    return k.v
+  end
+  return k
+end
+R.key_of = key_of
+
 function R.getitem(obj, key)
   check(obj)
   check(key)
   if map.is_map(obj) then
+    key = key_of(key)
     local v = obj[key]
     if v == nil and type(key) == "boolean" then
       v = obj[num(key)]
@@ -393,109 +534,26 @@ local function strip_chars(s, chars, left, right)
 end
 R.strip_chars = strip_chars
 
-local function prefix_any(s, arg, fn)
-  check(arg)
-  if is_list(arg) then
-    for _, p in ipairs(arg) do
-      if fn(s, p) then
-        return true
-      end
-    end
-    return false
-  elseif type(arg) ~= "string" then
-    raise("type", "startswith/endswith arg must be str or a tuple of str, not %s", typename(arg))
-  end
-  return fn(s, arg)
-end
-
-local METHODS = {
-  dict = {
-    items = function(d)
-      local out = {}
-      for k, v in map.pairs(d) do
-        out[#out + 1] = { k, v }
-      end
-      return out
-    end,
-    keys = function(d)
-      return map.keys(d)
-    end,
-    values = function(d)
-      local out = {}
-      for _, v in map.pairs(d) do
-        out[#out + 1] = v
-      end
-      return out
-    end,
-    get = function(d, k, dflt)
-      local v = d[check(k)]
-      if v == nil then
-        return dflt == nil and R.NONE or dflt
-      end
-      return v
-    end,
-  },
-  str = {
-    upper = function(s)
-      return R.upper(s)
-    end,
-    lower = function(s)
-      return vim.fn.tolower(s)
-    end,
-    strip = function(s, chars)
-      return strip_chars(s, chars ~= nil and chars ~= R.NONE and check(chars) or nil, true, true)
-    end,
-    startswith = function(s, p)
-      return prefix_any(s, p, function(a, b)
-        return a:sub(1, #b) == b
-      end)
-    end,
-    endswith = function(s, p)
-      return prefix_any(s, p, function(a, b)
-        return b == "" or a:sub(-#b) == b
-      end)
-    end,
-  },
-}
-
-R.METHOD_NAMES = { "items", "keys", "values", "get", "upper", "lower", "strip", "startswith", "endswith" }
-
----obj.name(args...) for the whitelisted methods.
-function R.method(obj, name, ...)
-  check(obj)
-  local tn = typename(obj)
-  local fns = METHODS[tn == "Markup" and "str" or tn]
-  local fn = fns and fns[name]
-  if not fn then
-    raise("undefined", "'%s object' has no attribute '%s'", tn, name)
-  end
-  if tn == "Markup" then
-    obj = obj.s
-  end
-  return fn(obj, ...)
-end
-
-local METHOD_SET = {}
-for _, m in ipairs(R.METHOD_NAMES) do
-  METHOD_SET[m] = true
-end
-
----obj.name(args): a macro exported by an imported template, or a whitelisted method.
+---obj.name(args): a macro or function in a mapping (imported template, .lua module), a
+---method of the value (dbdash.template.methods: Python's str, dict, list methods), or a
+---callable attribute (namespace, cycler, ...).
 function R.call_attr(env, obj, name, args, kwargs)
   check(obj)
   if map.is_map(obj) and (getmetatable(obj[name]) == Macro or type(obj[name]) == "function") then
     return R.call(env, obj[name], args, kwargs) -- a macro, or a function of a .lua module
   end
-  if not METHOD_SET[name] then
-    raise("type", "calling '.%s()' is not supported (allowed methods: %s)", name, table.concat(R.METHOD_NAMES, ", "))
-  end
-  if next(kwargs) then
-    raise("type", "keyword arguments are not supported for methods")
-  end
   for i = 1, #args do
     check(args[i])
   end
-  return R.method(obj, name, unpack(args))
+  local found, out = require("dbdash.template.methods").call(obj, name, args, kwargs)
+  if found then
+    return out
+  end
+  local attr = R.getattr(obj, name)
+  if not R.is_undef(attr) then
+    return R.call(env, attr, args, kwargs)
+  end
+  raise("undefined", "'%s object' has no attribute '%s'", typename(obj), name)
 end
 
 ---Call a global function value: fn(args, kwargs, env).
@@ -523,13 +581,15 @@ function R.to_lua(v)
     return module_raw[v] -- an imported .lua module: its own table
   elseif R.is_safe(v) then
     return v.s
+  elseif getmetatable(v) == Float then
+    return v.v
   elseif map.is_map(v) then
     local out = map.new()
     for k, x in map.pairs(v) do
       map.set(out, k, R.to_lua(x))
     end
     return out
-  elseif type(v) == "table" and getmetatable(v) == nil then
+  elseif is_list(v) then
     local out = {}
     for i = 1, #v do
       out[i] = R.to_lua(v[i])
@@ -735,8 +795,10 @@ end
 
 local module_names = setmetatable({}, { __mode = "k" })
 
----Run another template without the caller's context and return its macros as a mapping.
-function R.import(env, target)
+---Run another template and return its top-level variables and macros as a mapping.
+---Without `wctx` it sees the globals only (a dashboard's args and meta; cached per
+---render); "with context" passes `wctx`, the caller's context and variables.
+function R.import(env, target, wctx)
   check(target)
   if type(target) ~= "string" then
     raise("type", "import target must be a string, not %s", typename(target))
@@ -745,7 +807,7 @@ function R.import(env, target)
     raise("value", "{%% import %%} needs a template loader (base directory)")
   end
   env._modules = env._modules or {}
-  if env._modules[target] then
+  if env._modules[target] and not wctx then
     return env._modules[target]
   end
   env._importing = env._importing or {}
@@ -768,9 +830,9 @@ function R.import(env, target)
   local L = { l = nil }
   local outer_source = env.source
   env.source = path or target -- Lua in the imported file reports its own name
-  -- Imported templates do not see the caller's variables, only env.context (dashboards:
-  -- args and meta).
-  local ok, out, exports = pcall(tpl.fn, env.context or {}, env, L)
+  -- Imported templates see env.context (dashboards: args and meta), and with context the
+  -- caller's variables too.
+  local ok, out, exports = pcall(tpl.fn, wctx or env.context or {}, env, L)
   env._importing[target] = nil
   env.source = outer_source
   if not ok then
@@ -787,7 +849,9 @@ function R.import(env, target)
     end
   end
   module_names[mod] = target
-  env._modules[target] = mod
+  if not wctx then
+    env._modules[target] = mod
+  end
   return mod
 end
 
@@ -805,7 +869,7 @@ end
 function R.dict(flat)
   local d = map.new()
   for i = 1, #flat, 2 do
-    map.set(d, check(flat[i]), flat[i + 1])
+    map.set(d, key_of(check(flat[i])), flat[i + 1])
   end
   return d
 end
@@ -855,43 +919,46 @@ end
 function R.add(a, b)
   check(a)
   check(b)
-  local x, y = num(a), num(b)
+  local x, fx = num(a)
+  local y, fy = num(b)
   if x and y then
-    return x + y
+    return mknum(x + y, fx or fy)
   end
   local s, t = as_str(a), as_str(b)
   if s and t then
     return s .. t
   end
-  if is_list(a) and is_list(b) then
+  if is_list(a) and is_list(b) and R.is_tuple(a) == R.is_tuple(b) then
     local out = {}
     vim.list_extend(out, a)
     vim.list_extend(out, b)
-    return out
+    return R.is_tuple(a) and R.tuple(out) or out
   end
   op_error("+", a, b)
 end
 
 function R.sub(a, b)
-  local x, y = num(check(a)), num(check(b))
+  local x, fx = num(check(a))
+  local y, fy = num(check(b))
   if not (x and y) then
     op_error("-", a, b)
   end
-  return x - y
+  return mknum(x - y, fx or fy)
 end
 
 function R.mul(a, b)
   check(a)
   check(b)
-  local x, y = num(a), num(b)
+  local x, fx = num(a)
+  local y, fy = num(b)
   if x and y then
-    return x * y
+    return mknum(x * y, fx or fy)
   end
-  local seq, n = a, y
+  local seq, n, nf = a, y, fy
   if x and not y then
-    seq, n = b, x
+    seq, n, nf = b, x, fx
   end
-  if n and n == math.floor(n) then
+  if n and not nf then
     local s = as_str(seq)
     if s then
       return n > 0 and s:rep(n) or ""
@@ -900,56 +967,63 @@ function R.mul(a, b)
       for _ = 1, n do
         vim.list_extend(out, seq)
       end
-      return out
+      return R.is_tuple(seq) and R.tuple(out) or out
     end
   end
   op_error("*", a, b)
 end
 
 function R.div(a, b)
-  local x, y = num(check(a)), num(check(b))
+  local x = num(check(a))
+  local y = num(check(b))
   if not (x and y) then
     op_error("/", a, b)
   end
   if y == 0 then
     raise("value", "division by zero")
   end
-  return x / y
+  return R.float(x / y)
 end
 
 function R.floordiv(a, b)
-  local x, y = num(check(a)), num(check(b))
+  local x, fx = num(check(a))
+  local y, fy = num(check(b))
   if not (x and y) then
     op_error("//", a, b)
   end
   if y == 0 then
     raise("value", "integer division or modulo by zero")
   end
-  return math.floor(x / y)
+  return mknum(math.floor(x / y), fx or fy)
 end
 
 function R.mod(a, b)
   check(a)
   check(b)
-  local x, y = num(a), num(b)
+  local x, fx = num(a)
+  local y, fy = num(b)
   if not (x and y) then
-    if as_str(a) then
-      raise("type", "string formatting with '%%' is not supported; use filters instead")
+    local s = as_str(a)
+    if s then
+      -- printf-style formatting: 'x=%s' % value
+      local out = require("dbdash.template.pyformat").percent(s, b)
+      return R.is_safe(a) and R.safe(out) or out
     end
     op_error("%", a, b)
   end
   if y == 0 then
     raise("value", "integer division or modulo by zero")
   end
-  return x - math.floor(x / y) * y
+  return mknum(x - math.floor(x / y) * y, fx or fy)
 end
 
 function R.pow(a, b)
-  local x, y = num(check(a)), num(check(b))
+  local x, fx = num(check(a))
+  local y, fy = num(check(b))
   if not (x and y) then
     op_error("** or pow()", a, b)
   end
-  return x ^ y
+  return mknum(x ^ y, fx or fy or y < 0)
 end
 
 function R.concat(a, b)
@@ -957,19 +1031,19 @@ function R.concat(a, b)
 end
 
 function R.neg(a)
-  local x = num(check(a))
+  local x, fx = num(check(a))
   if not x then
     raise("type", "bad operand type for unary -: '%s'", typename(a))
   end
-  return -x
+  return mknum(-x, fx)
 end
 
 function R.pos(a)
-  local x = num(check(a))
+  local x, fx = num(check(a))
   if not x then
     raise("type", "bad operand type for unary +: '%s'", typename(a))
   end
-  return x
+  return mknum(x, fx)
 end
 
 -- Comparison ------------------------------------------------------------------------------
@@ -999,7 +1073,7 @@ function R.eq(a, b)
     return true
   end
   if is_list(a) and is_list(b) then
-    if #a ~= #b then
+    if #a ~= #b or R.is_tuple(a) ~= R.is_tuple(b) then
       return false
     end
     for i = 1, #a do
@@ -1038,6 +1112,33 @@ local function lt(a, b, op)
   )
 end
 
+---Python's sorted(): stable, by `key(item)` (default: the item), raising on values that
+---cannot be compared.
+---@param key fun(v: any): any?
+function R.sorted(seq, key, reverse)
+  local items = {}
+  for i, v in ipairs(seq) do
+    items[i] = { v = v, k = key and key(v) or v, i = i }
+  end
+  table.sort(items, function(a, b)
+    local x, y = a.k, b.k
+    if reverse then
+      x, y = y, x
+    end
+    if lt(x, y, "<") then
+      return true
+    elseif lt(y, x, "<") then
+      return false
+    end
+    return a.i < b.i
+  end)
+  local out = {}
+  for i, it in ipairs(items) do
+    out[i] = it.v
+  end
+  return out
+end
+
 function R.contains(container, item)
   check(container)
   check(item)
@@ -1049,7 +1150,7 @@ function R.contains(container, item)
     end
     return s:find(t, 1, true) ~= nil
   elseif map.is_map(container) then
-    return container[item] ~= nil
+    return container[key_of(item)] ~= nil
   elseif is_list(container) then
     for _, v in ipairs(container) do
       if R.eq(v, item) then

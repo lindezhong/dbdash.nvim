@@ -79,6 +79,8 @@ local function make(name, spec)
       return d.quote_string(v)
     elseif require("dbdash.template.runtime").is_safe(v) then
       return v.s
+    elseif require("dbdash.template.runtime").is_float_box(v) then
+      return require("dbdash.template.runtime").floatstr(v) -- 2.0 (a template float)
     elseif map.is_map(v) then
       if spec.map_literal then
         return spec.map_literal(v)

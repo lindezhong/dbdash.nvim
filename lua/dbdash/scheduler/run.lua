@@ -234,7 +234,8 @@ function M.render_text(d, text, line, o)
   if o.run then
     table.insert(o.run.maps, args_map)
   end
-  local vars = { args = args_map, meta = metadata.for_template(o.meta) }
+  -- args and meta are read-only for the template's methods (args change with set_arg).
+  local vars = { args = R.freeze(args_map, "args"), meta = R.freeze(metadata.for_template(o.meta), "meta") }
   if o.run then
     table.insert(o.run.meta_maps, vars.meta)
   end

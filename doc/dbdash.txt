@@ -803,8 +803,8 @@ loop does not change the variable outside it (Jinja scoping).
 
 Expressions:
 
-  literals     'text' "text" 42 3.14 true false none (True/False/None too)
-               [1, 2] (1, 2) {'key': value}
+  literals     'text' "text" 42 0x1f 0o17 0b101 1_000 3.14 1e3 true false
+               none (True/False/None too) [1, 2] (1, 2) {'key': value}
   access       m.key  m['key']  xs[0]  xs[-1]  'text'[1]
   math         + - * / // % **      (/ always divides, // floors)
   strings      'a' ~ b (concatenate as text)   'a' + 'b'
@@ -860,9 +860,25 @@ Functions:
 Tests (`x is name`, `x is not name`): defined, undefined, none, number,
 string, mapping, sequence, true, false.
 
-Methods: on mappings items(), keys(), values(), get(key, default); on strings
-upper(), lower(), strip(chars), startswith(prefix), endswith(suffix)
-(prefix/suffix may be a tuple). Other method calls are errors.
+Methods, as in Python (`'a,b'.split(',')`, `'{:.2f}'.format(x)`):
+
+  strings      capitalize() casefold() center() count() endswith()
+               expandtabs() find() format() format_map() index() isalnum()
+               isalpha() isascii() isdecimal() isdigit() isidentifier()
+               islower() isnumeric() isspace() istitle() isupper() join()
+               ljust() lower() lstrip() partition() removeprefix()
+               removesuffix() replace() rfind() rindex() rjust()
+               rpartition() rsplit() rstrip() split() splitlines()
+               startswith() strip() swapcase() title() upper() zfill()
+  mappings     items() keys() values() get() copy() update() pop()
+               popitem() setdefault() clear()
+  lists        index() count() copy() append() extend() insert() pop()
+               remove() reverse() sort() clear()
+  tuples       index() count()
+
+Methods that change a value cannot change `args` or `meta` (they are
+read-only; |dbdash-assign-args| sets an argument). Strings also format with
+`%`: `'%s: %.1f' % (name, value)`.
 
 Examples: >jinja
   WHERE status = {{ args.status | sql_quote }}
@@ -897,9 +913,11 @@ The SQL filters and autoescape follow the database type:
 Imports                                              *dbdash-template-imports*
 
 Paths in import and from-import are relative to the config file's
-directory. An imported file only exports its macros; it sees `args` and
-`meta` but not the importing template's own variables (`set`, `for`), so pass
-those as macro arguments: >jinja
+directory. An imported file exports its macros and top-level variables
+(`set`; names starting with "_" stay private). It always sees `args` and
+`meta`; the importing template's own variables (`set`, `for`) only with
+`with context` (`{% import 'x.sql' as x with context %}`), otherwise pass
+them as macro arguments: >jinja
   {# macros/filters.sql #}
   {% macro in_list(column, values) -%}
   {{ column | safe }} IN {{ values | sql_in }}
@@ -969,10 +987,10 @@ write it: "'days' is undefined; arguments are written args.days".
 Not supported (error with the reason): extends, block, include, call/caller,
 filter blocks, with, block set, namespace(), break/continue, loop filtering
 (`for ... if`), recursive loops, loop.cycle/previtem/nextitem, slices,
-custom filters/tests, *args/**kwargs, other method calls.
+custom filters/tests, *args/**kwargs.
 
-Known difference from Jinja: numbers have one Lua type, so integral floats
-print without ".0" (`{{ 4 / 2 }}` is `2`, Jinja prints `2.0`).
+Numbers are ints and floats as in Python: `{{ 4 / 2 }}` is `2.0`. Numbers
+from the database and from Lua are ints when they have no fraction.
 
 ==============================================================================
 7. ARGUMENTS                                                *dbdash-arguments*

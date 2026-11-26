@@ -45,6 +45,19 @@ function M.set(t, k, v)
   rawset(t, k, v)
 end
 
+---Remove key `k` (set again, it goes last, like a Python dict).
+---@param t table
+---@param k any
+function M.delete(t, k)
+  rawset(t, k, nil)
+  local ks = order[t]
+  for i = #(ks or {}), 1, -1 do
+    if ks[i] == k then
+      table.remove(ks, i)
+    end
+  end
+end
+
 ---Keys of `t` in insertion order; keys set without `M.set` follow, sorted.
 ---@param t table
 ---@return any[]

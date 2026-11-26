@@ -107,11 +107,11 @@ local function trunc(x)
   return x >= 0 and math.floor(x) or math.ceil(x)
 end
 
+---The number of `v` and whether it is a float.
 local function as_number(v, fname)
-  if type(v) == "number" then
-    return v
-  elseif type(v) == "boolean" then
-    return v and 1 or 0
+  local n, isf = R.num(v)
+  if n then
+    return n, isf
   end
   raise("type", "%s: expected a number, got '%s'", fname, R.typename(v))
 end
@@ -179,12 +179,13 @@ local function to_json(v)
     return "null"
   elseif t == "boolean" then
     return tostring(v)
-  elseif t == "number" then
-    if v ~= v then
+  elseif t == "number" or R.is_float_box(v) then
+    local n = R.num(v)
+    if n ~= n then
       return "NaN"
-    elseif v == math.huge then
+    elseif n == math.huge then
       return "Infinity"
-    elseif v == -math.huge then
+    elseif n == -math.huge then
       return "-Infinity"
     end
     return R.numstr(v)
@@ -322,27 +323,24 @@ F.int = function(_, v, args, kw)
       return trunc(f)
     end
     return dflt
-  elseif type(v) == "number" then
-    if v ~= v or v == math.huge or v == -math.huge then
+  elseif R.num(v) then
+    local n = R.num(v)
+    if n ~= n or n == math.huge or n == -math.huge then
       return dflt
     end
-    return trunc(v)
-  elseif type(v) == "boolean" then
-    return v and 1 or 0
+    return trunc(n)
   end
   return dflt
 end
 
 F.float = function(_, v, args, kw)
-  local dflt = bind("float", args, kw, { { "default", 0.0 } })
-  if type(v) == "number" then
-    return v
-  elseif type(v) == "boolean" then
-    return v and 1 or 0
+  local dflt = bind("float", args, kw, { { "default", R.float(0) } })
+  if R.num(v) then
+    return R.float((R.num(v)))
   elseif type(v) == "string" or R.is_safe(v) then
     local f = parse_float(R.str(v))
     if f then
-      return f
+      return R.float(f)
     end
   end
   return dflt
@@ -355,17 +353,19 @@ end
 
 F.abs = function(_, v, args, kw)
   bind("abs", args, kw, {})
-  return math.abs(as_number(v, "abs"))
+  local n, isf = as_number(v, "abs")
+  return R.mknum(math.abs(n), isf)
 end
 
 F.round = function(_, v, args, kw)
   local precision, method = bind("round", args, kw, { { "precision", 0 }, { "method", "common" } })
-  local x = as_number(v, "round")
+  local x, isf = as_number(v, "round")
   if method == "common" then
-    return round_half_even(x, precision)
+    -- Python's round(): an int stays an int, a float gives a float.
+    return R.mknum(round_half_even(x, precision), isf)
   elseif method == "ceil" or method == "floor" then
     local m = 10 ^ precision
-    return math[method](x * m) / m
+    return R.float(math[method](x * m) / m)
   end
   raise("value", "method must be 'common', 'ceil' or 'floor'")
 end
@@ -399,7 +399,7 @@ T.none = function(_, v)
 end
 T.number = function(_, v)
   local t = type(R.check(v))
-  return t == "number" or t == "boolean"
+  return t == "number" or t == "boolean" or R.is_float_box(v)
 end
 T.string = function(_, v)
   return type(R.check(v)) == "string" or R.is_safe(v)
@@ -433,7 +433,8 @@ G.range = function(args, kwargs)
     raise("type", "range expected 1 to 3 arguments, got %d", #args)
   end
   for _, x in ipairs({ start, stop, step }) do
-    if type(x) ~= "number" or x ~= math.floor(x) then
+    R.check(x)
+    if type(x) ~= "number" or R.is_float(x) then
       raise("type", "'%s' object cannot be interpreted as an integer", R.typename(x))
     end
   end

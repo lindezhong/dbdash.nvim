@@ -80,4 +80,12 @@ T["autoescape renders dialect literals"] = function()
   eq(render("x IN {{ ids|sql_in }} AND y = {{ name|sql_quote }}", ctx, "postgres", true), "x IN (1, 2, 3) AND y = 'it''s'")
 end
 
+T["floats: 2.0 stays 2.0 in SQL; sql_limit takes an integral float"] = function()
+  eq(render("{{ (4 / 2) | sql_quote }} {{ 2.5 | sql_quote }} {{ [1.0, 2] | sql_in }}"), "2.0 2.5 (1.0, 2)")
+  eq(render("{{ 4 / 2 }}", nil, "sqlite", true), "2.0")
+  eq(render("{{ (8 / 2) | sql_limit }}"), "4")
+  eq(render("{{ 2.5 | sql_limit }}"):find("Invalid LIMIT") ~= nil, true)
+  eq(render("{{ true | sql_limit }}"):find("Invalid LIMIT") ~= nil, true)
+end
+
 return T
