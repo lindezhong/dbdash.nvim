@@ -31,11 +31,6 @@ local function scope(node)
   return require("dbdash.css").scope(node, nil)
 end
 
----ⓘ (dashboard.icons.description): there is a description to read with K.
-local function desc_icon()
-  return require("dbdash").options.dashboard.icons.description
-end
-
 ---The header shows ⓘ for the dashboard's description, and in a one-chart dashboard for the
 ---chart's too (the chart has no title line of its own).
 function Dashboard:header_icon()
@@ -49,13 +44,12 @@ end
 ---@return string[] lines, table[] hl, table[]? regions
 function Dashboard:render_view(width, height)
   require("dbdash.dom.build").sync(self, {
-    icon = desc_icon(),
     format_error = M.format_error,
     header_icon = self:header_icon(),
   })
   -- style phase: restyle from the dirty root before layout reads computed styles and
   -- decides what it can reuse
-  self.last_restyle = require("dbdash.css.style").restyle(self.doc)
+  self.last_restyle = require("dbdash.css.style").take_restyled(self.doc)
   local tree = require("dbdash.layout.view").reflow(self, width, height)
   local list = require("dbdash.paint").view(tree)
   local lines, hl = vim.deepcopy(list.header.lines), vim.deepcopy(list.header.hl)
@@ -131,7 +125,9 @@ end
 ---Countdown and error extmarks.
 function Dashboard:update_status()
   local header
-  if self.cfg.show_countdown then
+  local build = require("dbdash.dom.build")
+  local shown, format = build.countdown(self.header_node)
+  if shown and self.cfg.refresh_all then
     local running = false
     if self.refreshing_all then
       for _, p in ipairs(self.panels) do
@@ -139,14 +135,14 @@ function Dashboard:update_status()
       end
       self.refreshing_all = running or nil
     end
-    header = M.countdown_text(self.cfg.countdown_format, self:remaining_global(), running)
+    header = M.countdown_text(format, self:remaining_global(), running)
   end
   if not self.cfg.grid then
     local p = self.panels[1]
-    local show = p.cfg.show
     local countdown
-    if show.show_countdown then
-      countdown = M.countdown_text(show.countdown_format, p:remaining(), p.running)
+    local p_shown, p_format = build.countdown(p.node)
+    if p_shown then
+      countdown = M.countdown_text(p_format, p:remaining(), p.running)
     end
     if p.push then
       countdown = p:push_state() .. (countdown and p:push_state() ~= "ended" and ("  " .. countdown) or "")
@@ -165,11 +161,11 @@ function Dashboard:update_status()
   local marks = {}
   for i, p in ipairs(self.panels) do
     local r = self.regions and self.regions[i]
-    local show = p.cfg.show
-    if r and (show.show_countdown or p.running or p.push) then
-      local text = M.countdown_text(show.countdown_format, p:remaining(), p.running)
+    local p_shown, p_format = build.countdown(p.node)
+    if r and (p_shown or p.running or p.push) then
+      local text = M.countdown_text(p_format, p:remaining(), p.running)
       if p.push then
-        text = p:push_state() .. (show.show_countdown and p:push_state() ~= "ended" and ("  " .. text) or "")
+        text = p:push_state() .. (p_shown and p:push_state() ~= "ended" and ("  " .. text) or "")
       end
       marks[#marks + 1] = { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text), text = text }
     end

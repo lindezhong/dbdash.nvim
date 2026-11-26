@@ -1,11 +1,12 @@
 -- XY plots on a pixel canvas: line, area, scatter and bubble (design §11.1).
 --
--- Options after Chart.js / ECharts:
---   line_style.stepped (true | before | after | middle), line_style.point (a marker
---   character), line_style.span_gaps (false: NULLs break the line), axes.*.scale (log),
---   axes.*.ticks (how many), axes.*.grid (grid lines), mark_lines (reference lines:
---   value, mean, min, max), mark_points (max, min), style.stacked: percent (area),
---   style.trend_line: linear, style.point (scatter / bubble), style.size_range (bubble).
+-- Options after Chart.js / ECharts: show.span_gaps (false: NULLs break the line),
+-- axes.*.scale (log), axes.*.ticks (how many), mark_lines (reference lines: value, mean,
+-- min, max), mark_points (max, min), show.stacked (area: true or percent),
+-- show.trend_line: linear, show.size_range (bubble radii).
+-- Appearance (CSS): series { curve: step | step-before | step-after | step-middle, fill,
+-- color } (series:nth-child(N), series.<name>), point { display, content (a marker
+-- character) }, grid.x / grid.y { display: block } (grid lines).
 local C = require("dbdash.render.charts.common")
 local W = require("dbdash.util.width")
 local fmt = require("dbdash.render.format")
@@ -95,7 +96,7 @@ local function collect(rs, show, ctx, kind)
     end
     return series, xaxis
   end
-  local span_gaps = nn((nn(show.line_style) or {}).span_gaps) ~= false
+  local span_gaps = nn(show.span_gaps) ~= false
   local xaxis = C.x_axis(rs, nn(show.x_column))
   for i, s in ipairs(C.series(rs, show)) do
     local pts, gap = {}, false
@@ -113,7 +114,7 @@ local function collect(rs, show, ctx, kind)
         return a.x < b.x
       end)
     end
-    series[i] = { label = s.label, group = C.color(ctx, show, i, s.color, s.label), points = pts }
+    series[i] = { label = s.label, group = C.color(ctx, show, i, nil, s.label), points = pts }
   end
   return series, xaxis
 end
@@ -182,9 +183,7 @@ end
 ---@param kind "line"|"area"|"scatter"|"bubble"
 function M.render(rs, show, ctx, kind)
   local axes = C.axes(show)
-  local style = nn(show.style) or {}
-  local line_style = nn(show.line_style) or {}
-  local stacked = kind == "area" and nn(style.stacked)
+  local stacked = kind == "area" and nn(show.stacked)
   stacked = (stacked == true or stacked == "percent") and stacked or false
   local series, xaxis = collect(rs, show, ctx, kind)
   local ylog = axes.yscale == "log"
@@ -275,7 +274,7 @@ function M.render(rs, show, ctx, kind)
     xlo, xhi = xlo - 0.5, xhi + 0.5
   end
 
-  local legend_pos = C.legend_position(show, #series)
+  local legend_pos = C.legend_position(ctx, #series)
   local legend = {}
   for i, s in ipairs(series) do
     legend[i] = { label = s.label, group = s.group }
@@ -305,7 +304,7 @@ function M.render(rs, show, ctx, kind)
 
   -- Grid lines first, so the data is drawn over them (Chart.js grid.display).
   local grid_hl = ctx.css:hl("grid")
-  if axes.ygrid then
+  if ctx.css:get("grid", { classes = { "y" } }).display ~= "none" then
     for _, t in ipairs(spec.yticks or {}) do
       local py = (rows - 1 - t.row) * canvas.px_y + math.floor(canvas.px_y / 2)
       for px = 0, canvas:width_px() - 1, 4 do
@@ -313,7 +312,7 @@ function M.render(rs, show, ctx, kind)
       end
     end
   end
-  if axes.xgrid then
+  if ctx.css:get("grid", { classes = { "x" } }).display ~= "none" then
     for _, t in ipairs(spec.xticks or {}) do
       local px = t.col * canvas.px_x + math.floor(canvas.px_x / 2)
       for py = 0, canvas:height_px() - 1, 4 do
@@ -322,12 +321,16 @@ function M.render(rs, show, ctx, kind)
     end
   end
 
-  local show_points = nn(line_style.show_points)
-  local fill = kind == "area" or nn(line_style.fill_area) == true
-  local stepped = nn(line_style.stepped)
-  stepped = stepped ~= nil and stepped ~= false and (stepped == true and "before" or stepped) or nil
-  local marker = (kind == "scatter" or kind == "bubble") and nn(style.point) or nn(line_style.point)
-  local size_range = nn(style.size_range)
+  -- point markers: content is the marker character; on lines and areas they show with
+  -- display: block (hidden by the UA sheet), scatter and bubble always draw them
+  local point = ctx.css:get("point")
+  local show_points = point.display ~= "none"
+  local marker = point.content
+  if kind == "line" or kind == "area" then
+    marker = show_points and marker or nil
+  end
+  local size_range = nn(show.size_range)
+  local CURVE = { step = "before", ["step-before"] = "before", ["step-after"] = "after", ["step-middle"] = "middle" }
 
   local function mark(p, group)
     local row, col = canvas:cell_of(p.x, p.y)
@@ -337,6 +340,9 @@ function M.render(rs, show, ctx, kind)
   for si = #series, 1, -1 do
     local s = series[si]
     local pts = s.points
+    local sc = ctx.css:get("series", C.series_spec(si, s.label))
+    local fill = kind == "area" or sc.fill == true
+    local stepped = CURVE[sc.curve]
     if kind == "scatter" then
       for _, p in ipairs(pts) do
         if marker then
@@ -411,7 +417,7 @@ function M.render(rs, show, ctx, kind)
         end
       end
     end
-    if nn(style.trend_line) == "linear" then -- ECharts regression: a dashed fit per series
+    if nn(show.trend_line) == "linear" then -- ECharts regression: a dashed fit per series
       local a, b = regression(pts)
       if a then
         canvas:line(xlo, a + b * xlo, xhi, a + b * xhi, s.group, 2)
@@ -437,7 +443,7 @@ function M.render(rs, show, ctx, kind)
     end
   end
   for _, m in ipairs(nn(show.mark_lines) or {}) do
-    local group = nn(m.color) and ctx.color(m.color) or ctx.css:hl("mark")
+    local group = ctx.css:hl("mark", { classes = nn(m.class) and { m.class } or nil })
     local axis = nn(m.axis) or "y"
     local v = nn(m.value)
     if axis == "x" then

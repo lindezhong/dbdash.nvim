@@ -1,14 +1,15 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
 # Area chart: every canvas and option, one panel each (press K on a panel). An area is a
-# line filled down to zero; several series stack (style.stacked) or overlap. The line
-# options (axes, legend, mark_lines, ...) work here too, see line.yaml.
+# line filled down to zero; several series stack (show.stacked) or overlap. The line
+# options (axes, mark_lines, the legend, ...) work here too, see line.yaml.
 
 title: "Area chart"
 description: |
   An area chart fills under each series: `x_column` and `y_columns` (or `y_column`,
-  `series_column`). `style.stacked` piles the series up, `stacked: percent` scales every
-  x to 100%. See `:help dbdash-chart-types`.
+  `series_column`). `stacked: true` piles the series up, `stacked: percent` scales every
+  x to 100%. Colors are style rules: `series.<label> { color }` here, for every panel.
+  See `:help dbdash-chart-types` and `:help dbdash-css`.
 
 database:
   url: "sqlite:///:memory:"
@@ -16,8 +17,12 @@ database:
 show:
   interval: 5m
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
+  # the series by their labels, in every panel (series:nth-child(N) goes by position)
+  "series.Desktop": { color: "#61afef" }
+  "series.Mobile": { color: "#e06c75" }
+  "series.Tablet": { color: "#98c379" }
 
 panels:
   - query:
@@ -29,16 +34,16 @@ panels:
         FROM m
     show:
       type: area
-      title: "style.stacked: true (canvas: braille)"
+      title: "stacked: true (canvas braille)"
       description: |
         `stacked: true` piles the series up, each on the one before (ECharts `stack`); the
         top line is the total. Braille draws 2 x 4 dots per character.
       x_column: month
       y_columns:
-        - { column: desktop, label: "Desktop", color: "#61afef" }
-        - { column: mobile, label: "Mobile", color: "#e06c75" }
-        - { column: tablet, label: "Tablet", color: "#98c379" }
-      style: { stacked: true }
+        - { column: desktop, label: Desktop }
+        - { column: mobile, label: Mobile }
+        - { column: tablet, label: Tablet }
+      stacked: true
   - query:
       sql: |
         WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
@@ -48,18 +53,18 @@ panels:
         FROM m
     show:
       type: area
-      title: "style.stacked: percent"
+      title: "stacked: percent"
       description: |
         `stacked: percent` scales every month to 100% (a 100% stacked area): the share of each
         series, not its size.
       x_column: month
       y_columns:
-        - { column: desktop, label: "Desktop", color: "#61afef" }
-        - { column: mobile, label: "Mobile", color: "#e06c75" }
-        - { column: tablet, label: "Tablet", color: "#98c379" }
-      style: { stacked: percent }
+        - { column: desktop, label: Desktop }
+        - { column: mobile, label: Mobile }
+        - { column: tablet, label: Tablet }
       axes:
         y_axis: { max_value: 100, format: "{:.0f}%" }
+      stacked: percent
   - query:
       sql: |
         WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
@@ -75,9 +80,9 @@ panels:
         `min_value` / `max_value` fix the scale so refreshes do not rescale it.
       x_column: month
       y_columns:
-        - { column: desktop, label: "Desktop", color: "#61afef" }
-        - { column: mobile, label: "Mobile", color: "#e06c75" }
-        - { column: tablet, label: "Tablet", color: "#98c379" }
+        - { column: desktop, label: Desktop }
+        - { column: mobile, label: Mobile }
+        - { column: tablet, label: Tablet }
       axes:
         y_axis: { min_value: 0, max_value: 100 }
   - query:
@@ -89,11 +94,12 @@ panels:
         FROM m
     show:
       type: area
-      title: "canvas: quadrant"
-      description: "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts."
-      canvas: quadrant
+      title: "chart { canvas: quadrant }"
+      description: "`chart { canvas: quadrant }`: 2 x 2 pixels per character (▗▄▖), works in most fonts."
       x_column: month
       y_column: mobile
+    style:
+      chart: { canvas: quadrant }
   - query:
       sql: |
         WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
@@ -103,11 +109,12 @@ panels:
         FROM m
     show:
       type: area
-      title: "canvas: block"
-      description: "`canvas: block`: one full block per pixel: coarse but bold."
-      canvas: block
+      title: "chart { canvas: block }"
+      description: "`chart { canvas: block }`: one full block per pixel: coarse but bold."
       x_column: month
       y_column: mobile
+    style:
+      chart: { canvas: block }
   - query:
       sql: |
         WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
@@ -117,11 +124,12 @@ panels:
         FROM m
     show:
       type: area
-      title: "canvas: halfblock"
-      description: "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄)."
-      canvas: halfblock
+      title: "chart { canvas: halfblock }"
+      description: "`chart { canvas: halfblock }`: 1 x 2 pixels per character (▀ ▄)."
       x_column: month
       y_column: mobile
+    style:
+      chart: { canvas: halfblock }
   - query:
       sql: |
         WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
@@ -131,8 +139,9 @@ panels:
         FROM m
     show:
       type: area
-      title: "canvas: ascii"
-      description: "`canvas: ascii`: plain ASCII, for any terminal or font."
-      canvas: ascii
+      title: "chart { canvas: ascii }"
+      description: "`chart { canvas: ascii }`: plain ASCII, for any terminal or font."
       x_column: month
       y_column: mobile
+    style:
+      chart: { canvas: ascii }

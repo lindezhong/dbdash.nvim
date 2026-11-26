@@ -150,7 +150,20 @@ function M.restyle(doc)
   stats.root = root
   local parent = root.parent and root.parent.style_data and root.parent.style_data.computed or nil
   restyle_subtree(doc, root, parent, stats)
+  -- what restyles did since the last rendering update (a query flushes styles early)
+  local acc = doc.restyled or { nodes = 0, damage = D.none }
+  doc.restyled = { nodes = acc.nodes + stats.nodes, damage = math.max(acc.damage, stats.damage) }
   return stats
+end
+
+---What was restyled since the last call (restyles forced by queries included): the style
+---phase of a rendering update reports it.
+---@return { nodes: integer, damage: integer }
+function M.take_restyled(doc)
+  M.restyle(doc)
+  local r = doc.restyled or { nodes = 0, damage = D.none }
+  doc.restyled = nil
+  return r
 end
 
 ---The computed style of a node, restyling the document first when it is dirty (like

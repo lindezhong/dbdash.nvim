@@ -7,7 +7,7 @@
 title: "Text"
 description: |
   A text chart shows the result without a table: each row is its cells joined by
-  `style.separator`; newlines in a cell start new lines and long lines wrap. Good for
+  `separator`; newlines in a cell start new lines and long lines wrap. Good for
   logs, messages and `lua://` output. See `:help dbdash-chart-types`.
 
 database:
@@ -16,8 +16,8 @@ database:
 show:
   interval: 5m
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -33,7 +33,7 @@ panels:
       description: |
         `column_list` picks and orders the columns, `separator` joins them (default a space).
       column_list: [at, level, message]
-      style: { separator: " │ " }
+      separator: " │ "
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 12)
@@ -43,16 +43,17 @@ panels:
         FROM n
     show:
       type: text
-      title: "highlight, reverse, line_numbers"
+      title: "highlight, reverse, line numbers"
       description: |
-        `highlight` colors the lines that match a Vim regex (the first rule wins), `reverse`
-        puts the last row first (newest on top), `line_numbers` numbers the rows.
-      style:
-        reverse: true
-        line_numbers: true
-        highlight:
-          - { pattern: "ERROR", color: "#e06c75" }
-          - { pattern: "WARN", color: "#e5c07b" }
+        `highlight` gives the lines that match a Vim regex a class (the first rule wins),
+        colored by `line.<class>` rules; `reverse` puts the last row first (newest on top),
+        `line-number { display: block }` numbers the rows.
+      reverse: true
+      highlight: [{ pattern: ERROR, class: error }, { pattern: WARN, class: warn }]
+    style:
+      line-number: { display: block }
+      line.error: { color: "#e06c75" }
+      line.warn: { color: "#e5c07b" }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 12)
@@ -62,11 +63,13 @@ panels:
         FROM n
     show:
       type: text
-      title: "max_lines, color"
+      title: "chart { line-clamp }, line { color }"
       description: |
-        `max_lines` shows the first N lines and how many more there are; `style.color` colors
-        the text (CSS `color`).
-      style: { max_lines: 5, color: "#98c379" }
+        `chart { line-clamp: 5 }` shows the first 5 lines and how many more there are;
+        `line { color }` colors the text.
+    style:
+      chart: { line-clamp: 5 }
+      line: { color: "#98c379" }
   - query:
       sql: |
         SELECT 'A long message that does not fit on one line of the panel wraps at the spaces, as text does in a browser.' AS t
@@ -75,25 +78,28 @@ panels:
       type: text
       title: "wrap (default), newlines"
       description: |
-        Long lines wrap at spaces (`wrap: true`, CSS `white-space: normal`; `"char"` breaks
-        anywhere); newlines in a cell start new lines.
+        Long lines wrap at spaces (`line { white-space: normal }`, the default;
+        `word-break: break-all` breaks anywhere); newlines in a cell start new lines.
   - query:
       sql: |
         SELECT 'A long message that does not fit on one line of the panel is cut at the edge, wherever that edge happens to be in your window.' AS t
     show:
       type: text
-      title: "wrap: false, ellipsis"
+      title: "white-space: nowrap, text-overflow"
       description: |
-        `wrap: false` keeps one line per row and cuts it at the edge (`ellipsis` marks the cut,
-        CSS `text-overflow`).
-      style: { wrap: false, ellipsis: "…" }
+        `line { white-space: nowrap }` keeps one line per row and cuts it at the edge
+        (`text-overflow: "…"` marks the cut; the default `clip` does not).
+    style:
+      line: { white-space: nowrap, text-overflow: "…" }
   - query:
       sql: |
         SELECT 'centered' AS t UNION ALL SELECT 'text' UNION ALL SELECT NULL
     show:
       type: text
-      title: "text_align: center, null_text"
+      title: "line { text-align: center }, cell.null"
       description: |
-        `text_align` is CSS `text-align` for the lines (left, center, right); `null_text` is
-        what a NULL shows (default nothing).
-      style: { text_align: center, null_text: "(none)" }
+        `line { text-align }` aligns the lines (left, center, right); `cell.null { content }`
+        is what a NULL shows (default nothing).
+    style:
+      line: { text-align: center }
+      "cell.null": { content: "(none)" }

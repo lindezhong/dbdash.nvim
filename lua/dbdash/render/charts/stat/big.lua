@@ -1,5 +1,8 @@
 -- Stat chart: the value in 3-row block digits, the change since the previous refresh and a
 -- sparkline of recent refreshes. Falls back to one line when the window is too narrow.
+-- Appearance (CSS): value { font-size: big (block digits, the default) | normal, color },
+-- value.<threshold class>, unit, label, delta.up / .down / .same, sparkline; delta and
+-- sparkline { display: none } leave them out.
 --   Active users
 --   █▀█ ▄█  ▀▀█
 --   █ █  █    █
@@ -77,22 +80,19 @@ local function one(rs, show, ctx, history)
     return { lines = lines, hl = hl }
   end
   local text, unit = C.text(v, show)
-  local group = ctx.value_group or ctx.css:hl("value")
+  -- the value element: its threshold class colors it (Grafana colorMode is a rule:
+  -- value.danger { background-color: ... })
+  local classes = {}
   if show.thresholds and show.thresholds ~= vim.NIL then
     local T = require("dbdash.render.thresholds")
     local below = show.thresholds_below == true
     local _, step = T.level(v, T.steps(show.thresholds, below), below)
-    group = T.group(step) or group
+    classes = T.classes(step)
   end
-  -- Grafana colorMode: value (the digits), background (reversed), none (plain text)
-  local mode = show.color_mode ~= vim.NIL and show.color_mode or "value"
-  if mode == "none" then
-    group = ctx.css:hl("line")
-  elseif mode == "background" then
-    group = require("dbdash.render.highlight").reverse(group)
-  end
+  local vstyle = ctx.css:get("value", { classes = classes })
+  local group = ctx.css:hl("value", { classes = classes })
 
-  local size = show.text_size ~= vim.NIL and show.text_size or "big"
+  local size = vstyle["font-size"]
   local rows = size ~= "normal" and big(text) or nil
   local fits = rows and W.width(rows[1]) + (unit and (W.width(unit) + 1) or 0) <= ctx.width
   if fits then
@@ -123,13 +123,13 @@ local function one(rs, show, ctx, history)
     parts[#parts + 1] = s
     pos = pos + #s
   end
-  if show.delta ~= false then
+  if ctx.css:get("delta").display ~= "none" then
     local d = C.delta(history, show.delta_mode ~= vim.NIL and show.delta_mode or nil)
     if d then
       put(d.text, ctx.css:hl("delta", { classes = { d.dir } }))
     end
   end
-  if show.sparkline ~= false then
+  if ctx.css:get("sparkline").display ~= "none" then
     local len = tonumber(show.sparkline_length ~= vim.NIL and show.sparkline_length or nil) or C.HISTORY
     local room = ctx.width - (pos > 0 and (W.width(table.concat(parts)) + 2) or 0)
     local spark = C.sparkline(history, math.min(len, room))

@@ -19,44 +19,27 @@ local function nn(v)
   return v
 end
 
----The box settings of a show config (show.style).
+---The box settings of an element from its computed style: padding, border (with
+---border-color), background-color, justify-self / align-self, and its title part's
+---color, text-align and text-overflow.
+---@param css dbdash.css.Scope? the panel's element (default: a panel of its own)
 ---@return { pad: integer[], border: table?, border_group: string, background: string?, justify: string, align: string, title_group: string, title_align: string?, ellipsis: string }
----@param css dbdash.css.Scope? the panel's element (default colors: panel border and title)
-function M.settings(show, css)
+function M.settings(css)
   css = css or require("dbdash.css").scope(nil, nil)
-  local style = nn(show.style) or {}
-  local color = require("dbdash.render.highlight").color
-  local pad = nn(style.padding)
-  local top, right, bottom, left = 0, 0, 0, 0
-  if type(pad) == "number" then
-    top, right, bottom, left = pad, pad, pad, pad
-  elseif type(pad) == "table" then
-    -- CSS shorthand: [all], [vertical, horizontal], [top, horizontal, bottom], [t, r, b, l]
-    local p = vim.tbl_map(function(x)
-      return tonumber(x) or 0
-    end, pad)
-    if #p == 1 then
-      top, right, bottom, left = p[1], p[1], p[1], p[1]
-    elseif #p == 2 then
-      top, right, bottom, left = p[1], p[2], p[1], p[2]
-    elseif #p == 3 then
-      top, right, bottom, left = p[1], p[2], p[3], p[2]
-    elseif #p >= 4 then
-      top, right, bottom, left = p[1], p[2], p[3], p[4]
-    end
-  end
-  local border = nn(style.panel_border)
+  local c = css.node.tag == "panel" and css:get() or css:get("panel")
+  local title = css:get("panel-title")
+  local hl = require("dbdash.css.hl")
+  local border = c.border ~= "none" and borders.get(c.border, "single") or nil
   return {
-    pad = { top, right, bottom, left },
-    border = (border ~= nil and border ~= false) and borders.get(border, "single") or nil,
-    -- the panel's own border color (a panel part when styling outside a dashboard)
-    border_group = color(nn(style.border_style), css:border_hl(css.node.tag ~= "panel" and "panel" or nil)),
-    background = nn(style.background) and color("on " .. style.background:gsub("^on%s+", "")) or nil,
-    justify = nn(style.justify) or "stretch",
-    align = nn(style.align) or "start",
-    title_group = color(nn(style.title_style), css:hl("panel-title")),
-    title_align = nn(style.title_align),
-    ellipsis = nn(style.ellipsis) or "…",
+    pad = c.padding,
+    border = border,
+    border_group = hl.group({ color = c["border-color"] }),
+    background = c["background-color"] and hl.group({ ["background-color"] = c["background-color"] }) or nil,
+    justify = c["justify-self"],
+    align = c["align-self"],
+    title_group = css:hl("panel-title"),
+    title_align = title["text-align"] ~= "start" and title["text-align"] or nil,
+    ellipsis = require("dbdash.render").ellipsis(title),
   }
 end
 

@@ -15,11 +15,10 @@ database:
   url: "mysql://dbdash:dbdash_pw@127.0.0.1:13306/dbdash_test"
   type: mariadb                      # (an alias of mysql: the same driver)
 
-show:
-  style: { panel_border: rounded, border_style: "#e5c07b" }
-
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
+  panel: { border: rounded, border-color: "#e5c07b" }
+  table: { border-color: "#e5c07b" }
 
 panels:
   - query:
@@ -59,4 +58,5 @@ panels:
         A few server counters from `SHOW GLOBAL STATUS` (a SHOW statement works like a
         query).
       interval: 10s
-      span: 2
+    style:
+      panel: { grid-column: span 2 }

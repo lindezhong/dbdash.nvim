@@ -111,7 +111,7 @@ T["every schema field has a help tag that jumps to it"] = function()
   local tags = gen.tags(schema)
   local help = gen.read(gen.HELP)
   -- a sample of each kind, and every top-level field and definition
-  for _, t in ipairs({ "dbdash-schema-panels", "dbdash-schema-layout.columns", "dbdash-schema-def-show",
+  for _, t in ipairs({ "dbdash-schema-panels", "dbdash-schema-style.renderer", "dbdash-schema-def-show",
                        "dbdash-schema-show.interval", "dbdash-schema-database.options.lib_path",
                        "dbdash-schema-show.column_list.alias", "dbdash-schema-query.sql" }) do
     eq({ t, help:find("*" .. t .. "* >yaml", 1, true) ~= nil }, { t, true })

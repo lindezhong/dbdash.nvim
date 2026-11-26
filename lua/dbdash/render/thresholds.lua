@@ -1,6 +1,8 @@
 -- Thresholds on values: show.thresholds for stat charts, column_list[].thresholds for
--- tables. A list of { value, color, notify? } steps; a value at or above a step's value
--- (at or below with thresholds_below) reaches it, and the most severe step reached wins.
+-- tables, show.row_thresholds for table rows. A list of { value, class, notify? } steps; a
+-- value at or above a step's value (at or below with thresholds_below) reaches it, and the
+-- most severe step reached wins. The step's class goes on the element (value, cell, row)
+-- and style sheets color it: the UA sheet colors success, info, warning and danger.
 local M = {}
 
 local NULL = vim.NIL
@@ -15,13 +17,13 @@ end
 ---Steps ordered from least to most severe.
 ---@param list table[]?
 ---@param below boolean?
----@return { value: number, color: string?, notify: boolean }[]
+---@return { value: number, class: string?, notify: boolean }[]
 function M.steps(list, below)
   local out = {}
   for _, s in ipairs(nn(list) or {}) do
     local v = tonumber(nn(s.value))
     if v then
-      out[#out + 1] = { value = v, color = nn(s.color), notify = nn(s.notify) == true }
+      out[#out + 1] = { value = v, class = nn(s.class), notify = nn(s.notify) == true }
     end
   end
   table.sort(out, function(a, b)
@@ -63,24 +65,25 @@ function M.level(v, steps, below)
   return level, step
 end
 
----Highlight group for a step (its color spec), or nil.
-function M.group(step)
-  if step and step.color then
-    return require("dbdash.render.highlight").color(step.color)
-  end
+---The classes a step puts on an element ({} when none is reached).
+function M.classes(step)
+  return step and step.class and { step.class } or {}
 end
 
 ---Validate a thresholds list from a config; returns an error message or nil.
 function M.check(list)
   if not vim.islist(list) then
-    return "thresholds must be a list of { value, color, notify }"
+    return "thresholds must be a list of { value, class, notify }"
   end
   for i, s in ipairs(list) do
     if type(s) ~= "table" or tonumber(nn(s.value)) == nil then
       return ("thresholds[%d]: value must be a number"):format(i - 1)
     end
-    if nn(s.color) ~= nil and type(s.color) ~= "string" then
-      return ("thresholds[%d]: color must be a string"):format(i - 1)
+    if nn(s.color) ~= nil then
+      return ("thresholds[%d]: color is appearance: give the step a class and color it in style (e.g. class: danger, or \"value.danger\": { color: ... })"):format(i - 1)
+    end
+    if nn(s.class) ~= nil and (type(s.class) ~= "string" or not s.class:match("^[%a_][%w_-]*$")) then
+      return ("thresholds[%d]: class must be a class name"):format(i - 1)
     end
     if nn(s.notify) ~= nil and type(s.notify) ~= "boolean" then
       return ("thresholds[%d]: notify must be true or false"):format(i - 1)

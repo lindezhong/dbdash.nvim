@@ -3,7 +3,8 @@
 # Stat ("KPI"): every option, one panel each (press K on a panel). After Grafana's stat
 # panel: how the value is picked from the rows, its format, prefix and unit, thresholds,
 # the change and sparkline, color mode, size, and several values side by side. Leave it
-# open for a few refreshes to see the change and the sparkline.
+# open for a few refreshes to see the change and the sparkline. Thresholds give the value
+# a class (success, info, warning, danger are colored by default); style rules do the rest.
 
 title: "Stat"
 description: |
@@ -17,8 +18,8 @@ database:
 show:
   interval: 5s
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -28,15 +29,15 @@ panels:
       type: stat
       title: "format, unit, thresholds (notify)"
       description: |
-        `format` is a Python format ("{:,}"), `unit` follows the value. `thresholds` color it
-        (>= 1000 yellow, >= 1190 red); a step with `notify: true` also notifies once when the
-        value rises to it.
+        `format` is a Python format ("{:,}"), `unit` follows the value. `thresholds` give the
+        value a class (>= 1000 `warning`, >= 1190 `danger`), which the default style sheet
+        colors; a step with `notify: true` also notifies once when the value rises to it.
       value_column: users
       format: "{:,}"
       unit: users
       thresholds:
-        - { value: 1000, color: yellow }
-        - { value: 1190, color: red, notify: true }
+        - { value: 1000, class: warning }
+        - { value: 1190, notify: true, class: danger }
   - query:
       sql: |
         SELECT abs(random() % 100) AS free_pct
@@ -49,8 +50,8 @@ panels:
       format: "{:.0f}%"
       thresholds_below: true
       thresholds:
-        - { value: 30, color: yellow }
-        - { value: 10, color: red }
+        - { value: 30, class: warning }
+        - { value: 10, class: danger }
       delta_mode: absolute
   - query:
       sql: |
@@ -72,29 +73,32 @@ panels:
         SELECT abs(random() % 500) AS queue
     show:
       type: stat
-      title: "color_mode: background, sparkline_length"
+      title: "background color by class, sparkline_length"
       description: |
-        `color_mode: background` shows the value reversed, in its color as the background
-        (Grafana `colorMode`; `none` leaves it plain). `sparkline_length: 40` keeps the last 40
+        Grafana's `colorMode: background` is a style rule: `value.success { background-color }`
+        puts the threshold's color behind the value. `sparkline_length: 40` keeps the last 40
         refreshes.
-      color_mode: background
       sparkline_length: 40
       thresholds:
-        - { value: 0, color: green }
-        - { value: 400, color: red }
+        - { value: 0, class: success }
+        - { value: 400, class: danger }
+    style:
+      value.success: { background-color: DiagnosticOk, color: "#282c34" }
+      value.danger: { background-color: DiagnosticError, color: "#282c34" }
   - query:
       sql: |
         SELECT abs(random() % 10000) / 100.0 AS latency
     show:
       type: stat
-      title: "text_size: normal, delta: false, sparkline: false"
+      title: "value { font-size: normal }, no delta and sparkline"
       description: |
-        `text_size: normal` writes the value on one line instead of block digits; `delta:
-        false` and `sparkline: false` hide the second line.
+        `value { font-size: normal }` writes the value on one line instead of block digits;
+        `delta` and `sparkline { display: none }` hide the second line.
       format: "{:.2f} ms"
-      text_size: normal
-      delta: false
-      sparkline: false
+    style:
+      value: { font-size: normal }
+      delta: { display: none }
+      sparkline: { display: none }
   - query:
       sql: |
         SELECT 1200 + abs(random() % 300) AS orders, abs(random() % 100) / 100.0 AS conversion,
@@ -106,8 +110,9 @@ panels:
         `value_columns` shows several values side by side (a Grafana stat with several fields),
         each a column name or `{ column, label, format, unit, prefix }`. The change and
         sparkline follow the first value.
-      span: 2
       value_columns:
         - orders
         - { column: conversion, label: "conversion", format: "{:.0%}" }
         - { column: refunds, label: "refunds", prefix: "-" }
+    style:
+      panel: { grid-column: span 2 }

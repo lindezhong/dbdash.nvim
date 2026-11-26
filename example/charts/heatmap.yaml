@@ -7,8 +7,8 @@
 title: "Heat map"
 description: |
   A heat map colors a grid: `x_column` across, `y_column` down, `value_column` the color.
-  The default style packs two rows into one line (half blocks); `renderer: block` gives
-  every row a line and can write the values. See `:help dbdash-chart-types`.
+  The default renderer packs two rows into one line (half blocks); `chart { renderer:
+  block }` gives every row a line and can write the values. See `:help dbdash-chart-types`.
 
 database:
   url: "sqlite:///:memory:"
@@ -16,8 +16,8 @@ database:
 show:
   interval: 5m
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -45,17 +45,19 @@ panels:
         FROM d, h
     show:
       type: heatmap
-      renderer: block
-      title: "renderer: block, show_values, format"
+      title: "renderer: block, value { display: block }, format"
       description: |
-        `renderer: block` gives every row its own line; `show_values` writes each value in its
-        cell (black or white, whichever reads better), in the Python `axes.y_axis.format`.
+        `chart { renderer: block }` gives every row its own line; `value { display: block }`
+        writes each value in its cell (black or white, whichever reads better), in the Python
+        `axes.y_axis.format`.
       x_column: hour
       y_column: day
       value_column: requests
-      style: { show_values: true }
       axes:
         y_axis: { format: "{:.0f}" }
+    style:
+      chart: { renderer: block }
+      value: { display: block }
   - query:
       sql: |
         WITH RECURSIVE d(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM d WHERE n < 5),
@@ -65,16 +67,18 @@ panels:
         FROM d, h
     show:
       type: heatmap
-      renderer: block
-      title: "color_scale, scale_min, scale_max"
+      title: "color-scale, scale_min, scale_max"
       description: |
-        Your own colors from low to high (`color_scale`, "#rrggbb" stops, ECharts
-        `inRange.color`) over a fixed range (`scale_min` / `scale_max`): values outside take the
-        end colors.
+        Your own colors from low to high (`chart { color-scale }`, "#rrggbb" stops, ECharts
+        `inRange.color`) over a fixed range of the data (`scale_min` / `scale_max`): values
+        outside take the end colors.
       x_column: hour
       y_column: day
       value_column: requests
-      style: { color_scale: ["#1e2030", "#61afef", "#e5c07b", "#e06c75"], scale_min: 0, scale_max: 60 }
+      scale_min: 0
+      scale_max: 60
+    style:
+      chart: { renderer: block, color-scale: ["#1e2030", "#61afef", "#e5c07b", "#e06c75"] }
   - query:
       sql: |
         WITH RECURSIVE d(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM d WHERE n < 5),
@@ -84,18 +88,19 @@ panels:
         FROM d, h
     show:
       type: heatmap
-      renderer: block
-      title: "color_steps (piecewise), legend: false"
+      title: "color-steps (piecewise), legend { display: none }"
       description: |
-        `color_steps` colors by thresholds instead of a gradient (ECharts piecewise
-        visualMap): a value takes the color of the highest step it reaches. `legend: false`
-        hides the scale.
+        `chart { color-steps }` colors by thresholds instead of a gradient (ECharts piecewise
+        visualMap): a value takes the color of the highest step it reaches. `legend {
+        display: none }` hides the scale.
       x_column: hour
       y_column: day
       value_column: requests
-      legend: false
-      style:
-        color_steps:
+    style:
+      chart:
+        renderer: block
+        color-steps:
           - { value: 0, color: "#98c379" }
           - { value: 20, color: "#e5c07b" }
           - { value: 40, color: "#e06c75" }
+      legend: { display: none }

@@ -25,9 +25,9 @@ $id: "dbdash.schema.yaml"
 title: dbdash.nvim dashboard
 description: >-
   One dashboard: either a single chart (database / query / show) or several panels
-  (panels / layout). Top-level bare fields (interval, args, layout) are dashboard-wide; the
-  top-level database, query and show are the panels' defaults (without panels: the only
-  panel). See :help dbdash-config.
+  (panels). Top-level bare fields (interval, args, style) are dashboard-wide; the top-level
+  database, query and show are the panels' defaults (without panels: the only panel). All
+  appearance is in style sheets (style, panels[].style). See :help dbdash-config.
 type: object
 if: { required: [panels] }
 then:
@@ -38,13 +38,10 @@ then:
       properties: { sql: false, transform: false, args: false }
     show:
       properties:
-        { type: false, title: false, subtitle: false, description: false, span: false, area: false, row: false, column: false, row_span: false, column_list: false, x_label: false, y_label: false }
+        { type: false, title: false, subtitle: false, description: false, column_list: false, x_label: false, y_label: false }
       patternProperties: { "_columns?$": false }
 else:
   required: [database] # query too, except for http(s):// (a GET of the URL) and webhook://
-  not: { required: [layout] } # layout only applies with panels
-dependencies:
-  show_countdown: [interval] # it counts down to the global refresh
 properties:
   database:
     $ref: "#/definitions/database"
@@ -59,8 +56,7 @@ properties:
     $ref: "#/definitions/show"
     description: >-
       The single chart's show; with panels, defaults of every panel's show (interval,
-      show_countdown, countdown_format, args_show, refresh_hidden, style, ...), merged
-      key by key.
+      args_show, refresh_hidden, axes, ...), merged key by key.
   interval:
     $ref: "#/definitions/duration"
     description: >-
@@ -78,13 +74,6 @@ properties:
       The dashboard's description: a template (the shared args; meta without panel fields;
       it cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe;
       ⓘ in the header says there is one.
-  show_countdown:
-    type: boolean
-    default: false
-    description: Count down to the next refresh of every panel (needs interval), right of the title.
-  countdown_format:
-    type: string
-    description: Text of that countdown ({time} seconds, {clock} m:ss; default setup defaults.countdown_format).
   args:
     type: array
     description: >-
@@ -93,44 +82,15 @@ properties:
       line name=value sets every argument of that name, <panel id>.name=value one panel's
       own (a local name nothing else has is plain name too).
     items: { $ref: "#/definitions/arg" }
-  layout:
-    type: object
-    description: Grid layout for panels.
-    additionalProperties: false
-    properties:
-      columns:
-        description: >-
-          Column tracks (CSS grid-template-columns): a number of equal columns, a string
-          ("1fr 2fr 30", "repeat(3, 1fr)") or a list. Tracks: an integer (display columns),
-          "N%", "Nfr", auto (1fr) or "minmax(a, b)". Default 1, or the width of areas.
-          See :help dbdash-layout.
-        oneOf:
-          - { type: integer, minimum: 1 }
-          - { type: string }
-          - { type: array, minItems: 1, items: { $ref: "#/definitions/track" } }
-      rows:
-        description: >-
-          The first row tracks (CSS grid-template-rows): an integer (lines), "Nfr", auto
-          (minmax(min-content, max-content)), min-content, max-content or "minmax(a, b)".
-        oneOf:
-          - { type: string }
-          - { type: array, items: { $ref: "#/definitions/track" } }
-      auto_rows:
-        $ref: "#/definitions/track"
-        description: Rows past layout.rows (CSS grid-auto-rows; default auto).
-      gap: { type: integer, minimum: 0, default: 2, description: Spaces between columns (column-gap). }
-      row_gap: { type: integer, minimum: 0, default: 1, description: Blank lines between rows (row-gap). }
-      areas:
-        type: array
-        items: { type: string }
-        description: >-
-          Named areas (CSS grid-template-areas): one string per row, names separated by
-          spaces, "." for an empty cell; each name must be a rectangle. Panels go into one
-          with show.area.
+  style:
+    $ref: "#/definitions/style"
+    description: >-
+      The dashboard's style sheet (author origin): above setup({ style }), below a panel's
+      own style. The grid is dashboard { grid-template-columns, ... }; see :help dbdash-css.
   panels:
     type: array
     minItems: 1
-    description: Charts placed left to right, wrapping into rows (see show.span).
+    description: Charts in a CSS grid (style dashboard { grid-template-* }, panel { grid-* }).
     items: { $ref: "#/definitions/panel" }
 additionalProperties: false
 
@@ -423,6 +383,11 @@ definitions:
           panel needs one of the two.
       query: { $ref: "#/definitions/query" }
       show: { $ref: "#/definitions/show" }
+      style:
+        $ref: "#/definitions/style"
+        description: >-
+          This panel's style sheet (inline origin): its rules match only in this panel and
+          win over the dashboard's (e.g. panel { grid-column: "span 2" }, chart { renderer: vertical }).
 
   series:
     oneOf:
@@ -431,8 +396,7 @@ definitions:
         required: [column]
         properties:
           column: { type: string }
-          label: { type: string }
-          color: { $ref: "#/definitions/color" }
+          label: { type: string, description: "The legend label; series.<label> in style sheets." }
 
   track:
     description: 'A grid track: an integer, "N%", "Nfr", auto, min-content, max-content or "minmax(a, b)".'
@@ -443,8 +407,13 @@ definitions:
   color:
     type: string
     description: >-
-      Hex ("#3498db"), a color name ("blue", "bright_blue"), a style ("bold blue on black"),
-      or an existing highlight group ("DiagnosticOk").
+      Hex ("#3498db"), a color name ("blue", "bright_blue"), or an existing highlight group
+      ("DiagnosticOk").
+
+  class:
+    type: string
+    pattern: "^[A-Za-z_][A-Za-z0-9_-]*$"
+    description: "A class name for style sheets (.<class>); success, info, warning and danger are colored by default."
 
   show:
     type: object
@@ -466,43 +435,12 @@ definitions:
         description: >-
           Refresh interval of this chart (default the top-level show.interval, then the
           top-level interval, else 30s from setup defaults.interval). At least 1s.
-      show_countdown: { type: boolean, default: false, description: "This chart's own countdown to its next refresh." }
       refresh_hidden:
         type: boolean
         default: false
         description: >-
           Keep refreshing this chart while the dashboard is not visible (paused, see
           dashboard.pause_hidden in setup): thresholds and errors still notify.
-      countdown_format:
-        type: string
-        default: "Next update: {time}s"
-        description: "{time} is replaced by the seconds left, {clock} by m:ss (default: setup defaults.countdown_format)."
-      renderer:
-        type: string
-        description: |-
-          Style for the chart type (the first one is the default):
-            table: box          line: canvas, asciichart     scatter/area/bubble: canvas
-            bar: horizontal, vertical    histogram: horizontal, vertical
-            boxplot: boxdraw, vertical    heatmap: halfblock, block    pie: bar, circle
-            stat: big           text: plain
-          Custom styles registered with setup({ register = ... }) are accepted too.
-      canvas:
-        type: string
-        description: "Pixel canvas for canvas styles: braille (default), quadrant, block, halfblock, ascii."
-      palette:
-        type: string
-        description: "Series colors: theme (default, follows the colorscheme) or tableau."
-      width: { type: integer, minimum: 20, description: Maximum chart width (default the window). }
-      height: { type: integer, minimum: 3, description: "Plot rows (default: setup defaults.height, else 15)." }
-      span: { type: integer, minimum: 1, default: 1, description: Grid columns this panel spans. }
-      row_span: { type: integer, minimum: 1, default: 1, description: Grid rows this panel spans. }
-      row: { type: integer, minimum: 1, description: "Grid row of this panel (CSS grid-row; 1-based)." }
-      column: { type: integer, minimum: 1, description: "Grid column of this panel (CSS grid-column; 1-based)." }
-      area: { type: string, description: "A name of layout.areas to place this panel in (CSS grid-area)." }
-      min_height:
-        type: integer
-        minimum: 1
-        description: "Smallest plot rows in a grid before it scrolls (default: setup defaults.min_height, else 8)."
       args_show:
         description: >-
           Show argument values above this chart: true for the arguments its query reads (and
@@ -511,159 +449,62 @@ definitions:
           - type: boolean
           - { type: array, items: { type: string } }
         default: false
-      style:
-        type: object
-        description: |-
-          Styles, after CSS (:help dbdash-css); every chart type takes the common ones:
-            color, background, title_style, title_align, header_style, axis_style,
-            label_style, legend_style, value_style, null_style, border_style, border,
-            panel_border, padding, justify, align, ellipsis, show_title, show_axes
-          Chart options:
-            table      border, header_style, border_style, title_style, show_lines, null_text,
-                       wrap (true: long cells wrap at spaces; "char": anywhere; false: one
-                       line cut with "…"), cell_width / cell_height (every column's width
-                       and most lines per cell; a cell still too long ends with "…")
-            area       stacked
-            bar        color, show_values
-            histogram  color, show_values
-            boxplot    show_outliers, show_means
-            heatmap    show_values (block renderer)
-            pie        show_labels, show_values, show_percentages
-            text       separator (" "), null_text (""), wrap (true: at spaces; "char":
-                       anywhere; false cuts long lines), title_style
-        properties:
-          color: { type: string, description: "The data's color (CSS color): bars, the first series, stat value, text." }
-          background: { type: string, description: "The panel's background color (CSS background-color)." }
-          title_style: { type: string, description: 'Title color and attributes, e.g. "bold #e5c07b".' }
-          title_align: { enum: [left, center, right], description: "Title position (CSS text-align)." }
-          header_style: { type: string, description: "Table header color." }
-          axis_style: { type: string, description: "Tick labels." }
-          label_style: { type: string, description: "Axis titles and category labels." }
-          legend_style: { type: string, description: "Legend labels." }
-          value_style: { type: string, description: "Value labels (bars, pie)." }
-          null_style: { type: string, description: "NULL cells." }
-          border_style: { type: string, description: "Border color (CSS border-color)." }
-          border:
-            description: "Plot and table border line (CSS border-style): single, rounded, heavy, double, dashed, ascii, none; true / false."
-            oneOf:
-              - type: boolean
-              - enum: [single, rounded, heavy, double, dashed, ascii, none]
-          panel_border:
-            description: "A box around the whole panel, the title in its top line (CSS border on the panel)."
-            oneOf:
-              - type: boolean
-              - enum: [single, rounded, heavy, double, dashed, ascii, none]
-          padding:
-            description: "Space inside the panel (CSS padding): N, [vertical, horizontal], [top, horizontal, bottom] or [top, right, bottom, left]."
-            oneOf:
-              - { type: integer, minimum: 0 }
-              - { type: array, minItems: 1, maxItems: 4, items: { type: integer, minimum: 0 } }
-          justify: { enum: [start, center, end, stretch], description: "Where the chart sits across its cell (CSS justify-self)." }
-          align: { enum: [start, center, end], description: "Where the chart sits down its cell (CSS align-self)." }
-          ellipsis: { type: string, description: 'What marks cut text (CSS text-overflow; default "…").' }
-          show_title: { type: boolean, description: "false hides the title (CSS display: none)." }
-          show_axes: { type: boolean, description: "false hides tick labels and axis titles." }
-          wrap:
-            description: 'Long text wraps at spaces (true), anywhere ("char") or is cut (false).'
-            oneOf:
-              - type: boolean
-              - const: char
-          cell_width: { type: integer, minimum: 1, description: "table: every column's width." }
-          cell_height: { type: integer, minimum: 1, description: "table: most lines per cell." }
-          cell_padding: { type: integer, minimum: 0, description: "table: spaces each side of a cell (default 1)." }
-          vertical_align: { enum: [top, middle, bottom], description: "table: a short cell in a taller row." }
-          striped: { type: string, description: "table: background of every other row (CSS :nth-child(even))." }
-          stacked:
-            description: "area: stack the series (true), or stack them to 100% (percent)."
-            oneOf:
-              - type: boolean
-              - const: percent
-          group: { enum: [grouped, stacked], description: "bar: several series side by side (default) or stacked." }
-          bar_width: { type: integer, minimum: 1, description: "bar: columns (vertical) or lines (horizontal) per bar." }
-          bar_gap: { type: integer, minimum: 0, description: "bar: columns or lines between categories." }
-          top: { type: integer, minimum: 1, description: "bar: keep the first N bars (after sort); pie: the first N slices and one for the rest." }
-          value_position: { enum: [end, inside], description: "bar: the value after / above the bar (end) or inside its end." }
-          cumulative: { type: boolean, description: "histogram: add the bins up." }
-          whiskers:
-            description: "boxplot: whiskers at 1.5 IQR (iqr, default), the extremes (minmax), or two percentiles ([5, 95])."
-            oneOf:
-              - enum: [iqr, minmax]
-              - { type: array, minItems: 2, maxItems: 2, items: { type: number, minimum: 0, maximum: 100 } }
-          color_scale:
-            type: array
-            minItems: 1
-            items: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
-            description: 'heatmap: the colors from low to high, "#rrggbb" (ECharts visualMap inRange.color).'
-          color_steps:
-            type: array
-            description: "heatmap: piecewise colors; a value takes the color of the highest step it reaches."
-            items:
-              type: object
-              properties:
-                value: { type: number }
-                color: { $ref: "#/definitions/color" }
-          scale_min: { type: number, description: "heatmap: the low end of the colors (default the smallest value)." }
-          scale_max: { type: number, description: "heatmap: the high end of the colors (default the largest value)." }
-          donut: { type: number, minimum: 0, maximum: 0.9, description: "pie (circle): the hole, a fraction of the radius (Chart.js cutout); 0.5+ shows the total." }
-          half: { type: boolean, description: "pie (circle): the upper half only (Chart.js circumference: 180)." }
-          other_label: { type: string, description: 'pie: the slice of what style.top leaves out (default "Other").' }
-          text_align: { enum: [left, center, right], description: "text: the lines' alignment (CSS text-align)." }
-          max_lines: { type: integer, minimum: 1, description: "text: show the first N lines, then how many more." }
-          line_numbers: { type: boolean, description: "text: number the rows." }
-          reverse: { type: boolean, description: "text: the last row first (newest on top)." }
-          highlight:
-            type: array
-            description: "text: color the lines matching a Vim regex (the first rule that matches wins)."
-            items:
-              type: object
-              properties:
-                pattern: { type: string }
-                color: { $ref: "#/definitions/color" }
-          normalize: { enum: [count, percent, density], description: "histogram: counts, shares of all values, or density." }
-          trend_line: { const: linear, description: "scatter, bubble, line: a dashed least-squares line per series." }
-          point: { type: string, description: "scatter, bubble: a character for every point instead of a dot." }
-          size_range:
-            type: array
-            minItems: 2
-            maxItems: 2
-            items: { type: number, minimum: 0 }
-            description: "bubble: smallest and largest radius, in canvas pixels."
-          caption: { enum: [top, bottom], description: "Where the title goes (CSS caption-side; default top)." }
-          sort:
-            description: 'table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last. bar: asc or desc by value.'
-            oneOf:
-              - type: string
-              - type: object
-                properties:
-                  column: { type: string }
-                  order: { enum: [asc, desc] }
-          max_rows_shown: { type: integer, minimum: 1, description: "table: show the first N rows, then how many more." }
-          row_thresholds:
-            type: object
-            description: "table: color whole rows by one column's value (AG Grid rowStyle)."
-            properties:
-              column: { type: string }
-              steps: { $ref: "#/definitions/thresholds" }
-              below: { type: boolean, description: "Steps apply at or below their value." }
-      colors:
-        description: Series / slice colors, by position (list) or by category name (mapping).
-        oneOf:
-          - type: array
-            items: { $ref: "#/definitions/color" }
-          - type: object
-            additionalProperties: { $ref: "#/definitions/color" }
-      legend:
-        oneOf:
-          - type: boolean
-          - type: object
-            properties:
-              show: { type: boolean }
-              position: { type: string, description: "right (default) or bottom." }
       axes:
         type: object
         properties:
           x_axis: { $ref: "#/definitions/axis" }
           y_axis: { $ref: "#/definitions/axis" }
+      stacked:
+        description: "area: stack the series (true), or stack them to 100% (percent); bar: segments on top of each other (true)."
+        oneOf:
+          - type: boolean
+          - const: percent
+      sort:
+        description: 'table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last. bar, pie: asc or desc by value.'
+        oneOf:
+          - type: string
+          - type: object
+            properties:
+              column: { type: string }
+              order: { enum: [asc, desc] }
+      top: { type: integer, minimum: 1, description: "bar: keep the first N bars (after sort); pie: the first N slices and one for the rest." }
+      other_label: { type: string, description: 'pie: the slice of what top leaves out (default "Other"; styled as series.other).' }
+      cumulative: { type: boolean, description: "histogram: add the bins up." }
+      normalize: { enum: [count, percent, density], description: "histogram: counts, shares of all values, or density." }
+      whiskers:
+        description: "boxplot: whiskers at 1.5 IQR (iqr, default), the extremes (minmax), or two percentiles ([5, 95])."
+        oneOf:
+          - enum: [iqr, minmax]
+          - { type: array, minItems: 2, maxItems: 2, items: { type: number, minimum: 0, maximum: 100 } }
+      scale_min: { type: number, description: "heatmap: the value at the low end of the colors (default the smallest value)." }
+      scale_max: { type: number, description: "heatmap: the value at the high end of the colors (default the largest value)." }
+      trend_line: { const: linear, description: "scatter, bubble, line: a dashed least-squares line per series." }
+      size_range:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items: { type: number, minimum: 0 }
+        description: "bubble: smallest and largest radius, in canvas pixels."
+      span_gaps: { type: boolean, default: true, description: "line, area: false: a NULL breaks the line (Chart.js spanGaps)." }
+      separator: { type: string, description: 'text: between the cells of a row (default " ").' }
+      reverse: { type: boolean, description: "text: the last row first (newest on top)." }
+      highlight:
+        type: array
+        description: "text: give lines that match a Vim regex a class (line.<class> in style; default warning); the first rule that matches wins."
+        items:
+          type: object
+          required: [pattern]
+          additionalProperties: false
+          properties:
+            pattern: { type: string }
+            class: { $ref: "#/definitions/class" }
+      row_thresholds:
+        type: object
+        description: "table: a class on whole rows by one column's value (AG Grid rowStyle); row.<class> in style."
+        properties:
+          column: { type: string }
+          steps: { $ref: "#/definitions/thresholds" }
+          below: { type: boolean, description: "Steps apply at or below their value." }
       x_label: { type: string }
       y_label: { type: string }
       x_column: { type: string }
@@ -671,18 +512,6 @@ definitions:
       y_columns:
         type: array
         items: { $ref: "#/definitions/series" }
-      line_style:
-        type: object
-        properties:
-          fill_area: { type: boolean }
-          show_points: { type: boolean }
-          stepped:
-            description: "Steps instead of slopes (Chart.js stepped): true (= before), before, after, middle."
-            oneOf:
-              - type: boolean
-              - enum: [before, after, middle]
-          point: { type: string, description: 'A character marking every point (Chart.js pointStyle), e.g. "●", "×".' }
-          span_gaps: { type: boolean, default: true, description: "false: a NULL breaks the line (Chart.js spanGaps)." }
       mark_lines:
         type: array
         description: "Reference lines (ECharts markLine): a value, or mean / min / max of the data."
@@ -692,7 +521,7 @@ definitions:
             value: { anyOf: [{ type: number }, { enum: [mean, average, min, max] }, { type: string }], description: "A number, mean, min, max, or (x axis) a category." }
             axis: { enum: [x, y], default: y }
             label: { type: string }
-            color: { $ref: "#/definitions/color" }
+            class: { $ref: "#/definitions/class", description: "A class on the line: mark.<class> in style colors it." }
       mark_points:
         type: array
         description: "Mark each series' max / min point with its value (ECharts markPoint)."
@@ -722,8 +551,6 @@ definitions:
         description: "stat: which value of the rows (Grafana reduceOptions.calcs)."
       delta_mode: { enum: [percent, absolute], default: percent, description: "stat: the change as a percentage or an amount." }
       sparkline_length: { type: integer, minimum: 2, default: 20, description: "stat: how many refreshes the sparkline shows." }
-      color_mode: { enum: [value, background, none], default: value, description: "stat: color the digits, reverse them (background), or none (Grafana colorMode)." }
-      text_size: { enum: [big, normal], default: big, description: "stat: block digits or one line." }
       value_columns:
         type: array
         description: "stat: several values side by side, each a column name or { column, label, format, unit, prefix }."
@@ -738,11 +565,9 @@ definitions:
                 format: { type: string }
                 unit: { type: string }
                 prefix: { type: string }
-      delta: { type: boolean, default: true, description: "stat: show the change since the previous refresh." }
-      sparkline: { type: boolean, default: true, description: "stat: show the last 20 values." }
       thresholds:
         $ref: "#/definitions/thresholds"
-        description: "stat: color the value by thresholds; notify: true notifies when the value rises to a step."
+        description: "stat: a class on the value by thresholds (value.<class> in style); notify: true notifies when the value rises to a step."
       thresholds_below: { type: boolean, default: false, description: "Thresholds apply at or below their value (lower is worse)." }
       column_list:
         type: array
@@ -759,10 +584,9 @@ definitions:
                 height: { type: integer, minimum: 1, description: "Most lines a cell takes; longer ends with …" }
                 align: { enum: [left, center, right], description: "Text alignment (default: numbers right)." }
                 format: { type: string, description: 'Python format of numbers, e.g. "{:,.2f}", "{:.1%}".' }
-                style: { type: string, description: "Color of the column's cells." }
                 thresholds:
                   $ref: "#/definitions/thresholds"
-                  description: Color the cells of this column by value (notify works as for stat).
+                  description: A class on the cells of this column by value (cell.<class> in style; notify works as for stat).
                 thresholds_below: { type: boolean, default: false }
     allOf:
       - if: { properties: { type: { enum: [line, area, bar] } }, required: [type] }
@@ -782,14 +606,16 @@ definitions:
     type: array
     description: >-
       Steps from least to most severe; a value at or above a step's value (at or below with
-      thresholds_below) reaches it and the most severe step reached wins.
+      thresholds_below) reaches it and the most severe step reached wins: its class goes on
+      the element (value, cell, row). The default sheet colors success, info, warning and
+      danger.
     items:
       type: object
       required: [value]
       additionalProperties: false
       properties:
         value: { type: number }
-        color: { $ref: "#/definitions/color" }
+        class: { $ref: "#/definitions/class" }
         notify: { type: boolean, default: false, description: "vim.notify once when the value rises to this step." }
 
   axis:
@@ -800,5 +626,112 @@ definitions:
       max_value: { type: number }
       scale: { enum: [linear, log], default: linear, description: "log: one tick per power of ten (Chart.js type: logarithmic)." }
       ticks: { type: integer, minimum: 2, description: "About how many ticks (Chart.js ticks.count)." }
-      grid: { type: boolean, default: false, description: "Grid lines at the ticks (Chart.js grid.display)." }
       format: { type: string, description: 'Python format, e.g. "{:,.0f}" or "{:.1%}".' }
+
+  style:
+    type: object
+    description: |-
+      A style sheet (:help dbdash-css): selector -> properties, as in CSS. Selectors: an
+      element (dashboard, header, header-title, countdown, panel, panel-title, args, error,
+      chart, title, subtitle, plot, axis, axis-title, label, legend, grid, mark, series,
+      point, bar, value, percent, unit, delta, sparkline, table, header, row, cell, rule,
+      line, line-number, outlier, mean, ...), #id, .class, [attr] / [attr=value],
+      :nth-child(odd | even | N), :first-child, :last-child, descendants ("panel title"),
+      ::part(name) and comma lists. Later and more specific rules win; style sheets cascade
+      default < setup({ style }) < the dashboard's style < a panel's style < :DbDashStyle.
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      properties:
+        color: { $ref: "#/definitions/color", description: "Text color (inherited)." }
+        background-color: { $ref: "#/definitions/color" }
+        font-weight: { enum: [normal, bold] }
+        font-style: { enum: [normal, italic] }
+        text-decoration: { enum: [none, underline, undercurl, line-through] }
+        palette: { type: string, description: "Series colors: theme (default, follows the colorscheme) or tableau (inherited)." }
+        display: { enum: [block, none], description: "none hides the element (countdown, legend, value, point, mean, line-number, rule, ... are hidden by default)." }
+        content: { type: string, description: 'Generated text: countdown ("Next update: {time}s"; {time}, {clock}), description-icon ("ⓘ"), cell.null ("NULL"), point (a marker).' }
+        text-align: { enum: [start, left, center, right] }
+        vertical-align: { enum: [top, middle, bottom] }
+        white-space: { enum: [normal, nowrap], description: "nowrap: one line, cut with text-overflow." }
+        word-break: { enum: [normal, break-all], description: "break-all: wrap anywhere, not only at spaces." }
+        text-overflow: { type: string, description: 'What marks cut text: ellipsis ("…"), clip (nothing) or a string.' }
+        line-clamp: { type: integer, minimum: 1, description: "table: rows shown; text chart: lines shown (then how many more)." }
+        font-size: { enum: [normal, big], description: "stat value: block digits (big, the default) or one line." }
+        caption-side: { enum: [top, bottom], description: "title, panel-title: above or under the chart." }
+        border:
+          description: "Border line: single, rounded, heavy, double, dashed, ascii, rich (tables: heavy header), none; true / false."
+          oneOf:
+            - type: boolean
+            - enum: [single, rounded, heavy, double, dashed, ascii, rich, none]
+        border-color: { $ref: "#/definitions/color" }
+        padding:
+          description: "N, [vertical, horizontal], [top, horizontal, bottom] or [top, right, bottom, left]."
+          oneOf:
+            - { type: integer, minimum: 0 }
+            - { type: array, minItems: 1, maxItems: 4, items: { type: integer, minimum: 0 } }
+        width: { type: integer, minimum: 1, description: "cell: column width; bar: columns / lines per bar." }
+        max-width: { type: integer, minimum: 1, description: "chart: the widest it gets." }
+        height: { type: integer, minimum: 1, description: "plot: plot rows; cell: most lines per cell." }
+        min-height: { type: integer, minimum: 1, description: "plot: smallest plot rows in a grid before it scrolls (default 8)." }
+        grid-template-columns:
+          description: 'dashboard: column tracks: N equal columns, "1fr 2fr 30", "repeat(3, 1fr)" or a list; tracks are an integer, "N%", "Nfr", auto or "minmax(a, b)".'
+          oneOf:
+            - { type: integer, minimum: 1 }
+            - { type: string }
+            - { type: array, minItems: 1, items: { $ref: "#/definitions/track" } }
+        grid-template-rows:
+          description: "dashboard: the first row tracks (an integer, Nfr, auto, min-content, max-content, minmax(a, b))."
+          oneOf:
+            - { type: string }
+            - { type: array, items: { $ref: "#/definitions/track" } }
+        grid-auto-rows: { $ref: "#/definitions/track", description: "dashboard: rows past the declared ones (default auto)." }
+        grid-template-areas:
+          type: array
+          items: { type: string }
+          description: 'dashboard: named areas, one string per row ("a a b"), "." for an empty cell.'
+        column-gap: { type: integer, minimum: 0, description: "dashboard: spaces between columns (default 2)." }
+        row-gap: { type: integer, minimum: 0, description: "dashboard: blank lines between rows (default 1)." }
+        grid-area: { type: string, description: "panel: a name of grid-template-areas." }
+        grid-row:
+          description: 'panel: N, "span M" or "N / span M".'
+          oneOf:
+            - { type: integer, minimum: 1 }
+            - { type: string, pattern: "^(\\d+|span \\d+|\\d+ */ *span \\d+)$" }
+        grid-column:
+          description: 'panel: N, "span M" or "N / span M".'
+          oneOf:
+            - { type: integer, minimum: 1 }
+            - { type: string, pattern: "^(\\d+|span \\d+|\\d+ */ *span \\d+)$" }
+        justify-self: { enum: [start, center, end, stretch], description: "panel: where the chart sits across its cell." }
+        align-self: { enum: [start, center, end, stretch], description: "panel: where the chart sits down its cell." }
+        renderer:
+          type: string
+          description: |-
+            chart: how the type is drawn (the first one is the default):
+              table: box          line: canvas, asciichart     scatter/area/bubble: canvas
+              bar: horizontal, vertical    histogram: horizontal, vertical
+              boxplot: boxdraw, vertical    heatmap: halfblock, block    pie: bar, circle
+              stat: big           text: plain
+            Renderers registered with setup({ register = ... }) are accepted too.
+        canvas: { type: string, description: "chart: the pixel canvas: braille (default), quadrant, block, halfblock, ascii." }
+        curve: { enum: [linear, step, step-before, step-after, step-middle], description: "series: steps instead of slopes (Chart.js stepped)." }
+        fill: { type: boolean, description: "series: fill down to zero (lines)." }
+        hole: { type: number, minimum: 0, maximum: 0.9, description: "chart (pie circle): the hole, a fraction of the radius; 0.5+ shows the total." }
+        angle: { enum: [180, 360], description: "chart (pie circle): 180 draws the upper half." }
+        gap: { type: integer, minimum: 0, description: "bar: columns or lines between categories." }
+        position: { enum: [right, bottom, end, inside], description: "legend: right or bottom; value: end or inside the bar." }
+        color-scale:
+          type: array
+          minItems: 1
+          items: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+          description: 'chart (heatmap): the colors from low to high, "#rrggbb" (ECharts visualMap inRange.color).'
+        color-steps:
+          type: array
+          description: "chart (heatmap): piecewise colors; a value takes the color of the highest step it reaches."
+          items:
+            type: object
+            required: [value, color]
+            properties:
+              value: { type: number }
+              color: { $ref: "#/definitions/color" }

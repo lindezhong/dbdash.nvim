@@ -62,15 +62,16 @@ local function margin(spec)
   return m
 end
 
----show.style through ctx: the border line style (CSS border-style) and show_axes
----(display: none of the tick labels and axis titles). Charts fill in their ticks between
----plot_size() calls, so this runs on every call.
+---The plot's computed style through ctx: plot { border } (the line style; none drops the
+---frame) and axis { display: none } (no tick labels and axis titles). Charts fill in
+---their ticks between plot_size() calls, so this runs on every call.
 function M.apply_style(ctx, spec)
   if spec.border ~= false and not spec.chars then
-    spec.chars = borders.get(ctx.border, "single")
+    local b = ctx.css:get("plot").border
+    spec.chars = b ~= "none" and borders.get(b, "single") or nil
     spec.border = spec.chars ~= nil
   end
-  if ctx.show_axes == false then
+  if ctx.css:get("axis").display == "none" then
     spec.ylabels, spec.yticks, spec.xticks = nil, nil, nil
     spec.x_axis, spec.xlabel, spec.ylabel = false, nil, nil
   end

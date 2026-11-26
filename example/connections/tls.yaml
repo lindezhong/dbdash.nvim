@@ -17,12 +17,13 @@ description: |
   TLS for every protocol: verify-full with a CA file, pinning the certificate, require,
   and HTTPS. Needs `make it-up` (its test certificates). See `:help dbdash-tls`.
 
-layout:
-  columns: 2
-
 show:
-  style: { title_align: center, border: rounded }
   interval: 1m
+
+style:
+  dashboard: { grid-template-columns: 2 }
+  panel-title: { text-align: center }
+  plot: { border: rounded }
 
 panels:
   - database:
@@ -78,4 +79,5 @@ panels:
       title: "HTTPS (verify-full by default) with ca="
       description: |
         HTTPS verifies the certificate and host name by default; `ca=` adds the test root.
-      span: 2
+    style:
+      panel: { grid-column: span 2 }

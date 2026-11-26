@@ -265,7 +265,7 @@ function M.place(items, ncols, areas)
     if it.area then
       local a = areas and areas[it.area]
       if not a then
-        return fail(i, "area", "no area named %q in layout.areas", it.area)
+        return fail(i, "area", "no area named %q in grid-template-areas", it.area)
       end
       p = { row = a.row, col = a.col, span = a.span, row_span = a.row_span }
     elseif it.row and it.column then
@@ -526,7 +526,88 @@ function M.rows(tracks, items, avail, gap)
   return distribute(bases, limits, frs, avail), fill
 end
 
----The old flow layout: `columns` equal columns, panels in order with their spans.
+---A grid-row / grid-column value: N, "span M" or "N / span M" -> start, span.
+---@return integer? start, integer span
+local function grid_line(v)
+  if type(v) == "number" then
+    return v, 1
+  end
+  if type(v) ~= "string" then
+    return nil, 1
+  end
+  local a, b = v:match("^(%d+)%s*/%s*span%s+(%d+)$")
+  if a then
+    return tonumber(a), tonumber(b)
+  end
+  local n = v:match("^span%s+(%d+)$")
+  if n then
+    return nil, tonumber(n)
+  end
+  return tonumber(v), 1
+end
+M.grid_line = grid_line
+
+---The grid of a dashboard from computed styles: the container's tracks, gaps and areas,
+---and each panel's placement (grid-area, grid-row, grid-column).
+---@param container table computed style of the dashboard element
+---@param items table[] computed style of every panel, in order
+---@return { columns: table, rows: table, auto_row: table, gap: integer, row_gap: integer, places: dbdash.layout.Place[] }?, { index: integer?, field: string, message: string }? err
+function M.from_styles(container, items)
+  local areas, area_cols
+  if container["grid-template-areas"] then
+    local err
+    areas, area_cols, err = M.parse_areas(container["grid-template-areas"])
+    if not areas then
+      return nil, { field = "grid-template-areas", message = err }
+    end
+  end
+  local cols_v = container["grid-template-columns"]
+  if cols_v == 1 and area_cols then
+    cols_v = area_cols -- the default: as many columns as the areas have
+  end
+  local columns, err = M.parse_tracks(cols_v, "columns")
+  if not columns then
+    return nil, { field = "grid-template-columns", message = err }
+  end
+  if area_cols and #columns ~= area_cols then
+    return nil, { field = "grid-template-columns", message = ("%d columns, but grid-template-areas has %d"):format(#columns, area_cols) }
+  end
+  local rows = {}
+  if container["grid-template-rows"] then
+    rows, err = M.parse_tracks(container["grid-template-rows"], "rows")
+    if not rows then
+      return nil, { field = "grid-template-rows", message = err }
+    end
+  end
+  local auto, aerr = M.parse_tracks(container["grid-auto-rows"] or "auto", "rows")
+  if not auto then
+    return nil, { field = "grid-auto-rows", message = aerr }
+  end
+  local list = {}
+  for i, c in ipairs(items) do
+    local row, row_span = grid_line(c["grid-row"])
+    local column, span = grid_line(c["grid-column"])
+    list[i] = { area = c["grid-area"], row = row, row_span = row_span, column = column, span = span }
+    if list[i].area and (row or column) then
+      return nil, { index = i, field = "grid-area", message = "grid-area and grid-row / grid-column cannot be used together" }
+    end
+  end
+  local places, perr = M.place(list, #columns, areas)
+  if not places then
+    local field = ({ area = "grid-area", row = "grid-row", column = "grid-column" })[perr.field] or perr.field
+    return nil, { index = perr.index, field = field, message = perr.message }
+  end
+  return {
+    columns = columns,
+    rows = rows,
+    auto_row = auto[1],
+    gap = container["column-gap"],
+    row_gap = container["row-gap"],
+    places = places,
+  }
+end
+
+---`columns` equal columns with the panels in order and their spans (tests and tools).
 ---@param spans integer[]
 ---@param width integer
 ---@param columns integer

@@ -136,22 +136,6 @@ function M.color(spec, fallback)
   return name
 end
 
-local reversed = {} ---@type table<string, string> generated name -> source group
-
----A group showing `group` reversed (its color as the background), e.g. for a stat value
----with color_mode: background. Follows the source group after :colorscheme.
----@param group string
----@return string
-function M.reverse(group)
-  local name = "DbDashRev_" .. group:gsub("[^%w]", "_")
-  if not reversed[name] then
-    reversed[name] = group
-    local src = vim.api.nvim_get_hl(0, { name = group, link = false })
-    vim.api.nvim_set_hl(0, name, vim.tbl_extend("force", src, { reverse = true, bold = true }))
-  end
-  return name
-end
-
 ---Define base groups (default=true so user overrides win) and re-create generated ones.
 function M.setup()
   for name, attrs in pairs(M.BASE) do
@@ -159,10 +143,6 @@ function M.setup()
   end
   for name, attrs in pairs(defined) do
     vim.api.nvim_set_hl(0, name, attrs)
-  end
-  for name, group in pairs(reversed) do
-    local src = vim.api.nvim_get_hl(0, { name = group, link = false })
-    vim.api.nvim_set_hl(0, name, vim.tbl_extend("force", src, { reverse = true, bold = true }))
   end
   require("dbdash.css.hl").refresh() -- groups made from computed styles
 end

@@ -2,8 +2,8 @@
 --        ╷  ┌────┬───┐    ╷
 --    A   ├──┤    │   ├────┤  •
 --        ╵  └────┴───┘    ╵
--- Whiskers reach the furthest values within 1.5 IQR (style.whiskers: iqr), the extremes
--- (minmax), or two percentiles ([5, 95]); values beyond are outliers. show_values writes
+-- Whiskers reach the furthest values within 1.5 IQR (show.whiskers: iqr), the extremes
+-- (minmax), or two percentiles ([5, 95]); values beyond are outliers (outlier { display: none } hides them). value { display: block } writes
 -- q1, the median and q3 under each box.
 local C = require("dbdash.render.charts.common")
 
@@ -59,7 +59,6 @@ function M.stats(values, whiskers)
 end
 
 function M.render(rs, show, ctx)
-  local style = C.nn(show.style) or {}
   local axes = C.axes(show)
   local vi = C.col(rs, C.nn(show.value_column), "value_column")
   local ci = C.nn(show.category_column) and C.col(rs, show.category_column, "category_column")
@@ -80,13 +79,13 @@ function M.render(rs, show, ctx)
   end
   local stats, lo, hi = {}, nil, nil
   for i, cat in ipairs(order) do
-    stats[i] = M.stats(groups[cat], C.nn(style.whiskers))
+    stats[i] = M.stats(groups[cat], C.nn(show.whiskers))
     lo = math.min(lo or stats[i].min, stats[i].min)
     hi = math.max(hi or stats[i].max, stats[i].max)
   end
   lo, hi = C.limits(ctx, lo, hi, axes.xmin or axes.ymin, axes.xmax or axes.ymax)
 
-  local show_values = C.nn(style.show_values) == true
+  local show_values = ctx.css:get("value").display ~= "none" -- hidden by the UA sheet
   local rows_needed = #order * 4 - (show_values and 0 or 1)
   local spec = {
     title = C.nn(show.title),
@@ -109,8 +108,8 @@ function M.render(rs, show, ctx)
       grid[r][c], colors[r][c] = ch, g
     end
   end
-  local show_outliers = C.nn(style.show_outliers) ~= false
-  local show_means = C.nn(style.show_means) == true
+  local show_outliers = ctx.css:get("outlier").display ~= "none"
+  local show_means = ctx.css:get("mean").display ~= "none" -- hidden by the UA sheet
   spec.yticks = {}
   for i, s in ipairs(stats) do
     local g = C.color(ctx, show, i, nil, order[i])

@@ -38,10 +38,17 @@ function M.dashboard(d)
       end
     end)
   end
+  -- the config's sheets: the dashboard's (author origin), each panel's (inline, scoped)
+  if d.cfg.style_rules then
+    doc:set_sheet("author", d.cfg.style_rules)
+  end
   for _, p in ipairs(d.panels) do
     local t = p.cfg.show.type
     p.node = doc.root:append(dom.new("panel", { id = p.cfg.id, classes = { t } }))
     p.chart_node = p.node:append(dom.new("chart", { classes = { t }, attrs = { type = t } }))
+    if p.cfg.style_rules then
+      doc:set_sheet("inline", p.cfg.style_rules, p.node)
+    end
   end
   return doc
 end
@@ -60,18 +67,29 @@ M.child = child
 ---Bring the view's nodes up to date with the dashboard's state (titles, ⓘ, errors,
 ---argument values). Only changes mark nodes dirty, as DOM mutations do in a browser.
 ---@param d table the dashboard
----@param o { icon: string, format_error: fun(err: any): string, header_icon: boolean }
+---@param o { format_error: fun(err: any): string, header_icon: boolean }
 function M.sync(d, o)
   if not d.doc then
     M.dashboard(d)
   end
+  local style = require("dbdash.css.style")
+  ---ⓘ: the icon element's content (description-icon { content }), unless it is hidden
+  local function icon(parent, shown)
+    local n = child(parent, "description-icon")
+    local c = style.get(n)
+    n:set_text(shown and c.display ~= "none" and c.content or nil)
+  end
   child(d.header_node, "header-title"):set_text(d.cfg.title or "")
-  child(d.header_node, "description-icon"):set_text(o.header_icon and o.icon or nil)
+  icon(d.header_node, o.header_icon)
   for _, p in ipairs(d.panels) do
     local show = p:show_config()
-    local style = show.style ~= vim.NIL and show.style or {}
-    child(p.node, "panel-title"):set_text(style.show_title == false and "" or p:title())
-    child(p.node, "description-icon"):set_text(p.cfg.show.description and o.icon or nil)
+    -- the chart type (:DbDashStyle can switch it) is the elements' class and attribute
+    p.node:set_classes({ show.type })
+    p.chart_node:set_classes({ show.type })
+    p.chart_node:set_attr("type", show.type)
+    local title = child(p.node, "panel-title")
+    title:set_text(style.get(title).display == "none" and "" or p:title())
+    icon(p.node, p.cfg.show.description ~= nil)
     child(p.node, "error"):set_text(p.error and o.format_error(p.error) or nil)
     local sub = show.subtitle
     child(p.node, "subtitle"):set_text(sub ~= nil and sub ~= vim.NIL and sub or nil)
@@ -92,6 +110,24 @@ function M.sync(d, o)
       args:set_children(kids)
     end
   end
+end
+
+---The document of a config without running it (config checks, tests, tools): a stand-in
+---dashboard { cfg, doc, header_node, panels = { { cfg, node, chart_node } } }.
+function M.from_config(cfg)
+  local d = { cfg = cfg, panels = {} }
+  for i, pc in ipairs(cfg.panels) do
+    d.panels[i] = { cfg = pc }
+  end
+  M.dashboard(d)
+  return d
+end
+
+---A countdown element (under the header or a panel): shown?, its format (content).
+---@return boolean shown, string format
+function M.countdown(parent)
+  local c = require("dbdash.css.style").get(child(parent, "countdown"))
+  return c.display ~= "none", c.content or "Next update: {time}s"
 end
 
 ---A document for one view of its own (the sidebar, a popup): root `tag`.

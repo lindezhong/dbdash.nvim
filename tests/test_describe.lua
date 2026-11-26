@@ -68,7 +68,7 @@ description: |
   Last **{{ args.hours }} hours**{% if meta.db_type %} from {{ meta.db_type }}{% endif %}.
 database: { url: "sqlite:///:memory:" }
 args: [{ name: hours, type: int, default: 24 }]
-layout: { columns: 2 }
+style: { dashboard: { grid-template-columns: 2 } }
 panels:
   - query: { sql: SELECT 1 AS x }
     show:

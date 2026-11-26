@@ -18,10 +18,9 @@ function M.items(rs, show, ctx)
       sum = sum + v
     end
   end
-  -- style.sort (asc / desc by value) and style.top: the first N, the rest as one slice
-  -- (style.other_label, default "Other"), as ECharts examples do.
-  local style = C.nn(show.style) or {}
-  local order = C.nn(style.sort)
+  -- show.sort (asc / desc by value) and show.top: the first N, the rest as one slice
+  -- (show.other_label, default "Other"; styled as series.other), as ECharts examples do.
+  local order = C.nn(show.sort)
   if order == "asc" or order == "desc" then
     table.sort(items, function(a, b)
       if order == "asc" then
@@ -30,14 +29,14 @@ function M.items(rs, show, ctx)
       return a.value > b.value
     end)
   end
-  local top = tonumber(C.nn(style.top))
+  local top = tonumber(C.nn(show.top))
   if top and #items > top then
     local rest = 0
     for i = top + 1, #items do
       rest = rest + items[i].value
     end
     items = { unpack(items, 1, top) }
-    items[#items + 1] = { label = C.nn(style.other_label) or "Other", value = rest, other = true }
+    items[#items + 1] = { label = C.nn(show.other_label) or "Other", value = rest, other = true }
   end
   for i, it in ipairs(items) do
     it.group = it.other and ctx.css:hl("series", { classes = { "other" } }) or C.color(ctx, show, i, nil, it.label)
@@ -46,19 +45,18 @@ function M.items(rs, show, ctx)
 end
 
 ---Where the legend goes: "right" (beside the circle, the default), "bottom" or "none".
-function M.legend_position(show)
-  return C.legend_position(show, 2)
+function M.legend_position(ctx)
+  return C.legend_position(ctx, 2)
 end
 
----Legend lines "■ label  value  pct%" honoring style.show_labels / show_values /
----show_percentages. Spans are byte ranges within each line.
+---Legend lines "■ label  value  pct%"; label, value and percent { display: none } leave
+---a column out. Spans are byte ranges within each line.
 ---@param max_label integer? label width cap (default 30)
 ---@return { text: string, spans: { [1]: integer, [2]: integer, [3]: string }[] }[]
 function M.legend(items, sum, show, max_label, ctx)
-  local style = C.nn(show.style) or {}
-  local show_labels = C.nn(style.show_labels) ~= false
-  local show_values = C.nn(style.show_values) ~= false
-  local show_pct = C.nn(style.show_percentages) ~= false
+  local show_labels = ctx.css:get("label").display ~= "none"
+  local show_values = ctx.css:get("value").display ~= "none"
+  local show_pct = ctx.css:get("percent").display ~= "none"
   local lw, vw = 0, 0
   for _, it in ipairs(items) do
     lw = math.max(lw, W.width(it.label))

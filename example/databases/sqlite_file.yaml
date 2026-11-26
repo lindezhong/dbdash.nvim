@@ -34,5 +34,6 @@ show:
   interval: 5s
   x_column: at
   y_column: value
-  show_countdown: true
-  countdown_format: "{time}s"
+
+style:
+  countdown: { display: block, content: "{time}s" }

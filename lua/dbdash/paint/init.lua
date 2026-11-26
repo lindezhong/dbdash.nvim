@@ -72,6 +72,9 @@ function M.view(tree)
     end
     list.hits[#list.hits + 1] = { row_s = 0, row_e = #body.lines - 1, x = 0, width = tree.single.width, node = tree.single.node }
   else
+    if tree.grid.error then
+      list.header = stack({ tree.header, { lines = { tree.grid.error }, hl = { { row = 0, col_s = 0, col_e = #tree.grid.error, group = "DbDashError" } } } })
+    end
     for _, f in ipairs(tree.grid.fragments) do
       list.layers[#list.layers + 1] = { x = f.x, y = f.y, width = f.width, height = f.height, out = M.fragment(f), node = f.node }
     end

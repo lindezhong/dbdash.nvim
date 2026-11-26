@@ -28,12 +28,13 @@ function M.render(rs, show, ctx)
     end
     return w
   end
-  local pos = P.legend_position(show)
+  local pos = P.legend_position(ctx)
   local legend = pos == "none" and {} or P.legend(items, sum, show, nil, ctx)
   local lw = legend_width(legend)
-  local style = show.style ~= vim.NIL and show.style or {}
-  local donut = math.max(0, math.min(tonumber(style.donut ~= vim.NIL and style.donut or nil) or 0, 0.9))
-  local half = style.half == true
+  -- chart { hole: 0.5 } (a doughnut: the hole's share of the radius), angle: 180 (half)
+  local chart = ctx.css:get()
+  local donut = math.max(0, math.min(chart.hole or 0, 0.9))
+  local half = chart.angle == 180
   if lw > ctx.width then -- shorten labels until the legend fits the window
     legend = P.legend(items, sum, show, math.max(3, 30 - (lw - ctx.width)), ctx)
     lw = legend_width(legend)

@@ -1,8 +1,8 @@
 │Errors
   ^ 0-6 DbDashTitle
 │█▀▀ █▀▀ █▀█
-  ^ 0-29 DbDashC_red
+  ^ 0-29 DiagnosticError
 │█▀█ ▀▀█ █ █
-  ^ 0-27 DbDashC_red
+  ^ 0-27 DiagnosticError
 │█▄█ ▄▄█ █▄█
-  ^ 0-29 DbDashC_red
+  ^ 0-29 DiagnosticError

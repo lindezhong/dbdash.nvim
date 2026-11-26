@@ -9,7 +9,7 @@ return {
     o.fine, o.marks, o.stacked, o.axes = true, nil, false, nil
     -- mark_lines are values of the data: the bin they fall in is colored and labeled
     for _, m in ipairs(bars.histogram_marks(show, bins, vals)) do
-      m.bin.group = m.color and ctx.color(m.color) or ctx.css:hl("mark")
+      m.bin.group = ctx.css:hl("mark", { classes = m.class and { m.class } or nil })
       m.bin.label = m.bin.label .. " ◀ " .. m.label
     end
     return bars.horizontal(ctx, bins, o)

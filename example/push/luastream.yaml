@@ -14,11 +14,9 @@ description: |
   the data, item by item. Runs Lua, so it asks for trust first. See
   `:help dbdash-luastream`.
 
-show:
-  style: { panel_border: single, padding: [0, 1] }
-
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
+  panel: { border: single, padding: [0, 1] }
 
 panels:
   - database: { url: "luastream://" }

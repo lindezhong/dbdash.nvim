@@ -10,11 +10,9 @@ description: |
   `meta`: what templates and Lua know about the dashboard, the panel and the run. Runs
   Lua, so it asks for trust first. See `:help dbdash-meta`.
 
-show:
-  style: { title_align: center }
-
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
+  panel-title: { text-align: center }
 
 panels:
   - database: { url: "lua://" }
@@ -61,8 +59,9 @@ panels:
     show:
       type: table
       title: "meta in a SQL template"
-      span: 2
       description: |
         A few meta fields in a SQL template; `query.max_rows` and `query.timeout` show up as
         `meta.max_rows` and `meta.timeout`.
       interval: 30s
+    style:
+      panel: { grid-column: span 2 }

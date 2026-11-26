@@ -87,18 +87,20 @@ end
 
 T["defaults apply where a config or URL sets nothing"] = function()
   dbdash.setup({
-    defaults = { interval = "2m", max_rows = 5, timeout = "7s", connect_timeout = "3s", height = 6, countdown_format = "in {time}" },
+    defaults = { interval = "2m", max_rows = 5, timeout = "7s", connect_timeout = "3s" },
+    style = { plot = { height = 6 } },
   })
   local f = vim.fn.tempname() .. ".yaml"
   vim.fn.writefile({ "database: { url: 'sqlite:///:memory:' }", "query: { sql: SELECT 1 }", "show: { type: table }" }, f)
   local cfg = assert(require("dbdash.config").load(f))
-  eq({ cfg.show.interval, cfg.query.max_rows, cfg.show.countdown_format }, { 120000, 5, "in {time}" })
+  eq({ cfg.show.interval, cfg.query.max_rows }, { 120000, 5 })
   local u = require("dbdash.db.url").parse("postgres://h/db")
   eq({ u.timeout, u.connect_timeout }, { 7000, 3000 })
   u = require("dbdash.db.url").parse("postgres://h/db?timeout=1s")
   eq(u.timeout, 1000) -- the URL wins
 
-  -- plot height: a line chart is shorter with defaults.height = 6 than with its own 15
+  -- plot height: a line chart is shorter with the user rule plot { height: 6 } than with
+  -- its own 15
   local rs = require("tests.helpers").ok("sqlite:///:memory:", "SELECT 1 AS x, 2 AS y UNION ALL SELECT 2, 5")
   local show = { type = "line", x_column = "x", y_column = "y", title = "" }
   local short = #require("dbdash.render").render(rs, show, { width = 60, height = 40 }).lines

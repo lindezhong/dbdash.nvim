@@ -9,10 +9,17 @@ local T = MiniTest.new_set()
 
 local SIZE = { width = 72, height = 18 }
 
-local function golden(show, rs, case)
-  local renderer, canvas = require("dbdash.render.registry").resolve(show, {})
+---Golden output of a chart styled by `style` (selector -> properties; chart { renderer,
+---canvas } picks the renderer).
+local function golden(show, rs, case, style)
+  local renderer, canvas = require("dbdash.render.registry").resolve(show.type, (style or {}).chart)
   local dir = show.type .. "/" .. renderer .. (renderer == "canvas" and ("-" .. canvas) or "")
-  helpers.golden(dir .. "/" .. case, render.render(rs, show, SIZE))
+  helpers.golden(dir .. "/" .. case, render.render(rs, show, vim.tbl_extend("force", SIZE, { style = style })))
+end
+
+---The chart element's renderer / canvas as a style sheet.
+local function chart(renderer, canvas)
+  return { chart = { renderer = renderer, canvas = canvas } }
 end
 
 local LINE = {
@@ -24,32 +31,30 @@ local LINE = {
 
 for _, canvas in ipairs({ "braille", "quadrant", "block", "halfblock", "ascii" }) do
   T["line on " .. canvas] = function()
-    golden(vim.tbl_extend("force", LINE, { canvas = canvas }), fx.hourly_visits(), "visits")
+    golden(LINE, fx.hourly_visits(), "visits", chart(nil, canvas))
   end
 end
 
 T["line asciichart"] = function()
-  golden(vim.tbl_extend("force", LINE, { renderer = "asciichart" }), fx.hourly_visits(), "visits")
+  golden(LINE, fx.hourly_visits(), "visits", chart("asciichart"))
 end
 
 T["line with axes, legend at bottom and fill"] = function()
   golden(vim.tbl_extend("force", LINE, {
     axes = { x_axis = { title = "hour" }, y_axis = { title = "count", min_value = 0, max_value = 200 } },
-    legend = { position = "bottom" },
-    line_style = { fill_area = true },
-  }), fx.hourly_visits(), "options")
+  }), fx.hourly_visits(), "options", { legend = { position = "bottom" }, series = { fill = true } })
 end
 
 T["area stacked and overlapping"] = function()
   local show = { type = "area", x_column = "hour", y_columns = { "visits", "signups" } }
   golden(show, fx.hourly_visits(), "overlap")
-  show.style = { stacked = true }
+  show.stacked = true
   golden(show, fx.hourly_visits(), "stacked")
 end
 
 T["scatter colored by category"] = function()
-  golden({ type = "scatter", x_column = "revenue", y_column = "margin", color_column = "segment", colors = { Large = "#e74c3c" } }, fx.companies(), "segments")
-  golden({ type = "scatter", x_column = "revenue", y_column = "margin", canvas = "quadrant" }, fx.companies(), "plain")
+  golden({ type = "scatter", x_column = "revenue", y_column = "margin", color_column = "segment" }, fx.companies(), "segments", { ["series.Large"] = { color = "#e74c3c" } })
+  golden({ type = "scatter", x_column = "revenue", y_column = "margin" }, fx.companies(), "plain", chart(nil, "quadrant"))
 end
 
 T["bubble sizes and labels"] = function()
@@ -57,42 +62,47 @@ T["bubble sizes and labels"] = function()
 end
 
 T["bar horizontal and vertical"] = function()
-  local show = { type = "bar", title = "Headcount", x_column = "department", y_column = "headcount", style = { color = "blue", show_values = true } }
-  golden(show, fx.departments(), "headcount")
-  golden(vim.tbl_extend("force", show, { renderer = "vertical" }), fx.departments(), "headcount")
+  local show = { type = "bar", title = "Headcount", x_column = "department", y_column = "headcount" }
+  golden(show, fx.departments(), "headcount", { series = { color = "blue" } })
+  golden(show, fx.departments(), "headcount", { series = { color = "blue" }, chart = { renderer = "vertical" } })
 end
 
 T["histogram horizontal and vertical"] = function()
   local show = { type = "histogram", value_column = "score", bins = 6 }
   golden(show, fx.scores(), "scores")
-  golden(vim.tbl_extend("force", show, { renderer = "vertical" }), fx.scores(), "scores")
+  golden(show, fx.scores(), "scores", chart("vertical"))
 end
 
 T["boxplot with outliers and means"] = function()
-  golden({ type = "boxplot", category_column = "class", value_column = "score", style = { show_outliers = true, show_means = true } }, fx.scores(), "classes")
+  golden({ type = "boxplot", category_column = "class", value_column = "score" }, fx.scores(), "classes", { mean = { display = "block" } })
 end
 
 T["heatmap halfblock and block"] = function()
   local show = { type = "heatmap", x_column = "hour", y_column = "day", value_column = "activity" }
   golden(show, fx.activity(), "week")
-  golden(vim.tbl_extend("force", show, { renderer = "block", style = { show_values = true } }), fx.activity(), "week")
+  golden(show, fx.activity(), "week", { chart = { renderer = "block" }, value = { display = "block" } })
 end
 
 T["pie as a proportional bar"] = function()
-  golden({ type = "pie", title = "Headcount share", label_column = "department", value_column = "headcount", colors = { "#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4" } }, fx.departments(), "departments")
+  golden({ type = "pie", title = "Headcount share", label_column = "department", value_column = "headcount" }, fx.departments(), "departments", {
+    ["series:nth-child(1)"] = { color = "#ff6b6b" },
+    ["series:nth-child(2)"] = { color = "#4ecdc4" },
+    ["series:nth-child(3)"] = { color = "#45b7d1" },
+    ["series:nth-child(4)"] = { color = "#96ceb4" },
+  })
 end
 
 T["pie as a circle"] = function()
-  local show = { type = "pie", renderer = "circle", title = "Headcount share", label_column = "department", value_column = "headcount" }
-  golden(show, fx.departments(), "departments")
-  golden(vim.tbl_extend("force", show, { canvas = "quadrant" }), fx.departments(), "departments-quadrant")
+  local show = { type = "pie", title = "Headcount share", label_column = "department", value_column = "headcount" }
+  golden(show, fx.departments(), "departments", chart("circle"))
+  golden(show, fx.departments(), "departments-quadrant", chart("circle", "quadrant"))
 end
 
 T["missing columns are reported in place of the chart"] = function()
   local out = render.render(fx.hourly_visits(), { type = "line", x_column = "nope", y_column = "visits" }, SIZE)
   eq(out.lines[1], "column 'nope' (show.x_column) not found; available: hour, visits, signups")
   eq(out.hl[1].group, "DbDashError")
-  out = render.render(fx.hourly_visits(), { type = "line", renderer = "fancy", x_column = "hour", y_column = "visits" }, SIZE)
+  out = render.render(fx.hourly_visits(), { type = "line", x_column = "hour", y_column = "visits" }, vim.tbl_extend("force", SIZE, { style = chart("fancy") }))
   eq(out.lines[1]:find("unknown style 'chart/line/fancy' %(available: asciichart, canvas%)") ~= nil, true)
 end
 
@@ -105,9 +115,9 @@ T["every chart fits the requested width"] = function()
       { { type = "boxplot", category_column = "class", value_column = "score" }, fx.scores() },
       { { type = "heatmap", x_column = "hour", y_column = "day", value_column = "activity" }, fx.activity() },
       { { type = "pie", label_column = "department", value_column = "headcount" }, fx.departments() },
-      { { type = "pie", renderer = "circle", label_column = "department", value_column = "headcount" }, fx.departments() },
+      { { type = "pie", label_column = "department", value_column = "headcount" }, fx.departments(), chart("circle") },
     }) do
-      local out = render.render(case[2], case[1], { width = w, height = 20 })
+      local out = render.render(case[2], case[1], { width = w, height = 20, style = case[3] })
       for _, l in ipairs(out.lines) do
         eq({ case[1].type, w, W.width(l) <= w }, { case[1].type, w, true })
       end
@@ -115,17 +125,23 @@ T["every chart fits the requested width"] = function()
   end
 end
 
-T["registry: custom styles and setup defaults"] = function()
+T["registry: custom renderers; renderer and canvas from computed styles"] = function()
   local registry = require("dbdash.render.registry")
   registry.register("chart/bar/mine", {
     render = function(rs)
       return { lines = { "mine: " .. rs.row_count }, hl = {} }
     end,
   })
-  local out = render.render(fx.departments(), { type = "bar", renderer = "mine" }, SIZE)
+  local out = render.render(fx.departments(), { type = "bar" }, vim.tbl_extend("force", SIZE, { style = chart("mine") }))
   eq(out.lines, { "mine: 4" })
-  eq({ registry.resolve({ type = "line" }, { line = { canvas = "quadrant" } }) }, { "canvas", "quadrant" })
-  eq({ registry.resolve({ type = "line", canvas = "block" }, { line = { canvas = "quadrant" } }) }, { "canvas", "block" })
+  eq({ registry.resolve("line", {}) }, { "canvas", "braille" })
+  eq({ registry.resolve("line", { canvas = "quadrant" }) }, { "canvas", "quadrant" })
+  eq({ registry.resolve("pie", {}) }, { "bar", "braille" })
+  -- setup({ style }) is the user sheet: below a dashboard's own rules
+  require("dbdash").setup({ style = { ["chart.line"] = { canvas = "block" } } })
+  out = render.render(fx.hourly_visits(), LINE, SIZE)
+  eq(table.concat(out.lines):find("█", 1, true) ~= nil, true)
+  require("dbdash").setup({})
   eq(registry.names("chart/bar/"), { "horizontal", "mine", "vertical" })
 end
 
@@ -152,10 +168,10 @@ end
 
 -- xy options (Chart.js / ECharts) ------------------------------------------------------
 
-local function xy(rows, show, cols)
+local function xy(rows, show, cols, style)
   cols = cols or { { name = "x", type = "integer" }, { name = "y", type = "integer" } }
   show.x_column, show.y_column = show.x_column or "x", show.y_column or "y"
-  local out = render.render(resultset.new(cols, rows), show, { width = 60, height = 14 })
+  local out = render.render(resultset.new(cols, rows), show, { width = 60, height = 14, style = style })
   return out, table.concat(out.lines, "\n")
 end
 
@@ -174,7 +190,7 @@ end
 
 T["xy: point markers, mark_points, mark_lines labels"] = function()
   local rows = { { 1, 5 }, { 2, 9 }, { 3, 2 } }
-  local _, text = xy(rows, { type = "line", line_style = { point = "●" }, mark_points = { "max", "min" } })
+  local _, text = xy(rows, { type = "line", mark_points = { "max", "min" } }, nil, { point = { display = "block", content = "●" } })
   local _, n = text:gsub("●", "")
   eq(n, 3)
   eq({ text:find("▲9", 1, true) ~= nil, text:find("▼2", 1, true) ~= nil }, { true, true })
@@ -191,14 +207,14 @@ end
 
 T["xy: stepped lines, NULL gaps, percent stacking"] = function()
   local o1 = xy({ { 1, 1 }, { 2, 5 } }, { type = "line" })
-  local o2 = xy({ { 1, 1 }, { 2, 5 } }, { type = "line", line_style = { stepped = "after" } })
+  local o2 = xy({ { 1, 1 }, { 2, 5 } }, { type = "line" }, nil, { series = { curve = "step-after" } })
   eq(table.concat(o1.lines) ~= table.concat(o2.lines), true)
   local cols = { { name = "x", type = "integer" }, { name = "y", type = "integer" } }
-  local gap = xy({ { 1, 1 }, { 2, vim.NIL }, { 3, 1 } }, { type = "line", line_style = { span_gaps = false } }, cols)
+  local gap = xy({ { 1, 1 }, { 2, vim.NIL }, { 3, 1 } }, { type = "line", span_gaps = false }, cols)
   local joined = xy({ { 1, 1 }, { 2, vim.NIL }, { 3, 1 } }, { type = "line" }, cols)
   eq(table.concat(gap.lines) ~= table.concat(joined.lines), true)
   local pcols = { { name = "x", type = "integer" }, { name = "a", type = "integer" }, { name = "b", type = "integer" } }
-  local _, text = xy({ { 1, 1, 3 }, { 2, 2, 2 } }, { type = "area", y_columns = { "a", "b" }, style = { stacked = "percent" } }, pcols)
+  local _, text = xy({ { 1, 1, 3 }, { 2, 2, 2 } }, { type = "area", y_columns = { "a", "b" }, stacked = "percent" }, pcols)
   eq(text:find("100 │", 1, true) ~= nil, true)
 end
 
@@ -226,20 +242,20 @@ T["bar: grouped and stacked series, legend"] = function()
   eq({ text:find("■ a", 1, true) ~= nil, text:find("■ b", 1, true) ~= nil }, { true, true })
   local _, n = text:gsub("│■", "")
   eq(n, 6) -- one line per series and category
-  show.style = { group = "stacked" }
+  show.stacked = true
   text = text_of(render.render(bar_rs(), show, { width = 60, height = 20 }))
   eq({ text:find("■ 6 ", 1, true) ~= nil, text:find("■ 11", 1, true) ~= nil }, { true, true }) -- totals
 end
 
 T["bar: sort, top, inside values, mark_lines labels"] = function()
-  local show = { type = "bar", x_column = "c", y_column = "a", style = { sort = "desc", top = 2 } }
+  local show = { type = "bar", x_column = "c", y_column = "a", sort = "desc", top = 2 }
   local out = render.render(bar_rs(), show, { width = 50, height = 10 })
   eq({ vim.trim(out.lines[2]):sub(1, 1), vim.trim(out.lines[3]):sub(1, 1) }, { "y", "x" })
   eq(text_of(out):find("z", 1, true), nil)
   show.mark_lines = { { value = 4, label = "four" } }
   eq(text_of(render.render(bar_rs(), show, { width = 50, height = 10 })):find("four", 1, true) ~= nil, true)
-  show = { type = "bar", renderer = "vertical", x_column = "c", y_column = "a", mark_lines = { { value = "mean" } } }
-  eq(text_of(render.render(bar_rs(), show, { width = 50, height = 12 })):find("mean 5.33", 1, true) ~= nil, true)
+  show = { type = "bar", x_column = "c", y_column = "a", mark_lines = { { value = "mean" } } }
+  eq(text_of(render.render(bar_rs(), show, { width = 50, height = 12, style = chart("vertical") })):find("mean 5.33", 1, true) ~= nil, true)
 end
 
 T["histogram: bin_width, bin_range, cumulative, percent"] = function()
@@ -253,7 +269,7 @@ T["histogram: bin_width, bin_range, cumulative, percent"] = function()
   eq(vim.tbl_map(function(b)
     return b.value
   end, bins), { 2, 3, 2, 3 })
-  bins = B.histogram(rs, { value_column = "v", bin_width = 25, bin_range = { 0, 100 }, style = { cumulative = true, normalize = "percent" } }, render.ctx({ width = 40 }))
+  bins = B.histogram(rs, { value_column = "v", bin_width = 25, bin_range = { 0, 100 }, cumulative = true, normalize = "percent" }, render.ctx({ width = 40 }))
   eq(bins[#bins].value, 100)
 end
 
@@ -269,33 +285,34 @@ T["boxplot: whiskers, values, vertical renderer"] = function()
     return { v }
   end, vals)
   local rs = resultset.new({ { name = "v", type = "integer" } }, rows)
-  local text = text_of(render.render(rs, { type = "boxplot", value_column = "v", style = { show_values = true } }, { width = 60, height = 12 }))
+  local text = text_of(render.render(rs, { type = "boxplot", value_column = "v" }, { width = 60, height = 12, style = { value = { display = "block" } } }))
   eq(text:find("5.5", 1, true) ~= nil, true) -- the median under the box
-  text = text_of(render.render(rs, { type = "boxplot", renderer = "vertical", value_column = "v" }, { width = 40, height = 14 }))
+  text = text_of(render.render(rs, { type = "boxplot", value_column = "v" }, { width = 40, height = 14, style = chart("vertical") }))
   eq({ text:find("┌", 1, true) ~= nil, text:find("├", 1, true) ~= nil }, { true, true })
 end
 
-T["heatmap: color_steps, scale range, legend off"] = function()
+T["heatmap: color-steps, scale range, legend off"] = function()
   local rs = resultset.new(
     { { name = "x", type = "string" }, { name = "y", type = "string" }, { name = "v", type = "integer" } },
     { { "a", "r", 1 }, { "b", "r", 50 }, { "a", "s", 90 }, { "b", "s", 10 } }
   )
-  local show = { type = "heatmap", x_column = "x", y_column = "y", value_column = "v", style = { color_steps = { { value = 0, color = "#00ff00" }, { value = 60, color = "#ff0000" } } } }
-  local text = text_of(render.render(rs, show, { width = 40, height = 10 }))
+  local show = { type = "heatmap", x_column = "x", y_column = "y", value_column = "v" }
+  local text = text_of(render.render(rs, show, { width = 40, height = 10, style = { chart = { ["color-steps"] = { { value = 0, color = "#00ff00" }, { value = 60, color = "#ff0000" } } } } }))
   eq({ text:find("≥0", 1, true) ~= nil, text:find("≥60", 1, true) ~= nil }, { true, true })
-  show = { type = "heatmap", x_column = "x", y_column = "y", value_column = "v", legend = false, style = { scale_min = 0, scale_max = 200, color_scale = { "#000000", "#ffffff" } } }
-  text = text_of(render.render(rs, show, { width = 40, height = 10 }))
+  show = { type = "heatmap", x_column = "x", y_column = "y", value_column = "v", scale_min = 0, scale_max = 200 }
+  text = text_of(render.render(rs, show, { width = 40, height = 10, style = { legend = { display = "none" }, chart = { ["color-scale"] = { "#000000", "#ffffff" } } } }))
   eq(text:find("200", 1, true), nil) -- no legend
 end
 
-T["pie: top + Other, donut total, half, legend off, format"] = function()
+T["pie: top + Other, hole total, half, legend off, format"] = function()
   local rs = resultset.new({ { name = "l", type = "string" }, { name = "v", type = "integer" } }, { { "a", 50 }, { "b", 30 }, { "c", 15 }, { "d", 5 } })
-  local text = text_of(render.render(rs, { type = "pie", label_column = "l", value_column = "v", format = "{} u", style = { sort = "asc", top = 2 } }, { width = 50, height = 12 }))
+  local text = text_of(render.render(rs, { type = "pie", label_column = "l", value_column = "v", format = "{} u", sort = "asc", top = 2 }, { width = 50, height = 12 }))
   eq({ text:find("Other", 1, true) ~= nil, text:find("80 u", 1, true) ~= nil, text:find("■ d", 1, true) ~= nil }, { true, true, true })
-  text = text_of(render.render(rs, { type = "pie", renderer = "circle", label_column = "l", value_column = "v", style = { donut = 0.6 } }, { width = 60, height = 14 }))
+  local pie = { type = "pie", label_column = "l", value_column = "v" }
+  text = text_of(render.render(rs, pie, { width = 60, height = 14, style = { chart = { renderer = "circle", hole = 0.6 } } }))
   eq(text:find("100", 1, true) ~= nil, true)
-  local full = render.render(rs, { type = "pie", renderer = "circle", label_column = "l", value_column = "v", legend = false }, { width = 60, height = 14 })
-  local half = render.render(rs, { type = "pie", renderer = "circle", label_column = "l", value_column = "v", legend = false, style = { half = true } }, { width = 60, height = 14 })
+  local full = render.render(rs, pie, { width = 60, height = 14, style = { chart = { renderer = "circle" }, legend = { display = "none" } } })
+  local half = render.render(rs, pie, { width = 60, height = 14, style = { chart = { renderer = "circle", angle = 180 }, legend = { display = "none" } } })
   eq(#half.lines < #full.lines, true)
   eq(text_of(full):find("■", 1, true), nil)
 end
@@ -307,20 +324,25 @@ T["stat: reduce, prefix, label, delta_mode, several values"] = function()
     eq({ reduce, C.value(rs, { reduce = reduce }) }, { reduce, want })
   end
   eq(C.delta({ 10, 15 }, "absolute").text, "↑ 5")
-  local out = render.render(rs, { type = "stat", text_size = "normal", prefix = "$", label = "total", reduce = "sum" }, { width = 40, height = 8 })
+  local normal = { value = { ["font-size"] = "normal" } }
+  local out = render.render(rs, { type = "stat", prefix = "$", label = "total", reduce = "sum" }, { width = 40, height = 8, style = normal })
   eq({ out.lines[1], out.lines[2] }, { "$40", "total" })
-  local text = text_of(render.render(rs, { type = "stat", text_size = "normal", value_columns = { "a", { column = "b", label = "bee" } } }, { width = 40, height = 8 }))
+  local text = text_of(render.render(rs, { type = "stat", value_columns = { "a", { column = "b", label = "bee" } } }, { width = 40, height = 8, style = normal }))
   eq(text:find("bee", 1, true) ~= nil, true)
 end
 
-T["text: align, numbers, max_lines, highlight, reverse"] = function()
+T["text: text-align, line numbers, line-clamp, highlight classes, reverse"] = function()
   local rs = resultset.new({ { name = "l", type = "string" } }, { { "INFO up" }, { "ERROR down" }, { "INFO ok" } })
-  local out = render.render(rs, { type = "text", style = { reverse = true, line_numbers = true, max_lines = 2, highlight = { { pattern = "ERROR", color = "Error" } } } }, { width = 30, height = 8 })
-  eq({ out.lines[1], out.lines[2], out.lines[3] }, { "1 INFO ok", "2 ERROR down", "… 1 more lines (style.max_lines)" })
+  local out = render.render(rs, { type = "text", reverse = true, highlight = { { pattern = "ERROR", class = "bad" } } }, {
+    width = 30,
+    height = 8,
+    style = { ["line-number"] = { display = "block" }, chart = { ["line-clamp"] = 2 }, ["line.bad"] = { color = "Error" } },
+  })
+  eq({ out.lines[1], out.lines[2], out.lines[3] }, { "1 INFO ok", "2 ERROR down", "… 1 more lines (chart line-clamp)" })
   eq(vim.tbl_filter(function(h)
     return h.group == "Error"
   end, out.hl)[1].row, 1)
-  out = render.render(rs, { type = "text", style = { text_align = "right" } }, { width = 30, height = 8 })
+  out = render.render(rs, { type = "text" }, { width = 30, height = 8, style = { line = { ["text-align"] = "right" } } })
   eq(#out.lines[1], 30)
 end
 
@@ -333,8 +355,8 @@ local function stat_rs(v, typ)
   )
 end
 
-local function stat(case, show, rs, opts)
-  local out = render.render(rs, vim.tbl_extend("force", { type = "stat" }, show), vim.tbl_extend("force", SIZE, opts or {}))
+local function stat(case, show, rs, opts, style)
+  local out = render.render(rs, vim.tbl_extend("force", { type = "stat" }, show), vim.tbl_extend("force", SIZE, opts or {}, { style = style }))
   helpers.golden("stat/big/" .. case, out)
   return out
 end
@@ -350,8 +372,10 @@ T["stat: decrease, first refresh, unchanged"] = function()
 end
 
 T["stat: format, unit, value_column, options off"] = function()
-  stat("format_unit", { value_column = "users", format = "{:,.1f}", unit = "ms", delta = false, sparkline = false },
-    stat_rs(1234.56, "number"))
+  stat("format_unit", { value_column = "users", format = "{:,.1f}", unit = "ms" }, stat_rs(1234.56, "number"), nil, {
+    delta = { display = "none" },
+    sparkline = { display = "none" },
+  })
 end
 
 T["stat: falls back to one line when narrow or not drawable"] = function()

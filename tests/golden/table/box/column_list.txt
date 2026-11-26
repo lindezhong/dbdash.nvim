@@ -2,13 +2,13 @@
   ^ 0-123 DbDashBorder
 │┃ 部门       ┃ 人数 ┃ Manager ┃ Missing ┃
   ^ 0-3 DbDashBorder
-  ^ 4-16 DbDashC_bold_blue
+  ^ 4-16 DbDashCss_blue__b__
   ^ 17-20 DbDashBorder
-  ^ 21-27 DbDashC_bold_blue
+  ^ 21-27 DbDashCss_blue__b__
   ^ 28-31 DbDashBorder
-  ^ 32-39 DbDashC_bold_blue
+  ^ 32-39 DbDashCss_blue__b__
   ^ 40-43 DbDashBorder
-  ^ 44-51 DbDashC_bold_blue
+  ^ 44-51 DbDashCss_blue__b__
   ^ 52-55 DbDashBorder
 │┡━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
   ^ 0-123 DbDashBorder

@@ -1,12 +1,13 @@
 -- Shared bar drawing for bar charts and histograms.
 --
 -- Bars are categories with one segment per series. Options after Chart.js / ECharts:
---   style.group      grouped (side by side, the default) or stacked
---   style.bar_width  vertical: columns per bar; horizontal: lines per bar
---   style.bar_gap    vertical: columns between categories; horizontal: lines between them
---   style.sort       asc / desc (by value, or total when stacked)
---   style.top        keep the first N categories (after sorting)
---   style.value_position  end (after / above the bar, default) or inside
+--   show.stacked     true: segments on top of each other (default: side by side)
+--   show.sort        asc / desc (by value, or total when stacked)
+--   show.top         keep the first N categories (after sorting)
+-- Appearance (CSS):
+--   bar   width (vertical: columns per bar; horizontal: lines per bar), gap (between
+--         categories)
+--   value display: none hides the values; position: inside puts them in the bar end
 --   axes.y_axis.min_value / max_value   the value axis (the baseline of the bars)
 --   mark_lines       reference lines on the value axis (a value, mean, min, max)
 local C = require("dbdash.render.charts.common")
@@ -91,7 +92,7 @@ local function mark_values(marks, all)
       end
     end
     if x then
-      out[#out + 1] = { value = x, label = nn(m.label) or (type(v) == "string" and ("%s %s"):format(v, fmt.number(x))), color = nn(m.color) }
+      out[#out + 1] = { value = x, label = nn(m.label) or (type(v) == "string" and ("%s %s"):format(v, fmt.number(x))), class = nn(m.class) }
     end
   end
   return out
@@ -223,7 +224,7 @@ function M.horizontal(ctx, bars, o)
   local label_line, label_hl = "", {}
   for _, m in ipairs(marks) do
     local c = col_of(m.value)
-    local group = m.color and ctx.color(m.color) or ctx.css:hl("mark")
+    local group = ctx.css:hl("mark", { classes = m.class and { m.class } or nil })
     for i = 1, #lines do
       local l = lines[i]
       local w = W.width(l)
@@ -356,7 +357,7 @@ function M.vertical(ctx, bars, o)
   for _, m in ipairs(mark_values(o.marks, all)) do
     local r = rows - 1 - math.floor(height_of(m.value))
     if r >= 0 and r < rows then
-      local group = m.color and ctx.color(m.color) or ctx.css:hl("mark")
+      local group = ctx.css:hl("mark", { classes = m.class and { m.class } or nil })
       for c = 0, cols - 1 do
         if not grid[r][c] then
           grid[r][c] = "┄"
@@ -395,7 +396,6 @@ end
 ---Bars from x_column and y_column / y_columns / series_column (bar charts), sorted and
 ---cut to style.top. Returns the bars and the legend (several series).
 function M.from_show(rs, show, ctx)
-  local style = nn(show.style) or {}
   local bars, legend = {}, nil
   if nn(show.series_column) then
     local xaxis, long = C.long(rs, show)
@@ -422,7 +422,7 @@ function M.from_show(rs, show, ctx)
     if #series > 1 then
       legend = {}
       for i, s in ipairs(series) do
-        legend[i] = { label = s.label, group = C.color(ctx, show, i, s.color, s.label) }
+        legend[i] = { label = s.label, group = C.color(ctx, show, i, nil, s.label) }
       end
     end
     for _, row in ipairs(rs.rows) do
@@ -430,7 +430,7 @@ function M.from_show(rs, show, ctx)
       if #series == 1 then
         local v = C.num(row[series[1].index])
         if v then
-          bars[#bars + 1] = { label = label, value = v, group = C.color(ctx, show, 1, series[1].color, label) }
+          bars[#bars + 1] = { label = label, value = v, group = C.color(ctx, show, 1, nil, label) }
         end
       else
         local segs = {}
@@ -441,7 +441,7 @@ function M.from_show(rs, show, ctx)
       end
     end
   end
-  local order = nn(style.sort)
+  local order = nn(show.sort)
   if order == "asc" or order == "desc" then
     local function total(b)
       local t = 0
@@ -457,7 +457,7 @@ function M.from_show(rs, show, ctx)
       return total(a) > total(b)
     end)
   end
-  local top = tonumber(nn(style.top))
+  local top = tonumber(nn(show.top))
   if top and #bars > top then
     bars = { unpack(bars, 1, top) }
   end
@@ -466,21 +466,21 @@ end
 
 ---The options shared by bar charts and histograms.
 function M.options(show, ctx, legend)
-  local style = nn(show.style) or {}
   local axes = C.axes(show)
+  local bar, value = ctx.css:get("bar"), ctx.css:get("value")
   return {
     xlabel = axes.xlabel,
     ylabel = axes.ylabel,
-    show_values = nn(style.show_values) ~= false,
+    show_values = value.display ~= "none",
     value_format = axes.yformat,
-    stacked = nn(style.group) == "stacked",
-    bar_width = tonumber(nn(style.bar_width)),
-    bar_gap = tonumber(nn(style.bar_gap)),
-    inside = nn(style.value_position) == "inside",
+    stacked = nn(show.stacked) == true,
+    bar_width = bar.width,
+    bar_gap = bar.gap,
+    inside = value.position == "inside",
     axes = axes,
     marks = nn(show.mark_lines),
     legend = legend,
-    legend_position = legend and C.legend_position(show, #legend) or "none",
+    legend_position = legend and C.legend_position(ctx, #legend) or "none",
   }
 end
 
@@ -488,7 +488,6 @@ end
 ---bin_range fix the bins (Vega-Lite bin.step / extent); cumulative adds up; normalize:
 ---percent (of all values) or density (per unit of the value).
 function M.histogram(rs, show, ctx)
-  local style = nn(show.style) or {}
   local vi = C.col(rs, nn(show.value_column), "value_column")
   local vals = {}
   for _, row in ipairs(rs.rows) do
@@ -528,12 +527,12 @@ function M.histogram(rs, show, ctx)
       counts[b] = counts[b] + 1
     end
   end
-  if nn(style.cumulative) == true then
+  if nn(show.cumulative) == true then
     for i = 2, nb do
       counts[i] = counts[i] + counts[i - 1]
     end
   end
-  local norm = nn(style.normalize)
+  local norm = nn(show.normalize)
   if norm == "percent" then
     for i = 1, nb do
       counts[i] = counts[i] / #vals * 100
@@ -565,7 +564,7 @@ function M.histogram_marks(show, bins, vals)
   for _, m in ipairs(mark_values(nn(show.mark_lines), vals)) do
     for _, b in ipairs(bins) do
       if m.value >= b.lower and m.value <= b.upper then
-        out[#out + 1] = { bin = b, label = m.label or fmt.number(m.value), color = m.color }
+        out[#out + 1] = { bin = b, label = m.label or fmt.number(m.value), class = m.class }
         break
       end
     end

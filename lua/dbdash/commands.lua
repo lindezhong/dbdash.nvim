@@ -489,43 +489,122 @@ function M.mksession(bang, file)
   vim.cmd("mksession" .. (bang and "!" or "") .. (file ~= "" and (" " .. vim.fn.fnameescape(file)) or ""))
 end
 
----:DbDashStyle <type> <style> | canvas <name> | reset: re-render cached data (§11.4).
----Overrides last until the dashboard stops.
+---A :DbDashStyle value: JSON (numbers, true / false, lists, quoted strings), else the
+---word itself.
+local function style_value(text)
+  local ok, v = pcall(vim.json.decode, text)
+  if ok and v ~= vim.NIL then
+    return v
+  end
+  return text
+end
+
+---Install a dashboard's runtime rules (:DbDashStyle): the dashboard-wide sheet and each
+---panel's own (scoped to the panel), above every other origin.
+local function apply_runtime(d)
+  local parser = require("dbdash.css.parser")
+  local function sheet(m)
+    local rules, perr = parser.sheet(m.rules, m.order)
+    if not rules then
+      return nil, perr
+    end
+    return rules
+  end
+  local rules, perr = sheet(d.runtime_style)
+  if not rules then
+    return perr
+  end
+  d.doc:set_sheet("runtime", rules)
+  for _, p in ipairs(d.panels) do
+    if p.runtime_style then
+      local pr, pe = sheet(p.runtime_style)
+      if not pr then
+        return pe
+      end
+      d.doc:set_sheet("runtime", pr, p.node)
+    end
+  end
+end
+
+---Add a declaration to a runtime sheet ({ rules = selector -> decls, order = selectors }).
+local function declare(m, selector, prop, value)
+  if not m.rules[selector] then
+    m.rules[selector] = {}
+    m.order[#m.order + 1] = selector
+  end
+  m.rules[selector][prop] = value
+end
+
+local function new_sheet()
+  return { rules = {}, order = {} }
+end
+
+---:DbDashStyle, the dashboard's runtime style (like editing styles in DevTools):
+---  :DbDashStyle                               the panel's renderer and canvas
+---  :DbDashStyle <type> [<renderer|canvas>]    show the panel as another chart type
+---  :DbDashStyle canvas <name>                 the panel's canvas
+---  :DbDashStyle set <selector> <property> <value>   a rule for the whole dashboard
+---  :DbDashStyle reset                         drop the runtime rules and type
+---Renderer and canvas are rules on the panel's chart element (runtime origin, scoped to the
+---panel); they last until the dashboard stops.
 function M.style(fargs)
   local d = current()
   if not d then
     return
   end
+  local registry = require("dbdash.render.registry")
+  local a, b = fargs[1], fargs[2]
+  d.runtime_style = d.runtime_style or new_sheet()
+  if a == "set" then
+    if #fargs < 4 then
+      return err("usage: DbDashStyle set <selector> <property> <value>")
+    end
+    local value = style_value(table.concat(fargs, " ", 4))
+    local saved = vim.deepcopy(d.runtime_style)
+    declare(d.runtime_style, fargs[2], fargs[3], value)
+    local perr = apply_runtime(d)
+    if perr then
+      d.runtime_style = saved
+      apply_runtime(d)
+      return err(("%s%s: %s"):format(perr.key, perr.property and (" " .. perr.property) or "", perr.message))
+    end
+    return d:redraw()
+  end
+  if a == "reset" then
+    d.runtime_style = new_sheet()
+    for _, p in ipairs(d.panels) do
+      p.runtime_style, p.style = nil, {}
+      if p.node then
+        d.doc:set_sheet("runtime", {}, p.node)
+      end
+    end
+    d.doc:set_sheet("runtime", {})
+    return d:redraw()
+  end
   with_panel(d, function(p)
-    local registry = require("dbdash.render.registry")
-    local a, b = fargs[1], fargs[2]
     if not a then
-      local renderer, canvas = registry.resolve(p:show_config(), require("dbdash").options.styles)
+      local chart = require("dbdash.css.style").get(p.chart_node)
+      local renderer, canvas = registry.resolve(p:show_config().type, chart)
       vim.api.nvim_echo({ { ("%s: renderer=%s canvas=%s"):format(p:show_config().type, renderer, canvas) } }, false, {})
       return
     end
-    if a == "reset" then
-      p.style = {}
-    elseif a == "canvas" then
+    p.runtime_style = p.runtime_style or new_sheet()
+    if a == "canvas" then
       if not b or not registry.get("canvas/" .. b) then
         return err("unknown canvas '" .. tostring(b) .. "' (available: " .. table.concat(registry.names("canvas/"), ", ") .. ")")
       end
-      p.style.canvas = b
+      declare(p.runtime_style, "chart", "canvas", b)
     else
       if not registry.DEFAULTS[a] and not registry.names("chart/" .. a .. "/")[1] then
         return err("unknown chart type '" .. a .. "'")
       end
-      if a ~= p.cfg.show.type then
-        p.style.type = a
-      else
-        p.style.type = nil
-      end
+      p.style.type = a ~= p.cfg.show.type and a or nil
       if b then
         if registry.get("chart/" .. a .. "/" .. b) then
-          p.style.renderer = b
+          declare(p.runtime_style, "chart", "renderer", b)
         elseif registry.get("canvas/" .. b) then
-          p.style.renderer = "canvas"
-          p.style.canvas = b
+          declare(p.runtime_style, "chart", "renderer", "canvas")
+          declare(p.runtime_style, "chart", "canvas", b)
         else
           return err(("unknown style '%s' for %s (available: %s)"):format(
             b,
@@ -533,12 +612,29 @@ function M.style(fargs)
             table.concat(vim.list_extend(registry.names("chart/" .. a .. "/"), registry.names("canvas/")), ", ")
           ))
         end
-      else
-        p.style.renderer = nil
+      elseif p.runtime_style.rules.chart then
+        p.runtime_style.rules.chart.renderer = nil
       end
     end
+    apply_runtime(d)
     d:redraw()
   end)
+end
+
+---:DbDashInspect [element]: the element under the cursor (or an element inside it), its
+---matching rules, computed style and box (DevTools).
+function M.inspect(fargs)
+  local d = current()
+  if not d then
+    return
+  end
+  return require("dbdash.inspect").open(d, fargs[1])
+end
+
+function M.complete_inspect(arglead)
+  return vim.tbl_filter(function(x)
+    return vim.startswith(x, arglead)
+  end, require("dbdash.inspect").tags(sched.for_buf(vim.api.nvim_get_current_buf())))
 end
 
 function M.complete_style(arglead, cmdline)
@@ -547,7 +643,9 @@ function M.complete_style(arglead, cmdline)
   local out
   if #words == 0 or (#words == 1 and arglead ~= "") then
     out = vim.tbl_keys(registry.DEFAULTS)
-    vim.list_extend(out, { "canvas", "reset" })
+    vim.list_extend(out, { "canvas", "reset", "set" })
+  elseif words[1] == "set" then
+    out = (#words == 2 and arglead == "" or #words == 3 and arglead ~= "") and require("dbdash.css.properties").names() or {}
   elseif words[1] == "canvas" then
     out = registry.names("canvas/")
   else

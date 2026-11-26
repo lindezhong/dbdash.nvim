@@ -42,7 +42,8 @@ function M.header(d)
   local title = text(child(d.header_node, "header-title")) or ""
   local icon_node = child(d.header_node, "description-icon")
   local icon = text(icon_node)
-  if not (d.cfg.title or d.cfg.show_countdown or icon) then
+  local countdown = require("dbdash.dom.build").countdown(d.header_node) and d.cfg.refresh_all
+  if not (d.cfg.title or countdown or icon) then
     return { lines = {}, hl = {} }
   end
   local line, hl = title, { { row = 0, col_s = 0, col_e = #title, group = css.hl_of(child(d.header_node, "header-title")) } }
@@ -160,10 +161,10 @@ M.stats = { hits = 0, misses = 0 }
 
 layout_panel = function(p, width, height, fill, exact)
   local show = vim.deepcopy(p:show_config())
-  local st = box.settings(show, css.scope(p.node))
+  local scope = css.scope(p.node)
+  local st = box.settings(scope)
   show.title = nil -- in the title line (or the box's top border) instead
   local iw, ih = box.inner(st, width, height)
-  local style = show.style ~= vim.NIL and show.style or {}
   local head, spans = title_line(p, st, iw)
   local frag = { node = p.node, x = 0, y = 0, width = width, height = exact and height or nil, box = st, rows = {} }
   local header = { lines = { head }, hl = {} }
@@ -190,7 +191,7 @@ layout_panel = function(p, width, height, fill, exact)
   local bh = ih - (header and #header.lines or 0) - (args_line and 1 or 0)
   local body = replaced.raster(p, show, iw, bh, fill)
   body = box.position(body, st, iw, exact and bh or nil)
-  frag.caption_bottom = style.caption == "bottom" -- CSS caption-side: the title under the chart
+  frag.caption_bottom = scope:get("panel-title")["caption-side"] == "bottom" -- the title under the chart
   if header and not frag.caption_bottom then
     frag.rows[#frag.rows + 1] = { node = p.node, out = header }
   end
@@ -209,7 +210,7 @@ end
 ---@return dbdash.layout.Fragment
 function M.single(p, width, height)
   local show = p:show_config()
-  local st = box.settings(show, css.scope(p.node))
+  local st = box.settings(css.scope(p.node))
   local iw, ih = box.inner(st, width, height)
   local frag = { node = p.node, x = 0, y = 0, width = width, box = st, rows = {} }
   if st.border and show.title ~= nil and show.title ~= vim.NIL then
@@ -250,7 +251,17 @@ end
 ---@return { fragments: dbdash.layout.Fragment[] }
 function M.grid(d, width, avail)
   local L = require("dbdash.layout.grid")
-  local lay = d.cfg.layout
+  local style = require("dbdash.css.style")
+  local items = {}
+  for i, p in ipairs(d.panels) do
+    items[i] = style.get(p.node)
+  end
+  local lay, err = L.from_styles(style.get(d.doc.root), items)
+  if not lay then
+    -- a runtime rule broke the grid: say so instead of drawing (config rules were checked)
+    local msg = ("style: %s%s: %s"):format(err.index and ("panel %d "):format(err.index) or "", err.field, err.message)
+    return { fragments = {}, error = msg }
+  end
   local cols = L.columns(lay.columns, width, lay.gap)
   local nrows = 0
   for _, pl in ipairs(lay.places) do

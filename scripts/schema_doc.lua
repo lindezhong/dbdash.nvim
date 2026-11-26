@@ -22,7 +22,7 @@ function M.tags(lines)
   local tags, used = {}, {}
   local stack = {} -- { indent, key, field } from the root to the current line's parent
   for i, line in ipairs(lines) do
-    local indent, dash, key = line:match("^(%s*)(%-?%s*)([%w_$]+):")
+    local indent, dash, key = line:match("^(%s*)(%-?%s*)([%w_$][%w_$-]*):")
     if key and not line:match("^%s*#") then
       local depth = #indent + #dash -- a list item's keys are one level in
       while #stack > 0 and stack[#stack].indent >= depth do

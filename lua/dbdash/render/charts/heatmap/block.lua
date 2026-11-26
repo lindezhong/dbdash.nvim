@@ -14,13 +14,12 @@ end
 
 function M.render(rs, show, ctx)
   local g = H.grid(rs, show)
-  local scale = H.colors(show, g)
+  local scale = H.colors(show, g, ctx)
   local axes = C.axes(show)
-  local style = C.nn(show.style) or {}
   local spec = { title = C.nn(show.title), xlabel = axes.xlabel, ylabel = axes.ylabel, ylabels = g.ys, height = #g.ys, min_rows = #g.ys }
   local cols = ctx.frame.plot_size(ctx, spec)
   local vw = 0
-  if C.nn(style.show_values) == true then
+  if ctx.css:get("value").display ~= "none" then -- hidden by the UA sheet
     for _, v in pairs(g.values) do
       vw = math.max(vw, #fmt.value(v, axes.yformat))
     end

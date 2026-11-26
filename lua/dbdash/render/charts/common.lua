@@ -1,5 +1,4 @@
 -- Helpers shared by chart styles: column access, series, colors, axes and legends.
-local map = require("dbdash.util.map")
 local resultset = require("dbdash.db.resultset")
 local fmt = require("dbdash.render.format")
 
@@ -114,9 +113,8 @@ end
 ---@field column string
 ---@field index integer
 ---@field label string
----@field color string? color spec from the config
 
----Series from y_columns (list of strings or {column, label, color}) or y_column.
+---Series from y_columns (list of strings or {column, label}) or y_column.
 ---@return dbdash.render.Series[]
 function M.series(rs, show)
   local out = {}
@@ -138,38 +136,25 @@ function M.series(rs, show)
       column = col,
       index = i,
       label = type(s) == "table" and nn(s.label) or col,
-      color = type(s) == "table" and nn(s.color) or nil,
     }
   end
   return out
 end
 
----Highlight group for the i-th series / named category.
----Order: explicit color > show.colors (list by index, map by name) > style.color > palette.
-function M.color(ctx, show, i, explicit, name)
-  if explicit then
-    return ctx.color(explicit)
+---The element of the i-th series / named category: series:nth-child(i), with the name
+---as an attribute (series[name="EU"]) and, when it is an identifier, a class (series.EU).
+function M.series_spec(i, name, classes)
+  local cls = vim.list_extend({}, classes or {})
+  if type(name) == "string" and name:match("^[%a_][%w_-]*$") then
+    cls[#cls + 1] = name
   end
-  local colors = nn(show.colors)
-  if map.is_map(colors) then
-    local c = name and nn(colors[name])
-    if c then
-      return ctx.color(c)
-    end
-    if i == 1 and nn(colors.primary) then
-      return ctx.color(colors.primary)
-    end
-    if i == 2 and nn(colors.secondary) then
-      return ctx.color(colors.secondary)
-    end
-  elseif type(colors) == "table" and #colors > 0 then
-    return ctx.color(colors[(i - 1) % #colors + 1])
-  end
-  local style = nn(show.style) or {}
-  if i == 1 and nn(style.color) then
-    return ctx.color(style.color)
-  end
-  return ctx.palette(i)
+  return { index = i, classes = cls, attrs = name and { name = tostring(name) } or nil }
+end
+
+---Highlight group for the i-th series / named category: its element's color in the style
+---sheets, else the palette's i-th color.
+function M.color(ctx, _, i, _, name)
+  return ctx.css:hl("series", M.series_spec(i, name)) or ctx.palette(i)
 end
 
 ---Axis settings from show.axes.{x_axis,y_axis} or x_label/y_label.
@@ -187,36 +172,23 @@ function M.axes(show)
     xmax = tonumber(nn(xa.max_value)),
     yformat = nn(ya.format),
     xformat = nn(xa.format),
-    -- Chart.js scales: type (linear | log), ticks.count, grid.display
+    -- Chart.js scales: type (linear | log), ticks.count (grid lines are the grid.x /
+    -- grid.y elements' display)
     yscale = nn(ya.scale) or "linear",
     xscale = nn(xa.scale) or "linear",
     yticks = tonumber(nn(ya.ticks)),
     xticks = tonumber(nn(xa.ticks)),
-    ygrid = nn(ya.grid) == true,
-    xgrid = nn(xa.grid) == true,
   }
 end
 
----Legend position: "right", "bottom" or "none".
-function M.legend_position(show, count)
-  local legend = nn(show.legend)
-  if legend == false then
+---Legend position from the legend element: "right" (default), "bottom" (position:
+---bottom) or "none" (display: none, or a single series without a position set).
+function M.legend_position(ctx, count)
+  local c = ctx.css:get("legend")
+  if c.display == "none" or (count < 2 and not c.position) then
     return "none"
   end
-  legend = type(legend) == "table" and legend or {}
-  if nn(legend.show) == false then
-    return "none"
-  end
-  if nn(legend.show) == nil and count < 2 then
-    return "none"
-  end
-  local pos = tostring(nn(legend.position) or "right")
-  if pos:find("bottom") or pos == "top" or pos == "below" then
-    return "bottom"
-  elseif pos == "none" then
-    return "none"
-  end
-  return "right"
+  return c.position == "bottom" and "bottom" or "right"
 end
 
 ---Numeric y ticks for a canvas with `rows` character rows: labels on rows that are hit.

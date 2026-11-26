@@ -71,6 +71,15 @@ end, { desc = "Reset dashboard arguments to their defaults" })
 command("DbDashShowSQL", function()
   cmds().show_sql()
 end, { desc = "Show the rendered query" })
+command("DbDashInspect", function(o)
+  cmds().inspect(o.fargs)
+end, {
+  nargs = "?",
+  complete = function(a)
+    return cmds().complete_inspect(a)
+  end,
+  desc = "Inspect the element under the cursor: matched rules, computed style, box",
+})
 command("DbDashDescribe", function()
   cmds().describe()
 end, { desc = "Show the description of the dashboard or the panel under the cursor" })
@@ -91,7 +100,7 @@ end, {
   complete = function(a, l)
     return cmds().complete_style(a, l)
   end,
-  desc = "Switch the chart style: DbDashStyle <type> <style> | canvas <name> | reset",
+  desc = "Runtime style: DbDashStyle <type> [<style>] | canvas <name> | set <selector> <property> <value> | reset",
 })
 command("DbDashTrust", function(o)
   cmds().trust(o.fargs)

@@ -8,7 +8,7 @@ local M = { name = "halfblock" }
 
 function M.render(rs, show, ctx)
   local g = H.grid(rs, show)
-  local scale = H.colors(show, g)
+  local scale = H.colors(show, g, ctx)
   local axes = C.axes(show)
   local rows = math.ceil(#g.ys / 2)
   local ylabels = {}

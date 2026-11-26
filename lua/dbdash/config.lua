@@ -307,13 +307,18 @@ function Ctx:show(s, top_interval, prefix)
   if out.interval < 1000 then
     self:fail(prefix .. "show.interval", "interval must be at least 1s")
   end
-  out.show_countdown = self:expect(prefix .. "show.show_countdown", s.show_countdown, "boolean", true)
-    == true
-  out.countdown_format = self:expect(prefix .. "show.countdown_format", s.countdown_format, "string", true)
-    or DEFAULTS.countdown_format
-  out.style = self:expect(prefix .. "show.style", s.style, "map", true) or map.new()
-  out.renderer = self:expect(prefix .. "show.renderer", s.renderer, "string", true)
-  out.canvas = self:expect(prefix .. "show.canvas", s.canvas, "string", true)
+  for k in pairs(M.MOVED) do
+    local field = k:match("^show%.(.+)$")
+    if field and nn(s[field]) ~= nil then
+      self:moved(prefix .. k)
+    end
+  end
+  for _, axis in ipairs({ "x_axis", "y_axis" }) do
+    local a = nn((nn(s.axes) or {})[axis])
+    if a and nn(a.grid) ~= nil then
+      self:fail(("%sshow.axes.%s.grid"):format(prefix, axis), "grid lines are appearance: style: \"grid.%s\" { display: block }", axis:sub(1, 1))
+    end
+  end
   local T = require("dbdash.render.thresholds")
   if nn(s.thresholds) ~= nil then
     local terr = T.check(s.thresholds)
@@ -341,18 +346,6 @@ function Ctx:show(s, top_interval, prefix)
   end
   out.args_show = as or false
   out.refresh_hidden = self:expect(prefix .. "show.refresh_hidden", s.refresh_hidden, "boolean", true) == true
-  out.span = self:expect(prefix .. "show.span", s.span, "integer", true) or 1
-  if out.span < 1 then
-    self:fail(prefix .. "show.span", "span must be at least 1")
-  end
-  -- Grid placement (CSS grid-area, grid-row / grid-column) and the smallest plot.
-  out.area = self:expect(prefix .. "show.area", s.area, "string", true)
-  for _, k in ipairs({ "row", "column", "row_span", "min_height" }) do
-    out[k] = self:expect(prefix .. "show." .. k, s[k], "integer", true)
-    if out[k] and out[k] < 1 then
-      self:fail(prefix .. "show." .. k, "%s must be at least 1", k)
-    end
-  end
   return out
 end
 
@@ -369,6 +362,60 @@ end
 ---@field follows_global boolean no timer of its own: the global refresh (cfg.refresh_all)
 ---  comes as often or more often than show.interval
 
+-- Appearance moved into style sheets (:help dbdash-css): where each old field went.
+M.MOVED = {
+  ["layout"] = "style: dashboard { grid-template-columns, grid-template-rows, grid-template-areas, column-gap, row-gap }",
+  ["show_countdown"] = "style: header countdown { display: block }",
+  ["countdown_format"] = 'style: countdown { content: "Next update: {time}s" }',
+  ["show.style"] = "style (a style sheet: selector -> properties; per panel: panels[].style)",
+  ["show.span"] = 'style: panel { grid-column: "span N" }',
+  ["show.area"] = "style: panel { grid-area: name }",
+  ["show.row"] = "style: panel { grid-row: N }",
+  ["show.column"] = "style: panel { grid-column: N }",
+  ["show.row_span"] = 'style: panel { grid-row: "N / span M" }',
+  ["show.height"] = "style: plot { height: N }",
+  ["show.min_height"] = "style: plot { min-height: N }",
+  ["show.width"] = "style: chart { max-width: N }",
+  ["show.renderer"] = "style: chart { renderer: name }",
+  ["show.canvas"] = "style: chart { canvas: name }",
+  ["show.colors"] = 'style: "series.<name>" or "series:nth-child(N)" { color }',
+  ["show.palette"] = "style: chart { palette: name }",
+  ["show.legend"] = "style: legend { display: none } / legend { position: bottom }",
+  ["show.line_style"] = "style: series { curve, fill }, point { display, content }; show.span_gaps",
+  ["show.show_countdown"] = "style: countdown { display: block } (in the panel's style)",
+  ["show.countdown_format"] = 'style: countdown { content: "..." }',
+  ["show.color_mode"] = 'style: "value.<class>" { background-color } (thresholds give classes)',
+  ["show.text_size"] = "style: value { font-size: normal }",
+  ["show.delta"] = "style: delta { display: none }",
+  ["show.sparkline"] = "style: sparkline { display: none }",
+}
+
+---Report a field that moved into style sheets.
+function Ctx:moved(path)
+  self:fail(path, "'%s' is appearance and moved to %s", path, M.MOVED[path:gsub("^panels%[%d+%]%.", "")])
+end
+
+---A style sheet (selector -> properties), parsed in the order written; errors name the
+---selector's line. `scope`: "author" (the top level) or "inline" (a panel).
+---@return dbdash.css.Rule[]?
+function Ctx:style(raw, path)
+  local m = self:expect(path, raw, "map", true)
+  if not m then
+    return nil
+  end
+  local parser = require("dbdash.css.parser")
+  local keys = map.keys(m)
+  local rules, err = parser.sheet(m, keys)
+  if not rules then
+    local where = path .. "." .. err.key
+    if err.property then
+      where = where .. "." .. err.property
+    end
+    self:fail(where, "%s", err.message)
+  end
+  return rules
+end
+
 -- Fields that describe one chart: with panels they cannot be top-level defaults.
 local PANEL_ONLY = {
   query = { sql = true, transform = true, args = true },
@@ -377,11 +424,6 @@ local PANEL_ONLY = {
     title = true,
     subtitle = true,
     description = true,
-    span = true,
-    area = true,
-    row = true,
-    column = true,
-    row_span = true,
     column_list = true,
     x_label = true,
     y_label = true,
@@ -480,12 +522,13 @@ function M.validate(data, file, positions)
   -- The dashboard's description: a template rendered as Markdown (:DbDashDescribe).
   cfg.description = ctx:expect("description", data.description, "string", true)
   cfg.description_line = (ctx.pos["description"] or {}).line or 1
-  cfg.show_countdown = ctx:expect("show_countdown", data.show_countdown, "boolean", true) == true
-  cfg.countdown_format = ctx:expect("countdown_format", data.countdown_format, "string", true)
-    or DEFAULTS.countdown_format
-  if cfg.show_countdown and not cfg.refresh_all then
-    ctx:fail("show_countdown", "show_countdown counts down to the top-level interval; set interval")
+  for _, k in ipairs({ "layout", "show_countdown", "countdown_format" }) do
+    if nn(data[k]) ~= nil then
+      ctx:moved(k)
+    end
   end
+  -- the dashboard's style sheet (author origin); panels have their own (inline, scoped)
+  cfg.style_rules = ctx:style(data.style, "style")
   local panels_raw = nn(data.panels)
   cfg.grid = panels_raw ~= nil
   local top_query = ctx:expect("query", data.query, "map", true)
@@ -505,9 +548,6 @@ function M.validate(data, file, positions)
       end
     end
   else
-    if nn(data.layout) ~= nil then
-      ctx:fail("layout", "layout only applies with panels")
-    end
     -- The top level is the only panel.
     panels_raw = { { query = top_query, show = top_show } }
     top_query, top_show = nil, nil
@@ -546,6 +586,7 @@ function M.validate(data, file, positions)
       query = merge(top_query, nn(raw.query)),
       show = merge(top_show, nn(raw.show)),
     }, prefix, cfg, i, id, nn(data.interval))
+    panel.style_rules = cfg.grid and ctx:style(raw.style, prefix .. "style") or nil
     cfg.panels[i] = panel
   end
   cfg.args = vim.list_extend({}, cfg.shared_args)
@@ -565,68 +606,37 @@ function M.validate(data, file, positions)
   if not cfg.grid then
     local p = cfg.panels[1]
     cfg.query, cfg.show = p.query, p.show
-    cfg.layout = { columns = 1, gap = 2 }
     return cfg
   end
-  cfg.layout = ctx:layout(data.layout, cfg.panels)
+  -- Place the panels once with the config's own sheets, so conflicts (overlaps, unknown
+  -- areas, areas that are not rectangles) are reported with a line; :DbDashStyle rules
+  -- are placed again at layout.
+  ctx:check_grid(cfg)
   return cfg
 end
 
----layout: CSS Grid tracks, gaps and areas; the panels are placed here, so conflicts are
----reported with the panel's line.
----@return dbdash.LayoutConfig
-function Ctx:layout(raw, panels)
-  local L = require("dbdash.layout.grid")
-  local layout = self:expect("layout", raw, "map", true) or map.new()
-  local out = {
-    gap = self:expect("layout.gap", layout.gap, "integer", true) or 2,
-    row_gap = self:expect("layout.row_gap", layout.row_gap, "integer", true) or 1,
-  }
-  if out.gap < 0 or out.row_gap < 0 then
-    self:fail(out.gap < 0 and "layout.gap" or "layout.row_gap", "gaps cannot be negative")
-  end
-  local areas, area_cols
-  local raw_areas = nn(layout.areas)
-  if raw_areas ~= nil then
-    local list = self:expect("layout.areas", raw_areas, "list")
-    for i, r in ipairs(list) do
-      self:expect(("layout.areas[%d]"):format(i), r, "string")
-    end
-    local err
-    areas, area_cols, err = L.parse_areas(list)
-    if not areas then
-      self:fail("layout.areas", "%s", err)
-    end
-  end
-  local function tracks(key, v, axis)
-    local t, err = L.parse_tracks(v, axis)
-    if not t then
-      self:fail("layout." .. key, "%s", err)
-    end
-    return t
-  end
-  local cols = nn(layout.columns)
-  out.columns = tracks("columns", cols == nil and (area_cols or 1) or cols, "columns")
-  if area_cols and #out.columns ~= area_cols then
-    self:fail("layout.columns", "%d columns, but layout.areas has %d", #out.columns, area_cols)
-  end
-  out.rows = nn(layout.rows) ~= nil and tracks("rows", layout.rows, "rows") or {}
-  out.auto_row = tracks("auto_rows", nn(layout.auto_rows) or "auto", "rows")[1]
-  out.areas = areas
+---Place the panels with the config's style sheets (computed as a dashboard would), so a
+---grid that cannot be laid out is an error with the line of the rule at fault.
+function Ctx:check_grid(cfg)
+  local fake = require("dbdash.dom.build").from_config(cfg)
+  local style = require("dbdash.css.style")
   local items = {}
-  for i, p in ipairs(panels) do
-    local sh = p.show
-    items[i] = { area = sh.area, row = sh.row, column = sh.column, span = sh.span, row_span = sh.row_span }
-    if sh.area and (sh.row or sh.column) then
-      self:fail(("panels[%d].show.area"):format(i), "area and row / column cannot be used together")
+  for i, p in ipairs(fake.panels) do
+    items[i] = style.get(p.node)
+  end
+  local _, err = require("dbdash.layout.grid").from_styles(style.get(fake.doc.root), items)
+  if err then
+    -- the declaration at fault: <sheet>.<selector>.<property>, else the sheet
+    local sheet = err.index and ("panels[%d].style"):format(err.index) or "style"
+    local rules = (err.index and cfg.panels[err.index].style_rules or cfg.style_rules) or {}
+    local where = sheet
+    for _, r in ipairs(rules) do
+      if r.decls[err.field] ~= nil then
+        where = ("%s.%s.%s"):format(sheet, r.key or r.selector.text, err.field)
+      end
     end
+    self:fail(where, "%s: %s", err.field, err.message)
   end
-  local places, err = L.place(items, #out.columns, areas)
-  if not places then
-    self:fail(("panels[%d].show.%s"):format(err.index, err.field), "%s", err.message)
-  end
-  out.places = places
-  return out
 end
 
 ---@class dbdash.LayoutConfig
@@ -635,7 +645,6 @@ end
 ---@field auto_row dbdash.layout.Track rows past the declared ones
 ---@field gap integer
 ---@field row_gap integer
----@field areas table?
 ---@field places dbdash.layout.Place[] where each panel goes
 
 ---Validate one panel: the same for the only panel of a one-chart config and for panels[i].

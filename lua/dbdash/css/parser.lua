@@ -185,9 +185,10 @@ function M.sheet(sheet, keys)
     for piece in (key .. ","):gmatch("([^,]*),") do
       local sel, err = M.selector(piece)
       if not sel then
-        return nil, { key = key, message = err }
+        return nil, { key = key, message = ("selector %q: %s"):format(vim.trim(piece), err) }
       end
-      rules[#rules + 1] = { selector = sel, decls = decls, order = #rules + 1 }
+      -- key: the selector list as written (a config reports the line of its declarations)
+      rules[#rules + 1] = { selector = sel, decls = decls, order = #rules + 1, key = key }
     end
   end
   return rules

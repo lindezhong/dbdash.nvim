@@ -17,7 +17,6 @@ local M = {}
 ---@field open "current"|"vsplit"|"split"|"tab" where :DbDashStart shows a dashboard
 ---@field pause_hidden boolean stop refreshing while no window of the current tab shows it
 ---@field keys table<"modify"|"show_args"|"refresh"|"reset"|"show_sql"|"export"|"describe", string|false>
----@field icons { description: string } ⓘ after a title with a description to read (K)
 
 ---@class dbdash.PopupOptions
 ---@field border string|string[] floating window border (default "rounded")
@@ -29,9 +28,6 @@ local M = {}
 ---@field timeout string|number query timeout when the URL sets none (default "30s")
 ---@field connect_timeout string|number (default "10s")
 ---@field max_rows integer (default 10000)
----@field height integer? chart plot rows (default: each chart's own)
----@field min_height integer smallest plot rows in a grid before it scrolls (default 8)
----@field countdown_format string (default "Next update: {time}s")
 ---@field history integer queries kept for :DbDashStatus (default 20)
 
 ---@class dbdash.ErrorsOptions
@@ -51,7 +47,8 @@ local M = {}
 ---@field mappings boolean|table<"start"|"refresh"|"stop"|"list"|"sidebar", string|false>
 ---@field countdown_interval integer ms between countdown updates (default 10000)
 ---@field countdown_position "right_align"|"eol"|"overlay"
----@field styles table<string, { renderer: string?, canvas: string? }> per chart type defaults
+---@field style table<string, table> the user style sheet: selector -> properties
+---  (:help dbdash-css); between the default sheet and dashboards' own sheets
 ---@field ticks string tick algorithm ("nice" | "linear")
 ---@field register table<string, any> custom render implementations ("chart/bar/mine", ...)
 ---@field sidebar dbdash.SidebarOptions
@@ -65,7 +62,7 @@ local defaults = {
   mappings = true,
   countdown_interval = 10000,
   countdown_position = "right_align",
-  styles = {},
+  style = {},
   ticks = "nice",
   register = {},
   sidebar = {
@@ -89,7 +86,6 @@ local defaults = {
       export = "e",
       describe = "K",
     },
-    icons = { description = "ⓘ" },
   },
   popup = { border = "rounded", max_width = 120, max_height = "100%" },
   defaults = {
@@ -97,9 +93,6 @@ local defaults = {
     timeout = "30s",
     connect_timeout = "10s",
     max_rows = 10000,
-    height = nil,
-    min_height = 8,
-    countdown_format = "Next update: {time}s",
     history = 20,
   },
   errors = {
@@ -216,7 +209,18 @@ local SPEC = {
   end,
   countdown_interval = int(100),
   countdown_position = enum("right_align", "eol", "overlay"),
-  styles = of_type("table"),
+  style = function(v)
+    if type(v) ~= "table" then
+      return "must be a style sheet (selector -> properties)"
+    end
+    local keys = vim.tbl_keys(v)
+    table.sort(keys)
+    local _, err = require("dbdash.css.parser").sheet(v, keys)
+    if err then
+      -- a declaration's message names its property, a selector's the selector
+      return err.property and ("%s: %s"):format(err.key, err.message) or err.message
+    end
+  end,
   ticks = enum("nice", "linear"),
   register = of_type("table"),
   sidebar = {
@@ -236,13 +240,6 @@ local SPEC = {
     open = enum("current", "vsplit", "split", "tab"),
     pause_hidden = of_type("boolean"),
     keys = keys({ "modify", "show_args", "refresh", "reset", "show_sql", "export", "describe" }),
-    icons = {
-      description = function(v)
-        if type(v) ~= "string" or v == "" then
-          return "must be a non-empty string"
-        end
-      end,
-    },
   },
   popup = {
     border = of_type("string", "table"),
@@ -254,9 +251,6 @@ local SPEC = {
     timeout = dur(1),
     connect_timeout = dur(1),
     max_rows = int(1),
-    height = optional(int(3)),
-    min_height = int(1),
-    countdown_format = of_type("string"),
     history = int(1),
   },
   errors = {
@@ -278,11 +272,24 @@ local SPEC = {
 ---Check `opts` against SPEC; invalid or unknown entries are reported and replaced by the
 ---default, so a typo never breaks startup.
 ---@return string[] errors
+-- Appearance options that moved into setup({ style }).
+local MOVED = {
+  styles = 'style: { ["chart.line"] = { renderer = "...", canvas = "..." } }',
+  ["dashboard.icons"] = 'style: { ["description-icon"] = { content = "ⓘ" } }',
+  ["defaults.height"] = "style: { plot = { height = N } }",
+  ["defaults.min_height"] = 'style: { plot = { ["min-height"] = N } }',
+  ["defaults.countdown_format"] = 'style: { countdown = { content = "..." } }',
+  palette = "style: { chart = { palette = name } }",
+}
+
 local function validate(opts, spec, dflt, path, errors)
   for k, v in pairs(opts) do
     local name = path .. tostring(k)
     local check = spec[k]
-    if check == nil then
+    if MOVED[name] then
+      errors[#errors + 1] = ("%s: appearance moved to %s"):format(name, MOVED[name])
+      opts[k] = nil
+    elseif check == nil then
       errors[#errors + 1] = name .. ": unknown option"
       opts[k] = nil
     elseif type(check) == "table" then

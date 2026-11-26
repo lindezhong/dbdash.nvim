@@ -86,7 +86,7 @@ T["place: areas, explicit, row or column only, auto flow, errors"] = function()
   local _, err = layout.place({ { row = 1, column = 1 }, { row = 1, column = 1 } }, 2, nil)
   eq(err, { index = 2, field = "row", message = "overlaps panel 1" })
   _, err = layout.place({ { area = "zz" } }, 2, {})
-  eq(err.message, 'no area named "zz" in layout.areas')
+  eq(err.message, 'no area named "zz" in grid-template-areas')
   _, err = layout.place({ { row = 1, column = 2, span = 2 } }, 2, nil)
   eq(err.field, "column")
 end

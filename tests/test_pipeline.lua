@@ -23,7 +23,7 @@ local T = MiniTest.new_set({
 local CFG = {
   "database: { url: 'sqlite:///:memory:' }",
   "interval: 1h",
-  "layout: { columns: 2 }",
+  "style: { dashboard: { grid-template-columns: 2 } }",
   "panels:",
   "  - id: a",
   "    query: { sql: 'SELECT 1 AS n' }",

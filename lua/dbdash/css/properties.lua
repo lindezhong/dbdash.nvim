@@ -92,8 +92,9 @@ local function box4(v)
   return nil, "expected N or a list of 1 to 4 integers (top, right, bottom, left)"
 end
 
----A border line style; true is single, false is none.
-local BORDER = enum("single", "rounded", "heavy", "double", "dashed", "ascii", "none")
+---A border line style; true is single, false is none. "rich" (tables): a heavy header
+---over a light body.
+local BORDER = enum("single", "rounded", "heavy", "double", "dashed", "ascii", "rich", "none")
 local function border(v)
   if v == true then
     return "single"
@@ -115,10 +116,16 @@ local function grid_line(v)
   if type(v) == "number" and v >= 1 and v == math.floor(v) then
     return v
   end
-  if type(v) == "string" and (v:match("^%d+$") or v:match("^span%s+%d+$") or v:match("^%d+%s*/%s*span%s+%d+$")) then
-    return v
+  if type(v) == "string" then
+    local a = v:match("^(%d+)$")
+    local span = v:match("^span%s+(%d+)$")
+    local b, c = v:match("^(%d+)%s*/%s*span%s+(%d+)$")
+    local ok = (a and tonumber(a) >= 1) or (span and tonumber(span) >= 1) or (b and tonumber(b) >= 1 and tonumber(c) >= 1)
+    if ok then
+      return v
+    end
   end
-  return nil, 'expected N, "span N" or "N / span M"'
+  return nil, 'expected N, "span N" or "N / span M" (N, M at least 1)'
 end
 
 local function list_of_strings(v)
@@ -210,6 +217,22 @@ M.list = {
   ["gap"] = { inherited = false, initial = nil, parse = int(0), damage = "relayout" },
   ["position"] = { inherited = false, initial = nil, parse = enum("right", "bottom", "end", "inside"), damage = "relayout" },
   ["color-scale"] = { inherited = false, initial = nil, parse = list_of_strings, damage = "repaint" },
+  ["color-steps"] = {
+    inherited = false,
+    initial = nil,
+    parse = function(v)
+      if type(v) ~= "table" or #v == 0 then
+        return nil, "expected a list of { value, color }"
+      end
+      for i, st in ipairs(v) do
+        if type(st) ~= "table" or type(nn(st.value)) ~= "number" or type(nn(st.color)) ~= "string" then
+          return nil, ("step %d: expected { value: number, color: string }"):format(i)
+        end
+      end
+      return v
+    end,
+    damage = "repaint",
+  },
 }
 
 ---Parse a declared value of `name`.

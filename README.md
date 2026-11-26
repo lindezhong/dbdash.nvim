@@ -10,7 +10,14 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
 - **Charts**: table, line, area, bar, histogram, boxplot, heatmap, scatter, bubble, pie,
   stat (a KPI value in large digits with its change and a sparkline), text (the result as
   plain text, e.g. log lines or a command's output),
-  each with alternative styles (braille / block canvases, vertical bars, round pie, ...).
+  each with alternative renderers (braille / block canvases, vertical bars, round pie, ...).
+- **Style sheets**: all appearance is CSS: selectors (elements, `#id`, `.class`,
+  attributes, `:nth-child`, descendants), a cascade from the defaults through `setup()`,
+  the dashboard and each panel to run-time changes, and properties after CSS (colors,
+  borders, padding, CSS Grid for the layout, text wrapping, `display`, ...). The rendering
+  is layered like a browser's (DOM, style, layout, paint, composite, events), redraws only
+  what changed, and `:DbDashInspect` shows the rules and computed style of what is under
+  the cursor.
 - **Several panels** per dashboard in a grid, each with its own database (mix SQLite,
   PostgreSQL, an HTTP API, ...) and interval, plus an optional refresh of all of them; the
   top-level `database`, `query` and `show` are defaults every panel can override.
@@ -32,7 +39,8 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
   prints), `exec://` (a script's output, like `tail -f`) and `webhook://` (an HTTP endpoint
   described by an OpenAPI 3.1 document, validated with JSON Schema, secured after MCP's
   rules). Items are processed one at a time; the panel is drawn on its interval.
-- **Thresholds**: color values (stat cards, table cells) and notify when a value crosses a level.
+- **Thresholds**: classes on values (stat cards, table cells and rows), colored by style
+  sheets, and notify when a value crosses a level.
 - **Arguments**: typed variables set from the command line, prompts or in the dashboard;
   shared by all panels or a panel's own.
 - **Sidebar**: browse config files and subdirectories as a tree, start and stop dashboards.
@@ -123,7 +131,8 @@ call the GitHub API).
 | `:DbDashShowSQL` | Show the rendered query |
 | `:DbDashDescribe` | Show the description of the dashboard or the panel under the cursor (Markdown) |
 | `:DbDashExport[!] [csv\|tsv\|json\|markdown] [{file}]` | Export the result to a register or a file |
-| `:DbDashStyle {type} {style}` | Re-render with another style, e.g. `:DbDashStyle line asciichart` |
+| `:DbDashStyle {type} [{renderer}]`, `:DbDashStyle set {selector} {property} {value}` | Change the style at run time, e.g. `:DbDashStyle line asciichart`, `:DbDashStyle set value color DiagnosticOk` |
+| `:DbDashInspect [{element}]` | The element under the cursor: its matched rules, computed style and box |
 | `:DbDashTrust [allow\|deny\|remove] [{config}]` | Decide about a config that runs Lua without the question |
 | `:DbDashMksession[!] [{file}]` | Write a session (any `:mksession` restores dashboards) |
 
@@ -132,12 +141,12 @@ arguments, `s` show the query, `e` export the result, `K` show the description (
 titles that have one). Global mappings: `<leader>ds` start, `<leader>dr` refresh,
 `<leader>dt` stop, `<leader>dl` list, `<leader>dd` sidebar.
 
-Every key, the `ⓘ` icon, the sidebar (width, position, directory, file globs, cursor line),
-where dashboards open, the popup border and size, the default interval, timeouts and row
-limit, the `dbdash.run()` limits and the push sources' queue can be set in `setup()`; see
-`:help dbdash-setup`.
-Colors use highlight groups (`:help dbdash-highlights`), e.g. `DbDashSidebarDir` for
-sidebar directories.
+Every key, the sidebar (width, position, directory, file globs, cursor line), where
+dashboards open, the popup border and size, the default interval, timeouts and row limit,
+the `dbdash.run()` limits and the push sources' queue can be set in `setup()`, and your
+own style sheet for every dashboard (`setup({ style = { ... } })`); see
+`:help dbdash-setup`. The default colors are highlight groups (`:help dbdash-highlights`),
+e.g. `DbDashSidebarDir` for sidebar directories.
 
 ### Sessions
 
@@ -153,29 +162,41 @@ require("dbdash").load_session(session_file .. ".dbdash") -- after sourcing the 
 
 ## Configuration
 
-A config file describes one dashboard: `database`, `query` and `show`, or `panels` and
-`layout` for several charts. Top-level bare fields are dashboard-wide: `interval` (a refresh
-of every panel), `args` (shared arguments), `layout`, and the header's `title`,
-`description` and `show_countdown`. The top-level `database`, `query` and `show` are
+A config file describes one dashboard: `database`, `query` and `show`, or `panels` for
+several charts, and a `style` sheet for how it looks. Top-level bare fields are
+dashboard-wide: `interval` (a refresh of every panel), `args` (shared arguments), `style`,
+the header's `title` and `description`. The top-level `database`, `query` and `show` are
 defaults each panel can override (a panel's own `database`, `show.interval`, ...); fields
 of one chart (`query.sql`, `show.type`, ...) belong in each panel. A panel's `query.args`
 are its own. See `:help dbdash-config`.
 
-`layout` works like CSS Grid: `columns` and `rows` take tracks (`30`, `"25%"`, `"2fr"`,
-`auto`, `"minmax(10, 1fr)"`), `areas` names rectangles, and a panel goes into an area
-(`show.area`), at a position (`show.row`, `column`, `span`, `row_span`) or into the next
-free cells. Rows get at least each chart's smallest readable plot (`show.min_height`) and
-share the rest of the window; a grid taller than the window scrolls instead of squeezing
-the charts. See `:help dbdash-layout` and
-[`example/dashboards/grid.yaml`](example/dashboards/grid.yaml).
+Style sheets map selectors to CSS properties, at the top level (the dashboard's), in a
+panel (only its own elements) and in `setup()` (every dashboard):
 
-`show.style` takes CSS-like properties that every chart understands: `color`, `background`,
-a color per part (`title_style`, `axis_style`, `legend_style`, ...), `title_align`, `border`
-line styles, `panel_border`, `padding`, `justify` / `align` in the cell, `ellipsis`; they
-cascade from `setup({ styles })` to the top-level `show` to each panel. Each chart type adds
-the options of the common chart libraries (Chart.js, ECharts, Grafana, DataTables): stacked
-and grouped series, reference lines, log axes, donuts, reduce functions, sorting, row colors,
-and more; long table cells wrap. See `:help dbdash-css`, `:help dbdash-charts` and
+```yaml
+style:
+  dashboard: { grid-template-columns: "2fr 1fr", column-gap: 2 }
+  panel-title: { font-weight: bold }
+  "#orders series": { color: "#61afef" }
+  "row:nth-child(even)": { background-color: "#2c313a" }
+  value.danger: { background-color: DiagnosticError }   # a threshold's class
+panels:
+  - id: orders
+    query: { sql: "SELECT ..." }
+    show: { type: line, x_column: day, y_column: total }
+    style:
+      panel: { grid-column: "span 2" }
+      chart: { canvas: quadrant }
+```
+
+The grid is CSS Grid: tracks (`30`, `"25%"`, `"2fr"`, `auto`, `"minmax(10, 1fr)"`), named
+areas, and panels placed by `grid-area`, `grid-row` / `grid-column` or into the next free
+cells. Rows get at least each chart's smallest readable plot (`plot { min-height }`) and
+share the rest of the window; a grid taller than the window scrolls instead of squeezing
+the charts. Each chart type takes the options of the common chart libraries (Chart.js,
+ECharts, Grafana, DataTables): stacked and grouped series, reference lines, log axes,
+doughnuts, reduce functions, sorting, row classes, and more; long table cells wrap. See
+`:help dbdash-css`, `:help dbdash-layout`, `:help dbdash-charts` and
 [`example/charts/`](example/charts), where every option has its own panel.
 
 [`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a JSON Schema of the whole
@@ -190,8 +211,8 @@ Examples are in [`example/`](example), one directory per topic (`:help dbdash-ex
 
 | Directory | Shows |
 | --- | --- |
-| [`charts/`](example/charts) | the CSS-like styles every chart takes ([`css.yaml`](example/charts/css.yaml)); one file per chart type with every style and option, one panel each ([`line.yaml`](example/charts/line.yaml), [`bar.yaml`](example/charts/bar.yaml), [`pie.yaml`](example/charts/pie.yaml), [`table.yaml`](example/charts/table.yaml), [`stat.yaml`](example/charts/stat.yaml), ...) |
-| [`dashboards/`](example/dashboards) | several panels in a grid ([`multi_panel.yaml`](example/dashboards/multi_panel.yaml): defaults, intervals, a database per panel, title, countdown, descriptions, argument lines); a grid laid out like CSS Grid ([`grid.yaml`](example/dashboards/grid.yaml): column and row tracks, areas, placement) |
+| [`charts/`](example/charts) | style sheets: selectors, the cascade and the common properties ([`css.yaml`](example/charts/css.yaml)); one file per chart type with every renderer and option, one panel each ([`line.yaml`](example/charts/line.yaml), [`bar.yaml`](example/charts/bar.yaml), [`pie.yaml`](example/charts/pie.yaml), [`table.yaml`](example/charts/table.yaml), [`stat.yaml`](example/charts/stat.yaml), ...) |
+| [`dashboards/`](example/dashboards) | several panels in a grid ([`multi_panel.yaml`](example/dashboards/multi_panel.yaml): defaults, intervals, a database per panel, title, countdown, descriptions, argument lines); a grid laid out with CSS Grid properties ([`grid.yaml`](example/dashboards/grid.yaml): column and row tracks, areas, placement) |
 | [`templates/`](example/templates) | arguments ([`arguments.yaml`](example/templates/arguments.yaml)); every statement ([`statements.yaml`](example/templates/statements.yaml)), filter ([`filters.yaml`](example/templates/filters.yaml)), test, function and expression ([`tests_functions.yaml`](example/templates/tests_functions.yaml)) and method ([`methods.yaml`](example/templates/methods.yaml)); SQL filters and autoescape ([`sql.yaml`](example/templates/sql.yaml)); macros ([`macros.yaml`](example/templates/macros.yaml)); extends / include / import ([`inheritance.yaml`](example/templates/inheritance.yaml)); Lua in templates ([`template_lua.yaml`](example/templates/template_lua.yaml)); every `meta` field ([`meta.yaml`](example/templates/meta.yaml)) |
 | [`lua/`](example/lua) | a `lua://` source ([`lua.yaml`](example/lua/lua.yaml)), `query.transform` ([`transform.yaml`](example/lua/transform.yaml)), panel state, callbacks and run records ([`callback.yaml`](example/lua/callback.yaml)) |
 | [`push/`](example/push) | push sources: [`luastream.yaml`](example/push/luastream.yaml), [`exec.yaml`](example/push/exec.yaml), [`webhook.yaml`](example/push/webhook.yaml) (OpenAPI) |

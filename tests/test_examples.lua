@@ -147,10 +147,11 @@ end
 T["examples cover every chart type and alternative style"] = function()
   local seen = {}
   for _, f in ipairs(files) do
-    local cfg = assert(config.load(f))
-    for _, p in ipairs(cfg.panels) do
-      local renderer, canvas = require("dbdash.render.registry").resolve(p.show, {})
-      seen[p.show.type .. "/" .. renderer] = true
+    local d = require("dbdash.dom.build").from_config(assert(config.load(f)))
+    for _, p in ipairs(d.panels) do
+      local chart = require("dbdash.css.style").get(p.chart_node)
+      local renderer, canvas = require("dbdash.render.registry").resolve(p.cfg.show.type, chart)
+      seen[p.cfg.show.type .. "/" .. renderer] = true
       seen["canvas/" .. canvas] = seen["canvas/" .. canvas] or renderer == "canvas"
     end
   end

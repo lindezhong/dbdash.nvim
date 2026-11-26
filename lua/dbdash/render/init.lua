@@ -18,7 +18,6 @@ local M = {}
 ---@field frame table
 ---@field palette fun(i: integer): string
 ---@field history number[]? recent values of this panel, oldest first (stat charts)
----@field value_group string? highlight group for the value (stat thresholds)
 
 ---@class dbdash.render.Output
 ---@field lines string[]
@@ -40,13 +39,13 @@ local function need(name)
   return impl
 end
 
----@param opts { width: integer, height: integer?, canvas: string?, ticks: string?, palette: string? }
+---@param opts { width: integer, height: integer?, canvas: string?, ticks: string?, palette: string?, css: dbdash.css.Scope?, type: string? }
 ---@return dbdash.render.Ctx
 function M.ctx(opts)
   local o = options()
   local canvas_type = need("canvas/" .. (opts.canvas or "braille"))
   local ticks = need("ticks/" .. (opts.ticks or o.ticks or "nice"))
-  local palette = need("palette/" .. (opts.palette or o.palette or "theme"))
+  local palette = need("palette/" .. (opts.palette or "theme"))
   return {
     width = math.max(opts.width or 80, 20),
     height = math.max(opts.height or 24, 5),
@@ -58,6 +57,8 @@ function M.ctx(opts)
     limits = ticks.limits,
     frame = need("frame/" .. (opts.frame or "unicodeplots")),
     palette = palette.color,
+    -- the chart's parts are styled through its element (render() passes the dashboard's)
+    css = opts.css or require("dbdash.css").scope(nil, opts.type),
   }
 end
 
@@ -68,121 +69,82 @@ local function nn(v)
   return v
 end
 
--- Parts of a chart and the style.* key that colors them (CSS: one rule per element).
-M.PARTS = {
-  DbDashAxis = "axis_style",
-  DbDashLabel = "label_style",
-  DbDashLegend = "legend_style",
-  DbDashNumber = "value_style",
-  DbDashNull = "null_style",
-  DbDashBorder = "border_style",
-  DbDashHeader = "header_style",
-  DbDashStatValue = "color",
-  DbDashText = "color",
-}
-
----Recolor the parts of an output by show.style (axis_style, label_style, ...).
----@param out dbdash.render.Output
----@param style table
-function M.restyle(out, style)
-  local map
-  for group, key in pairs(M.PARTS) do
-    local spec = nn(style[key])
-    if spec then
-      map = map or {}
-      map[group] = highlight.color(spec, group)
-    end
-  end
-  if map then
-    for _, h in ipairs(out.hl) do
-      h.group = map[h.group] or h.group
-    end
-  end
-  return out
-end
-
--- Where a title sits when show.style.title_align does not say.
+-- Where a title sits when its text-align is "start".
 local LEFT_TITLES = { stat = true, text = true }
 
----Put the title line above a chart: aligned over the chart's width.
-function M.with_title(out, title, style, width, chart_type, subtitle, css)
+---The cut marker of a computed text-overflow: "ellipsis" -> "…", "clip" -> "", else
+---the string itself (CSS text-overflow: "<string>").
+function M.ellipsis(c)
+  local v = c["text-overflow"]
+  if v == nil or v == "ellipsis" then
+    return "…"
+  elseif v == "clip" then
+    return ""
+  end
+  return v
+end
+
+---Put the title line (and the subtitle under it) above a chart, aligned over the chart's
+---width; caption-side: bottom puts them under it. Styles: the title and subtitle parts.
+function M.with_title(out, title, subtitle, width, chart_type, css)
   local w = 0
   for _, l in ipairs(out.lines) do
     w = math.max(w, W.width(l))
   end
   w = math.min(math.max(w, 1), width)
-  local align = nn(style.title_align) or (LEFT_TITLES[chart_type] and "left" or "center")
-  local line, s, e = require("dbdash.render.box").title_line(title, w, align, nn(style.ellipsis))
-  local group = highlight.color(nn(style.title_style), css and css:hl(style.__part or "title") or "DbDashTitle")
-  line = line:gsub("%s+$", "")
-  if subtitle then -- a muted second line (Chart.js subtitle)
-    local sl, ss, se = require("dbdash.render.box").title_line(subtitle, w, align, nn(style.ellipsis))
-    out = M.with_title(out, sl:sub(ss + 1, se), vim.tbl_extend("force", {}, style, {
-      title_style = vim.NIL,
-      title_align = align,
-      __part = "subtitle",
-    }), width, chart_type, nil, css)
-    -- the subtitle is now the first line; keep the title above (or below) it
+  local box = require("dbdash.render.box")
+  local tc = css:get("title")
+  local function line_of(text, part)
+    local c = css:get(part)
+    local align = c["text-align"] ~= "start" and c["text-align"] or (LEFT_TITLES[chart_type] and "left" or "center")
+    local line, s, e = box.title_line(text, w, align, M.ellipsis(c))
+    return { lines = { (line:gsub("%s+$", "")) }, hl = { { row = 0, col_s = s, col_e = e, group = css:hl(part) } } }
   end
-  -- caption: bottom puts it under the chart (CSS caption-side)
-  if nn(style.caption) == "bottom" then
-    local lines = vim.list_extend({}, out.lines)
-    lines[#lines + 1] = line
-    local hl = vim.list_extend({}, out.hl)
-    hl[#hl + 1] = { row = #lines - 1, col_s = s, col_e = e, group = group }
-    return { lines = lines, hl = hl }
+  local parts = { line_of(title, "title") }
+  if subtitle and css:get("subtitle").display ~= "none" then
+    parts[#parts + 1] = line_of(subtitle, "subtitle")
   end
-  local hl = { { row = 0, col_s = s, col_e = e, group = group } }
-  for _, h in ipairs(out.hl) do
-    local c = vim.deepcopy(h)
-    c.row = h.row + 1
-    hl[#hl + 1] = c
+  local stack = require("dbdash.paint").stack
+  if tc["caption-side"] == "bottom" then
+    return stack(vim.list_extend({ out }, parts))
   end
-  local lines = { line }
-  vim.list_extend(lines, out.lines)
-  return { lines = lines, hl = hl }
+  parts[#parts + 1] = out
+  return stack(parts)
 end
 
 local function message(text, group)
   return { lines = { text }, hl = { { row = 0, col_s = 0, col_e = #text, group = group } } }
 end
 
----Render a result set according to the show config.
+---Render a result set according to the show config and the chart element's computed
+---style (renderer, canvas, palette, plot sizes, title placement).
 ---@param rs dbdash.db.ResultSet
 ---@param show table
----@param opts { width: integer, height: integer?, history: number[]?, fill: boolean?, node: dbdash.dom.Node? }
+---@param opts { width: integer, height: integer?, history: number[]?, fill: boolean?, node: dbdash.dom.Node?, style: table? }
+---  node: the chart's element in a dashboard; without it the chart gets a document of its
+---  own with the default sheets and `style` (selector -> properties) as its sheet
 ---@return dbdash.render.Output
 function M.render(rs, show, opts)
-  local renderer, canvas = registry.resolve(show, options().styles)
+  local css = require("dbdash.css").scope(opts.node, show.type, opts.style)
   local ok, res = pcall(function()
-    local ctx = M.ctx({ width = opts.width, height = opts.height, canvas = canvas, palette = show.palette ~= vim.NIL and show.palette or nil })
-    local w = tonumber(show.width ~= vim.NIL and show.width or nil)
-    if w then
-      ctx.width = math.min(ctx.width, w)
+    local chart = css:get()
+    local renderer, canvas = registry.resolve(show.type, chart)
+    local ctx = M.ctx({ width = opts.width, height = opts.height, canvas = canvas, palette = chart.palette, css = css })
+    if chart["max-width"] then
+      ctx.width = math.min(ctx.width, chart["max-width"])
     end
-    -- Plot rows: show.height, else the whole cell (opts.fill: a fixed or fr grid row),
-    -- else setup's default (each chart's own when unset); never fewer than min_height
-    -- (CSS min-height), unless the plot is capped below that.
-    local defaults = require("dbdash").options.defaults
-    local h = tonumber(show.height ~= vim.NIL and show.height or nil) or (opts.fill and 10000) or defaults.height
-    if h then
-      ctx.plot_height = h
-    end
-    local mh = tonumber(show.min_height ~= vim.NIL and show.min_height or nil) or defaults.min_height or 3
-    ctx.min_plot_height = math.min(mh, h or 15)
+    -- Plot rows: plot { height }, else the whole cell (opts.fill: a fixed or fr grid row),
+    -- else each chart's own (15); never fewer than plot { min-height } (default 8), unless
+    -- the plot is capped below that.
+    local plot = css:get("plot")
+    local h = plot.height or (opts.fill and 10000) or nil
+    ctx.plot_height = h
+    ctx.min_plot_height = math.min(plot["min-height"] or 8, h or 15)
     ctx.history = opts.history
-    -- the chart's element (its parts are styled through it); a chart rendered on its own
-    -- gets a document of its own with the default sheets
-    ctx.css = require("dbdash.css").scope(opts.node, show.type)
-    local st = nn(show.style) or {}
-    ctx.border = nn(st.border)
-    ctx.show_axes = nn(st.show_axes) ~= false
-    ctx.ellipsis = nn(st.ellipsis) or "…"
     local style = need("chart/" .. show.type .. "/" .. renderer)
-    -- The title is drawn here for every chart type (title_style, title_align,
-    -- show_title); the chart gets the rest of the height.
+    -- The title is drawn here for every chart type; the chart gets the rest of the height.
     local title = nn(show.title)
-    if nn(st.show_title) == false then
+    if css:get("title").display == "none" then
       title = nil
     end
     local inner = show
@@ -199,9 +161,8 @@ function M.render(rs, show, opts)
       ctx.height = math.max(ctx.height - (subtitle and 2 or 1), 5)
     end
     local out = (style.render or style)(rs, inner, ctx)
-    out = M.restyle(out, st)
     if title and title ~= "" then
-      out = M.with_title(out, title, st, ctx.width, show.type, subtitle, ctx.css)
+      out = M.with_title(out, title, subtitle, ctx.width, show.type, css)
     end
     return out
   end)
@@ -209,7 +170,7 @@ function M.render(rs, show, opts)
     return res
   end
   if type(res) == "table" and res.message then
-    return message(res.message, require("dbdash.css").scope(opts.node, show.type):hl("error"))
+    return message(res.message, css:hl("error"))
   end
   error(res, 0)
 end

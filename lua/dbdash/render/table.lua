@@ -6,12 +6,17 @@
 --   │  1 │ Alice │
 --   └────┴───────┘
 --
--- show.column_list: [{column, alias, width, height}] selects and labels columns (all by
--- default); width and height limit a column's cells.
--- show.style: border (true), header_style, border_style, title_style, show_lines (false),
---             null_text ("NULL"), wrap (true: long cells wrap at spaces; "char": anywhere;
---             false: one line, cut with "…"), cell_width / cell_height (every column's
---             limits). A cell still longer than its height ends with "…".
+-- show.column_list: [{column, alias, align, format, thresholds}] selects and labels
+-- columns (all by default); show.sort orders the rows, show.row_thresholds gives rows a
+-- class. Appearance is CSS (the chart's parts):
+--   table   border (rich: heavy header, light body), border-color, line-clamp (rows shown)
+--   header  color; header[column=name]
+--   rule    display: block draws a line between rows
+--   row     background-color (row:nth-child(even) stripes), color; row.<threshold class>
+--   cell    padding, width, height, white-space (nowrap: one line), word-break
+--           (break-all: wrap anywhere), vertical-align, text-overflow, color;
+--           cell[column=name], cell.null { content: "NULL" }, cell.<threshold class>
+-- A cell still longer than its height ends with text-overflow.
 local W = require("dbdash.util.width")
 
 local M = { name = "box" }
@@ -74,7 +79,6 @@ local function select_columns(rs, show)
           width = type(spec) == "table" and tonumber(nn(spec.width)) or nil,
           height = type(spec) == "table" and tonumber(nn(spec.height)) or nil,
           format = type(spec) == "table" and nn(spec.format) or nil,
-          style = type(spec) == "table" and nn(spec.style) or nil,
           align = (type(spec) == "table" and nn(spec.align)) or ((ltype and NUMERIC[ltype]) and "right" or "left"),
           ltype = ltype,
           thresholds = type(spec) == "table" and nn(spec.thresholds) and require("dbdash.render.thresholds").steps(
@@ -142,21 +146,23 @@ end
 ---@param ctx dbdash.render.Ctx
 ---@return dbdash.render.Output
 function M.render(rs, show, ctx)
-  local style = nn(show.style) or {}
-  local border = nn(style.border) ~= false
-  local show_lines = nn(style.show_lines) == true
-  local null_text = nn(style.null_text) or "NULL"
-  local g_border = ctx.color(nn(style.border_style), ctx.css:border_hl("table"))
-  local g_header = ctx.color(nn(style.header_style), ctx.css:hl("header"))
-  local null_hl = ctx.css:hl("cell", { classes = { "null" } })
-  local wrap = nn(style.wrap)
-  local wrap_mode = wrap == "char" and "char" or (wrap ~= false and "word" or nil)
-  local cell_w, cell_h = tonumber(nn(style.cell_width)), tonumber(nn(style.cell_height))
+  local css = ctx.css
+  local tbl = css:get("table")
+  local show_lines = css:get("rule").display ~= "none"
+  local null_text = css:get("cell", { classes = { "null" } }).content or ""
+  local g_border = css:border_hl("table")
+  local null_hl = css:hl("cell", { classes = { "null" } })
+  local cell = css:get("cell")
+  local wrap_mode = cell["white-space"] ~= "nowrap" and (cell["word-break"] == "break-all" and "char" or "word") or nil
 
   local cols = select_columns(rs, show)
   for _, col in ipairs(cols) do
-    col.width = col.width or cell_w
-    col.height = col.height or cell_h
+    -- per column: cell[column=name] and header[column=name]
+    local cc = css:get("cell", { attrs = { column = col.label } })
+    col.width = col.width or cc.width
+    col.height = col.height or cc.height
+    col.group = css:hl("cell", { attrs = { column = col.label } })
+    col.header_group = css:hl("header", { attrs = { column = col.label } })
   end
   local lines, hl = {}, {}
   local function add(line, spans)
@@ -173,13 +179,13 @@ function M.render(rs, show, ctx)
 
   -- Rows to show: sorted (DataTables order) and at most max_rows_shown.
   local rows = rs.rows
-  local sort = nn(style.sort)
+  local sort = nn(show.sort)
   if sort then
     local sc = type(sort) == "table" and nn(sort.column) or sort
     local desc = type(sort) == "table" and nn(sort.order) == "desc"
     local si = rs:col_index(sc)
     if not si then
-      error({ phase = "render", message = ("style.sort: no column '%s'"):format(tostring(sc)) }, 0)
+      error({ phase = "render", message = ("show.sort: no column '%s'"):format(tostring(sc)) }, 0)
     end
     rows = vim.list_extend({}, rows)
     local function key(r)
@@ -204,30 +210,27 @@ function M.render(rs, show, ctx)
     end)
   end
   local hidden = 0
-  local limit = tonumber(nn(style.max_rows_shown))
+  local limit = tbl["line-clamp"]
   if limit and #rows > limit then
     hidden = #rows - limit
     rows = { unpack(rows, 1, limit) }
   end
   -- Whole rows colored by one column's thresholds (AG Grid rowStyle).
-  local row_th = nn(style.row_thresholds)
+  local row_th = nn(show.row_thresholds)
   local row_steps, row_col, row_below
   if row_th then
     local T = require("dbdash.render.thresholds")
     row_col = rs:col_index(nn(row_th.column) or "")
     if not row_col then
-      error({ phase = "render", message = "style.row_thresholds: no column '" .. tostring(nn(row_th.column)) .. "'" }, 0)
+      error({ phase = "render", message = "show.row_thresholds: no column '" .. tostring(nn(row_th.column)) .. "'" }, 0)
     end
     row_below = nn(row_th.below) == true
     row_steps = T.steps(nn(row_th.steps) or {}, row_below)
   end
-  for _, col in ipairs(cols) do
-    col.group = col.style and ctx.color(col.style) or nil
-  end
 
   -- Cell texts and natural widths.
   local cells = {}
-  local row_groups = {}
+  local row_groups, row_bg = {}, {}
   local widths, data_w = {}, {}
   for c, col in ipairs(cols) do
     widths[c] = col.width or W.width(col.label)
@@ -235,11 +238,16 @@ function M.render(rs, show, ctx)
   end
   for r, row in ipairs(rows) do
     cells[r] = {}
+    local row_classes = {}
     if row_steps then
       local T = require("dbdash.render.thresholds")
       local _, step = T.level(row[row_col], row_steps, row_below)
-      row_groups[r] = step and T.group(step) or nil
+      row_classes = T.classes(step)
     end
+    -- the row element: its color (threshold classes) and background (:nth-child stripes)
+    local rc = css:get("row", { classes = row_classes, index = r })
+    row_groups[r] = require("dbdash.css.hl").group({ color = rc.color, ["font-weight"] = rc["font-weight"] })
+    row_bg[r] = rc["background-color"] and require("dbdash.css.hl").group({ ["background-color"] = rc["background-color"] }) or nil
     for c, col in ipairs(cols) do
       local v
       if col.index then
@@ -253,7 +261,9 @@ function M.render(rs, show, ctx)
       if col.thresholds and not is_null then
         local T = require("dbdash.render.thresholds")
         local _, step = T.level(v, col.thresholds, col.below)
-        group = T.group(step)
+        if step and step.class then
+          group = css:hl("cell", { classes = { step.class }, attrs = { column = col.label } })
+        end
       end
       cells[r][c] = { text = text, null = is_null, group = group }
       local tw = 0
@@ -267,17 +277,16 @@ function M.render(rs, show, ctx)
     end
   end
 
-  -- Box-drawing: the default mixes a heavy header with a light body (like rich);
-  -- style.border picks one line style for all (CSS border-style), false / "none" drops it.
+  -- Box-drawing: "rich" (the default) mixes a heavy header with a light body (like rich);
+  -- another border style draws all lines with it, none drops them.
   local B = require("dbdash.render.borders")
-  local chars = border and B.get(nn(style.border), "single") or nil
-  local rich = border and (nn(style.border) == nil or nn(style.border) == true)
-  border = chars ~= nil
-  local pad = math.max(tonumber(nn(style.cell_padding)) or 1, 0)
+  local rich = tbl.border == "rich"
+  local chars = tbl.border ~= "none" and B.get(rich and "single" or tbl.border, "single") or nil
+  local border = chars ~= nil
+  local pad = cell.padding[2]
   local sp = string.rep(" ", pad)
-  local valign = nn(style.vertical_align) or "top"
-  local ellipsis = nn(style.ellipsis) or "…"
-  local striped = nn(style.striped) and ctx.color("on " .. tostring(style.striped):gsub("^on%s+", "")) or nil
+  local valign = cell["vertical-align"]
+  local ellipsis = require("dbdash.render").ellipsis(cell)
 
   -- Overhead: the bars around and between the columns and the padding of every cell.
   local overhead = border and (#cols + 1 + 2 * pad * #cols) or (math.max(2 * pad, 1) * (#cols - 1))
@@ -337,7 +346,7 @@ function M.render(rs, show, ctx)
   local labels, hgroups = {}, {}
   for c, col in ipairs(cols) do
     labels[c] = col.label
-    hgroups[c] = g_header
+    hgroups[c] = col.header_group
   end
   local head_lines, hn = {}, 1
   for c = 1, #cols do
@@ -402,8 +411,8 @@ function M.render(rs, show, ctx)
         texts[c] = parts[c][k - skip] or ""
       end
       add(row_line(texts, groups, v))
-      if striped and r % 2 == 0 then
-        table.insert(hl, { row = #lines - 1, col_s = 0, col_e = #lines[#lines], group = striped, priority = 50 })
+      if row_bg[r] then
+        table.insert(hl, { row = #lines - 1, col_s = 0, col_e = #lines[#lines], group = row_bg[r], priority = 50 })
       end
     end
   end
@@ -419,7 +428,7 @@ function M.render(rs, show, ctx)
   if #rs.rows == 0 then
     note = "(no rows)"
   elseif hidden > 0 then
-    note = ("… %d more rows (style.max_rows_shown)"):format(hidden)
+    note = ("… %d more rows (table line-clamp)"):format(hidden)
   elseif rs.truncated then
     note = ("… showing the first %d rows (query.max_rows)"):format(#rs.rows)
   end

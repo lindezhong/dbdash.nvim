@@ -59,7 +59,7 @@ function M.render(rs, show, ctx)
   end
   add(table.concat(parts), spans)
   add(table.concat(parts), spans)
-  if P.legend_position(show) ~= "none" then
+  if P.legend_position(ctx) ~= "none" then
     add("")
     for _, l in ipairs(P.legend(items, sum, show, nil, ctx)) do
       add(" " .. l.text, l.spans, 1)

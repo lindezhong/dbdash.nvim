@@ -55,8 +55,7 @@ T["minimal config gets defaults"] = function()
   eq(cfg.query.args, {})
   eq(cfg.show.type, "table")
   eq(cfg.show.interval, 30000)
-  eq(cfg.show.show_countdown, false)
-  eq(cfg.show.countdown_format, "Next update: {time}s")
+  eq(cfg.style_rules, nil)
 end
 
 T["args are normalized"] = function()
@@ -120,8 +119,8 @@ interval: 5m
 args:
   - name: region
     default: Asia
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 panels:
   - query:
       sql: SELECT 1
@@ -133,7 +132,8 @@ panels:
     show:
       type: line
       interval: 30s
-      span: 2
+    style:
+      panel: { grid-column: span 2 }
   - database:
       url: "redis://localhost"
     query:
@@ -142,14 +142,14 @@ panels:
 
 T["multi-panel configs"] = function()
   local cfg = assert(load(MULTI))
-  eq({ cfg.grid, #cfg.panels, #cfg.layout.columns, cfg.layout.gap, cfg.refresh_all }, { true, 2, 2, 2, 300000 })
+  eq({ cfg.grid, #cfg.panels, #cfg.style_rules, cfg.refresh_all }, { true, 2, 1, 300000 })
   -- Shared arguments, then each panel's local ones (keyed <panel id>.<name>).
   eq(vim.tbl_map(function(a)
     return a.key
   end, cfg.args), { "region", "1.region", "n" })
   local p1, p2 = cfg.panels[1], cfg.panels[2]
-  eq({ p1.show.interval, p1.follows_global, p1.show.span, p1.database.type }, { 30000, false, 2, "sqlite" })
-  eq({ p2.show.interval, p2.follows_global, p2.database.type, p2.query.sql_line }, { 300000, true, "redis", 24 })
+  eq({ p1.show.interval, p1.follows_global, p1.style_rules[1].decls["grid-column"], p1.database.type }, { 30000, false, "span 2", "sqlite" })
+  eq({ p2.show.interval, p2.follows_global, p2.database.type, p2.query.sql_line, p2.style_rules }, { 300000, true, "redis", 25, nil })
 end
 
 T["the top-level database is only a default: a panel's own wins, either is enough"] = function()
@@ -206,17 +206,16 @@ T["with panels, top-level query and show are defaults"] = function()
 database: { url: "sqlite:///:memory:" }
 query: { timeout: 5s, max_rows: 10 }
 show:
-  show_countdown: true
-  style: { border: true, header_style: bold }
+  axes: { x_axis: { title: t, format: "{}" } }
 panels:
   - query: { sql: SELECT 1 }
   - query: { sql: SELECT 2, max_rows: 20 }
-    show: { style: { border: false } }
+    show: { axes: { x_axis: { title: u } } }
 ]]))
   local p1, p2 = cfg.panels[1], cfg.panels[2]
-  eq({ p1.query.timeout, p1.query.max_rows, p1.show.show_countdown, p1.show.style.border }, { 5000, 10, true, true })
-  -- Mappings merge key by key: header_style is kept, border overridden.
-  eq({ p2.query.max_rows, p2.show.style.border, p2.show.style.header_style }, { 20, false, "bold" })
+  eq({ p1.query.timeout, p1.query.max_rows, p1.show.axes.x_axis.title }, { 5000, 10, "t" })
+  -- Mappings merge key by key: format is kept, title overridden.
+  eq({ p2.query.max_rows, p2.show.axes.x_axis.title, p2.show.axes.x_axis.format }, { 20, "u", "{}" })
   -- An inherited invalid value is reported at the top-level line.
   local msg = err_of("database: { url: 'sqlite:///:memory:' }\nshow:\n  interval: soon\npanels:\n  - query: { sql: x }\n")
   eq(msg:find(":3:13: 'panels%[1%]%.show%.interval'") ~= nil, true)
@@ -363,52 +362,83 @@ T["show.refresh_hidden is a boolean, with a top-level default"] = function()
   eq({ cfg.panels[1].show.refresh_hidden, cfg.panels[2].show.refresh_hidden }, { true, false })
 end
 
-T["layout needs panels"] = function()
-  eq(err_of(MINIMAL .. "layout: { columns: 3 }\n"):find("layout only applies with panels") ~= nil, true)
+T["appearance fields moved into style sheets say where"] = function()
+  local function moved(yaml, want)
+    local msg = err_of(yaml)
+    eq({ yaml, msg:find(want, 1, true) ~= nil }, { yaml, true })
+  end
+  moved(MINIMAL .. "layout: { columns: 3 }\n", "'layout' is appearance and moved to style: dashboard {")
+  moved(MINIMAL .. "show_countdown: true\n", "header countdown { display: block }")
+  moved(MINIMAL .. "show: { style: { border: true } }\n", "'show.style' is appearance")
+  moved(MINIMAL .. "show: { height: 5 }\n", "plot { height: N }")
+  moved(MINIMAL .. "show: { colors: [red] }\n", "series")
+  moved("database: { url: 'sqlite:///:memory:' }\npanels:\n  - query: { sql: x }\n    show: { span: 2 }\n", "'panels[1].show.span' is appearance")
+  moved(MINIMAL .. "show: { axes: { x_axis: { grid: true } } }\n", 'grid.x\" { display: block }')
+end
+
+T["style sheets: parsed in order, errors name the declaration's line"] = function()
+  local cfg = assert(load(MINIMAL .. "style:\n  title: { color: Error }\n  chart:\n    renderer: x\n"))
+  eq({ #cfg.style_rules, cfg.style_rules[1].selector.text, cfg.style_rules[2].decls.renderer }, { 2, "title", "x" })
+  local msg = err_of(MINIMAL .. "style:\n  title:\n    colour: red\n")
+  eq(msg:find(":%d+:%d+: .*unknown property 'colour'") ~= nil, true)
+  msg = err_of(MINIMAL .. "style:\n  'a >> b': { color: red }\n")
+  eq(msg:find('selector "a >> b"', 1, true) ~= nil, true)
 end
 
 local GRID = "database: { url: 'sqlite:///:memory:' }\n"
 
-T["layout: CSS Grid tracks, areas and placement"] = function()
-  local cfg = assert(load(GRID .. [[
-layout:
-  columns: "1fr 30 25%"
-  rows: [auto, 12]
-  auto_rows: 1fr
-  row_gap: 0
-  areas: ["a a b", "c . b"]
+---A dashboard's grid from its sheets, placed as layout does (from computed styles).
+local function grid_of(yaml)
+  local d = require("dbdash.dom.build").from_config(assert(load(yaml)))
+  local style = require("dbdash.css.style")
+  local items = {}
+  for i, p in ipairs(d.panels) do
+    items[i] = style.get(p.node)
+  end
+  return assert(require("dbdash.layout.grid").from_styles(style.get(d.doc.root), items))
+end
+
+T["grid: CSS Grid tracks, areas and placement from the style sheets"] = function()
+  local lay = grid_of(GRID .. [[
+style:
+  dashboard:
+    grid-template-columns: "1fr 30 25%"
+    grid-template-rows: [auto, 12]
+    grid-auto-rows: 1fr
+    row-gap: 0
+    grid-template-areas: ["a a b", "c . b"]
+  "#p3": { grid-row: 3, grid-column: "2 / span 2" }
 panels:
   - query: { sql: x }
-    show: { area: b }
+    style: { panel: { grid-area: b } }
   - query: { sql: x }
-    show: { area: a }
+    style: { panel: { grid-area: a } }
+  - id: p3
+    query: { sql: x }
   - query: { sql: x }
-    show: { row: 3, column: 2, span: 2 }
-  - query: { sql: x }
-]]))
-  local lay = cfg.layout
+]])
   eq({ #lay.columns, #lay.rows, lay.auto_row.max, lay.row_gap }, { 3, 2, { "fr", 1 }, 0 })
   eq(lay.places[1], { row = 1, col = 3, span = 1, row_span = 2 })
   eq(lay.places[2], { row = 1, col = 1, span = 2, row_span = 1 })
   eq(lay.places[3], { row = 3, col = 2, span = 2, row_span = 1 })
   eq(lay.places[4], { row = 2, col = 1, span = 1, row_span = 1 }) -- the first free cell
   -- columns from the areas when not given
-  cfg = assert(load(GRID .. "layout: { areas: ['x y'] }\npanels:\n  - query: { sql: x }\n"))
-  eq(#cfg.layout.columns, 2)
+  lay = grid_of(GRID .. "style:\n  dashboard: { grid-template-areas: ['x y'] }\npanels:\n  - query: { sql: x }\n")
+  eq(#lay.columns, 2)
 end
 
-T["layout: errors name the line"] = function()
-  local function grid_err(layout, show)
-    return err_of(GRID .. "layout: " .. layout .. "\npanels:\n  - query: { sql: x }\n    show: " .. (show or "{}") .. "\n  - query: { sql: y }\n    show: { row: 1, column: 1 }\n")
+T["grid: errors name the declaration's line"] = function()
+  local function grid_err(dashboard, panel)
+    return err_of(GRID .. "style:\n  dashboard: " .. dashboard .. "\npanels:\n  - query: { sql: x }\n    style:\n      panel: " .. (panel or "{}") .. "\n  - query: { sql: y }\n    style:\n      panel: { grid-row: 1, grid-column: 1 }\n")
   end
-  eq(grid_err("{ columns: [1fr, '10%%x'] }"):find(':2:.*invalid track') ~= nil, true)
-  eq(grid_err("{ rows: [max-content, '5%'] }"):find("invalid track") ~= nil, true)
-  eq(grid_err("{ areas: ['a b', 'b b'] }"):find('area "b" is not a rectangle') ~= nil, true)
-  eq(grid_err("{ columns: 3, areas: ['a b'] }"):find("3 columns, but layout.areas has 2") ~= nil, true)
-  eq(grid_err("{ columns: 2 }", "{ row: 1, column: 1 }"):find(":7:.*overlaps panel 1") ~= nil, true)
-  eq(grid_err("{ columns: 2, areas: ['a b'] }", "{ area: zz }"):find(":5:.*no area named") ~= nil, true)
-  eq(grid_err("{ columns: 2 }", "{ row_span: 0 }"):find("row_span must be at least 1") ~= nil, true)
-  eq(grid_err("{ row_gap: -1 }"):find("gaps cannot be negative") ~= nil, true)
+  eq(grid_err("{ grid-template-columns: [1fr, '10%%x'] }"):find(':3:.*invalid track') ~= nil, true)
+  eq(grid_err("{ grid-template-rows: [max-content, '5%'] }"):find("invalid track") ~= nil, true)
+  eq(grid_err("{ grid-template-areas: ['a b', 'b b'] }"):find('area "b" is not a rectangle') ~= nil, true)
+  eq(grid_err("{ grid-template-columns: 3, grid-template-areas: ['a b'] }"):find("3 columns, but grid%-template%-areas has 2") ~= nil, true)
+  eq(grid_err("{ grid-template-columns: 2 }", "{ grid-row: 1, grid-column: 1 }"):find(":10:.*overlaps panel 1") ~= nil, true)
+  eq(grid_err("{ grid-template-columns: 2, grid-template-areas: ['a b'] }", "{ grid-area: zz }"):find(":7:.*no area named") ~= nil, true)
+  eq(grid_err("{ grid-template-columns: 2 }", "{ grid-row: '1 / span 0' }"):find("grid%-row") ~= nil, true)
+  eq(grid_err("{ row-gap: -1 }"):find("at least 0") ~= nil, true)
 end
 
 T["every driver URL scheme is accepted, with drivers not loaded yet"] = function()

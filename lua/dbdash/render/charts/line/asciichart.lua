@@ -21,7 +21,7 @@ function M.render(rs, show, ctx)
         yhi = math.max(yhi or v, v)
       end
     end
-    data[i] = { values = vals, group = C.color(ctx, show, i, s.color, s.label), label = s.label }
+    data[i] = { values = vals, group = C.color(ctx, show, i, nil, s.label), label = s.label }
   end
   if not ylo then
     return { lines = { "(no data to plot)" }, hl = {} }
@@ -36,7 +36,7 @@ function M.render(rs, show, ctx)
     xlabel = axes.xlabel,
     ylabel = axes.ylabel,
     legend = legend,
-    legend_position = C.legend_position(show, #data),
+    legend_position = C.legend_position(ctx, #data),
     height = ctx.plot_height,
   }
   local _, labels = C.y_ticks(ctx, ylo, yhi, 15, axes.yformat)

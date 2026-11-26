@@ -73,9 +73,22 @@ Scope.__index = Scope
 ---a document of its own, for rendering outside a dashboard)
 ---@param chart_type string?
 ---@return dbdash.css.Scope
-function M.scope(node, chart_type)
+---@param sheet table? for a chart of its own: a style sheet (selector -> properties)
+function M.scope(node, chart_type, sheet)
   if not node then
     local doc = M.document()
+    if sheet then
+      local keys = require("dbdash.util.map").keys(sheet)
+      if #keys == 0 then
+        keys = vim.tbl_keys(sheet)
+        table.sort(keys)
+      end
+      local rules, err = parser.sheet(sheet, keys)
+      if not rules then
+        error({ phase = "render", message = ("style %s: %s"):format(err.key, err.message) }, 0)
+      end
+      doc:set_sheet("author", rules)
+    end
     node = doc.root:append(dom.new("chart", { classes = { chart_type }, attrs = { type = chart_type } }))
   end
   -- the parts live on the node, so every render of the same chart reuses them
@@ -94,14 +107,17 @@ end
 ---@param spec dbdash.css.PartSpec?
 function Scope:part(tag, spec)
   spec = spec or {}
-  local key = tag
-    .. "|"
-    .. table.concat(spec.classes or {}, ".")
-    .. "|"
-    .. vim.inspect(spec.attrs or {})
-    .. "|"
-    .. tostring(spec.index or "")
+  -- a part at a position is one node whose classes and attributes follow the data (a
+  -- row that turns "danger" stays the 3rd row); other parts are keyed by what they match
+  local key = spec.index and (tag .. "#" .. spec.index)
+    or (tag .. "|" .. table.concat(spec.classes or {}, ".") .. "|" .. vim.inspect(spec.attrs or {}))
   local n = self.parts[key]
+  if n and spec.index then
+    n:set_classes(spec.classes or {})
+    for k, v in pairs(spec.attrs or {}) do
+      n:set_attr(k, v)
+    end
+  end
   if not n then
     n = dom.new(tag, { classes = spec.classes, attrs = spec.attrs })
     -- position among siblings: pad with placeholders so :nth-child sees the index

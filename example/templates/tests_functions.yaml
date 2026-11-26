@@ -19,8 +19,8 @@ database:
 show:
   interval: 1h
 
-layout:
-  columns: 1
+style:
+  dashboard: { grid-template-columns: 1 }
 
 panels:
   - query:

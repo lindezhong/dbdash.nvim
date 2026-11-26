@@ -110,20 +110,16 @@ function M.names(prefix)
   return out
 end
 
----Effective renderer and canvas: show config > setup() styles > built-in defaults.
----@param show table
----@param styles table<string, table>? from setup()
+---Effective renderer and canvas: the chart element's computed renderer / canvas (from
+---style sheets: setup({ style }), the dashboard's, the panel's, :DbDashStyle), else the
+---built-in defaults of the type.
+---@param t string chart type
+---@param computed table? computed style of the chart element
 ---@return string renderer, string canvas
-function M.resolve(show, styles)
-  local t = show.type
-  local user = (styles or {})[t] or {}
+function M.resolve(t, computed)
+  computed = computed or {}
   local d = M.DEFAULTS[t] or {}
-  local nn = function(v)
-    return v ~= vim.NIL and v or nil
-  end
-  local renderer = nn(show.renderer) or user.renderer or d.renderer or "canvas"
-  local canvas = nn(show.canvas) or user.canvas or d.canvas or "braille"
-  return renderer, canvas
+  return computed.renderer or d.renderer or "canvas", computed.canvas or d.canvas or "braille"
 end
 
 return M

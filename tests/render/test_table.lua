@@ -5,9 +5,10 @@ local resultset = require("dbdash.db.resultset")
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()
 
-local function out(rs, show, width)
+---Render a table; `style`: a style sheet for the chart (selector -> properties).
+local function out(rs, show, width, style)
   show.type = "table"
-  return render.render(rs, show, { width = width or 80 })
+  return render.render(rs, show, { width = width or 80, style = style })
 end
 
 T["golden: all columns"] = function()
@@ -24,8 +25,7 @@ T["golden: column_list with alias and width"] = function()
         { column = "manager", alias = "Manager" },
         { column = "missing", alias = "Missing" },
       },
-      style = { header_style = "bold blue" },
-    })
+    }, nil, { header = { color = "blue", ["font-weight"] = "bold" } })
   )
 end
 
@@ -34,8 +34,8 @@ T["golden: narrow window shrinks widest columns"] = function()
 end
 
 T["golden: no border, row lines"] = function()
-  helpers.golden("table/box/no_border", out(fx.departments(), { style = { border = false } }))
-  helpers.golden("table/box/show_lines", out(fx.departments(), { style = { show_lines = true } }))
+  helpers.golden("table/box/no_border", out(fx.departments(), {}, nil, { table = { border = "none" } }))
+  helpers.golden("table/box/show_lines", out(fx.departments(), {}, nil, { rule = { display = "block" } }))
 end
 
 T["golden: empty and truncated results"] = function()
@@ -96,7 +96,7 @@ T["highlight specs"] = function()
   eq(vim.api.nvim_get_hl(0, { name = g }).fg, 0xff0000)
 end
 
-T["long cells wrap; wrap = false cuts; char mode; newlines"] = function()
+T["long cells wrap; white-space: nowrap cuts; break-all; newlines"] = function()
   local rs = resultset.new(
     { { name = "k", type = "string" }, { name = "v", type = "string" } },
     { { "a", "the quick brown fox jumps" }, { "b", "x\ny" } }
@@ -107,56 +107,56 @@ T["long cells wrap; wrap = false cuts; char mode; newlines"] = function()
   eq(o.lines[6], "│   │ jumps        │")
   eq(o.lines[7], "│ b │ x            │")
   eq(o.lines[8], "│   │ y            │")
-  o = out(rs, { style = { wrap = false } }, 20)
+  o = out(rs, {}, 20, { cell = { ["white-space"] = "nowrap" } })
   eq(o.lines[4], "│ a │ the quick b… │")
   eq(o.lines[5], "│ b │ x↵y          │")
-  o = out(rs, { style = { wrap = "char" } }, 20)
+  o = out(rs, {}, 20, { cell = { ["word-break"] = "break-all" } })
   eq(o.lines[4], "│ a │ the quick br │")
 end
 
-T["cell width and height: column_list and style defaults"] = function()
+T["cell width and height: column_list and cell { width, height }"] = function()
   local rs = resultset.new({ { name = "v", type = "string" } }, { { "one two three four five" } })
   local o = out(rs, { column_list = { { column = "v", width = 7, height = 2 } } })
   eq({ o.lines[4], o.lines[5], o.lines[6] }, { "│ one two │", "│ three…  │", "└─────────┘" })
-  o = out(rs, { style = { cell_width = 9, cell_height = 1 } })
+  o = out(rs, {}, nil, { cell = { width = 9, height = 1 } })
   eq({ o.lines[4], o.lines[5] }, { "│ one two…  │", "└───────────┘" })
 end
 
 T["a wrapped row keeps its colors on every line"] = function()
   local rs = resultset.new({ { name = "n", type = "integer" }, { name = "t", type = "string" } }, { { 9, "aa bb" } })
-  local o = out(rs, { column_list = { { column = "n", thresholds = { { value = 5, color = "red" } } }, { column = "t", width = 2 } } })
+  local o = out(rs, { column_list = { { column = "n", thresholds = { { value = 5, class = "hot" } } }, { column = "t", width = 2 } } }, nil, { ["cell.hot"] = { color = "#ff0000" } })
   local rows = {}
   for _, h in ipairs(o.hl) do
-    if h.group:match("^DbDashC_") then
+    if h.group:match("^DbDashCss_") then
       rows[h.row] = true
     end
   end
   eq({ rows[3], rows[4] }, { true, true })
 end
 
-T["CSS-like options: border styles, padding, align, vertical_align, striped, ellipsis"] = function()
+T["CSS: border styles, padding, align, vertical-align, stripes, text-overflow"] = function()
   local rs = resultset.new(
     { { name = "k", type = "string" }, { name = "n", type = "integer" } },
     { { "a", 1 }, { "bb", 22 } }
   )
-  local o = out(rs, { style = { border = "rounded" } })
+  local o = out(rs, {}, nil, { table = { border = "rounded" } })
   eq({ o.lines[1], o.lines[3], o.lines[6] }, { "╭────┬────╮", "├────┼────┤", "╰────┴────╯" })
-  o = out(rs, { style = { border = "ascii", cell_padding = 0 } })
+  o = out(rs, {}, nil, { table = { border = "ascii" }, cell = { padding = 0 } })
   eq({ o.lines[1], o.lines[2], o.lines[4] }, { "+--+--+", "|k | n|", "|a | 1|" })
-  o = out(rs, { style = { border = "none" } })
+  o = out(rs, {}, nil, { table = { border = "none" } })
   eq(o.lines[1], "k    n")
   o = out(rs, { column_list = { { column = "k", align = "right" }, { column = "n", align = "center", width = 5 } } })
   eq(o.lines[4], "│  a │   1   │")
   -- vertical_align: the short cell sits in the middle of a three-line row
   rs = resultset.new({ { name = "a", type = "string" }, { name = "b", type = "string" } }, { { "x", "one two three" } })
-  o = out(rs, { style = { vertical_align = "middle" }, column_list = { "a", { column = "b", width = 5 } } })
+  o = out(rs, { column_list = { "a", { column = "b", width = 5 } } }, nil, { cell = { ["vertical-align"] = "middle" } })
   eq({ o.lines[4], o.lines[5], o.lines[6] }, { "│   │ one   │", "│ x │ two   │", "│   │ three │" })
-  -- ellipsis
-  o = out(rs, { style = { wrap = false, ellipsis = "..." }, column_list = { "a", { column = "b", width = 6 } } })
+  -- text-overflow
+  o = out(rs, { column_list = { "a", { column = "b", width = 6 } } }, nil, { cell = { ["white-space"] = "nowrap", ["text-overflow"] = "..." } })
   eq(o.lines[4], "│ x │ one... │")
-  -- striped: even rows get a background below the other colors
+  -- stripes: even rows get a background below the other colors
   rs = resultset.new({ { name = "a", type = "integer" } }, { { 1 }, { 2 } })
-  o = out(rs, { style = { striped = "#202020" } })
+  o = out(rs, {}, nil, { ["row:nth-child(even)"] = { ["background-color"] = "#202020" } })
   local bg = vim.tbl_filter(function(h)
     return h.priority == 50
   end, o.hl)
@@ -164,27 +164,27 @@ T["CSS-like options: border styles, padding, align, vertical_align, striped, ell
   eq(bg[1].row, 4)
 end
 
-T["DataTables-like: sort, rows shown, column format and style, row thresholds, caption"] = function()
+T["DataTables-like: sort, rows shown, column format and color, row thresholds, caption"] = function()
   local rs = resultset.new(
     { { name = "k", type = "string" }, { name = "n", type = "number" } },
     { { "a", 1234.5 }, { "b", vim.NIL }, { "c", 99 } }
   )
-  local o = out(rs, { style = { sort = { column = "n", order = "desc" } } })
+  local o = out(rs, { sort = { column = "n", order = "desc" } })
   eq({ o.lines[4]:sub(1, 6), o.lines[5]:sub(1, 6), o.lines[6]:sub(1, 6) }, { "│ a ", "│ c ", "│ b " })
-  o = out(rs, { style = { sort = "k", max_rows_shown = 1 } })
-  eq(o.lines[#o.lines], "… 2 more rows (style.max_rows_shown)")
-  o = out(rs, { column_list = { "k", { column = "n", format = "{:,.1f}", style = "Special" } } })
+  o = out(rs, { sort = "k" }, nil, { table = { ["line-clamp"] = 1 } })
+  eq(o.lines[#o.lines], "… 2 more rows (table line-clamp)")
+  o = out(rs, { column_list = { "k", { column = "n", format = "{:,.1f}" } } }, nil, { ["cell[column=n]"] = { color = "Special" } })
   eq(o.lines[4], "│ a │ 1,234.5 │")
   local special = vim.tbl_filter(function(h)
     return h.group == "Special"
   end, o.hl)
   eq(#special, 2) -- a and c; the NULL keeps its own color
-  o = out(rs, { style = { row_thresholds = { column = "n", steps = { { value = 1000, color = "red" } } } } })
+  o = out(rs, { row_thresholds = { column = "n", steps = { { value = 1000, class = "danger" } } } })
   local red = vim.tbl_filter(function(h)
-    return h.row == 3 and h.group:match("^DbDashC_")
+    return h.row == 3 and h.group == "DiagnosticError"
   end, o.hl)
   eq(#red, 2) -- both cells of the row with 1234.5
-  o = out(rs, { title = "T", style = { caption = "bottom" } })
+  o = out(rs, { title = "T" }, nil, { title = { ["caption-side"] = "bottom" } })
   eq(vim.trim(o.lines[#o.lines]), "T")
 end
 

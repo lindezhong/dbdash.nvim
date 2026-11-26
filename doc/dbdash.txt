@@ -38,7 +38,8 @@ defaults: >lua
     mappings = true,       -- global keys, see below
     countdown_interval = 10000,          -- ms between countdown updates
     countdown_position = "right_align",  -- "eol", "overlay"
-    styles = {},           -- default renderer/canvas per chart type
+    style = {},            -- your style sheet for every dashboard:
+                           -- selector -> properties, |dbdash-css|
     ticks = "nice",        -- axis ticks: "nice" or "linear"
     register = {},         -- custom chart styles and canvases
     sidebar = {
@@ -60,7 +61,6 @@ defaults: >lua
       keys = { modify = "a", show_args = "A", refresh = "r",
                reset = "R", show_sql = "s", export = "e",
                describe = "K" },
-      icons = { description = "ⓘ" },  -- after a title with a description
     },
     popup = {              -- :DbDashShowSQL and the other floats
       border = "rounded",  -- any 'winborder' value or a list of chars
@@ -72,9 +72,6 @@ defaults: >lua
       timeout = "30s",     -- query timeout (URL `timeout` wins)
       connect_timeout = "10s",  -- (URL `connect_timeout` wins)
       max_rows = 10000,
-      height = nil,        -- plot rows; nil = each chart's own (15)
-      min_height = 8,      -- smallest plot rows in a grid (|dbdash-layout|)
-      countdown_format = "Next update: {time}s",
       history = 20,        -- queries kept for |:DbDashStatus|
     },
     errors = {             -- failed refreshes, see |dbdash-errors|
@@ -107,8 +104,18 @@ keys), `false` (none) or a table that changes some of them: >lua
                stop = "<leader>dt", list = "<leader>dl",
                sidebar = "<leader>dd" }  -- the defaults; false removes one
 <
-Global keys already mapped by you are not overwritten. `styles`, `ticks` and
-`register` are described in |dbdash-styles|.
+Global keys already mapped by you are not overwritten. `ticks` and `register`
+are described in |dbdash-styles|.
+
+All appearance is in style sheets (|dbdash-css|); `style` is yours, between
+the default sheet and each dashboard's own. For example, every line chart on
+a quadrant canvas, plots 10 rows high and the countdown in every header: >lua
+  style = {
+    ["chart.line"] = { canvas = "quadrant" },
+    plot = { height = 10 },
+    ["header countdown"] = { display = "block" },
+  }
+<
 
 Errors                                                         *dbdash-errors*
 
@@ -249,12 +256,29 @@ and still notify thresholds and errors.
     `query.transform`) is exported (not the truncated cells): NULL is empty in
     csv, tsv and markdown and `null` in json; binary values are `\x` hex.
 
-:DbDashStyle {type} {style}                                     *:DbDashStyle*
+:DbDashStyle {type} [{renderer}]                                *:DbDashStyle*
 :DbDashStyle canvas {name}
+:DbDashStyle set {selector} {property} {value}
 :DbDashStyle reset
-    Re-render the current dashboard's cached data with another style without
-    querying again, e.g. `:DbDashStyle line quadrant`, `:DbDashStyle bar
-    vertical`, `:DbDashStyle canvas block`. Lasts until the dashboard stops.
+    Change the current dashboard's style at run time (the highest place of the
+    cascade, |dbdash-css-cascade|) and re-render its cached data without
+    querying again. `:DbDashStyle line quadrant` shows the panel under the
+    cursor as a line chart on a quadrant canvas, `:DbDashStyle bar vertical`
+    as vertical bars, `:DbDashStyle canvas block` changes its canvas (rules
+    on that panel's `chart`). `set` adds a rule for the whole dashboard:
+    `:DbDashStyle set value color DiagnosticOk`, `:DbDashStyle set dashboard
+    grid-template-columns 3` (the value is JSON when it parses as JSON:
+    numbers, true, lists). `reset` drops them all. They last until the
+    dashboard stops. Without arguments it shows the panel's renderer and
+    canvas.
+
+:DbDashInspect [{element}]                                    *:DbDashInspect*
+    Inspect the element under the cursor (a panel, its title line, argument
+    line or chart), or the nearest {element} from there (`:DbDashInspect
+    series`): its path in the tree (|dbdash-css-elements|), the rules that
+    match it with their origin and specificity, its computed style, its box
+    and highlight group, and its children. The box is highlighted in the
+    dashboard until the cursor moves.
 
 :DbDashTrust [allow|deny|remove] [{config}]                    *:DbDashTrust*
     Decide about a config that runs Lua (default: the current dashboard's)
@@ -334,65 +358,61 @@ Sidebar (`sidebar.keys`: select, stop, refresh, close):
                             # stat | text
     title: "Users"
     interval: 60s           # s, m, h or ms
-    show_countdown: true
-    countdown_format: "Next update: {time}s"
     args_show: false        # argument values above the chart
+  style:                    # how it looks: a style sheet (|dbdash-css|)
+    header countdown: { display: block }
 <
-Top-level fields: `database`, `query`, `show` (one chart) or `panels` and
-`layout` (several charts, |dbdash-panels|), `args` (shared arguments),
-`interval` (|dbdash-interval|) and the header (|dbdash-header|). Durations
-are numbers of seconds or strings with a unit: "500ms", "30s", "5m", "1h".
+Top-level fields: `database`, `query`, `show` (one chart) or `panels`
+(several charts, |dbdash-panels|), `args` (shared arguments), `interval`
+(|dbdash-interval|), `style` (|dbdash-css|), `title` and `description`.
+Durations are numbers of seconds or strings with a unit: "500ms", "30s",
+"5m", "1h".
+
+`show` says what to show: the chart type, its columns, titles and the options
+that change what is drawn (sorting, stacking, thresholds, ...). How it looks,
+the grid included, is in style sheets (|dbdash-css|); a config that still has
+an appearance field (`layout`, `show.span`, `show.height`, `show.canvas`,
+`show.colors`, `show.style`, ...) is an error that says where it went.
 
 Where a field is written says what it applies to, with one chart or many:
 
-  dashboard-wide       top-level bare fields: `interval`, `args`, `layout`,
-                       `panels`, `title`, `description`, `show_countdown`,
-                       `countdown_format`
+  dashboard-wide       top-level bare fields: `interval`, `args`, `style`,
+                       `panels`, `title`, `description`
   per panel, with a    the top-level `database`, `query` and `show`
   top-level default    sections: `database`; `query.timeout`, `max_rows`,
-                       `autoescape`; `show.interval`, `show_countdown`,
-                       `countdown_format`, `args_show`, `refresh_hidden`,
-                       `style`, `renderer`, `canvas`, `thresholds`, ...
+                       `autoescape`; `show.interval`, `args_show`,
+                       `refresh_hidden`, `thresholds`, `axes`, ...
   one panel only       `query.sql`, `transform`, `args`; `show.type`,
-                       `title`, `description`, `span`, `area`, `row`,
-                       `column`, `row_span`, `column_list`, the
-                       `*_column` fields, `x_label`, `y_label`
+                       `title`, `description`, `column_list`, the
+                       `*_column` fields, `x_label`, `y_label`; a panel's
+                       own `style`
 
 Without `panels` the top level is the only panel, so every field is written
 there. With `panels` each panel is its top-level `query` and `show` with its
-own fields over them (mappings such as `style` merge key by key, lists are
-replaced), and fields of one panel only are an error at the top level. A
-panel's `database` replaces the top-level one as a whole (its `options` and
-`password_cmd` too). Both kinds of config validate each panel the same way.
+own fields over them (mappings merge key by key, lists are replaced), and
+fields of one panel only are an error at the top level. A panel's `database`
+replaces the top-level one as a whole (its `options` and `password_cmd`
+too). Both kinds of config validate each panel the same way.
 
 `query.max_rows` caps the rows read; `query.timeout` defaults to the URL's
 `timeout`. Values a config leaves out (interval 30s, max_rows 10000, timeout
-30s, countdown_format, chart height) come from `defaults` in |dbdash-setup|.
-Fields the plugin does not use are ignored; invalid values of known fields
-are reported with their line and column. The full list of fields is in
-`example/dbdash.schema.yaml` (|dbdash-examples|).
+30s) come from `defaults` in |dbdash-setup|. Fields the plugin does not use
+are ignored; invalid values of known fields are reported with their line and
+column. The full list of fields is in `example/dbdash.schema.yaml`
+(|dbdash-examples|).
 
-Table options: `column_list: [{column, alias, width, height, thresholds}]`,
-`style.border`, `style.header_style`, `style.border_style`,
-`style.title_style`, `style.show_lines`, `style.null_text`, `style.wrap`,
-`style.cell_width`, `style.cell_height`.
-
-Long cells wrap inside their column (like CSS `white-space: normal`):
-`style.wrap` is true (break at spaces; a word longer than the column is cut),
-"char" (break anywhere) or false (one line, cut with "…"; newlines show as
-"↵"). Newlines in a value start a new line when wrapping. A column's `width`
-fixes its width and `height` the most lines a cell takes; `style.cell_width`
-and `style.cell_height` set them for every column. A cell that still does not
-fit ends with "…". When the window is narrower than the table, the widest
-text columns shrink first and their cells wrap more.
-
-Like DataTables / AG Grid columns, `column_list[]` also takes `format` (a
-Python format for numbers: "{:,.2f}", "{:.1%}"), `style` (the column's color)
-and `align` (left, center, right). `style.sort` orders the rows (a column, or
-`{ column, order: asc | desc }`; NULLs last), `style.max_rows_shown` shows
-the first N and how many more there are, and `style.row_thresholds: { column,
-steps, below }` colors whole rows by one column's value. `example/charts/
-table.yaml` shows each option.
+Table options: `column_list: [{column, alias, width, height, align, format,
+thresholds}]` picks, names, sizes and formats columns (a column's `width`
+fixes its width, `height` the most lines a cell takes; `format` is a Python
+format for numbers: "{:,.2f}", "{:.1%}"); `sort` orders the rows (a column,
+or `{ column, order: asc | desc }`; NULLs last); `row_thresholds: { column,
+steps, below }` gives whole rows a class by one column's value. Long cells
+wrap inside their column; newlines in a value start a new line. When the
+window is narrower than the table, the widest text columns shrink first and
+their cells wrap more. The rest is style: `table { border, line-clamp }`,
+`header`, `row`, `cell { width, height, padding, white-space, word-break,
+vertical-align, text-overflow }`, `cell.null { content }`, `rule`
+(|dbdash-css-elements|). `example/charts/table.yaml` shows each option.
 
 Refresh intervals                                            *dbdash-interval*
 
@@ -410,17 +430,18 @@ simply refreshes with everything else. >yaml
 <
 Header                                                         *dbdash-header*
 
-`title` and `show_countdown` (with `countdown_format`) at the top level put a
-header line above the charts (so does a description's `ⓘ`,
-|dbdash-description|): the title on the left, the countdown to the
-next refresh of every panel (the top-level `interval`, which it needs) on the
-right, "…" while that refresh runs. `show.show_countdown` is each chart's own
-countdown. In both formats `{time}` is the seconds left and `{clock}` the
-time as m:ss (h:mm:ss from an hour): >yaml
+`title` at the top level puts a header line above the charts (so does a
+description's `ⓘ`, |dbdash-description|, and a shown header countdown): the
+title on the left, the countdown to the next refresh of every panel (the
+top-level `interval`, which it needs) on the right, "…" while that refresh
+runs. Countdowns are elements hidden by default: `header countdown` is the
+dashboard's, `panel countdown` (or just `countdown`) each chart's own. Their
+`content` is the format: `{time}` is the seconds left and `{clock}` the time
+as m:ss (h:mm:ss from an hour): >yaml
   title: "Sales overview"
   interval: 10m
-  show_countdown: true
-  countdown_format: "all in {clock}"
+  style:
+    header countdown: { display: block, content: "all in {clock}" }
 <
 The title also names the dashboard in threshold notifications (for a chart
 without `show.title`), the panel picker, |:DbDashStatus| and
@@ -442,28 +463,28 @@ rendered when shown, and their result is Markdown: >yaml
 <
 They are not drawn in the dashboard: `ⓘ` after a title says there is one
 (the header's for the dashboard's; a panel's own title for a panel's; in a
-one-chart dashboard the header's for either), and `K` (|:DbDashDescribe|)
-shows it in a float with Markdown highlighting (treesitter; the Vim syntax
-when Neovim has no markdown parser), concealed markup and wrapped lines. A
-chart's description sees what its query sees: `args` with its own arguments
-and `meta` with its panel and database. The
-dashboard's sees the shared arguments and `meta` without the panel fields
-(`db_*` of the top-level database). Imports and Lua work as in queries, and
-Lua in a description asks for trust like any other (|dbdash-lua|), but a
-description cannot assign arguments (|dbdash-assign-args|): showing it
-changes nothing. The SQL
-filters quote for the panel's database, in the dashboard's description for
-the top-level one (SQLite's quoting without one).
+one-chart dashboard the header's for either; the icon is the `content` of
+`description-icon`), and `K` (|:DbDashDescribe|) shows it in a float with
+Markdown highlighting (treesitter; the Vim syntax when Neovim has no
+markdown parser), concealed markup and wrapped lines. A chart's description
+sees what its query sees: `args` with its own arguments and `meta` with its
+panel and database. The dashboard's sees the shared arguments and `meta`
+without the panel fields (`db_*` of the top-level database). Imports and Lua
+work as in queries, and Lua in a description asks for trust like any other
+(|dbdash-lua|), but a description cannot assign arguments
+(|dbdash-assign-args|): showing it changes nothing. The SQL filters quote for
+the panel's database, in the dashboard's description for the top-level one
+(SQLite's quoting without one).
 
 Examples and schema                                          *dbdash-examples*
 
 The `example/` directory of the plugin has runnable configs, one directory per
 topic (the sidebar shows them as a tree):
 
-  charts/       the CSS-like styles (css.yaml), and one file per chart type
-                with every style and option, one panel each
+  charts/       style sheets (css.yaml), and one file per chart type with
+                every renderer and option, one panel each
   dashboards/   several panels in a grid (multi_panel.yaml), a grid laid
-                out like CSS Grid (grid.yaml)
+                out with CSS Grid properties (grid.yaml)
   templates/    arguments; every statement, filter, test, function and
                 method; SQL filters and autoescape; macros; extends,
                 include and import; Lua in templates; every meta field
@@ -481,9 +502,10 @@ The others use an in-memory SQLite database and run as they are. Those that
 run Lua or a script ask for trust first (|dbdash-lua|).
 
 `example/dbdash.schema.yaml` is a JSON Schema for config files. It lists every
-field and the URL format of each database; |dbdash-schema| shows it, with a
-tag for every field (`:help dbdash-schema-show.interval`). Editors using
-yaml-language-server validate and complete a config that starts with: >yaml
+field, every style property and the URL format of each database;
+|dbdash-schema| shows it, with a tag for every field
+(`:help dbdash-schema-show.interval`). Editors using yaml-language-server
+validate and complete a config that starts with: >yaml
   # yaml-language-server: $schema=/path/to/example/dbdash.schema.yaml
 <
 The sidebar does not list `*.schema.yaml` files (the default
@@ -497,79 +519,24 @@ One config can hold several charts in a grid: >yaml
   args:             # shared arguments: every panel can use them
     - name: region
       default: EU
-  show:             # defaults of every panel's show
-    show_countdown: true
-  layout: { columns: 2, gap: 2 }
+  style:            # the dashboard's style sheet
+    dashboard: { grid-template-columns: 2 }
+    countdown: { display: block }
   panels:
-    - query: { sql: "SELECT ..." }
-      show: { type: line, title: Orders, interval: 30s, span: 2 }
+    - id: orders
+      query: { sql: "SELECT ..." }
+      show: { type: line, title: Orders, interval: 30s }
+      style:        # this panel's own rules
+        panel: { grid-column: "span 2" }
     - query: { sql: "SELECT ..." }
       show: { type: table, title: Latest }
 <
-Panels flow left to right and wrap; `show.span` widens a panel over several
-columns, and a single panel under `panels` is a grid too (|dbdash-layout| for
-sizes, rows, areas and placement). `id` names a panel
-for its arguments (|dbdash-arguments|). In the dashboard, `s` and
-|:DbDashStyle| act on the panel under the cursor (or ask which one); `r`
-refreshes all panels.
-
-Grid layout                                                    *dbdash-layout*
-
-`layout` works like CSS Grid: column and row tracks, gaps, named areas, and
-panels placed by area, by row and column, or in order into the next free
-cells. The short form `layout: { columns: 2, gap: 2 }` with `show.span` is
-the same grid with two equal columns. >yaml
-  layout:
-    columns: [1fr, 2fr, 30]  # or "1fr 2fr 30", "repeat(3, 1fr)", or 3
-    rows: [auto, 20, 1fr]    # the first rows; later rows use auto_rows
-    auto_rows: auto          # (default auto)
-    gap: 2                   # columns between panels (default 2)
-    row_gap: 1               # blank lines between rows (default 1)
-    areas:                   # optional; "." is an empty cell
-      - "trend trend kpi"
-      - "table table kpi"
-  panels:
-    - show: { area: trend }                      # by area name
-    - show: { row: 1, column: 3, row_span: 2 }   # by position (1-based)
-    - show: { span: 2 }                          # next free cells
-<
-CSS                          dbdash
-grid-template-columns        `layout.columns`
-grid-template-rows           `layout.rows`
-grid-auto-rows               `layout.auto_rows`
-column-gap / row-gap         `layout.gap` / `layout.row_gap`
-grid-template-areas          `layout.areas`
-grid-area                    `show.area`
-grid-row / grid-column       `show.row` / `show.column` with `row_span` /
-                             `span`
-min-height (of a chart)      `show.min_height`
-
-Tracks:
-  integer          a fixed size: display columns, or lines for rows
-  "N%"             columns: a share of the width
-  "Nfr"            a share of what is left (columns at least 10 wide, rows
-                   at least their panels' min-content)
-  auto             columns: 1fr; rows: minmax(min-content, max-content)
-  min-content      rows: as tall as the panels with their smallest plot
-                   (`show.min_height`, default `defaults.min_height`, 8)
-  max-content      rows: as tall as the panels with their full plot
-                   (`show.height`, default 15); tables, stat and text charts
-                   have one height
-  "minmax(a, b)"   at least a, at most b (b may be fr)
-
-Rows are sized like CSS: each row gets its panels' min-content, the lines of
-the window that are left grow the rows up to their limit (auto rows up to
-max-content, equally), and fr rows share what remains. Nothing is squeezed
-below its min-content: a grid taller than the window makes the buffer longer,
-and you scroll. A panel in a fixed or fr row fills its cell (its plot grows
-with the row, unless `show.height` is set). A panel over several rows that
-needs more than they give adds the difference to those rows.
-
-Placement follows CSS: panels with an area or a row and column go first,
-panels with only a row or a column go into the first free place there, and
-the rest flow in order into the next free cells. An unknown area, areas that
-are not rectangles, panels that overlap and positions past the last column
-are errors, reported with the line.
+Panels flow left to right and wrap; `panel { grid-column: "span 2" }`
+widens a panel over several columns, and a single panel under `panels` is a
+grid too (|dbdash-layout| for sizes, rows, areas and placement). `id` names
+a panel for its arguments (|dbdash-arguments|) and for style sheets
+(`#orders`). In the dashboard, `s` and |:DbDashStyle| act on the panel under
+the cursor (or ask which one); `r` refreshes all panels.
 
 Each panel queries its own database: `panels[].database` if it sets one,
 else the top-level `database`, which is only a default (a one-chart config is
@@ -585,156 +552,323 @@ Panels of different database types can share a dashboard: >yaml
 The SQL filters, autoescape and the `meta.db_*` values follow the panel's
 database.
 
+Grid layout                                                    *dbdash-layout*
+
+The grid is CSS Grid, written in style sheets: the `dashboard` element is the
+grid container and each `panel` a grid item. Panels are placed by area, by
+row and column, or in order into the next free cells. >yaml
+  style:
+    dashboard:
+      grid-template-columns: [1fr, 2fr, 30]  # or "1fr 2fr 30", or 3
+      grid-template-rows: [auto, 20, 1fr]    # later rows: grid-auto-rows
+      grid-auto-rows: auto                   # (default auto)
+      column-gap: 2                          # (default 2)
+      row-gap: 1                             # blank lines (default 1)
+      grid-template-areas:                   # "." is an empty cell
+        - "trend trend kpi"
+        - "table table kpi"
+    "#trend": { grid-area: trend }           # by area name
+  panels:
+    - id: trend
+      query: { sql: "..." }
+    - query: { sql: "..." }
+      style:
+        panel: { grid-row: "1 / span 2", grid-column: 3 }   # by position
+    - query: { sql: "..." }
+      style:
+        panel: { grid-column: "span 2" }     # next free cells
+<
+Container (`dashboard`): `grid-template-columns`, `grid-template-rows`,
+`grid-auto-rows`, `column-gap`, `row-gap`, `grid-template-areas`. Items
+(`panel`): `grid-area`, `grid-row` and `grid-column` (N, "span M" or
+"N / span M"), `justify-self`, `align-self`. A chart's smallest plot is
+`plot { min-height }` (default 8) and its full plot `plot { height }`
+(default 15).
+
+Tracks:
+  integer          a fixed size: display columns, or lines for rows
+  "N%"             columns: a share of the width
+  "Nfr"            a share of what is left (columns at least 10 wide, rows
+                   at least their panels' min-content)
+  auto             columns: 1fr; rows: minmax(min-content, max-content)
+  min-content      rows: as tall as the panels with their smallest plot
+                   (`plot { min-height }`, 8)
+  max-content      rows: as tall as the panels with their full plot
+                   (`plot { height }`, 15); tables, stat and text charts
+                   have one height
+  "minmax(a, b)"   at least a, at most b (b may be fr)
+
+Rows are sized like CSS: each row gets its panels' min-content, the lines of
+the window that are left grow the rows up to their limit (auto rows up to
+max-content, equally), and fr rows share what remains. Nothing is squeezed
+below its min-content: a grid taller than the window makes the buffer longer,
+and you scroll. A panel in a fixed or fr row fills its cell (its plot grows
+with the row, unless `plot { height }` is set). A panel over several rows
+that needs more than they give adds the difference to those rows.
+
+Placement follows CSS: panels with an area or a row and column go first,
+panels with only a row or a column go into the first free place there, and
+the rest flow in order into the next free cells. An unknown area, areas that
+are not rectangles, panels that overlap and positions past the last column
+are errors, reported with the line of the rule at fault. A rule added with
+|:DbDashStyle| that breaks the grid shows its error above the panels.
+
 Chart fields:                                                  *dbdash-charts*
 
-  line       x_column, y_columns [{column, label, color}] (or y_column, or
-             series_column for long data), line_style.{fill_area,
-             show_points, stepped, point, span_gaps}, legend.{show,
-             position}, axes.{x_axis,y_axis}.{title, min_value, max_value,
-             format, scale, ticks, grid}, mark_lines, mark_points,
-             style.trend_line
-  area       the line fields, style.stacked (true or percent)
-  bar        x_column, y_column (or y_columns, series_column), colors,
-             style.{color, show_values, group, bar_width, bar_gap, sort,
-             top, value_position}, axes.y_axis.{min_value, max_value,
-             format}, mark_lines
-  histogram  value_column, bins, bin_width, bin_range, style.{color,
-             show_values, cumulative, normalize}, mark_lines
-  boxplot    category_column, value_column, colors, style.{show_outliers,
-             show_means, show_values, whiskers}
-  heatmap    x_column, y_column, value_column, style.{show_values,
-             color_scale, color_steps, scale_min, scale_max}, legend
-  scatter    x_column, y_column, color_column, colors, style.{point,
-             trend_line}, axes, mark_lines
+`show` holds what to show; the style rules that matter most for each type
+follow the ";" (all of them: |dbdash-css-elements|).
+
+  line       x_column, y_columns [{column, label}] (or y_column, or
+             series_column for long data), span_gaps, axes.{x_axis,
+             y_axis}.{title, min_value, max_value, format, scale, ticks},
+             mark_lines, mark_points, trend_line; series { color, curve,
+             fill }, point { display, content }, grid.x / grid.y, legend
+  area       the line fields, stacked (true or percent)
+  bar        x_column, y_column (or y_columns, series_column), stacked,
+             sort, top, axes.y_axis.{min_value, max_value, format},
+             mark_lines; series { color }, bar { width, gap }, value
+             { display, position }
+  histogram  value_column, bins, bin_width, bin_range, cumulative,
+             normalize, mark_lines; series, value
+  boxplot    category_column, value_column, whiskers; series, outlier,
+             mean, value
+  heatmap    x_column, y_column, value_column, scale_min, scale_max; chart
+             { color-scale, color-steps }, value, legend
+  scatter    x_column, y_column, color_column, trend_line, axes,
+             mark_lines; series, point { content }
   bubble     x_column, y_column, size_column, color_column, label_column,
-             style.{size_range, point, trend_line}
-  pie        label_column, value_column, colors, format, legend,
-             style.{show_percentages, show_values, show_labels, sort, top,
-             other_label, donut, half}
+             size_range, trend_line; series, point
+  pie        label_column, value_column, format, sort, top, other_label;
+             series, chart { hole, angle }, legend, label, value, percent
   stat       value_column (default: the first numeric column; first row),
              reduce, format (Python format), prefix, unit, label,
-             thresholds, delta, delta_mode, sparkline, sparkline_length,
-             color_mode, text_size, value_columns
-  text       column_list, style.{separator, null_text, wrap, text_align,
-             max_lines, line_numbers, reverse, highlight}
-
-Style properties                                                *dbdash-css*
-
-`show.style` takes CSS-like properties; every chart type takes the common
-ones, and the setup `styles`, the top-level `show.style` and a panel's
-`show.style` cascade key by key (like CSS rules). A color is a CSS-like value:
-"#3498db", a name ("blue"), attributes and a background ("bold red on
-#202020"), or a highlight group ("DiagnosticOk").
-
-CSS                       `show.style`
-color                     `color`: the data (bars, the first series, the
-                          stat value, text lines)
-background-color          `background`: the whole panel
-color of an element       `title_style`, `header_style`, `axis_style` (tick
-                          labels), `label_style` (axis titles, categories),
-                          `legend_style`, `value_style` (value labels),
-                          `null_style`, `border_style`
-text-align                `title_align`: left, center, right;
-                          `column_list[].align` (tables)
-vertical-align            `vertical_align`: top, middle, bottom (tables)
-border-style              `border`: single, rounded, heavy, double, dashed,
-                          ascii, none (plots and tables; true / false too)
-border (of the panel)     `panel_border`: a box around the panel with the
-                          title in its top line (a line style or true)
-padding                   `padding`: N, [vertical, horizontal], [top,
-                          horizontal, bottom] or [top, right, bottom, left];
-                          `cell_padding` (tables, default 1)
-justify-self / align-self `justify`: start, center, end, stretch;
-                          `align`: start, center, end (the chart in its cell)
-white-space / word-break  `wrap`: true, "char", false (tables, text)
-text-overflow             `ellipsis` (default "…")
-:nth-child(even)          `striped`: a background for every other table row
-display: none             `show_title: false`, `show_axes: false`,
-                          `legend: false`, `show_values` / `show_labels`
-width / height            `show.width`, `show.height`, `show.min_height`,
-                          `cell_width`, `cell_height` (tables)
-
-Opacity, shadows, animations and hover effects have no terminal equivalent.
-`example/charts/css.yaml` shows each property.
-
-Thresholds                                                 *dbdash-thresholds*
-
-`show.thresholds` (stat) and `thresholds` on a `column_list` entry (table)
-color values by steps; the most severe step reached wins: >yaml
-  thresholds:
-    - { value: 100, color: yellow }            # >= 100
-    - { value: 500, color: red, notify: true } # >= 500, and notify
-  thresholds_below: false   # true: steps apply at or below (lower is worse)
-<With `notify: true`, the refresh where a value rises to that step notifies
-once (vim.notify WARN, e.g. "Errors: 650 ≥ 500"); it notifies again after
-falling back and crossing it again. For a table column the most severe cell
-counts. Colors take the same specs as `colors` (|dbdash-highlights|). Query
-failures are not thresholds: they show in the dashboard and notify once.
+             thresholds, delta_mode, sparkline_length, value_columns;
+             value { font-size }, delta, sparkline, unit, label
+  text       column_list, separator, reverse, highlight; line, line-number,
+             cell.null, chart { line-clamp }
+  table      column_list, sort, row_thresholds; see above
 
 A stat chart shows one value in large digits (one line when the window is
-too narrow), its change since the previous refresh (↑ 4.7%, ↓ 3.0%) and a
-sparkline of the last 20 refreshes; the history starts when the dashboard
-starts. `delta: false` and `sparkline: false` hide them.
+too narrow, or with `value { font-size: normal }`), its change since the
+previous refresh (↑ 4.7%, ↓ 3.0%) and a sparkline of the last 20 refreshes;
+the history starts when the dashboard starts. `delta` and `sparkline
+{ display: none }` hide them. `reduce` picks the value of the rows (first,
+last, mean, min, max, sum, count), `delta_mode: absolute` shows the change as
+an amount, and `value_columns` shows several values side by side (names or
+`{ column, label, format, unit, prefix }`).
 
 A text chart shows the result as plain text, without a table: each row is
-its cells joined by `style.separator` (default a space), so a one-column
-query shows one line per row; strings are shown as they are, newlines in a
-cell start new lines, NULL is `style.null_text` (default empty). Lines wider
-than the window wrap at spaces (`style.wrap: "char"` anywhere, `false` cuts
-them). The result must still
-be rows (|dbdash-result|): turn a string from `lua://` or HTTP into
+its cells joined by `separator` (default a space), so a one-column query
+shows one line per row; strings are shown as they are, newlines in a cell
+start new lines, NULL is `cell.null { content }` (default empty). Lines
+wider than the window wrap at spaces (`line { word-break: break-all }`
+anywhere, `white-space: nowrap` cuts them). `reverse` puts the last row
+first and `highlight: [{ pattern, class }]` gives lines that match a Vim
+regex a class (the first rule wins; default `warning`). The result must
+still be rows (|dbdash-result|): turn a string from `lua://` or HTTP into
 `{ { text = rs } }` with `query.transform` (|dbdash-transform|).
 
-`colors` is a list (by series index) or a mapping (by category name). `width`
-caps the chart width (default: the window), `height` sets the plot rows
-(default: `defaults.height`, else 15). `axes.y_axis.format` takes a Python
-format such as "{:,.0f}", "{:.1%}" or "{:.0f} ms" (text around the field is
-kept). `subtitle` is a muted line under the title.
+`axes.y_axis.format` takes a Python format such as "{:,.0f}", "{:.1%}" or
+"{:.0f} ms" (text around the field is kept). `subtitle` is a muted line
+under the title.
 
 Line, area, scatter and bubble charts take Chart.js / ECharts options:
 `series_column` turns long data (one row per x and series) into one series
-per value; `line_style.stepped` draws steps (true or "before", "after",
-"middle"); `line_style.point` marks every point with a character;
-`line_style.span_gaps: false` breaks the line at NULLs; an axis takes
-`scale: log` (one tick per power of ten), `ticks` (about how many) and `grid:
-true`; `mark_lines: [{ value, axis, label, color }]` draws reference lines at
-a value or at the data's `mean`, `min` or `max` (on the x axis: a number or
-a category); `mark_points: [max, min]` labels each series' extremes;
-`style.trend_line: linear` adds a dashed least-squares line; `style.stacked:
-percent` stacks areas to 100%; bubbles take `style.size_range: [min, max]`
-(radius in canvas pixels). `example/charts/line.yaml` and the area, scatter
-and bubble files show each option.
+per value; `span_gaps: false` breaks the line at NULLs; an axis takes
+`scale: log` (one tick per power of ten) and `ticks` (about how many);
+`mark_lines: [{ value, axis, label, class }]` draws reference lines at a
+value or at the data's `mean`, `min` or `max` (on the x axis: a number or a
+category; `mark.<class>` colors one); `mark_points: [max, min]` labels each
+series' extremes; `trend_line: linear` adds a dashed least-squares line;
+`stacked: percent` stacks areas to 100%; bubbles take `size_range: [min,
+max]` (radius in canvas pixels). `example/charts/line.yaml` and the area,
+scatter and bubble files show each option.
 
 Bar charts draw several series (`y_columns` or `series_column`) side by side
-or, with `style.group: stacked`, on top of each other (the value shown is the
-total). `style.bar_width` and `bar_gap` size the bars (columns when vertical,
-lines when horizontal), `style.sort: asc | desc` orders them by value and
-`style.top` keeps the first N, `style.value_position: inside` writes the
-value inside the bar, `axes.y_axis.min_value` / `max_value` set the value
-axis, and `mark_lines` draw reference lines on it. Histograms take `bin_width`
-and `bin_range: [from, to]` (values outside are left out), `style.cumulative`
-and `style.normalize: percent | density`; their `mark_lines` are values of
-the data, and the bin each falls in is colored (and labeled when
-horizontal).
+or, with `stacked: true`, on top of each other (the value shown is the
+total). `sort: asc | desc` orders them by value and `top` keeps the first N;
+`axes.y_axis.min_value` / `max_value` set the value axis, and `mark_lines`
+draw reference lines on it. Histograms take `bin_width` and `bin_range:
+[from, to]` (values outside are left out), `cumulative` and `normalize:
+percent | density`; their `mark_lines` are values of the data, and the bin
+each falls in is colored (and labeled when horizontal). Box plots take
+`whiskers` (iqr, the default; minmax; or two percentiles such as [5, 95]).
+Heat maps take `scale_min` / `scale_max` (the range of the data the colors
+span). Pie charts take `sort`, `top` (the rest in one slice named by
+`other_label`, styled as `series.other`) and `format`.
 
-Box plots take `style.whiskers` (iqr, the default; minmax; or two
-percentiles such as [5, 95]) and `style.show_values` (q1, median and q3), and
-`renderer: vertical` draws upright boxes. Heat maps take `style.color_scale`
-(a list of "#rrggbb" stops), `style.color_steps: [{ value, color }]`
-(piecewise colors), `style.scale_min` / `scale_max`, and `legend: false`.
-Pie charts take `style.sort`, `style.top` (the rest in one slice named by
-`style.other_label`), `format`, `legend: false` or `{ position: bottom }`,
-and (circle) `style.donut` (the hole, a fraction of the radius; from 0.5 the
-total is written in it) and `style.half`. Stat charts take `reduce` (first,
-last, mean, min, max, sum, count of the rows), `prefix`, `label`,
-`delta_mode: absolute`, `sparkline_length`, `color_mode` (value, background,
-none), `text_size: normal` and `value_columns` (several values side by side:
-names or `{ column, label, format, unit, prefix }`). Text charts take
-`style.text_align`, `style.max_lines`, `style.line_numbers`, `style.reverse`
-(the last row first) and `style.highlight: [{ pattern, color }]` (a Vim regex
-per rule; the first match colors the line).
+Thresholds                                                 *dbdash-thresholds*
 
-Styles                                                         *dbdash-styles*
+`show.thresholds` (stat), `thresholds` on a `column_list` entry (table) and
+`show.row_thresholds.steps` (table rows) give values a class by steps; the
+most severe step reached wins: >yaml
+  thresholds:
+    - { value: 100, class: warning }             # >= 100
+    - { value: 500, class: danger, notify: true } # >= 500, and notify
+  thresholds_below: false   # true: steps apply at or below (lower is worse)
+<The class goes on the element (`value`, `cell`, `row`) and style sheets
+color it: the default sheet colors `success`, `info`, `warning` and `danger`
+(Bootstrap's contextual classes) with the Diagnostic groups; any other class
+is yours to style (`value.critical { color: "#ff0000" }`; Grafana's color
+modes are rules too: `value.danger { background-color: DiagnosticError }`).
+With `notify: true`, the refresh where a value rises to that step notifies
+once (vim.notify WARN, e.g. "Errors: 650 ≥ 500"); it notifies again after
+falling back and crossing it again. For a table column the most severe cell
+counts. Query failures are not thresholds: they show in the dashboard and
+notify once.
+
+Style sheets                                                      *dbdash-css*
+
+All appearance is written in style sheets, as in a browser. A style sheet is
+a mapping of selectors to properties: >yaml
+  style:
+    panel-title: { font-weight: bold }
+    "#orders series": { color: "#61afef" }
+    "row:nth-child(even)": { background-color: "#2c313a" }
+    value.danger: { background-color: DiagnosticError }
+<
+A dashboard is a tree of elements (|dbdash-css-elements|), and every rule
+whose selector matches an element applies to it.
+
+Cascade                                                   *dbdash-css-cascade*
+
+Style sheets come from five places, lowest first (CSS origins):
+
+  1. the default sheet      how everything looks out of the box (UA)
+  2. setup({ style })       yours, for every dashboard (user)
+  3. `style` of a config    the dashboard's (author)
+  4. `panels[].style`       one panel's; its rules match only inside it
+                            (like an inline style, but with selectors)
+  5. |:DbDashStyle|         changes made at run time
+
+A later place wins over an earlier one. Within one place the more specific
+selector wins (ids, then classes, attributes and pseudo-classes, then
+element names, as in CSS), then the later rule. Inherited properties (color,
+text-align, white-space, word-break, font-*, palette, renderer, canvas) pass
+from an element to its children unless they set their own.
+
+Selectors                                               *dbdash-css-selectors*
+
+  panel              an element by name
+  *                  any element
+  #orders            the element with that id (a panel's `id`; panels
+                     without one are numbered 1, 2, ...)
+  .danger            an element with that class: the chart type of panels
+                     and charts (`panel.line`, `chart.stat`), threshold
+                     classes, `series.<name>`, `cell.null`, `delta.up`, ...
+  [type=line]        an attribute (`chart[type=...]`, `series[name=...]`,
+                     `cell[column=...]`, `header[column=...]`); [attr] for
+                     any value
+  :nth-child(even)   odd, even or N among elements of the same name;
+                     :first-child, :last-child
+  panel title        a descendant (any depth)
+  chart::part(axis)  a part of an element (the same as `chart axis`)
+  a, b               either
+
+Colors are "#rrggbb", "#rgb", a name ("blue", "bright_blue") or a highlight
+group ("DiagnosticOk"); a group alone keeps its own attributes and follows
+the colorscheme.
+
+Elements                                                 *dbdash-css-elements*
+
+  dashboard          the grid container (|dbdash-layout|)
+    header           the header line: header-title, description-icon,
+                     countdown
+    panel            a grid item; classes: its chart type; id: its `id`
+      panel-title    the title line of a panel in a grid; subtitle
+      description-icon, error, countdown
+      args           the argument line: arg-name (.local for a panel's
+                     own), arg-value
+      chart          the chart; classes and [type]: its type
+        title, subtitle   the chart's title (one-chart dashboards)
+        plot         the plot area (border, height, min-height)
+        axis, axis-title, label, grid (.x, .y), legend, mark (.<class>)
+        series       one per series or category: series:nth-child(N),
+                     series.<name>, series[name=...]; series.other
+        point, bar, value, percent, unit, outlier, mean
+        delta (.up, .down, .same), sparkline        stat
+        table, header, row, cell, rule              table
+        line, line-number, cell                     text
+  note, warning      notes ("… 3 more rows") and warnings
+
+The sidebar is a document of its own: sidebar-dir, sidebar-item (.running,
+.paused, .idle, .cursor).
+
+Properties                                             *dbdash-css-properties*
+
+Text:
+  color, background-color       a color (color is inherited)
+  font-weight                   normal, bold
+  font-style                    normal, italic
+  text-decoration               none, underline, undercurl, line-through
+  text-align                    start, left, center, right
+  vertical-align                top, middle, bottom (table cells)
+  white-space                   normal (wrap), nowrap (one line)
+  word-break                    normal, break-all (wrap anywhere)
+  text-overflow                 ellipsis ("…"), clip, or a string
+  line-clamp                    table: rows shown; text chart: lines shown
+  font-size                     normal, big (stat value: block digits)
+  caption-side                  top, bottom (a title over or under)
+Boxes:
+  display                       block, none (hides the element)
+  content                       generated text: countdown format,
+                                description-icon, cell.null, point marker
+  border                        single, rounded, heavy, double, dashed,
+                                ascii, rich (tables), none; true / false
+  border-color                  a color
+  padding                       N, [v, h], [top, h, bottom], [t, r, b, l]
+  width, max-width              cell / bar width, the widest a chart gets
+  height, min-height            plot rows, the most lines of a cell
+Grid: grid-template-columns, grid-template-rows, grid-auto-rows,
+  grid-template-areas, column-gap, row-gap, grid-area, grid-row,
+  grid-column, justify-self, align-self (|dbdash-layout|)
+Charts:
+  renderer, canvas              how the chart is drawn (|dbdash-styles|)
+  palette                       theme (the colorscheme) or tableau
+  curve                         linear, step, step-before, step-after,
+                                step-middle (series)
+  fill                          true: fill under a line (series)
+  hole                          pie circle: the hole, a share of the radius
+  angle                         pie circle: 360 or 180 (a half)
+  gap                           bar: columns or lines between categories
+  position                      legend: right, bottom; value: end, inside
+  color-scale                   heatmap: "#rrggbb" stops, low to high
+  color-steps                   heatmap: [{ value, color }] (piecewise)
+
+The default sheet hides what is optional: countdowns, grid lines, point
+markers on lines, the values of heat maps and box plots, box plot means,
+line numbers and table rules; `display: block` shows them. Opacity, shadows,
+animations and hover effects have no terminal equivalent.
+`example/charts/css.yaml` shows the cascade and the common properties.
+
+Rendering                                                 *dbdash-rendering*
+
+A dashboard is drawn the way a browser draws a page (after Servo):
+
+  DOM          the dashboard, its header, panels and charts as elements; a
+               query result, an error or a new argument value changes them
+               and marks them dirty
+  style        the cascade computes each element's style, restyling from
+               the dirty part; each property says what a change of it costs:
+               repaint (colors), relayout (sizes) or rebuild (renderer)
+  layout       the grid places the panels; a chart is a replaced element,
+               sized by layout and drawn by its renderer; a panel's layout
+               is reused while nothing it depends on changed
+  paint        the panels become layers of lines and highlights, with the
+               rows of each element for hit testing
+  composite    the layers become buffer lines; only the rows that changed
+               are written
+  events       a key is an event at the cursor: hit testing finds the
+               element under it, the event goes from the root down to it
+               and back up (capture and bubble), and the dashboard's keys
+               are listeners on the root
+
+Results, errors and push items only ask for a rendering update; all of them
+until it runs become one update, at most one every 20 ms, and a hidden
+dashboard renders when it is shown again. |:DbDashInspect| shows what the
+style phase computed for the element under the cursor.
+
+Renderers                                                      *dbdash-styles*
 
   type       renderer (first is the default)    canvas
   line       canvas, asciichart                 braille, quadrant, block,
@@ -750,12 +884,13 @@ Styles                                                         *dbdash-styles*
   stat       big
   text       plain
 
-Pick per config with `show.renderer` / `show.canvas`, or set defaults:  >lua
+Pick them with the `renderer` and `canvas` properties of the `chart`
+element, for one panel, a dashboard or (setup) every dashboard: >lua
 
   require("dbdash").setup({
-    styles = {
-      line = { canvas = "quadrant" },
-      bar = { renderer = "vertical" },
+    style = {
+      ["chart.line"] = { canvas = "quadrant" },
+      ["chart.bar"] = { renderer = "vertical" },
     },
     ticks = "nice",           -- or "linear"
     register = {              -- your own implementations
@@ -764,9 +899,10 @@ Pick per config with `show.renderer` / `show.canvas`, or set defaults:  >lua
     },
   })
 <
-A chart style is a table `{ render = fn }` where
-`fn(resultset, show, ctx)` returns `{ lines, hl }`; see lua/dbdash/render/
-for the canvas, ticks, frame and palette interfaces.
+A chart renderer is a table `{ render = fn }` where `fn(resultset, show,
+ctx)` returns `{ lines, hl }`; `ctx.css` gives the computed style of the
+chart's parts (`ctx.css:get("plot")`, `ctx.css:hl("series", { index = 1 })`);
+see lua/dbdash/render/ for the canvas, ticks, frame and palette interfaces.
 
 The YAML parser supports a subset: block and flow collections, quoted and
 plain scalars, block scalars, comments. Anchors, tags and multiple documents

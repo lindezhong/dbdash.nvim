@@ -18,16 +18,16 @@
 ││ b    │    150 │      40 │
   ^ 0-3 DbDashBorder
   ^ 9-12 DbDashBorder
-  ^ 13-19 DbDashC_yellow
+  ^ 13-19 DiagnosticWarn
   ^ 20-23 DbDashBorder
-  ^ 24-31 DbDashC_yellow
+  ^ 24-31 DiagnosticWarn
   ^ 32-35 DbDashBorder
 ││ c    │    900 │       5 │
   ^ 0-3 DbDashBorder
   ^ 9-12 DbDashBorder
-  ^ 13-19 DbDashC_red
+  ^ 13-19 DiagnosticError
   ^ 20-23 DbDashBorder
-  ^ 24-31 DbDashC_red
+  ^ 24-31 DiagnosticError
   ^ 32-35 DbDashBorder
 ││ d    │   NULL │    NULL │
   ^ 0-3 DbDashBorder

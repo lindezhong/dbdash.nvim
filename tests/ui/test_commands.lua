@@ -26,8 +26,8 @@ show:
   type: table
   title: Test board
   interval: 1h
-  show_countdown: true
-  countdown_format: "next {time}s"
+style:
+  countdown: { display: block, content: "next {time}s" }
 ]]
 
 ---Restart the child; a fresh temp directory with configs unless `keep_dir`.
@@ -523,7 +523,7 @@ args:
   - { name: region, default: EU }
   - { name: hours, type: int, default: 24 }
 show: { args_show: true }
-layout: { columns: 2 }
+style: { dashboard: { grid-template-columns: 2 } }
 panels:
   - id: orders
     query:
@@ -846,7 +846,7 @@ T["thresholds notify once when a value rises to a notify step"] = function()
     "  args: [{ name: v, type: int, default: 5 }]",
     "show:",
     "  type: stat",
-    "  thresholds: [{ value: 10, color: yellow }, { value: 50, color: red, notify: true }]",
+    "  thresholds: [{ value: 10, class: warning }, { value: 50, class: danger, notify: true }]",
   }, dir .. "/alert.yaml")
   child.cmd("DbDashStart alert.yaml")
   child.lua([[_G.wait_for(function() return require("dbdash.scheduler").list()[1].panels[1].rs ~= nil end)]])
@@ -1070,8 +1070,8 @@ local MULTI = [[
 database:
   url: "sqlite:///:memory:"
 interval: 3s
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 panels:
   - query:
       sql: SELECT 'alpha' AS a
@@ -1079,7 +1079,8 @@ panels:
       type: table
       title: Fast
       interval: 1s
-      show_countdown: true
+    style:
+      countdown: { display: block }
   - query:
       sql: SELECT 'beta' AS b
     show:
@@ -1090,7 +1091,8 @@ panels:
       sql: SELEC broken
     show:
       title: Broken
-      span: 2
+    style:
+      panel: { grid-column: span 2 }
 ]]
 
 local function start_multi()
@@ -1114,7 +1116,7 @@ T["multi-panel: grid, per-panel errors and countdowns"] = function()
   eq(regions[3].row_s > regions[1].row_e, true)
   local marks = child.lua_get([[vim.tbl_map(function(m) return { m[2], m[4].virt_text_win_col } end,
     vim.api.nvim_buf_get_extmarks(0, require("dbdash.view.buffer").ns_status, 0, -1, { details = true }))]])
-  eq(#marks, 1) -- only the panel with show_countdown
+  eq(#marks, 1) -- only the panel whose countdown is shown
   eq(marks[1][1], regions[1].row_s)
 end
 
@@ -1137,7 +1139,9 @@ T["multi-panel: commands act on the panel under the cursor"] = function()
   eq(lines()[1], "SELECT 'beta' AS b")
   child.type_keys("q")
   child.cmd("DbDashStyle table box")
-  local style = child.lua_get("vim.tbl_map(function(p) return p.style.renderer or '' end, require('dbdash.scheduler').list()[1].panels)")
+  -- a runtime rule on that panel's chart (the computed renderer of each chart)
+  local style = child.lua_get([[vim.tbl_map(function(p) return require("dbdash.css.style").get(p.chart_node).renderer or "" end,
+    require("dbdash.scheduler").list()[1].panels)]])
   eq(style, { "", "box", "" })
   local status = (function()
     child.cmd("DbDashStatus")

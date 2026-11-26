@@ -1,33 +1,33 @@
 │                            Headcount share
   ^ 28-43 DbDashTitle
 │ ██████████████████████████████████████████████████████████████████████
-  ^ 1-49 DbDashC__ff6b6b
-  ^ 49-58 DbDashC__4ecdc4
-  ^ 58-76 DbDashC__45b7d1
-  ^ 76-211 DbDashC__96ceb4
+  ^ 1-49 DbDashCss__ff6b6b____
+  ^ 49-58 DbDashCss__4ecdc4____
+  ^ 58-76 DbDashCss__45b7d1____
+  ^ 76-211 DbDashCss__96ceb4____
 │ ██████████████████████████████████████████████████████████████████████
-  ^ 1-49 DbDashC__ff6b6b
-  ^ 49-58 DbDashC__4ecdc4
-  ^ 58-76 DbDashC__45b7d1
-  ^ 76-211 DbDashC__96ceb4
+  ^ 1-49 DbDashCss__ff6b6b____
+  ^ 49-58 DbDashCss__4ecdc4____
+  ^ 58-76 DbDashCss__45b7d1____
+  ^ 76-211 DbDashCss__96ceb4____
 │
 │ ■ IT                       42   22.8%
-  ^ 1-4 DbDashC__ff6b6b
+  ^ 1-4 DbDashCss__ff6b6b____
   ^ 4-27 DbDashLegend
   ^ 27-32 DbDashNumber
   ^ 32-40 DbDashMuted
 │ ■ HR                        7    3.8%
-  ^ 1-4 DbDashC__4ecdc4
+  ^ 1-4 DbDashCss__4ecdc4____
   ^ 4-27 DbDashLegend
   ^ 27-32 DbDashNumber
   ^ 32-40 DbDashMuted
 │ ■ Finance                  15    8.2%
-  ^ 1-4 DbDashC__45b7d1
+  ^ 1-4 DbDashCss__45b7d1____
   ^ 4-27 DbDashLegend
   ^ 27-32 DbDashNumber
   ^ 32-40 DbDashMuted
 │ ■ Research & Development  120   65.2%
-  ^ 1-4 DbDashC__96ceb4
+  ^ 1-4 DbDashCss__96ceb4____
   ^ 4-27 DbDashLegend
   ^ 27-32 DbDashNumber
   ^ 32-40 DbDashMuted

@@ -44,27 +44,28 @@ function M.level_hex(l, stops)
   return M.hex((l - 1) / (M.LEVELS - 1), stops)
 end
 
----The colors of a heat map (ECharts visualMap): style.color_scale (a list of "#rrggbb"
----stops, continuous), style.color_steps (piecewise: [{value, color}], a value takes the
----color of the highest step it reaches), style.scale_min / scale_max (the range).
+---The colors of a heat map (ECharts visualMap): chart { color-scale } (a list of
+---"#rrggbb" stops, continuous) or chart { color-steps } (piecewise: [{value, color}], a
+---value takes the color of the highest step it reaches); show.scale_min / scale_max (the
+---range of the data mapped onto them).
 ---@return { color: fun(v: number): string?, lo: number, hi: number, stops: table?, steps: table? }
-function M.colors(show, g)
-  local style = C.nn(show.style) or {}
-  local lo = tonumber(C.nn(style.scale_min)) or g.lo
-  local hi = tonumber(C.nn(style.scale_max)) or g.hi
+function M.colors(show, g, ctx)
+  local chart = ctx.css:get()
+  local lo = tonumber(C.nn(show.scale_min)) or g.lo
+  local hi = tonumber(C.nn(show.scale_max)) or g.hi
   local stops
-  local scale = C.nn(style.color_scale)
+  local scale = chart["color-scale"]
   if type(scale) == "table" and #scale > 0 then
     stops = {}
     for _, c in ipairs(scale) do
       local rgb = rgb_of(c)
       if not rgb then
-        error({ phase = "render", message = ("style.color_scale: %q is not a #rrggbb color"):format(tostring(c)) }, 0)
+        error({ phase = "render", message = ("color-scale: %q is not a #rrggbb color"):format(tostring(c)) }, 0)
       end
       stops[#stops + 1] = rgb
     end
   end
-  local steps = C.nn(style.color_steps)
+  local steps = chart["color-steps"]
   if type(steps) == "table" and #steps > 0 then
     local list = {}
     for _, st in ipairs(steps) do
@@ -144,9 +145,9 @@ function M.get(g, x, y)
   return g.values[x .. "\0" .. y]
 end
 
----Scale legend line appended below the chart (style.legend / show.legend false hides it).
+---Scale legend line appended below the chart (legend { display: none } hides it).
 function M.legend(ctx, out, g, indent, scale, show)
-  if show and C.legend_position(show, 2) == "none" then
+  if show and C.legend_position(ctx, 2) == "none" then
     return out
   end
   scale = scale or { lo = g.lo, hi = g.hi }

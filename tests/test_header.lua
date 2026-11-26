@@ -58,11 +58,12 @@ T["title and global countdown: a header line, the panel's countdown below it"] =
   local d = run("one", [[
 title: Sales overview
 interval: 10m
-show_countdown: true
-countdown_format: "all in {clock}"
 database: { url: "sqlite:///:memory:" }
 query: { sql: SELECT 1 AS x }
-show: { show_countdown: true, countdown_format: "{time}s", interval: 30s }
+show: { interval: 30s }
+style:
+  countdown: { display: block, content: "{time}s" }
+  header countdown: { content: "all in {clock}" }
 ]])
   local lines = vim.api.nvim_buf_get_lines(d.buf, 0, 3, false)
   eq({ lines[1], lines[2] }, { "Sales overview", "" })
@@ -74,7 +75,7 @@ end
 T["grid: the header above the panels; without title or countdown, none"] = function()
   local d = run("grid", [[
 interval: 1h
-show_countdown: true
+style: { "header countdown": { display: block } }
 database: { url: "sqlite:///:memory:" }
 panels:
   - query: { sql: SELECT 1 AS x }
@@ -88,12 +89,13 @@ panels:
   eq(plain.panels[1].meta.dashboard_title, nil)
 end
 
-T["show_countdown needs the top-level interval"] = function()
-  local path = dir .. "/bad.yaml"
-  vim.fn.writefile({ "show_countdown: true", "database: { url: 'sqlite:///:memory:' }", "query: { sql: x }" }, path)
-  local cfg, err = require("dbdash.config").load(path)
-  eq(cfg, nil)
-  eq(err.message:find("show_countdown counts down to the top%-level interval; set interval") ~= nil, true)
+T["the header countdown counts down to the top-level interval: none without one"] = function()
+  local d = run("nointerval", [[
+style: { "header countdown": { display: block } }
+database: { url: "sqlite:///:memory:" }
+query: { sql: SELECT 1 AS x }
+]])
+  eq(#marks(d, 0), 0)
 end
 
 T["threshold notifications use the dashboard title when the panel has none"] = function()
@@ -108,7 +110,7 @@ database: { url: "sqlite:///:memory:" }
 query: { sql: SELECT 99 AS v }
 show:
   type: stat
-  thresholds: [{ value: 50, color: red, notify: true }]
+  thresholds: [{ value: 50, class: danger, notify: true }]
 ]])
   vim.notify = real
   local found = false

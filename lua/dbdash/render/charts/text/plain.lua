@@ -1,7 +1,11 @@
 -- text/plain: the result as plain text, without a table. Each row is one piece of text:
--- its cells joined by style.separator (" "), NULL as style.null_text (""); newlines in a
--- cell start new lines, tabs expand to 8-column stops. Lines wider than the panel wrap
--- (style.wrap = false cuts them instead). show.column_list picks and orders the columns.
+-- its cells joined by show.separator (" "), NULL as cell.null { content } (""); newlines
+-- in a cell start new lines, tabs expand to 8-column stops. show.column_list picks and
+-- orders the columns, show.reverse puts the last row first, show.highlight gives lines
+-- that match a pattern a class.
+-- Appearance (CSS): line { text-align, white-space (nowrap: cut instead of wrapping),
+-- word-break (break-all), text-overflow, color }, line.<class>, line-number { display:
+-- block }, chart { line-clamp: N } (lines shown).
 local W = require("dbdash.util.width")
 local tbl = require("dbdash.render.table")
 
@@ -76,17 +80,17 @@ end
 ---@param ctx dbdash.render.Ctx
 ---@return dbdash.render.Output
 function M.render(rs, show, ctx)
-  local style = nn(show.style) or {}
-  local sep = nn(style.separator) or " "
-  local null_text = nn(style.null_text) or ""
-  local wrap = nn(style.wrap)
-  local do_wrap = wrap ~= false
+  local css = ctx.css
+  local line_style = css:get("line")
+  local sep = nn(show.separator) or " "
+  local null_text = css:get("cell", { classes = { "null" } }).content or ""
+  local do_wrap = line_style["white-space"] ~= "nowrap"
   local lines, hl = {}, {}
   local title = nn(show.title)
   if title and title ~= "" then
     local t = W.truncate(title, ctx.width)
     lines[1] = t
-    hl[1] = { row = 0, col_s = 0, col_e = #t, group = ctx.color(nn(style.title_style), ctx.css:hl("title")) }
+    hl[1] = { row = 0, col_s = 0, col_e = #t, group = css:hl("title") }
   end
   if #rs.rows == 0 then
     lines[#lines + 1] = "(no rows)"
@@ -94,22 +98,22 @@ function M.render(rs, show, ctx)
     return { lines = lines, hl = hl }
   end
   local cols = columns(rs, show)
-  -- Options after Bootstrap's text utilities and log viewers: style.text_align (left, center,
-  -- right), style.reverse (the last row first), style.line_numbers, style.max_lines
-  -- ("… N more lines"), style.highlight: [{ pattern (a Vim regex), color }] colors the
-  -- lines that match (the first matching rule wins).
-  local align = nn(style.text_align) or "left"
-  local numbers = nn(style.line_numbers) == true
+  -- After Bootstrap's text utilities and log viewers: line { text-align }, show.reverse
+  -- (the last row first), line-number { display: block }, chart { line-clamp } ("… N more
+  -- lines"), show.highlight: [{ pattern (a Vim regex), class }] puts the class on the lines
+  -- that match (the first matching rule wins; default class: warning).
+  local align = line_style["text-align"] ~= "start" and line_style["text-align"] or "left"
+  local numbers = css:get("line-number").display ~= "none"
   local rules = {}
-  for _, r in ipairs(nn(style.highlight) or {}) do
+  for _, r in ipairs(nn(show.highlight) or {}) do
     local ok, re = pcall(vim.regex, tostring(nn(r.pattern) or ""))
     if not ok then
-      error({ phase = "render", message = ("style.highlight: invalid pattern %q"):format(tostring(nn(r.pattern))) }, 0)
+      error({ phase = "render", message = ("show.highlight: invalid pattern %q"):format(tostring(nn(r.pattern))) }, 0)
     end
-    rules[#rules + 1] = { re = re, group = ctx.color(nn(r.color), ctx.css:hl("warning")) }
+    rules[#rules + 1] = { re = re, group = css:hl("line", { classes = { nn(r.class) or "warning" } }) }
   end
   local rows = rs.rows
-  if nn(style.reverse) == true then
+  if nn(show.reverse) == true then
     rows = {}
     for k = #rs.rows, 1, -1 do
       rows[#rows + 1] = rs.rows[k]
@@ -124,7 +128,7 @@ function M.render(rs, show, ctx)
       parts[k] = cell_text(row[i], rs.columns[i].type, null_text)
     end
     local text = table.concat(parts, sep):gsub("\r\n", "\n"):gsub("\r", "")
-    local group = ctx.css:hl("line")
+    local group = css:hl("line")
     for _, r in ipairs(rules) do
       if r.re:match_str(text) then
         group = r.group
@@ -136,10 +140,10 @@ function M.render(rs, show, ctx)
       line = expand_tabs(line)
       local pieces
       if do_wrap then
-        pieces = W.wrap(line, width, wrap == "char" and "char" or "word")
+        pieces = W.wrap(line, width, line_style["word-break"] == "break-all" and "char" or "word")
       else
-        -- CSS text-overflow: clip by default, style.ellipsis to mark the cut
-        pieces = { W.truncate(line, width, nn(style.ellipsis) or "") }
+        -- CSS text-overflow: clip by default (the UA sheet), a string to mark the cut
+        pieces = { W.truncate(line, width, require("dbdash.render").ellipsis(line_style)) }
       end
       for _, piece in ipairs(pieces) do
         body[#body + 1] = { text = piece, group = group, n = first and n or nil }
@@ -147,7 +151,7 @@ function M.render(rs, show, ctx)
       end
     end
   end
-  local max = tonumber(nn(style.max_lines))
+  local max = css:get()["line-clamp"]
   local hidden = 0
   if max and #body > max then
     hidden = #body - max
@@ -170,7 +174,7 @@ function M.render(rs, show, ctx)
     end
   end
   if hidden > 0 then
-    local note = ("… %d more lines (style.max_lines)"):format(hidden)
+    local note = ("… %d more lines (chart line-clamp)"):format(hidden)
     lines[#lines + 1] = note
     hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #note, group = ctx.css:hl("note") }
   end
