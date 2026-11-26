@@ -260,6 +260,18 @@ T["config: non-local addresses need security; credentials never in the URL"] = f
   eq(st.err.message:find("needs a port", 1, true) ~= nil, true)
 end
 
+T["tokens: ${NAME} reads the environment; an unset one is a config error"] = function()
+  vim.env.DBDASH_TEST_TOKEN = "from-env"
+  local st = start("webhook://127.0.0.1:0/api", nil, { tokens = { bearer = "${DBDASH_TEST_TOKEN}" } })
+  eq(request(st, "GET", "/api/ping").status, 200)
+  local nd = { ["Content-Type"] = "application/x-ndjson" }
+  eq(request(st, "POST", "/api/orders/bj", '{"id": 1}', with(nd, { Authorization = "Bearer from-env" })).status, 202)
+  eq(request(st, "POST", "/api/orders/bj", '{"id": 1}', with(nd, { Authorization = "Bearer ${DBDASH_TEST_TOKEN}" })).status, 401)
+  vim.env.DBDASH_TEST_TOKEN = nil
+  st = start("webhook://127.0.0.1:0/api", nil, { tokens = { bearer = "${DBDASH_TEST_TOKEN}" } })
+  eq(st.err.message, "database.options.tokens.bearer: environment variable DBDASH_TEST_TOKEN is not set")
+end
+
 T["a busy port is an error; stopping frees the port"] = function()
   local a = start("webhook://127.0.0.1:0", "", {})
   local b = start("webhook://127.0.0.1:" .. a.port, "", {})

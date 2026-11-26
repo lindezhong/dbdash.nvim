@@ -104,7 +104,14 @@ function M.produce(info, text, ctx)
   })
   local tokens = {}
   for k, v in pairs(o.tokens or {}) do
-    tokens[k] = v
+    local what = "database.options.tokens." .. k
+    if type(v) == "table" then
+      tokens[k] = vim.tbl_map(function(x)
+        return options.expand_env(x, what)
+      end, v)
+    else
+      tokens[k] = options.expand_env(v, what) -- ${NAME}: from the environment
+    end
   end
   local ok, api = pcall(openapi.load, vim.trim(text) ~= "" and text or default_doc(info.base_path), {
     base_dir = ctx.base_dir,

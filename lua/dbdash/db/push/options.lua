@@ -67,6 +67,24 @@ function M.dir(scheme, value, base_dir)
   return p
 end
 
+---Replace ${NAME} with the environment variable NAME ($${ is a literal "${"); raises a
+---config error naming `what` when one is not set.
+function M.expand_env(value, what)
+  if type(value) ~= "string" then
+    return value
+  end
+  return (value:gsub("(%$?)%${([%a_][%w_]*)}", function(escape, name)
+    if escape == "$" then
+      return "${" .. name .. "}"
+    end
+    local v = vim.uv.os_getenv(name)
+    if v == nil then
+      dberr.raise("config", ("%s: environment variable %s is not set"):format(what, name))
+    end
+    return v
+  end))
+end
+
 function M.delimiter(v)
   if type(v) ~= "string" or v == "" then
     return "must be a non-empty string"

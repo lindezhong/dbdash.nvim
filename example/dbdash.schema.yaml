@@ -120,7 +120,7 @@ definitions:
     properties:
       type:
         description: Database type; inferred from the URL scheme when omitted.
-        enum: [sqlite, sqlite3, postgres, postgresql, mysql, mariadb, redis, rediss, mongodb, cassandra, cql, mssql, sqlserver, lua, http, https]
+        enum: [sqlite, sqlite3, postgres, postgresql, mysql, mariadb, redis, rediss, mongodb, cassandra, cql, mssql, sqlserver, lua, http, https, luastream, exec, webhook]
       url:
         type: string
         description: |-
@@ -152,6 +152,14 @@ definitions:
                       query.sql describes the request (:help dbdash-http); https
                       defaults to tls=verify-full; other ?parameters go to the server
 
+          Push sources: data arrives instead of being queried (:help dbdash-push)
+          Lua stream  luastream://   query.sql is Lua whose print() / io.write() output is
+                      the data (:help dbdash-luastream)
+          Script      exec://        query.sql is a script; its output is the data
+                      (:help dbdash-exec)
+          Webhook     webhook://127.0.0.1:8765/path   an HTTP endpoint; query.sql is an
+                      OpenAPI document (:help dbdash-webhook)
+
           Common parameters:
             tls=disable|require|pin|verify-ca|verify-full   (default disable)
             fingerprint=sha256:AB:CD:...                    (required for tls=pin)
@@ -172,6 +180,9 @@ definitions:
           - "mssql://sa:Secret1@sqlhost:1433/master?tls=pin&fingerprint=sha256:AB:..."
           - "lua://"
           - "https://api.example.com/v1?api_key=${API_KEY}"
+          - "luastream://"
+          - "exec://"
+          - "webhook://127.0.0.1:8765/events"
       password_cmd:
         description: >-
           Command printing the password (first line), used when the URL has none. A string
@@ -187,6 +198,62 @@ definitions:
           lib_path: { type: string, description: "SQLite: path of the libsqlite3 library to load." }
           readonly: { type: boolean, description: "SQLite: open the file read-only." }
           create: { type: boolean, description: "SQLite: create the file when it does not exist (default false)." }
+          delimiter:
+            type: string
+            minLength: 1
+            description: 'Push sources: what separates items in the output or a streamed request body (default "\n"; a "\r" before it is dropped).'
+          cwd:
+            type: string
+            description: "exec:// and luastream://: the working directory (default: this config file's directory; relative to it)."
+          interpreter:
+            type: array
+            minItems: 1
+            items: { type: string }
+            description: 'exec://: the program running the script, the script being its last argument (default ["sh", "-c"], ["cmd.exe", "/d", "/s", "/c"] on Windows).'
+            examples: [["bash", "-c"], ["python3", "-c"], ["pwsh", "-Command"]]
+          capture:
+            enum: [stdout, stderr, both]
+            description: "exec://: which output is the data (default stdout); each item knows its stream."
+          ok_codes:
+            type: array
+            minItems: 1
+            items: { type: integer }
+            description: "exec://: exit codes that end normally (default [0]); others fail with the end of stderr."
+          env:
+            type: object
+            additionalProperties: { type: [string, number, boolean] }
+            description: "exec://: environment variables added to Neovim's."
+          stdin:
+            type: string
+            description: "exec://: text written to the script's stdin (then closed)."
+          tokens:
+            type: object
+            description: >-
+              webhook://: the credentials of the OpenAPI document's security schemes, by scheme
+              name: a token (http bearer, apiKey), "user:password" (http basic), or a list of them.
+              Use ${NAME} to read them from the environment.
+          stream_types:
+            type: array
+            items: { type: string }
+            description: "webhook://: more media types whose bodies are cut into items at the delimiter."
+          max_body:
+            type: [string, integer]
+            description: 'webhook://: the largest request body (default "10MB"; larger ones get 413).'
+          max_connections:
+            type: integer
+            minimum: 1
+            description: "webhook://: connections at the same time (default 16; more are closed)."
+          timeout:
+            $ref: "#/definitions/duration"
+            description: "webhook://: time to send the headers and each part of the body (default 10s; then 408)."
+          allowed_origins:
+            type: array
+            items: { type: string }
+            description: "webhook://: Origin values accepted (browsers send one; default none). Requests without an Origin are accepted."
+          allowed_hosts:
+            type: array
+            items: { type: string }
+            description: "webhook://: more Host names accepted besides the listening address and localhost."
 
   arg:
     type: object
@@ -254,6 +321,11 @@ definitions:
                            query.transform turns into rows; it sees args, meta,
                            store and dbdash.system/query/sleep/run (:help
                            dbdash-lua)
+            luastream://   Lua code whose print() / io.write() output is cut into
+                           items (dbdash.emit(value) passes one as it is)
+            exec://        a script run by database.options.interpreter
+            webhook://     an OpenAPI 3.1 document (YAML or JSON) describing the
+                           requests it accepts (empty: POST or PUT of anything)
             http(s)://     a JSON request description (empty: GET the URL):
                            {"method": "POST", "path": "search", "query": {...},
                             "headers": {...}, "cookies": "a=1; b=2" | "cookies.txt",

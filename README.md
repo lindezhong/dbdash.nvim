@@ -28,6 +28,10 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
   imports from files next to the config.
 - **Cancelling**: a refresh you ask for, stopping a dashboard and timeouts cancel the
   running query, on the server too (PostgreSQL, MySQL, SQL Server, MongoDB, SQLite, Lua).
+- **Push sources**: data that arrives instead of being queried: `luastream://` (Lua that
+  prints), `exec://` (a script's output, like `tail -f`) and `webhook://` (an HTTP endpoint
+  described by an OpenAPI 3.1 document, validated with JSON Schema, secured after MCP's
+  rules). Items are processed one at a time; the panel is drawn on its interval.
 - **Thresholds**: color values (stat cards, table cells) and notify when a value crosses a level.
 - **Arguments**: typed variables set from the command line, prompts or in the dashboard;
   shared by all panels or a panel's own.
@@ -177,6 +181,7 @@ Examples, all runnable as they are:
 | [`sqlite_file.yaml`](example/sqlite_file.yaml) | a SQLite file database |
 | [`lua.yaml`](example/lua.yaml) | a `lua://` data source (Lua code, a command's output) |
 | [`transform.yaml`](example/transform.yaml) | `query.transform` reshaping a query result with Lua |
+| [`push.yaml`](example/push.yaml) | push sources: `luastream://`, `exec://`, `webhook://` with OpenAPI |
 | [`template_lua.yaml`](example/template_lua.yaml) | Lua in templates: `{% lua %}` blocks and an imported module ([`lua/helpers.lua`](example/lua/helpers.lua)) |
 | [`callback.yaml`](example/callback.yaml) | panel state in Lua: `store` (a counter, a history of results drawn as a line), `meta.prev_ok.result`, `dbdash.run()` callbacks from `query.transform`, `{% lua %}` and an imported module ([`lua/callbacks.lua`](example/lua/callbacks.lua)), assigning arguments, `show.refresh_hidden`, run records (`meta.prev_runs`: a refresh and its callbacks with ids, callers, times) |
 | [`http.yaml`](example/http.yaml) | an HTTPS API (GitHub releases) turned into rows by a transform (needs network) |

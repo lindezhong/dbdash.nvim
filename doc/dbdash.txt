@@ -183,7 +183,8 @@ database:
     Show the current dashboard's title, config, global refresh (the
     top-level `interval`) and, for each panel, its database, next refresh
     and last queries (duration, rows, errors, skipped refreshes;
-    `defaults.history` of them, 20 by default).
+    `defaults.history` of them, 20 by default); for a push source its state
+    and items received, processed, queued and dropped (|dbdash-push|).
 
 :DbDash                                                              *:DbDash*
     Open the sidebar: the *.yaml / *.yml files of the current directory and
@@ -744,7 +745,8 @@ life, from that refresh until the next one starts. A record has:
 
   id           a UUID version 7 (made in Lua; within one Neovim ids are
                unique and increase)
-  kind         "refresh" or "callback"
+  kind         "refresh", "callback" or "push" (an item of a push source,
+               |dbdash-push|)
   depth        0 for a refresh, n for a callback n levels deep
   parent_id    the id of the run that called it (none for a refresh)
   refresh_id   the id of the refresh of its life (its own for a refresh)
@@ -1162,7 +1164,9 @@ URL: `<scheme>://[user[:password]@]host[:port][/database][?param=value]`
 Schemes also accepted: `sqlite3`, `postgresql`, `mariadb`, `rediss` (Redis
 with TLS), `mongodb+srv`, `cql`, `sqlserver`. `lua://` runs Lua
 (|dbdash-lua|) and `http://` / `https://` call an HTTP API (|dbdash-http|).
-`database.type` is inferred from the scheme.
+`luastream://`, `exec://` and `webhook://` are push sources: their data
+arrives instead of being queried (|dbdash-push|). `database.type` is inferred
+from the scheme.
 
 Common parameters: `tls` (disable | require | pin | verify-ca |
 verify-full), `fingerprint` (sha256:AB:CD:..., required for pin), `ca`
@@ -1412,9 +1416,10 @@ script still running at the query timeout, or when its refresh is cancelled
 then). Blocking calls such as `vim.fn.system()` freeze
 the editor: use `dbdash.system()`.
 
-Trust: Lua runs with your permissions, so a config that runs Lua is trusted
-before it starts. The unit is the config: one question covers all the Lua it
-runs, its own (`lua://`, `transform`, `{% lua %}` blocks) and the files it
+Trust: Lua runs with your permissions, so a config that runs Lua (or a
+script: `exec://`) is trusted before it starts. The unit is the config: one
+question covers all the Lua it runs, its own (`lua://`, `luastream://`,
+`exec://`, `transform`, `{% lua %}` blocks) and the files it
 imports, includes or extends (`.lua` modules and templates with `{% lua %}`
 blocks, found through imports, includes and extends whose target is a
 quoted name). The question lists those files:
@@ -1519,6 +1524,193 @@ them.
 A response other than 2xx is an error showing the status and the start of the
 body (401 and 403 count as authentication errors). Compressed responses are
 not requested and not supported; bodies are limited to 64 MB.
+
+Push sources                                                     *dbdash-push*
+
+`luastream://`, `exec://` and `webhook://` are push sources: data arrives
+instead of being queried on an interval. All three work the same way:
+
+- A producer runs: Lua code (|dbdash-luastream|), a script (|dbdash-exec|)
+  or an HTTP endpoint (|dbdash-webhook|). What it writes is cut into items
+  at `database.options.delimiter` (default a newline; a "\r" before it is
+  dropped, empty items are skipped, items longer than `push.max_record` are
+  cut there). One item is passed at a time.
+- Items wait in the panel's queue (at most `push.max_queue`; when it is full
+  the oldest is dropped). One consumer takes them in order, one at a time,
+  each a run of kind "push" (|dbdash-runs|): `query.transform` gets the item
+  as `rs` (text, or the value `dbdash.emit()` or a request gave), plus
+  `stream`, `params` or `request` where the source gives them, and returns
+  rows. Without a transform an item must be JSON rows (|dbdash-result|).
+  `store`, `meta.prev`, `meta.prev_ok` and `meta.refresh_count` follow each
+  item; `dbdash.run(args)` runs the transform on the same item with other
+  arguments.
+- The panel is drawn on its `show.interval` when something is new, so a fast
+  source does not redraw for every item. A hidden dashboard keeps taking
+  items and draws when it is shown again.
+- The source starts with the dashboard, and again with `r`, |:DbDashRestart|
+  and changed arguments (`query.sql` is rendered then, with the arguments of
+  that moment). Timer refreshes do not start it.
+- When an `exec://` script or `luastream://` code ends, the queue is
+  drained, the last result drawn and the panel stops: its header says
+  "ended" (or shows the error); other panels go on, `r` starts it again.
+  Stopping the dashboard stops the source (the script is killed, the port
+  closed).
+
+The panel's header shows the state ("running", "listening
+127.0.0.1:8765", "ended"); |:DbDashStatus| the items received, processed,
+queued, dropped and cut, and the requests a webhook refused.
+
+Lua stream                                                  *dbdash-luastream*
+
+`luastream://`: `query.sql` is Lua, like |dbdash-lua|, whose output is the
+data: text written with `print()` or `io.write()` is cut into items, and
+`dbdash.emit(value)` passes one item as it is (a table, for example). A value
+the code returns is the last item; it ends when the code returns. >yaml
+  database:
+    url: "luastream://"
+    options: { cwd: "logs", delimiter: "\n" }
+  query:
+    sql: |
+      for line in io.lines("events.log") do print(line) end
+<
+It has no timeout: it runs until it returns or is stopped. Code that runs
+longer than the query timeout without waiting (`dbdash.sleep()`,
+`dbdash.checkpoint()`, a query, a command) is stopped, as it would freeze
+Neovim.
+
+`options.cwd` is its directory (default: the config file's; relative to
+it). Lua runs inside Neovim, so instead of changing the process's directory,
+`io.open`, `io.lines`, `dofile` and `loadfile` read relative paths from
+there and `io.popen`, `os.execute` and `dbdash.system()` run commands there;
+`dbdash.cwd` is its path. Neovim's own directory does not change.
+
+Script                                                           *dbdash-exec*
+
+`exec://`: `query.sql` is a script; its output is the data. Everything else
+is in `database.options`: >yaml
+  database:
+    url: "exec://"
+    options:
+      interpreter: ["bash", "-c"]   # default sh -c (cmd /d /s /c on Windows)
+      capture: both                 # stdout (default), stderr or both
+      delimiter: "\n"
+      ok_codes: [0, 1]              # exit codes that end normally (default 0)
+      cwd: "~/logs"                 # default: the config file's directory
+      env: { LANG: C }              # added to Neovim's environment
+      stdin: "..."                  # written to the script, then closed
+  query:
+    sql: tail -n 0 -F app.log
+<
+The script is the interpreter's last argument (`["python3", "-c"]`,
+`["pwsh", "-Command"]` and `["nvim", "--clean", "-l", "run.lua"]` work too).
+Each item knows its `stream` ("stdout" or "stderr"; the two are separate
+pipes, so lines of one may come before earlier lines of the other). An exit
+code not in `ok_codes` ends the panel with an error showing the code and the
+end of stderr. Stopping sends SIGTERM, and SIGKILL after 2 seconds.
+Arguments written into the script (`{{ args.file }}`) are text in it: quote
+them for the shell, or read them in the script some other way.
+
+Webhook                                                       *dbdash-webhook*
+
+`webhook://host:port/path` listens on its own port (host defaults to
+127.0.0.1; port 0 takes any free one, shown in the header). `query.sql` is an
+OpenAPI 3.1 document (YAML or JSON; 3.0 is accepted too) describing what it
+accepts; the document's paths are appended to the URL's path as written
+(`/api` and `/orders/{id}` serve `/api/orders/{id}`). Without a document it
+takes POST and PUT of anything at the URL's path. >yaml
+  database:
+    url: "webhook://127.0.0.1:8765/api"
+    options:
+      tokens: { bearer: "${ORDERS_TOKEN}" }
+  query:
+    sql: |
+      openapi: 3.1.0
+      info: { title: orders, version: "1" }
+      security: [ { bearer: [] } ]
+      paths:
+        /orders/{shop}:
+          post:
+            parameters:
+              - { name: shop, in: path, required: true,
+                  schema: { type: string, enum: [bj, sh] } }
+              - { name: limit, in: query,
+                  schema: { type: integer, default: 10 } }
+            requestBody:
+              required: true
+              content:
+                application/x-ndjson:
+                  schema: { $ref: "#/components/schemas/Order" }
+                application/json:
+                  schema: { type: array }
+            responses: { "202": { description: queued } }
+      components:
+        schemas:
+          Order:
+            type: object
+            required: [id]
+            properties: { id: { type: integer }, amt: { type: number } }
+        securitySchemes:
+          bearer: { type: http, scheme: bearer }
+<
+What the document can say:
+
+- paths with templates (`{name}`, one segment; concrete paths win), every
+  method, path item parameters merged with the operation's;
+- parameters in path, query, header and cookie, with `schema` (types are
+  converted, defaults filled in), every `style` and `explode` (form, simple,
+  label, matrix, spaceDelimited, pipeDelimited, deepObject), `required`,
+  `allowEmptyValue` and `content` (e.g. JSON in a query parameter);
+- `requestBody` with media types chosen by Content-Type (exact, then
+  `type/*`, then `*/*`), forms with `encoding`, multipart;
+- `security` (http bearer, http basic, apiKey in a header or a cookie;
+  requirements are alternatives, the schemes of one are all needed) with
+  the credentials in `database.options.tokens` by scheme name (a string,
+  "user:password" for basic, or a list; `${NAME}` reads the environment);
+- the first 2xx response is the reply, with its `example` as the body
+  (else 202 and `{"queued": N}`);
+- `$ref` in the document and to files next to it (`schemas.yaml#/Order`).
+
+Schemas are JSON Schema 2020-12 (OpenAPI 3.1's; formats date-time, date,
+time, email, uri, uuid, ipv4, ipv6 and hostname are checked, `pattern` is
+an ECMA-262 regular expression).
+
+Items, by the request body's media type:
+
+  application/x-ndjson, application/jsonl, application/json-seq,
+  text/plain, text/csv, text/event-stream (and options.stream_types)
+               cut at the delimiter: one item per piece, each checked
+               against the schema (JSON ones decoded)
+  other JSON   the decoded body is one item
+  forms        the fields are one item (a mapping)
+  no body      the parameters are one item (a mapping)
+
+`query.transform` also gets `params` (`{ path, query, header, cookie }`,
+converted) and `request` (`{ method, path, operation_id, content_type,
+headers }` without the credential headers). A request that does not fit gets
+an `application/problem+json` reply and gives no items: 400 (what and
+where), 401 (with WWW-Authenticate), 403, 404, 405 (with Allow), 408, 413,
+415. When a streamed body has a bad item, the items before it are kept.
+
+Options: `tokens`, `delimiter`, `stream_types`, `max_body` (default 10MB),
+`max_connections` (16), `timeout` (10s to send the headers and each part of
+the body), `allowed_origins`, `allowed_hosts` (|dbdash-webhook-security|).
+
+Webhook security                                     *dbdash-webhook-security*
+
+A webhook follows MCP's rules for HTTP endpoints:
+
+- It listens on 127.0.0.1 unless the URL names another address; then every
+  operation must have a `security` requirement, or it does not start.
+- Credentials go in headers or cookies only: an apiKey in the query string is
+  refused (URLs end up in logs). They are compared in constant time and never
+  shown in `request`, `params`, errors or replies.
+- The Host header must be the listening address, localhost or one of
+  `allowed_hosts`, and a request with an Origin header (browsers send one)
+  must come from one of `allowed_origins` (none by default): this stops
+  web pages from reaching the port through DNS rebinding. Requests without
+  an Origin (curl, scripts) are not affected.
+- Bodies, connections and slow requests are limited (`max_body`,
+  `max_connections`, `timeout`).
 
 TLS                                                               *dbdash-tls*
 

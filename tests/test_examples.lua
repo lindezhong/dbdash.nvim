@@ -33,13 +33,17 @@ for _, f in ipairs(files) do
       if p.database.type == "http" then
         h.require_it()
       end
-      eq(({ sqlite = true, lua = true, http = true })[p.database.type], true)
+      eq(({ sqlite = true, lua = true, http = true, luastream = true, exec = true, webhook = true })[p.database.type], true)
     end
     sched.start(f, { no_show = true })
     local d = assert(sched.get(sched.normalize(f)), "dashboard did not start")
+    ---A webhook panel waits for requests: listening is enough.
+    local function waiting(p)
+      return p.cfg.database.type == "webhook" and not p.error and (p:push_state() or ""):match("^listening") ~= nil
+    end
     vim.wait(30000, function()
       for _, p in ipairs(d.panels) do
-        if not (p.rs or p.error) or p.running then
+        if not waiting(p) and (not (p.rs or p.error) or p.running) then
           return false
         end
       end
@@ -49,6 +53,9 @@ for _, f in ipairs(files) do
       if p.error then
         error(f .. ": " .. sched.format_error(p.error))
       end
+      if waiting(p) then
+        goto continue
+      end
       local rs = assert(p.rs, f .. ": no result")
       eq(rs.row_count > 0, true)
       local out = render.render(rs, p.cfg.show, { width = 100, height = 30 })
@@ -57,6 +64,7 @@ for _, f in ipairs(files) do
           error(f .. ": " .. out.lines[hl.row + 1])
         end
       end
+      ::continue::
     end
   end
 end

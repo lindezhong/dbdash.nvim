@@ -158,12 +158,15 @@
       "sqlserver",
       "lua",
       "http",
-      "https"
+      "https",
+      "luastream",
+      "exec",
+      "webhook"
      ]
     },
     "url": {
      "type": "string",
-     "description": "Connection URL: <scheme>://[user[:password]@]host[:port][/database][?param=value&...]\nUser names and passwords are percent-decoded (write @ as %40, : as %3A).\n${NAME} is replaced by the environment variable NAME ($${ for a literal ${).\nWithout a password in the URL: password_cmd, then\nstdpath(\"data\")/dbdash/passwords.json (see :help dbdash-passwords).\n\nSQLite      sqlite:///absolute/path.db                (or sqlite3://)\n            sqlite://relative/to/this/config.db\n            sqlite:///:memory:\nPostgreSQL  postgres://user:pass@host:5432/db        (or postgresql://)\n            auth: cleartext, md5, SCRAM-SHA-256; ?options=-c%20search_path%3Dapp\nMySQL       mysql://user:pass@host:3306/db           (or mariadb://)\n            auth: mysql_native_password, caching_sha2_password\nRedis       redis://[user]:pass@host:6379/0          (rediss:// = TLS)\nMongoDB     mongodb://user:pass@host:27017/db?authSource=admin\n            mongodb://user:pass@h1:27017,h2:27017/db?readPreference=secondaryPreferred\n            mongodb+srv://user:pass@cluster0.example.net/db   (SRV + TXT lookup,\n            defaults to tls=verify-full; ?dns=host:port picks the name server)\n            ?authMechanism=SCRAM-SHA-256|SCRAM-SHA-1\nCassandra   cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_QUORUM\n            (or cql://)\nSQL Server  mssql://user:pass@host:1433/db            (or sqlserver://)\n            with TLS: TLS negotiated inside TDS; &encrypt=strict for TDS 8\nLua         lua://   query.sql is Lua code returning rows (:help dbdash-lua)\nHTTP        https://user:pass@api.example.com/v1?key=value   (or http://)\n            query.sql describes the request (:help dbdash-http); https\n            defaults to tls=verify-full; other ?parameters go to the server\n\nCommon parameters:\n  tls=disable|require|pin|verify-ca|verify-full   (default disable)\n  fingerprint=sha256:AB:CD:...                    (required for tls=pin)\n  ca=path/to/ca.pem                              (verify-*: trusted CAs instead of\n                                                  the system store; relative to\n                                                  this config file)\n  tls_host=name                                  (name to verify instead of host)\n  connect_timeout=10s   timeout=30s              (defaults: setup)\n  application_name=dbdash.nvim",
+     "description": "Connection URL: <scheme>://[user[:password]@]host[:port][/database][?param=value&...]\nUser names and passwords are percent-decoded (write @ as %40, : as %3A).\n${NAME} is replaced by the environment variable NAME ($${ for a literal ${).\nWithout a password in the URL: password_cmd, then\nstdpath(\"data\")/dbdash/passwords.json (see :help dbdash-passwords).\n\nSQLite      sqlite:///absolute/path.db                (or sqlite3://)\n            sqlite://relative/to/this/config.db\n            sqlite:///:memory:\nPostgreSQL  postgres://user:pass@host:5432/db        (or postgresql://)\n            auth: cleartext, md5, SCRAM-SHA-256; ?options=-c%20search_path%3Dapp\nMySQL       mysql://user:pass@host:3306/db           (or mariadb://)\n            auth: mysql_native_password, caching_sha2_password\nRedis       redis://[user]:pass@host:6379/0          (rediss:// = TLS)\nMongoDB     mongodb://user:pass@host:27017/db?authSource=admin\n            mongodb://user:pass@h1:27017,h2:27017/db?readPreference=secondaryPreferred\n            mongodb+srv://user:pass@cluster0.example.net/db   (SRV + TXT lookup,\n            defaults to tls=verify-full; ?dns=host:port picks the name server)\n            ?authMechanism=SCRAM-SHA-256|SCRAM-SHA-1\nCassandra   cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_QUORUM\n            (or cql://)\nSQL Server  mssql://user:pass@host:1433/db            (or sqlserver://)\n            with TLS: TLS negotiated inside TDS; &encrypt=strict for TDS 8\nLua         lua://   query.sql is Lua code returning rows (:help dbdash-lua)\nHTTP        https://user:pass@api.example.com/v1?key=value   (or http://)\n            query.sql describes the request (:help dbdash-http); https\n            defaults to tls=verify-full; other ?parameters go to the server\n\nPush sources: data arrives instead of being queried (:help dbdash-push)\nLua stream  luastream://   query.sql is Lua whose print() / io.write() output is\n            the data (:help dbdash-luastream)\nScript      exec://        query.sql is a script; its output is the data\n            (:help dbdash-exec)\nWebhook     webhook://127.0.0.1:8765/path   an HTTP endpoint; query.sql is an\n            OpenAPI document (:help dbdash-webhook)\n\nCommon parameters:\n  tls=disable|require|pin|verify-ca|verify-full   (default disable)\n  fingerprint=sha256:AB:CD:...                    (required for tls=pin)\n  ca=path/to/ca.pem                              (verify-*: trusted CAs instead of\n                                                  the system store; relative to\n                                                  this config file)\n  tls_host=name                                  (name to verify instead of host)\n  connect_timeout=10s   timeout=30s              (defaults: setup)\n  application_name=dbdash.nvim",
      "examples": [
       "sqlite:///:memory:",
       "sqlite://data/app.db",
@@ -174,7 +177,10 @@
       "cassandra://cassandra:cassandra@127.0.0.1:9042/metrics",
       "mssql://sa:Secret1@sqlhost:1433/master?tls=pin&fingerprint=sha256:AB:...",
       "lua://",
-      "https://api.example.com/v1?api_key=${API_KEY}"
+      "https://api.example.com/v1?api_key=${API_KEY}",
+      "luastream://",
+      "exec://",
+      "webhook://127.0.0.1:8765/events"
      ]
     },
     "password_cmd": {
@@ -211,6 +217,109 @@
       "create": {
        "type": "boolean",
        "description": "SQLite: create the file when it does not exist (default false)."
+      },
+      "delimiter": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Push sources: what separates items in the output or a streamed request body (default \"\\n\"; a \"\\r\" before it is dropped)."
+      },
+      "cwd": {
+       "type": "string",
+       "description": "exec:// and luastream://: the working directory (default: this config file's directory; relative to it)."
+      },
+      "interpreter": {
+       "type": "array",
+       "minItems": 1,
+       "items": {
+        "type": "string"
+       },
+       "description": "exec://: the program running the script, the script being its last argument (default [\"sh\", \"-c\"], [\"cmd.exe\", \"/d\", \"/s\", \"/c\"] on Windows).",
+       "examples": [
+        [
+         "bash",
+         "-c"
+        ],
+        [
+         "python3",
+         "-c"
+        ],
+        [
+         "pwsh",
+         "-Command"
+        ]
+       ]
+      },
+      "capture": {
+       "enum": [
+        "stdout",
+        "stderr",
+        "both"
+       ],
+       "description": "exec://: which output is the data (default stdout); each item knows its stream."
+      },
+      "ok_codes": {
+       "type": "array",
+       "minItems": 1,
+       "items": {
+        "type": "integer"
+       },
+       "description": "exec://: exit codes that end normally (default [0]); others fail with the end of stderr."
+      },
+      "env": {
+       "type": "object",
+       "additionalProperties": {
+        "type": [
+         "string",
+         "number",
+         "boolean"
+        ]
+       },
+       "description": "exec://: environment variables added to Neovim's."
+      },
+      "stdin": {
+       "type": "string",
+       "description": "exec://: text written to the script's stdin (then closed)."
+      },
+      "tokens": {
+       "type": "object",
+       "description": "webhook://: the credentials of the OpenAPI document's security schemes, by scheme name: a token (http bearer, apiKey), \"user:password\" (http basic), or a list of them. Use ${NAME} to read them from the environment."
+      },
+      "stream_types": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "webhook://: more media types whose bodies are cut into items at the delimiter."
+      },
+      "max_body": {
+       "type": [
+        "string",
+        "integer"
+       ],
+       "description": "webhook://: the largest request body (default \"10MB\"; larger ones get 413)."
+      },
+      "max_connections": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "webhook://: connections at the same time (default 16; more are closed)."
+      },
+      "timeout": {
+       "$ref": "#/definitions/duration",
+       "description": "webhook://: time to send the headers and each part of the body (default 10s; then 408)."
+      },
+      "allowed_origins": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "webhook://: Origin values accepted (browsers send one; default none). Requests without an Origin are accepted."
+      },
+      "allowed_hosts": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "webhook://: more Host names accepted besides the listening address and localhost."
       }
      }
     }
@@ -275,7 +384,7 @@
    "properties": {
     "sql": {
      "type": "string",
-     "description": "Query template (Jinja2, see :help dbdash-templates): arguments are\n{{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta, e.g.\nrun records with ids, times and results: meta.run (meta.run.kind: \"refresh\" or\n\"callback\"; meta.run.depth: 0 in a refresh, n in a callback), meta.runs,\nmeta.prev, meta.prev_ok (the last successful refresh, its rows in\nmeta.prev_ok.result): :help dbdash-runs), and\n{% set args.<name> = value %} sets an argument (:help dbdash-assign-args). Lua\nruns in {% lua %} ... {% endlua %} blocks and in modules imported with\n{% import 'x.lua' as h %} (:help dbdash-template-lua), with args, meta, store and\nthe dbdash.* helpers (dbdash.run(args): this query again with other arguments);\na config with Lua is trusted once, with the files it imports (:help dbdash-lua).\nIts language depends on the database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\": {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)\n  lua://         Lua code returning rows (see \"Result format\" at the top\n                 of this file, :help dbdash-result), or a value that\n                 query.transform turns into rows; it sees args, meta,\n                 store and dbdash.system/query/sleep/run (:help\n                 dbdash-lua)\n  http(s)://     a JSON request description (empty: GET the URL):\n                 {\"method\": \"POST\", \"path\": \"search\", \"query\": {...},\n                  \"headers\": {...}, \"cookies\": \"a=1; b=2\" | \"cookies.txt\",\n                  \"body\": {...} | \"text\", \"form\": {...}, \"redirects\": 5}\n                 JSON responses are decoded, other bodies stay text; the\n                 result must be rows (\"Result format\", :help\n                 dbdash-result): a JSON list of objects or {\"columns\",\n                 \"rows\"} shows directly, anything else needs\n                 query.transform (:help dbdash-http)"
+     "description": "Query template (Jinja2, see :help dbdash-templates): arguments are\n{{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta, e.g.\nrun records with ids, times and results: meta.run (meta.run.kind: \"refresh\" or\n\"callback\"; meta.run.depth: 0 in a refresh, n in a callback), meta.runs,\nmeta.prev, meta.prev_ok (the last successful refresh, its rows in\nmeta.prev_ok.result): :help dbdash-runs), and\n{% set args.<name> = value %} sets an argument (:help dbdash-assign-args). Lua\nruns in {% lua %} ... {% endlua %} blocks and in modules imported with\n{% import 'x.lua' as h %} (:help dbdash-template-lua), with args, meta, store and\nthe dbdash.* helpers (dbdash.run(args): this query again with other arguments);\na config with Lua is trusted once, with the files it imports (:help dbdash-lua).\nIts language depends on the database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\": {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)\n  lua://         Lua code returning rows (see \"Result format\" at the top\n                 of this file, :help dbdash-result), or a value that\n                 query.transform turns into rows; it sees args, meta,\n                 store and dbdash.system/query/sleep/run (:help\n                 dbdash-lua)\n  luastream://   Lua code whose print() / io.write() output is cut into\n                 items (dbdash.emit(value) passes one as it is)\n  exec://        a script run by database.options.interpreter\n  webhook://     an OpenAPI 3.1 document (YAML or JSON) describing the\n                 requests it accepts (empty: POST or PUT of anything)\n  http(s)://     a JSON request description (empty: GET the URL):\n                 {\"method\": \"POST\", \"path\": \"search\", \"query\": {...},\n                  \"headers\": {...}, \"cookies\": \"a=1; b=2\" | \"cookies.txt\",\n                  \"body\": {...} | \"text\", \"form\": {...}, \"redirects\": 5}\n                 JSON responses are decoded, other bodies stay text; the\n                 result must be rows (\"Result format\", :help\n                 dbdash-result): a JSON list of objects or {\"columns\",\n                 \"rows\"} shows directly, anything else needs\n                 query.transform (:help dbdash-http)"
     },
     "transform": {
      "type": "string",
