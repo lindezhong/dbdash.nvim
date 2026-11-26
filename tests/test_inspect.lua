@@ -86,7 +86,7 @@ T["inspect: path, rules by origin and specificity, computed style, box"] = funct
   cursor_on(d, d.panels[1].chart_node)
   vim.cmd("DbDashInspect header")
   local text = float_text()
-  eq(text:find("dashboard > panel#a.table > chart.table > header", 1, true) ~= nil, true)
+  eq(text:find("dashboard > panel#a.table > chart.table > table > header", 1, true) ~= nil, true)
   eq(text:find("ua       header", 1, true) ~= nil, true) -- the UA sheet's rule
   eq(text:find("user     chart.table header  (0,1,2)", 1, true) ~= nil, true) -- setup({ style })
   eq(text:find("font%-weight +bold") ~= nil, true)

@@ -136,24 +136,31 @@ end
 ---content, for measuring min-content / max-content). The fragment is reused while
 ---nothing it depends on changed.
 ---@return dbdash.layout.Fragment
-function M.panel(p, width, height, fill, exact)
+---A fragment from the panel's layout cache, else laid out by `build` and kept.
+local function cached(p, kind, width, height, fill, exact, build)
   p.layout_cache = p.layout_cache or { n = 0, entries = {} }
   local cache = p.layout_cache
-  local key = panel_key(p, width, height, fill, exact)
+  local key = kind .. "|" .. panel_key(p, width, height, fill, exact)
   local hit = cache.entries[key]
   if hit and hit.rs == p.rs then
     M.stats.hits = M.stats.hits + 1
     return hit.frag
   end
   M.stats.misses = M.stats.misses + 1
-  local frag = layout_panel(p, width, height, fill, exact)
+  local frag = build()
   if cache.n > 16 then -- sizes come and go with the window: keep the cache small
     cache.entries, cache.n = {}, 0
   end
   -- keyed on the version after layout: styling parts the first time bumps it
-  cache.entries[panel_key(p, width, height, fill, exact)] = { rs = p.rs, frag = frag }
+  cache.entries[kind .. "|" .. panel_key(p, width, height, fill, exact)] = { rs = p.rs, frag = frag }
   cache.n = cache.n + 1
   return frag
+end
+
+function M.panel(p, width, height, fill, exact)
+  return cached(p, "grid", width, height, fill, exact, function()
+    return layout_panel(p, width, height, fill, exact)
+  end)
 end
 
 ---Layout cache counters (tests).
@@ -208,7 +215,15 @@ end
 ---The chart of a one-chart dashboard in its box; the title stays the chart's own unless
 ---the border carries it.
 ---@return dbdash.layout.Fragment
+local layout_single
+
 function M.single(p, width, height)
+  return cached(p, "single", width, height, false, false, function()
+    return layout_single(p, width, height)
+  end)
+end
+
+layout_single = function(p, width, height)
   local show = p:show_config()
   local st = box.settings(css.scope(p.node))
   local iw, ih = box.inner(st, width, height)

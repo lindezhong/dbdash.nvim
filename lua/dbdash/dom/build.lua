@@ -87,6 +87,12 @@ function M.sync(d, o)
     p.node:set_classes({ show.type })
     p.chart_node:set_classes({ show.type })
     p.chart_node:set_attr("type", show.type)
+    -- the chart's content (dom/content): built from the result here, before styles are
+    -- computed, as a script builds elements before the browser styles them; a result the
+    -- data cannot show (a missing column) is reported by the renderer instead
+    if p.rs and not p.error then
+      pcall(require("dbdash.dom.content").build, p.chart_node, p.rs, show)
+    end
     local title = child(p.node, "panel-title")
     title:set_text(style.get(title).display == "none" and "" or p:title())
     icon(p.node, p.cfg.show.description ~= nil)

@@ -109,6 +109,9 @@ function M.damage(old, new)
   if not old then
     return D.rebuild
   end
+  if old == new then
+    return D.none -- the same shared style
+  end
   local worst = D.none
   for name in pairs(properties.list) do
     if not vim.deep_equal(old[name], new[name]) then
@@ -118,9 +121,106 @@ function M.damage(old, new)
   return worst
 end
 
+-- Style sharing (Stylo's StyleSharingCache): nodes that are alike for every selector in
+-- the sheets get the same computed table. Alike means: the same parent computed table (so
+-- the same ancestors, as far as selectors can tell), tag, id, classes and attributes, the
+-- same scoped sheets, and the same result for each structural pseudo-class the sheets use
+-- (:nth-child(even) and the like). Rows and cells of a table mostly share a handful.
+
+---The structural pseudo-classes used anywhere in the document's sheets.
+local function used_pseudos(doc)
+  local key = doc.sheets
+  if doc.pseudo_cache and doc.pseudo_cache.key == key and doc.pseudo_cache.n == #key then
+    return doc.pseudo_cache.list
+  end
+  local seen, list = {}, {}
+  for _, sheet in ipairs(doc.sheets) do
+    for _, r in ipairs(sheet.rules) do
+      for _, c in ipairs(r.selector.parts) do
+        for _, p in ipairs(c.pseudos) do
+          local id = p.name .. "(" .. tostring(p.arg) .. ")"
+          if not seen[id] then
+            seen[id] = true
+            list[#list + 1] = { tag = nil, id = nil, classes = {}, attrs = {}, pseudos = { p } }
+          end
+        end
+      end
+    end
+  end
+  doc.pseudo_cache = { key = key, n = #key, list = list }
+  return list
+end
+
+local function sharing_key(doc, n, parent_computed, pseudos, scoped)
+  local key = tostring(parent_computed) .. "\0" .. n.tag .. "\0" .. (n.id or "")
+  local cls = n.classes
+  if #cls == 1 then
+    key = key .. "\0." .. cls[1]
+  elseif #cls > 1 then
+    key = key .. "\0." .. table.concat(cls, ".")
+  end
+  local k1, v1 = next(n.attrs)
+  if k1 ~= nil then
+    if next(n.attrs, k1) == nil then
+      key = key .. "\0[" .. k1 .. "=" .. tostring(v1)
+    else
+      local names = {}
+      for k in pairs(n.attrs) do
+        names[#names + 1] = k
+      end
+      table.sort(names)
+      for _, k in ipairs(names) do
+        key = key .. "\0[" .. k .. "=" .. tostring(n.attrs[k])
+      end
+    end
+  end
+  if #pseudos > 0 then
+    local sig = {}
+    for i, c in ipairs(pseudos) do
+      sig[i] = match.compound(c, n) and "1" or "0"
+    end
+    key = key .. "\0:" .. table.concat(sig)
+  end
+  for _, s in ipairs(scoped) do
+    if in_scope(n, s.scope) then
+      key = key .. "\0s" .. s.index
+    end
+  end
+  return key
+end
+
+local function depth(n)
+  local d = 0
+  while n.parent do
+    d, n = d + 1, n.parent
+  end
+  return d
+end
+
 local function restyle_subtree(doc, n, parent_computed, stats)
   local old = n.style_data and n.style_data.computed
-  local computed, matched = M.compute(doc, n, parent_computed)
+  local share = stats.share
+  if not share then
+    local scoped = {}
+    for si, sheet in ipairs(doc.sheets) do
+      if sheet.scope then
+        scoped[#scoped + 1] = { scope = sheet.scope, index = si }
+      end
+    end
+    share = { cache = {}, pseudos = used_pseudos(doc), scoped = scoped }
+    stats.share = share
+  end
+  local key = sharing_key(doc, n, parent_computed, share.pseudos, share.scoped)
+  local hit = share.cache[key]
+  local computed, matched
+  if hit then
+    computed, matched = hit[1], hit[2]
+    stats.shared = (stats.shared or 0) + 1
+  else
+    computed, matched = M.compute(doc, n, parent_computed)
+    share.cache[key] = { computed, matched }
+    stats.computed = (stats.computed or 0) + 1
+  end
   local damage = M.damage(old, computed)
   n.style_data = { computed = computed, damage = damage, rules = matched }
   if damage > D.none then
@@ -153,7 +253,7 @@ function M.restyle(doc)
     local list = {}
     for n, kind in pairs(pending) do
       if kind ~= "content" then
-        list[#list + 1] = { n = n, depth = #n:ancestors() }
+        list[#list + 1] = { n = n, depth = depth(n) }
       end
     end
     table.sort(list, function(a, b)
@@ -166,12 +266,13 @@ function M.restyle(doc)
       while n.parent and not n.parent.style_data do
         n = n.parent
       end
-      local covered = false
-      for _, a in ipairs(n:ancestors()) do
+      local covered, a = false, n
+      while a do
         if done[a] then
           covered = true
           break
         end
+        a = a.parent
       end
       if not covered and n.document == doc then
         done[n] = true
@@ -183,8 +284,14 @@ function M.restyle(doc)
     return stats
   end
   -- what restyles did since the last rendering update (a query flushes styles early)
-  local acc = doc.restyled or { nodes = 0, damage = D.none }
-  doc.restyled = { nodes = acc.nodes + stats.nodes, damage = math.max(acc.damage, stats.damage) }
+  local acc = doc.restyled or { nodes = 0, damage = D.none, computed = 0, shared = 0 }
+  doc.restyled = {
+    nodes = acc.nodes + stats.nodes,
+    damage = math.max(acc.damage, stats.damage),
+    computed = (acc.computed or 0) + (stats.computed or 0), -- distinct styles computed
+    shared = (acc.shared or 0) + (stats.shared or 0), -- styles taken from the sharing cache
+  }
+  stats.share = nil
   return stats
 end
 

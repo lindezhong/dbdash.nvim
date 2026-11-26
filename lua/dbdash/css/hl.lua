@@ -72,10 +72,25 @@ local function build(parts)
   return attrs
 end
 
+-- Groups of computed tables: shared styles (css/style.lua) resolve their group once.
+local memo = setmetatable({}, { __mode = "k" })
+local NONE = {}
+
 ---Highlight group for a computed style (nil when it sets nothing).
 ---@param c table<string, any>
 ---@return string?
 function M.group(c)
+  local m = memo[c]
+  if m ~= nil then
+    return m ~= NONE and m or nil
+  end
+  local g = M.make(c)
+  memo[c] = g or NONE
+  return g
+end
+
+---The group of a computed style, without the memo (M.group caches it per table).
+function M.make(c)
   local parts = {
     color = c["color"],
     bg = c["background-color"],

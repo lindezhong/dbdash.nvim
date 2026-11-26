@@ -178,7 +178,9 @@ T["DataTables-like: sort, rows shown, column format and color, row thresholds, c
   local special = vim.tbl_filter(function(h)
     return h.group == "Special"
   end, o.hl)
-  eq(#special, 2) -- a and c; the NULL keeps its own color
+  -- every cell of the column, the NULL one too: an author rule wins over the default
+  -- sheet's cell.null (the cascade, as in a browser)
+  eq(#special, 3)
   o = out(rs, { row_thresholds = { column = "n", steps = { { value = 1000, class = "danger" } } } })
   local red = vim.tbl_filter(function(h)
     return h.row == 3 and h.group == "DiagnosticError"

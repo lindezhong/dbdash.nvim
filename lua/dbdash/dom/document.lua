@@ -30,6 +30,14 @@ end
 
 ---Lowest common ancestor of two nodes of the same tree.
 local function common_ancestor(a, b)
+  -- the usual case: the dirty root is already an ancestor of the new dirty node
+  local n = b
+  while n do
+    if n == a then
+      return a
+    end
+    n = n.parent
+  end
   local seen = {}
   for _, n in ipairs(a:ancestors()) do
     seen[n] = true
@@ -47,10 +55,11 @@ function Document:note_dirty(n, kind)
   self.version = self.version + 1
   n:bump()
   local prev = self.pending[n]
-  -- the strongest kind wins: other > content > style
-  local rank = { style = 1, content = 2, other = 3 }
-  if not prev or rank[kind] > rank[prev] then
+  -- style (restyle) and content (relayout) are different needs: both together are other
+  if not prev or prev == kind then
     self.pending[n] = kind
+  else
+    self.pending[n] = "other"
   end
   local p = n.parent
   while p and not p.dirty_descendants do

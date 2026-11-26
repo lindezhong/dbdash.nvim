@@ -115,6 +115,36 @@ function Node:set_children(children)
   self:dirty(M.CONTENT)
 end
 
+---Remove the children of `tag` past the first `keep` (they are the last of their tag:
+---content builders append in order). The new last one is no longer followed: restyle it
+---(:last-child).
+function Node:truncate(tag, keep)
+  local count = (self.tag_counts or {})[tag] or 0
+  if count <= keep then
+    return
+  end
+  local kept, last = {}, nil
+  for _, c in ipairs(self.children) do
+    if c.tag ~= tag or c.tag_index <= keep then
+      kept[#kept + 1] = c
+      if c.tag == tag then
+        last = c
+      end
+    else
+      c.parent = nil
+    end
+  end
+  self.children = kept
+  self.tag_counts[tag] = keep
+  self.last_by_tag[tag] = last
+  if self.document then
+    self:dirty(M.CONTENT)
+    if last then
+      last:dirty(M.STYLE)
+    end
+  end
+end
+
 function Node:has_class(name)
   for _, c in ipairs(self.classes) do
     if c == name then
