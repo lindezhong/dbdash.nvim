@@ -1,0 +1,280 @@
+-- Drawing a dashboard: header, countdowns, argument lines and the panel grid.
+local M = require("dbdash.scheduler")
+local S = require("dbdash.scheduler.shared")
+local Panel, Dashboard = S.Panel, S.Dashboard
+local opts, now = S.opts, S.now
+local args = require("dbdash.args")
+local buffer = require("dbdash.view.buffer")
+local W = require("dbdash.util.width")
+
+---Countdown text: {time} the seconds left, {clock} m:ss (h:mm:ss from an hour);
+---"…" while refreshing.
+function M.countdown_text(fmt, secs, running)
+  if running then
+    return "…"
+  end
+  local f = math.floor
+  local clock = secs >= 3600 and ("%d:%02d:%02d"):format(f(secs / 3600), f(secs % 3600 / 60), secs % 60)
+    or ("%d:%02d"):format(f(secs / 60), secs % 60)
+  return (fmt:gsub("{time}", tostring(secs)):gsub("{clock}", clock))
+end
+
+---Seconds until the next refresh of every panel (cfg.refresh_all).
+function Dashboard:remaining_global()
+  if not self.gnext_at then
+    return 0
+  end
+  return math.max(0, math.ceil((self.gnext_at - now()) / 1000))
+end
+
+---The header above the panels: the dashboard title (and the global countdown, an extmark
+---on its line), then an empty line; none without a title or countdown.
+---ⓘ (dashboard.icons.description): there is a description to read with K.
+local function desc_icon()
+  return require("dbdash").options.dashboard.icons.description
+end
+
+---The header shows ⓘ for the dashboard's description, and in a one-chart dashboard for the
+---chart's too (the chart has no title line of its own).
+function Dashboard:header_icon()
+  local cfg = self.cfg
+  return cfg.description ~= nil or (not cfg.grid and self.panels[1].cfg.show.description ~= nil)
+end
+
+---The header above the panels: the dashboard title and ⓘ (and the global countdown, an
+---extmark on its line), then an empty line; none without any of them.
+function Dashboard:header()
+  local cfg = self.cfg
+  local icon = self:header_icon()
+  if not (cfg.title or cfg.show_countdown or icon) then
+    return {}, {}
+  end
+  local title = cfg.title or ""
+  local line, hl = title, { { row = 0, col_s = 0, col_e = #title, group = "DbDashTitle" } }
+  if icon then
+    line = title ~= "" and (title .. " ") or ""
+    hl[#hl + 1] = { row = 0, col_s = #line, col_e = #line + #desc_icon(), group = "DbDashDescIcon" }
+    line = line .. desc_icon()
+  end
+  return { line, "" }, hl
+end
+
+---The args_show line of a panel (its shown_args with their current values; local ones
+---highlighted apart), cut to `width`; nil when it shows none.
+---@return { lines: string[], hl: table[] }?
+function M.args_line(p, width)
+  local specs = p.cfg.shown_args
+  if #specs == 0 then
+    return nil
+  end
+  local parts, spans, pos = {}, {}, 0
+  local function put(str, group)
+    if group then
+      spans[#spans + 1] = { pos, pos + #str, group }
+    end
+    parts[#parts + 1] = str
+    pos = pos + #str
+  end
+  for _, spec in ipairs(specs) do
+    if #parts > 0 then
+      put("  ")
+    end
+    put(spec.name, spec.panel and "DbDashArgLocal" or "DbDashArgName")
+    put("=")
+    put(args.format_value(args.value(spec, p.d.state)), "DbDashArgValue")
+  end
+  local W = require("dbdash.util.width")
+  local text = table.concat(parts)
+  local line = W.truncate(text, width)
+  local hl = {}
+  for _, sp in ipairs(spans) do
+    if sp[1] < #line then
+      hl[#hl + 1] = { row = 0, col_s = sp[1], col_e = math.min(sp[2], #line), group = sp[3] }
+    end
+  end
+  return { lines = { line }, hl = hl }
+end
+
+---`parts` (rendered blocks) above `body`, rows shifted.
+local function prepend(body, parts)
+  local out = { lines = {}, hl = {} }
+  for _, part in ipairs(vim.list_extend(vim.list_extend({}, parts), { body })) do
+    local off = #out.lines
+    vim.list_extend(out.lines, part.lines)
+    for _, h in ipairs(part.hl) do
+      out.hl[#out.hl + 1] = { row = h.row + off, col_s = h.col_s, col_e = h.col_e, group = h.group }
+    end
+  end
+  return out
+end
+
+local function message(text, group)
+  return { lines = { text }, hl = { { row = 0, col_s = 0, col_e = #text, group = group } } }
+end
+
+---Render one panel's chart (or a placeholder) at the given size.
+local function render_panel(p, show, width, height)
+  if p.rs then
+    local ok, out = pcall(require("dbdash.render").render, p.rs, show, { width = width, height = height, history = p.values })
+    if ok then
+      return out
+    end
+    return message("render error: " .. tostring(out), "DbDashError")
+  elseif not p.error then
+    return message("Loading…", "DbDashMuted")
+  end
+  return { lines = {}, hl = {} }
+end
+
+---Multi-panel cell: a header line (title, state, error) above the chart.
+local function panel_cell(p, width, height)
+  local show = vim.deepcopy(p:show_config())
+  show.title = nil -- shown in the header line instead
+  local name = p:title()
+  if p.cfg.show.description then
+    name = name .. " " .. desc_icon()
+  end
+  local title = W.truncate(name, width)
+  local head, spans = title, { { 0, #title, "DbDashTitle" } }
+  if p.cfg.show.description and title == name then
+    local icon = desc_icon()
+    spans = { { 0, #title - #icon - 1, "DbDashTitle" }, { #title - #icon, #title, "DbDashDescIcon" } }
+  end
+  if p.error then
+    local room = width - W.width(head) - 3
+    if room > 5 then
+      local e = W.truncate(M.format_error(p.error):gsub("\n", " "), room)
+      spans[#spans + 1] = { #head + 2, #head + 2 + #("✗ " .. e), "DbDashError" }
+      head = head .. "  ✗ " .. e
+    end
+  end
+  local args_line = M.args_line(p, width)
+  local body = render_panel(p, show, width, args_line and height - 1 or height)
+  if args_line then
+    body = prepend(body, { args_line })
+  end
+  local out = { lines = { head }, hl = {} }
+  for _, s in ipairs(spans) do
+    out.hl[#out.hl + 1] = { row = 0, col_s = s[1], col_e = s[2], group = s[3] }
+  end
+  for i, l in ipairs(body.lines) do
+    out.lines[i + 1] = l
+  end
+  for _, h in ipairs(body.hl) do
+    out.hl[#out.hl + 1] = { row = h.row + 1, col_s = h.col_s, col_e = h.col_e, group = h.group }
+  end
+  return out
+end
+
+---Re-render cached results into the buffer (no query).
+function Dashboard:redraw()
+  if not vim.api.nvim_buf_is_valid(self.buf) then
+    return
+  end
+  local width, height = buffer.size(self.buf)
+  self.last_size = { width, height }
+  local lines, hl = self:header()
+  local offset = #lines
+  local body
+  if not self.cfg.grid then
+    local p = self.panels[1]
+    local args_line = M.args_line(p, width)
+    local h = height - offset
+    if args_line then
+      h = h - 2
+    end
+    body = render_panel(p, p:show_config(), width, h)
+    if args_line then
+      body = prepend(body, { args_line, { lines = { "" }, hl = {} } })
+    end
+    self.regions = nil
+  else
+    local layout = require("dbdash.render.layout")
+    local lay = self.cfg.layout
+    local spans = {}
+    for i, p in ipairs(self.panels) do
+      spans[i] = p.cfg.show.span
+    end
+    local cells = layout.plan(spans, width, lay.columns, lay.gap)
+    local grid_rows = 0
+    for _, c in ipairs(cells) do
+      grid_rows = math.max(grid_rows, c.row)
+    end
+    local cell_h = math.max(8, math.floor((height - offset) / grid_rows) - 2)
+    local outs = {}
+    for i, p in ipairs(self.panels) do
+      outs[i] = panel_cell(p, cells[i].width, cell_h)
+    end
+    body = layout.compose(cells, outs)
+    self.regions = {}
+    for i, r in ipairs(body.regions) do
+      self.regions[i] = { row_s = r.row_s + offset, row_e = r.row_e + offset, x = r.x, width = r.width }
+    end
+  end
+  vim.list_extend(lines, body.lines)
+  for _, h in ipairs(body.hl) do
+    hl[#hl + 1] = { row = h.row + offset, col_s = h.col_s, col_e = h.col_e, group = h.group }
+  end
+  if #lines == 0 then
+    lines = { "" }
+  end
+  self.header_rows = offset
+  buffer.draw(self.buf, lines, hl)
+  vim.b[self.buf].dbdash_regions = self.regions
+  self:update_status()
+end
+
+---Countdown and error extmarks.
+function Dashboard:update_status()
+  local header
+  if self.cfg.show_countdown then
+    local running = false
+    if self.refreshing_all then
+      for _, p in ipairs(self.panels) do
+        running = running or p.running
+      end
+      self.refreshing_all = running or nil
+    end
+    header = M.countdown_text(self.cfg.countdown_format, self:remaining_global(), running)
+  end
+  if not self.cfg.grid then
+    local p = self.panels[1]
+    local show = p.cfg.show
+    local countdown
+    if show.show_countdown then
+      countdown = M.countdown_text(show.countdown_format, p:remaining(), p.running)
+    end
+    buffer.set_status(self.buf, {
+      header = header,
+      countdown = countdown,
+      row = self.header_rows or 0,
+      error = p.error and M.format_error(p.error) or nil,
+      position = opts().countdown_position,
+    })
+    return
+  end
+  local marks = {}
+  for i, p in ipairs(self.panels) do
+    local r = self.regions and self.regions[i]
+    local show = p.cfg.show
+    if r and (show.show_countdown or p.running) then
+      local text = M.countdown_text(show.countdown_format, p:remaining(), p.running)
+      marks[#marks + 1] = { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text), text = text }
+    end
+  end
+  buffer.set_status(self.buf, { header = header, panels = marks })
+end
+
+---Panel whose region contains buffer line `lnum` (1-based) and display column `dcol`
+---(0-based); the only panel when single. Panels side by side share lines, so the column
+---decides between them.
+function Dashboard:panel_at(lnum, dcol)
+  if not self.cfg.grid then
+    return self.panels[1]
+  end
+  for i, r in ipairs(self.regions or {}) do
+    if lnum - 1 >= r.row_s and lnum - 1 <= r.row_e and (dcol or 0) >= r.x and (dcol or 0) < r.x + r.width then
+      return self.panels[i]
+    end
+  end
+end
