@@ -63,6 +63,40 @@ T["every setup option is documented"] = function()
   eq(missing(names, " %s = "), {})
 end
 
+T["every CSS property and element is documented and in the schema"] = function()
+  local props = require("dbdash.css.properties").names()
+  local schema = table.concat(vim.fn.readfile("example/dbdash.schema.yaml"), "\n")
+  local not_in_schema = {}
+  for _, name in ipairs(props) do
+    if not schema:find("\n        " .. name .. ":", 1, true) then
+      not_in_schema[#not_in_schema + 1] = name
+    end
+  end
+  eq(not_in_schema, {})
+  -- the properties section of the help names each one
+  local section = DOC:match("%*dbdash%-css%-properties%*(.-)%*dbdash%-rendering%*")
+  local not_in_help = {}
+  for _, name in ipairs(props) do
+    if not section:find(name, 1, true) then
+      not_in_help[#not_in_help + 1] = name
+    end
+  end
+  eq(not_in_help, {})
+  -- every element the default sheet styles is in the element tree of the help
+  local elements = DOC:match("%*dbdash%-css%-elements%*(.-)%*dbdash%-css%-properties%*")
+  local missing_el = {}
+  for sel in pairs(require("dbdash.css.ua")) do
+    for piece in (sel .. ","):gmatch("([^,]*),") do
+      for tag in piece:gmatch("([%a][%w-]*)") do
+        if not piece:find("%." .. tag) and not elements:find(tag, 1, true) then
+          missing_el[#missing_el + 1] = tag
+        end
+      end
+    end
+  end
+  eq(missing_el, {})
+end
+
 T["help tags build and lines fit in 78 columns"] = function()
   local dir = vim.fn.tempname()
   vim.fn.mkdir(dir .. "/doc", "p")
