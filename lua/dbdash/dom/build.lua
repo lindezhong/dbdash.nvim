@@ -24,6 +24,54 @@ function M.dashboard(d)
   return doc
 end
 
+---The direct child of `parent` with `tag` (created at the end when missing).
+local function child(parent, tag)
+  for _, c in ipairs(parent.children) do
+    if c.tag == tag then
+      return c
+    end
+  end
+  return parent:append(dom.new(tag))
+end
+M.child = child
+
+---Bring the view's nodes up to date with the dashboard's state (titles, ⓘ, errors,
+---argument values). Only changes mark nodes dirty, as DOM mutations do in a browser.
+---@param d table the dashboard
+---@param o { icon: string, format_error: fun(err: any): string, header_icon: boolean }
+function M.sync(d, o)
+  if not d.doc then
+    M.dashboard(d)
+  end
+  child(d.header_node, "header-title"):set_text(d.cfg.title or "")
+  child(d.header_node, "description-icon"):set_text(o.header_icon and o.icon or nil)
+  for _, p in ipairs(d.panels) do
+    local show = p:show_config()
+    local style = show.style ~= vim.NIL and show.style or {}
+    child(p.node, "panel-title"):set_text(style.show_title == false and "" or p:title())
+    child(p.node, "description-icon"):set_text(p.cfg.show.description and o.icon or nil)
+    child(p.node, "error"):set_text(p.error and o.format_error(p.error) or nil)
+    local sub = show.subtitle
+    child(p.node, "subtitle"):set_text(sub ~= nil and sub ~= vim.NIL and sub or nil)
+    -- the argument line: arg-name (.local for a panel's own) = arg-value, per shown arg
+    local args = child(p.node, "args")
+    local items = {}
+    for _, spec in ipairs(p.cfg.shown_args) do
+      local value = require("dbdash.args").format_value(require("dbdash.args").value(spec, d.state))
+      items[#items + 1] = { name = spec.name, value = value, ["local"] = spec.panel ~= nil }
+    end
+    if not vim.deep_equal(items, args.items) then
+      args.items = items
+      local kids = {}
+      for _, it in ipairs(items) do
+        kids[#kids + 1] = dom.new("arg-name", { classes = it["local"] and { "local" } or {}, text = it.name })
+        kids[#kids + 1] = dom.new("arg-value", { text = it.value })
+      end
+      args:set_children(kids)
+    end
+  end
+end
+
 ---A document for one view of its own (the sidebar, a popup): root `tag`.
 function M.view(tag)
   return css.document(tag)

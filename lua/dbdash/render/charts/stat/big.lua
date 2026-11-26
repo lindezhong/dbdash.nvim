@@ -184,7 +184,7 @@ function M.render(rs, show, ctx)
   for _, c in ipairs(cells) do
     c.height = h
   end
-  local out = require("dbdash.render.layout").compose(cells, outs)
+  local out = require("dbdash.compositor").compose(cells, outs)
   return { lines = out.lines, hl = out.hl }
 end
 

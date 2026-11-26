@@ -576,7 +576,7 @@ end
 ---reported with the panel's line.
 ---@return dbdash.LayoutConfig
 function Ctx:layout(raw, panels)
-  local L = require("dbdash.render.layout")
+  local L = require("dbdash.layout.grid")
   local layout = self:expect("layout", raw, "map", true) or map.new()
   local out = {
     gap = self:expect("layout.gap", layout.gap, "integer", true) or 2,

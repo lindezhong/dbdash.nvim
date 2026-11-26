@@ -56,6 +56,13 @@ function M.user_rules()
   return user_rules
 end
 
+---Highlight group of a node's own computed style (nil when it sets none).
+---@param n dbdash.dom.Node
+---@return string?
+function M.hl_of(n)
+  return hl.group(style.get(n))
+end
+
 ---@class dbdash.css.Scope
 ---@field node dbdash.dom.Node
 ---@field parts table<string, dbdash.dom.Node>

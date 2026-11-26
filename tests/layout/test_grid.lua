@@ -1,4 +1,5 @@
-local layout = require("dbdash.render.layout")
+local layout = require("dbdash.layout.grid")
+local compositor = require("dbdash.compositor")
 local helpers = require("tests.helpers")
 local W = require("dbdash.util.width")
 local eq = MiniTest.expect.equality
@@ -23,7 +24,7 @@ end
 
 T["compose: side by side, uneven heights, blank line between rows"] = function()
   local cells = layout.plan({ 1, 1, 2 }, 42, 2, 2)
-  local out = layout.compose(cells, { box("中文 A", 1), box("B", 3, "DbDashSeries1"), box("Wide", 0) })
+  local out = compositor.compose(cells, { box("中文 A", 1), box("B", 3, "DbDashSeries1"), box("Wide", 0) })
   helpers.golden("layout/grid", out)
   for _, l in ipairs(out.lines) do
     eq(W.width(l) <= 42, true)
@@ -37,7 +38,7 @@ end
 T["compose: long lines are cut and highlights clipped"] = function()
   local cells = layout.plan({ 1, 1 }, 22, 2, 2)
   local long = { lines = { string.rep("x", 30) }, hl = { { row = 0, col_s = 5, col_e = 30, group = "G" } } }
-  local out = layout.compose(cells, { long, box("R", 0) })
+  local out = compositor.compose(cells, { long, box("R", 0) })
   eq(out.lines[1], string.rep("x", 10) .. "  R")
   eq(out.hl[1], { row = 0, col_s = 5, col_e = 10, group = "G" })
   eq(out.hl[2], { row = 0, col_s = 12, col_e = 13, group = "DbDashTitle" })
@@ -136,7 +137,7 @@ T["compose: cells at their lines, a panel across rows"] = function()
     { x = 8, width = 6, y = 0, height = 5 },
     { x = 0, width = 6, y = 3, height = 2 },
   }
-  local out = layout.compose(cells, { box("A", 1), box("B", 4), box("C", 1) })
+  local out = compositor.compose(cells, { box("A", 1), box("B", 4), box("C", 1) })
   eq(out.lines, { "A       B", "A line  B line", "        B line", "C       B line", "C line  B line" })
   eq(out.regions[2], { row_s = 0, row_e = 4, x = 8, width = 6 })
 end
