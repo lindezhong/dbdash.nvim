@@ -17,7 +17,7 @@ local M = {
 
 local NULL = vim.NIL
 
-local PKT = { SQL_BATCH = 0x01, REPLY = 0x04, LOGIN7 = 0x10, PRELOGIN = 0x12 }
+local PKT = { SQL_BATCH = 0x01, REPLY = 0x04, ATTENTION = 0x06, LOGIN7 = 0x10, PRELOGIN = 0x12 }
 local PACKET_SIZE = 4096
 
 -- Little-endian helpers ---------------------------------------------------------------------
@@ -753,6 +753,15 @@ end
 
 function Conn:close()
   self.sock:close()
+end
+
+---Stop the batch running on `conn`: an attention packet on the same connection (the
+---server ends the batch and acknowledges it; the connection is closed right after).
+function M.cancel(conn)
+  if conn.sock.closed then
+    return
+  end
+  conn.sock:write(string.char(PKT.ATTENTION, 1, 0, 8, 0, 0, 1, 0))
 end
 
 function Conn:server_version()

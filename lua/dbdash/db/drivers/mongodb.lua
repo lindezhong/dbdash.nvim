@@ -439,6 +439,20 @@ function Conn:execute(query, opts)
   local filter = opt(q, "filter") or map.new()
   local levels = tonumber(opt(q, "flatten")) or 0
   self.db = db
+  -- A comment marks the operation so that M.cancel can find it (servers from 4.4 accept it
+  -- on every command used here).
+  self.op_comment = nil
+  if (self.max_wire or 0) >= 9 and op ~= "command" then
+    self.op_comment = "dbdash:" .. require("dbdash.util.uuid").v7()
+  end
+  ---The command document of `fields`, with the comment and the database.
+  local function command(fields)
+    if self.op_comment then
+      fields[#fields + 1] = { "comment", self.op_comment }
+    end
+    fields[#fields + 1] = { "$db", db }
+    return doc(fields)
+  end
 
   if op == "find" then
     local limit = tonumber(opt(q, "limit"))
@@ -459,27 +473,25 @@ function Conn:execute(query, opts)
       fields[#fields + 1] = { "limit", limit }
     end
     fields[#fields + 1] = { "batchSize", math.min(max + 1, 10000) }
-    fields[#fields + 1] = { "$db", db }
-    local docs, truncated = self:cursor(doc(fields), coll, max)
+    local docs, truncated = self:cursor(command(fields), coll, max)
     return M.to_resultset(docs, levels, max, truncated)
   elseif op == "aggregate" then
     local pipeline = opt(q, "pipeline") or {}
-    local docs, truncated = self:cursor(doc({
+    local docs, truncated = self:cursor(command({
       { "aggregate", coll },
       { "pipeline", pipeline },
       { "cursor", doc({ { "batchSize", math.min(max + 1, 10000) } }) },
-      { "$db", db },
     }), coll, max)
     return M.to_resultset(docs, levels, max, truncated)
   elseif op == "count" then
-    local r = self:command(doc({ { "count", coll }, { "query", filter }, { "$db", db } }))
+    local r = self:command(command({ { "count", coll }, { "query", filter } }))
     return resultset.new({ { name = "count", type = "integer", db_type = "int" } }, { { r.n } })
   elseif op == "distinct" then
     local field = opt(q, "field")
     if type(field) ~= "string" then
       dberr.raise("query", 'distinct needs "field": "<name>"')
     end
-    local r = self:command(doc({ { "distinct", coll }, { "key", field }, { "query", filter }, { "$db", db } }))
+    local r = self:command(command({ { "distinct", coll }, { "key", field }, { "query", filter } }))
     local docs = {}
     for i, v in ipairs(r.values or {}) do
       docs[i] = map.from_pairs({ { field, v } })
@@ -511,6 +523,34 @@ end
 
 function Conn:close()
   self.sock:close()
+end
+
+---Stop the operation running on `conn`: on a new connection, find it by its comment
+---($currentOp) and killOp it (users may kill their own operations).
+function M.cancel(conn, info)
+  local tag = conn.op_comment
+  if not tag then
+    return
+  end
+  local c = M.connect(info)
+  pcall(function()
+    local reply = c:command(doc({
+      { "aggregate", 1 },
+      {
+        "pipeline",
+        {
+          doc({ { "$currentOp", doc({ { "allUsers", false } }) } }),
+          doc({ { "$match", doc({ { "command.comment", tag } }) } }),
+        },
+      },
+      { "cursor", doc({}) },
+      { "$db", "admin" },
+    }))
+    for _, op in ipairs(reply.cursor and reply.cursor.firstBatch or {}) do
+      pcall(c.command, c, doc({ { "killOp", 1 }, { "op", op.opid }, { "$db", "admin" } }))
+    end
+  end)
+  c:close()
 end
 
 return M

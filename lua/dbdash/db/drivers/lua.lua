@@ -27,6 +27,7 @@ function Conn:execute(code, opts)
     lua = opts.lua,
     timeout = opts.timeout,
     max_rows = opts.max_rows,
+    cancel = opts.cancel, -- cancelling the query stops the script
   })
   return require("dbdash.db.lua_result").raw(value)
 end

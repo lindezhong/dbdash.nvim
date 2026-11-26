@@ -288,6 +288,7 @@ end
 function Conn:handshake(info)
   local hs = M.parse_handshake(self:read_packet())
   self.version = hs.version
+  self.thread_id = hs.thread_id -- the connection id, for KILL QUERY (M.cancel)
   local password = info.password or ""
   local caps = bit.bor(
     CLIENT.LONG_PASSWORD,
@@ -476,6 +477,17 @@ function Conn:close()
     self:write_packet("\1") -- COM_QUIT
   end)
   self.sock:close()
+end
+
+---Stop the query running on `conn`: KILL QUERY <its connection id> on a new connection
+---(a user can always kill the queries of its own connections).
+function M.cancel(conn, info)
+  if not conn.thread_id then
+    return
+  end
+  local killer = M.connect(info)
+  pcall(killer.execute, killer, ("KILL QUERY %d"):format(conn.thread_id), { max_rows = 1 })
+  killer:close()
 end
 
 function Conn:server_version()

@@ -1,7 +1,7 @@
 -- Uniform database error object (design §8.9).
 local M = {}
 
----@alias dbdash.db.Phase "connect"|"tls"|"auth"|"query"|"decode"|"timeout"|"config"|"internal"|"transform"
+---@alias dbdash.db.Phase "connect"|"tls"|"auth"|"query"|"decode"|"timeout"|"cancelled"|"config"|"internal"|"transform"
 
 ---@class dbdash.db.DbError
 ---@field driver string?

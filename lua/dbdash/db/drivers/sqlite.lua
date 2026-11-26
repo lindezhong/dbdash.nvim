@@ -22,7 +22,8 @@ local M = {
 }
 
 -- Runs in a worker thread: must not use upvalues. Arguments and result are strings.
-local function worker(path, sql, max_rows, timeout_ms, libs, readonly, create)
+-- cancel_addr: the address of an int32 the main loop sets to 1 to stop the query (M.cancel).
+local function worker(path, sql, max_rows, timeout_ms, libs, readonly, create, cancel_addr)
   -- The progress handler is a Lua callback called from sqlite3_step. LuaJIT raises "bad
   -- callback" (and Neovim aborts) when a callback runs inside a JIT-compiled FFI call, which
   -- happens once the step loop gets hot in the reused thread VM. Keep this code interpreted.
@@ -135,8 +136,13 @@ local function worker(path, sql, max_rows, timeout_ms, libs, readonly, create)
   local timeout = tonumber(timeout_ms)
   lib.sqlite3_busy_timeout(db, math.min(timeout, 5000))
   local deadline = vim.uv.hrtime() + timeout * 1e6
-  local timed_out = false
+  local timed_out, cancelled = false, false
+  local cancel_flag = ffi.cast("volatile int32_t*", ffi.cast("uintptr_t", tonumber(cancel_addr)))
   local progress = ffi.cast("int(*)(void*)", function()
+    if cancel_flag[0] ~= 0 then
+      cancelled = true
+      return 1
+    end
     if vim.uv.hrtime() > deadline then
       timed_out = true
       return 1
@@ -240,7 +246,10 @@ local function worker(path, sql, max_rows, timeout_ms, libs, readonly, create)
   progress:free()
   lib.sqlite3_close_v2(db)
   if err then
-    if timed_out then
+    if cancelled then
+      err.phase = "cancelled"
+      err.message = "query cancelled"
+    elseif timed_out then
       err.phase = "timeout"
       err.message = "query interrupted after " .. timeout .. "ms"
     end
@@ -390,6 +399,11 @@ end
 function Conn:execute(sql, opts)
   local o = self.info.options or {}
   local lib_path = o.lib_path ~= nil and o.lib_path ~= vim.NIL and o.lib_path or nil
+  -- The flag M.cancel sets; the worker's progress handler reads it. The connection keeps
+  -- it alive until the worker is done.
+  local ffi = require("ffi")
+  local flag = ffi.new("int32_t[1]")
+  self.cancel_flag = flag
   local raw = async.await(function(cb)
     local work = vim.uv.new_work(worker, cb)
     work:queue(
@@ -399,9 +413,11 @@ function Conn:execute(sql, opts)
       tostring(opts.timeout),
       table.concat(M.lib_candidates(lib_path), "\n"),
       o.readonly == true and "1" or "0",
-      o.create == true and "1" or "0"
+      o.create == true and "1" or "0",
+      ("%.0f"):format(tonumber(ffi.cast("uintptr_t", flag))) -- (tostring keeps 14 digits)
     )
   end)
+  self.cancel_flag = nil
   local res = vim.json.decode(raw, { luanil = { object = true, array = true } })
   if res.error or res.phase then
     local e = res.error or res
@@ -412,6 +428,13 @@ function Conn:execute(sql, opts)
 end
 
 function Conn:close() end
+
+---Stop the query running on `conn`: its worker's progress handler interrupts SQLite.
+function M.cancel(conn)
+  if conn.cancel_flag then
+    conn.cancel_flag[0] = 1
+  end
+end
 
 function Conn:server_version()
   return self.version

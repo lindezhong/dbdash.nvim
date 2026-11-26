@@ -34,6 +34,8 @@ M.helpers = {
   ---@param opts table? max_rows, timeout, options
   ---   raw = true: the raw result of lua:// / http(s):// instead of rows (value, response)
   query = function(url, query, opts)
+    -- Cancelling the code that runs this (its refresh) cancels the query too.
+    opts = vim.tbl_extend("force", {}, opts or {}, { cancel = (opts or {}).cancel or M.current_cancel() })
     local rs = require("dbdash.db").query_async(url, query, opts)
     local lua_result = require("dbdash.db.lua_result")
     if lua_result.is_raw(rs) then
@@ -55,8 +57,9 @@ end
 -- Timeouts of guarded code. LuaJIT has one debug hook for all coroutines, so a single hook
 -- checks the deadlines of the coroutine running now: a task waiting in guarded code (on a
 -- query, a command) is not checked while other code runs, and guarded code inside guarded
--- code (dbdash.run() callbacks, modules) keeps the outer deadline too.
-local deadlines = setmetatable({}, { __mode = "k" }) -- coroutine -> { { at, timeout } }
+-- code (dbdash.run() callbacks, modules) keeps the outer deadline too. The same hook stops
+-- guarded code whose cancel token (dbdash.db.cancel) was cancelled.
+local deadlines = setmetatable({}, { __mode = "k" }) -- coroutine -> { { at, timeout, token, done } }
 
 local function timeout_hook()
   local co = coroutine.running()
@@ -69,24 +72,32 @@ local function timeout_hook()
   end
   local t = vim.uv.hrtime()
   for i, d in ipairs(list) do
-    if t > d.at then
-      -- Raise once for the outermost expired deadline; the inner ones end with it.
-      for j = i, #list do
-        list[j].at = math.huge
+    if not d.done then
+      local cancelled = d.token and d.token.cancelled
+      if cancelled or t > d.at then
+        -- Raise once for the outermost stopped entry; the inner ones end with it.
+        for j = i, #list do
+          list[j].done = true
+        end
+        if cancelled then
+          error({ message = "query cancelled: " .. d.token.reason, cancelled = true }, 0)
+        end
+        error({ message = ("script did not finish within %.1fs"):format(d.timeout / 1000), timeout = true }, 0)
       end
-      error({ message = ("script did not finish within %.1fs"):format(d.timeout / 1000), timeout = true }, 0)
     end
   end
 end
 
 ---Call fn() and stop it when it runs longer than `timeout` ms: the count hook raises
----{ timeout = true, message } (pure Lua loops included). Returns pcall's results.
+---{ timeout = true, message } (pure Lua loops included); or when `token` is cancelled:
+---{ cancelled = true, message }. Returns pcall's results.
+---@param token dbdash.db.CancelToken?
 ---@return boolean ok, any result_or_error
-function M.guard(fn, timeout)
+function M.guard(fn, timeout, token)
   -- Interpreted code so the count hook can stop a runaway loop after the timeout.
   jit.off(fn, true)
   local co = coroutine.running()
-  if not (timeout and co) then
+  if not ((timeout or token) and co) then
     return pcall(fn)
   end
   local list = deadlines[co]
@@ -94,13 +105,13 @@ function M.guard(fn, timeout)
     list = {}
     deadlines[co] = list
   end
-  local entry = { at = vim.uv.hrtime() + timeout * 1e6, timeout = timeout }
+  local entry = { at = timeout and vim.uv.hrtime() + timeout * 1e6 or math.huge, timeout = timeout, token = token }
   list[#list + 1] = entry
   if debug.gethook() ~= timeout_hook then
     debug.sethook(timeout_hook, "", 10000)
   end
   local ok, ret = pcall(fn)
-  entry.at = math.huge
+  entry.done = true
   for i = #list, 1, -1 do
     if list[i] == entry then
       table.remove(list, i)
@@ -116,9 +127,21 @@ function M.guard(fn, timeout)
   return ok, ret
 end
 
+---The cancel token of the guarded code running now (innermost), if any.
+---@return dbdash.db.CancelToken?
+function M.current_cancel()
+  local co = coroutine.running()
+  local list = co and deadlines[co]
+  for i = #(list or {}), 1, -1 do
+    if list[i].token and not list[i].done then
+      return list[i].token
+    end
+  end
+end
+
 ---Compile and run `code`. Must be called inside a util.async task.
 ---@param code string
----@param o { phase: string, source: string?, line: integer?, args: table?, meta: table?, lua: table?, vars: table?, timeout: integer?, max_rows: integer? }
+---@param o { phase: string, source: string?, line: integer?, args: table?, meta: table?, lua: table?, vars: table?, timeout: integer?, max_rows: integer?, cancel: dbdash.db.CancelToken? }
 ---   vars: extra globals (e.g. rs for transform); line: line of the code in the config file;
 ---   lua: { store, helpers } of the panel's run (store, and dbdash with the run's helpers)
 ---@return any value what the script returned (checked as rows by db/lua_result.lua)
@@ -140,10 +163,12 @@ function M.run(code, o)
   if not fn then
     dberr.raise(o.phase, "syntax error: " .. tostring(cerr))
   end
-  local ok, ret = M.guard(fn, o.timeout)
+  local ok, ret = M.guard(fn, o.timeout, o.cancel)
   if not ok then
     if type(ret) == "table" and ret.timeout then
       dberr.raise("timeout", ret.message)
+    elseif type(ret) == "table" and ret.cancelled then
+      dberr.raise("cancelled", ret.message)
     end
     if type(ret) == "table" and ret.phase and ret.message then
       error(ret, 0) -- a DbError from dbdash.query

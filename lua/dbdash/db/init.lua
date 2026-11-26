@@ -2,7 +2,7 @@
 --
 -- Every query is: parse url -> connect -> execute -> close (no pooling). close() is always
 -- called, the whole operation is bounded by connect_timeout + timeout, and callbacks always
--- run on the main loop.
+-- run on the main loop. A query can be cancelled (M.query's handle, opts.cancel).
 local async = require("dbdash.util.async")
 local dberr = require("dbdash.db.error")
 local dialect = require("dbdash.db.dialect")
@@ -29,6 +29,8 @@ M.Error = dberr
 ---@field dialect dbdash.db.Dialect?
 ---@field capabilities { tls: boolean, sql: boolean, query_language: string }
 ---@field parse_url (fun(u: dbdash.db.ConnInfo): dbdash.db.ConnInfo)?
+---@field cancel (fun(conn: dbdash.db.Connection, info: dbdash.db.ConnInfo))? stop the query
+---   running on `conn` on the server (inside a task, while the query's own task waits)
 ---@field connect fun(info: dbdash.db.ConnInfo): dbdash.db.Connection
 
 local drivers = {} ---@type table<string, dbdash.db.Driver>
@@ -119,18 +121,42 @@ end
 ---@field raw boolean? return a raw driver result (lua://, http) as is, for query.transform;
 ---   otherwise it is checked and turned into a result set
 ---@field cookie_jar dbdash.http.Jar? cookies kept between http(s):// queries (one per dashboard)
+---@field cancel dbdash.db.CancelToken? cancelling it stops the query (see M.query)
 
----Run a query. `callback(err, rs)` is invoked exactly once, on the main loop.
+-- Server-side cancels still being sent (see M.pending_cancels).
+local pending = 0
+
+---Server-side cancels still being sent: Neovim waits for them briefly when it exits.
+---@return integer
+function M.pending_cancels()
+  return pending
+end
+
+---Run a query. `callback(err, rs)` is invoked exactly once, on the main loop. Returns a
+---handle: handle:cancel(reason) stops the query.
+---
+---Stopping a query (cancelled, or its time is up) always goes the same way:
+---  1. the client stops waiting: the callback gets the error at once (phase "cancelled" or
+---     "timeout") and a result that comes later is dropped;
+---  2. the server stops: driver.cancel(conn, info) when the connection is open (Postgres
+---     CancelRequest, MySQL KILL QUERY, SQL Server attention, MongoDB killOp, SQLite
+---     interrupt, Lua scripts stop); drivers without it (redis, cassandra, http) skip this;
+---  3. the connection is closed.
 ---@param raw_url string
 ---@param query string
 ---@param opts dbdash.db.QueryOpts?
 ---@param callback fun(err: dbdash.db.DbError?, rs: dbdash.db.ResultSet?)
+---@return { cancel: fun(self, reason: string?) }
 function M.query(raw_url, query, opts, callback)
   opts = opts or {}
   local driver_name
   local done = false
   local timer
-  local conn
+  local conn, driver, info
+  local closed, server_stopped = false, false
+  -- This query's token: Lua code of the query (lua://) stops when it is cancelled.
+  local token = require("dbdash.db.cancel").new()
+  local unlink
 
   local function finish(err, rs)
     if done then
@@ -142,8 +168,61 @@ function M.query(raw_url, query, opts, callback)
       timer:close()
       timer = nil
     end
+    if unlink then
+      unlink()
+    end
     vim.schedule(function()
       callback(err and dberr.wrap(err, driver_name) or nil, rs)
+    end)
+  end
+
+  local function close_conn()
+    if conn and not closed then
+      closed = true
+      pcall(conn.close, conn)
+    end
+  end
+
+  ---Steps 2 and 3: stop the query on the server, then close the connection (in a task:
+  ---drivers talk to the server).
+  local function stop_server()
+    if server_stopped or not conn or closed then
+      return
+    end
+    server_stopped = true
+    pending = pending + 1
+    async.run(function()
+      if driver.cancel then
+        pcall(driver.cancel, conn, info)
+      end
+      close_conn()
+    end, function()
+      pending = pending - 1
+    end)
+  end
+
+  ---Stop the query: the caller gets the error now (step 1), then the server stops.
+  local function abort(phase, message)
+    if done then
+      return
+    end
+    finish(dberr.new({ driver = driver_name, phase = phase, message = message }))
+    token:cancel(message)
+    stop_server()
+  end
+
+  local handle = {
+    cancel = function(_, reason)
+      abort("cancelled", "query cancelled: " .. (reason or "cancelled"))
+    end,
+  }
+  if opts.cancel then
+    if opts.cancel.cancelled then
+      handle:cancel(opts.cancel.reason)
+      return handle
+    end
+    unlink = opts.cancel:on_cancel(function(reason)
+      handle:cancel(reason)
     end)
   end
 
@@ -152,21 +231,21 @@ function M.query(raw_url, query, opts, callback)
     if not expanded then
       dberr.raise("config", env_err)
     end
-    local driver = M.driver_for(expanded)
-    driver_name = driver.name
-    local info = url.parse(expanded)
-    info.options = opts.options or {}
-    info.base_dir = opts.base_dir
-    if driver.parse_url then
-      info = driver.parse_url(info)
+    local d = M.driver_for(expanded)
+    driver_name = d.name
+    local i = url.parse(expanded)
+    i.options = opts.options or {}
+    i.base_dir = opts.base_dir
+    if d.parse_url then
+      i = d.parse_url(i)
     end
-    return { driver = driver, info = info }
+    return { driver = d, info = i }
   end)
   if not ok then
     finish(prep)
-    return
+    return handle
   end
-  local driver, info = prep.driver, prep.info
+  driver, info = prep.driver, prep.info
   local q_timeout = opts.timeout or info.timeout
   local exec_opts = {
     max_rows = opts.max_rows or require("dbdash").options.defaults.max_rows,
@@ -177,18 +256,14 @@ function M.query(raw_url, query, opts, callback)
     source = opts.source,
     line = opts.line,
     cookie_jar = opts.cookie_jar,
+    cancel = token,
   }
 
   timer = vim.uv.new_timer()
   timer:start(info.connect_timeout + q_timeout, 0, function()
-    finish(dberr.new({
-      driver = driver_name,
-      phase = "timeout",
-      message = ("query did not finish within %.1fs"):format((info.connect_timeout + q_timeout) / 1000),
-    }))
-    if conn then
-      pcall(conn.close, conn)
-    end
+    vim.schedule(function()
+      abort("timeout", ("query did not finish within %.1fs"):format((info.connect_timeout + q_timeout) / 1000))
+    end)
   end)
 
   local started = vim.uv.hrtime()
@@ -198,13 +273,18 @@ function M.query(raw_url, query, opts, callback)
     if done then
       return
     end
-    conn = driver.connect(info)
-    if done then -- timed out while connecting
-      pcall(conn.close, conn)
+    local c = driver.connect(info)
+    if done then -- stopped while connecting: nothing runs on the server yet
+      pcall(c.close, c)
       return
     end
+    conn = c
     local ok2, rs = pcall(conn.execute, conn, query, exec_opts)
-    pcall(conn.close, conn)
+    if not ok2 and type(rs) == "table" and rs.phase == "timeout" then
+      stop_server() -- a read or write timed out: the query may still run on the server
+    elseif not server_stopped then
+      close_conn()
+    end
     if not ok2 then
       error(rs, 0)
     end
@@ -220,6 +300,7 @@ function M.query(raw_url, query, opts, callback)
     end
     finish(err, rs)
   end)
+  return handle
 end
 
 ---Coroutine-style query for use inside util.async tasks. Raises DbError.

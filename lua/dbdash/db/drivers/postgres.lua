@@ -359,7 +359,7 @@ function Conn:startup(info)
       local k, pos = read_cstr(b, 1)
       self.params[k] = read_cstr(b, pos)
     elseif t == "K" then
-      -- BackendKeyData: cancellation is not used
+      self.backend_key = b -- BackendKeyData (process id and secret key): see M.cancel
     elseif t == "Z" then
       return
     elseif t == "E" then
@@ -456,6 +456,20 @@ end
 
 function Conn:server_version()
   return self.params.server_version
+end
+
+---Stop the query running on `conn`: a CancelRequest with its BackendKeyData on a new
+---connection (plain TCP, like libpq: the server reads it before any TLS or login).
+function M.cancel(conn, info)
+  if not conn.backend_key then
+    return
+  end
+  local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.connect_timeout })
+  pcall(function()
+    sock:write(i32(8 + #conn.backend_key) .. i32(80877102) .. conn.backend_key)
+    sock:read_to_eof(1024) -- the server closes the connection once it has the request
+  end)
+  sock:close()
 end
 
 return M
