@@ -125,6 +125,7 @@ dbdash-schema-show.colors	dbdash-schema.txt	/*dbdash-schema-show.colors*
 dbdash-schema-show.column_list	dbdash-schema.txt	/*dbdash-schema-show.column_list*
 dbdash-schema-show.column_list.alias	dbdash-schema.txt	/*dbdash-schema-show.column_list.alias*
 dbdash-schema-show.column_list.column	dbdash-schema.txt	/*dbdash-schema-show.column_list.column*
+dbdash-schema-show.column_list.height	dbdash-schema.txt	/*dbdash-schema-show.column_list.height*
 dbdash-schema-show.column_list.thresholds	dbdash-schema.txt	/*dbdash-schema-show.column_list.thresholds*
 dbdash-schema-show.column_list.thresholds_below	dbdash-schema.txt	/*dbdash-schema-show.column_list.thresholds_below*
 dbdash-schema-show.column_list.width	dbdash-schema.txt	/*dbdash-schema-show.column_list.width*

@@ -473,15 +473,18 @@ definitions:
         type: object
         description: |-
           Chart options:
-            table      border, header_style, border_style, title_style, show_lines, null_text
+            table      border, header_style, border_style, title_style, show_lines, null_text,
+                       wrap (true: long cells wrap at spaces; "char": anywhere; false: one
+                       line cut with "…"), cell_width / cell_height (every column's width
+                       and most lines per cell; a cell still too long ends with "…")
             area       stacked
             bar        color, show_values
             histogram  color, show_values
             boxplot    show_outliers, show_means
             heatmap    show_values (block renderer)
             pie        show_labels, show_values, show_percentages
-            text       separator (" "), null_text (""), wrap (true; false cuts long lines),
-                       title_style
+            text       separator (" "), null_text (""), wrap (true: at spaces; "char":
+                       anywhere; false cuts long lines), title_style
       colors:
         description: Series / slice colors, by position (list) or by category name (mapping).
         oneOf:
@@ -540,7 +543,8 @@ definitions:
               properties:
                 column: { type: string }
                 alias: { type: string }
-                width: { type: integer, minimum: 1 }
+                width: { type: integer, minimum: 1, description: "Column width (cells wrap inside it)." }
+                height: { type: integer, minimum: 1, description: "Most lines a cell takes; longer ends with …" }
                 thresholds:
                   $ref: "#/definitions/thresholds"
                   description: Color the cells of this column by value (notify works as for stat).

@@ -555,7 +555,7 @@
     },
     "style": {
      "type": "object",
-     "description": "Chart options:\n  table      border, header_style, border_style, title_style, show_lines, null_text\n  area       stacked\n  bar        color, show_values\n  histogram  color, show_values\n  boxplot    show_outliers, show_means\n  heatmap    show_values (block renderer)\n  pie        show_labels, show_values, show_percentages\n  text       separator (\" \"), null_text (\"\"), wrap (true; false cuts long lines),\n             title_style"
+     "description": "Chart options:\n  table      border, header_style, border_style, title_style, show_lines, null_text,\n             wrap (true: long cells wrap at spaces; \"char\": anywhere; false: one\n             line cut with \"…\"), cell_width / cell_height (every column's width\n             and most lines per cell; a cell still too long ends with \"…\")\n  area       stacked\n  bar        color, show_values\n  histogram  color, show_values\n  boxplot    show_outliers, show_means\n  heatmap    show_values (block renderer)\n  pie        show_labels, show_values, show_percentages\n  text       separator (\" \"), null_text (\"\"), wrap (true: at spaces; \"char\":\n             anywhere; false cuts long lines), title_style"
     },
     "colors": {
      "description": "Series / slice colors, by position (list) or by category name (mapping).",
@@ -702,7 +702,13 @@
          },
          "width": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "description": "Column width (cells wrap inside it)."
+         },
+         "height": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Most lines a cell takes; longer ends with …"
          },
          "thresholds": {
           "$ref": "#/definitions/thresholds",

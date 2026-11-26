@@ -641,15 +641,18 @@ configs (|dbdash-examples|). Every field has a tag:
           type: object
           description: |-
             Chart options:
-              table      border, header_style, border_style, title_style, show_lines, null_text
+              table      border, header_style, border_style, title_style, show_lines, null_text,
+                         wrap (true: long cells wrap at spaces; "char": anywhere; false: one
+                         line cut with "…"), cell_width / cell_height (every column's width
+                         and most lines per cell; a cell still too long ends with "…")
               area       stacked
               bar        color, show_values
               histogram  color, show_values
               boxplot    show_outliers, show_means
               heatmap    show_values (block renderer)
               pie        show_labels, show_values, show_percentages
-              text       separator (" "), null_text (""), wrap (true; false cuts long lines),
-                         title_style
+              text       separator (" "), null_text (""), wrap (true: at spaces; "char":
+                         anywhere; false cuts long lines), title_style
 <
                                              *dbdash-schema-show.colors* >yaml
         colors:
@@ -770,7 +773,10 @@ configs (|dbdash-examples|). Every field has a tag:
                   alias: { type: string }
 <
                                   *dbdash-schema-show.column_list.width* >yaml
-                  width: { type: integer, minimum: 1 }
+                  width: { type: integer, minimum: 1, description: "Column width (cells wrap inside it)." }
+<
+                                 *dbdash-schema-show.column_list.height* >yaml
+                  height: { type: integer, minimum: 1, description: "Most lines a cell takes; longer ends with …" }
 <
                              *dbdash-schema-show.column_list.thresholds* >yaml
                   thresholds:

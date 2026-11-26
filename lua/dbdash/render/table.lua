@@ -6,9 +6,12 @@
 --   │  1 │ Alice │
 --   └────┴───────┘
 --
--- show.column_list: [{column, alias, width}] selects and labels columns (all by default).
+-- show.column_list: [{column, alias, width, height}] selects and labels columns (all by
+-- default); width and height limit a column's cells.
 -- show.style: border (true), header_style, border_style, title_style, show_lines (false),
---             null_text ("NULL").
+--             null_text ("NULL"), wrap (true: long cells wrap at spaces; "char": anywhere;
+--             false: one line, cut with "…"), cell_width / cell_height (every column's
+--             limits). A cell still longer than its height ends with "…".
 local W = require("dbdash.util.width")
 
 local M = { name = "box" }
@@ -23,9 +26,10 @@ local function nn(v)
   return v
 end
 
----Display text for a cell value.
+---Display text for a cell value. Line breaks become "↵" unless `keep_lines` (wrapping
+---tables break the cell there).
 ---@return string text, boolean is_null
-function M.format_value(v, ltype, null_text)
+function M.format_value(v, ltype, null_text, keep_lines)
   if v == nil or v == vim.NIL then
     return null_text, true
   end
@@ -47,7 +51,10 @@ function M.format_value(v, ltype, null_text)
   else
     s = tostring(v)
   end
-  s = s:gsub("\r?\n", "↵"):gsub("\t", " ")
+  s = s:gsub("\r\n?", "\n"):gsub("\t", " ")
+  if not keep_lines then
+    s = s:gsub("\n", "↵")
+  end
   return s, false
 end
 
@@ -65,6 +72,7 @@ local function select_columns(rs, show)
           index = idx,
           label = type(spec) == "table" and nn(spec.alias) or name,
           width = type(spec) == "table" and tonumber(nn(spec.width)) or nil,
+          height = type(spec) == "table" and tonumber(nn(spec.height)) or nil,
           align = (ltype and NUMERIC[ltype]) and "right" or "left",
           ltype = ltype,
           thresholds = type(spec) == "table" and nn(spec.thresholds) and require("dbdash.render.thresholds").steps(
@@ -139,8 +147,15 @@ function M.render(rs, show, ctx)
   local g_border = ctx.color(nn(style.border_style), "DbDashBorder")
   local g_header = ctx.color(nn(style.header_style), "DbDashHeader")
   local g_title = ctx.color(nn(style.title_style), "DbDashTitle")
+  local wrap = nn(style.wrap)
+  local wrap_mode = wrap == "char" and "char" or (wrap ~= false and "word" or nil)
+  local cell_w, cell_h = tonumber(nn(style.cell_width)), tonumber(nn(style.cell_height))
 
   local cols = select_columns(rs, show)
+  for _, col in ipairs(cols) do
+    col.width = col.width or cell_w
+    col.height = col.height or cell_h
+  end
   local lines, hl = {}, {}
   local function add(line, spans)
     lines[#lines + 1] = line
@@ -168,7 +183,7 @@ function M.render(rs, show, ctx)
       if col.index then
         v = row[col.index] -- not `and ... or nil`: that turned false into NULL
       end
-      local text, is_null = M.format_value(v, col.ltype, null_text)
+      local text, is_null = M.format_value(v, col.ltype, null_text, wrap_mode ~= nil)
       local group
       if col.thresholds and not is_null then
         local T = require("dbdash.render.thresholds")
@@ -176,9 +191,13 @@ function M.render(rs, show, ctx)
         group = T.group(step)
       end
       cells[r][c] = { text = text, null = is_null, group = group }
-      data_w[c] = math.max(data_w[c], W.width(text))
+      local tw = 0
+      for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+        tw = math.max(tw, W.width(line))
+      end
+      data_w[c] = math.max(data_w[c], tw)
       if not col.width then
-        widths[c] = math.max(widths[c], W.width(text))
+        widths[c] = math.max(widths[c], tw)
       end
     end
   end
@@ -253,16 +272,35 @@ function M.render(rs, show, ctx)
     add(s, { { 0, #s, g_border } })
   end
 
+  ---The lines of a cell in its column: wrapped (or cut) to the width, at most the height.
+  local function cell_lines(text, c)
+    local w, out = widths[c], {}
+    if not wrap_mode then
+      return { W.truncate(text, w) }
+    end
+    for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+      vim.list_extend(out, W.wrap(line, w, wrap_mode))
+    end
+    return W.clamp(out, cols[c].height, w)
+  end
+
   for r, row in ipairs(cells) do
     if show_lines and r > 1 and border then
       add(rule("├", "─", "┼", "┤"))
     end
-    local texts, groups = {}, {}
+    local parts, groups, n = {}, {}, 1
     for c, cell in ipairs(row) do
-      texts[c] = cell.text
+      parts[c] = cell_lines(cell.text, c)
+      n = math.max(n, #parts[c])
       groups[c] = cell.null and "DbDashNull" or cell.group
     end
-    add(row_line(texts, groups, "│"))
+    for k = 1, n do
+      local texts = {}
+      for c = 1, #cols do
+        texts[c] = parts[c][k] or ""
+      end
+      add(row_line(texts, groups, "│"))
+    end
   end
   if border then
     add(rule("└", "─", "┴", "┘"))

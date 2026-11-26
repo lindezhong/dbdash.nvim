@@ -370,9 +370,19 @@ Fields the plugin does not use are ignored; invalid values of known fields
 are reported with their line and column. The full list of fields is in
 `example/dbdash.schema.yaml` (|dbdash-examples|).
 
-Table options: `column_list: [{column, alias, width, thresholds}]`,
+Table options: `column_list: [{column, alias, width, height, thresholds}]`,
 `style.border`, `style.header_style`, `style.border_style`,
-`style.title_style`, `style.show_lines`, `style.null_text`.
+`style.title_style`, `style.show_lines`, `style.null_text`, `style.wrap`,
+`style.cell_width`, `style.cell_height`.
+
+Long cells wrap inside their column (like CSS `white-space: normal`):
+`style.wrap` is true (break at spaces; a word longer than the column is cut),
+"char" (break anywhere) or false (one line, cut with "…"; newlines show as
+"↵"). Newlines in a value start a new line when wrapping. A column's `width`
+fixes its width and `height` the most lines a cell takes; `style.cell_width`
+and `style.cell_height` set them for every column. A cell that still does not
+fit ends with "…". When the window is narrower than the table, the widest
+text columns shrink first and their cells wrap more.
 
 Refresh intervals                                            *dbdash-interval*
 
@@ -545,7 +555,8 @@ A text chart shows the result as plain text, without a table: each row is
 its cells joined by `style.separator` (default a space), so a one-column
 query shows one line per row; strings are shown as they are, newlines in a
 cell start new lines, NULL is `style.null_text` (default empty). Lines wider
-than the window wrap (`style.wrap: false` cuts them). The result must still
+than the window wrap at spaces (`style.wrap: "char"` anywhere, `false` cuts
+them). The result must still
 be rows (|dbdash-result|): turn a string from `lua://` or HTTP into
 `{ { text = rs } }` with `query.transform` (|dbdash-transform|).
 

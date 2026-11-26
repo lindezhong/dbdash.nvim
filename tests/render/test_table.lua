@@ -96,4 +96,42 @@ T["highlight specs"] = function()
   eq(vim.api.nvim_get_hl(0, { name = g }).fg, 0xff0000)
 end
 
+T["long cells wrap; wrap = false cuts; char mode; newlines"] = function()
+  local rs = resultset.new(
+    { { name = "k", type = "string" }, { name = "v", type = "string" } },
+    { { "a", "the quick brown fox jumps" }, { "b", "x\ny" } }
+  )
+  local o = out(rs, {}, 20)
+  eq(o.lines[4], "│ a │ the quick    │")
+  eq(o.lines[5], "│   │ brown fox    │")
+  eq(o.lines[6], "│   │ jumps        │")
+  eq(o.lines[7], "│ b │ x            │")
+  eq(o.lines[8], "│   │ y            │")
+  o = out(rs, { style = { wrap = false } }, 20)
+  eq(o.lines[4], "│ a │ the quick b… │")
+  eq(o.lines[5], "│ b │ x↵y          │")
+  o = out(rs, { style = { wrap = "char" } }, 20)
+  eq(o.lines[4], "│ a │ the quick br │")
+end
+
+T["cell width and height: column_list and style defaults"] = function()
+  local rs = resultset.new({ { name = "v", type = "string" } }, { { "one two three four five" } })
+  local o = out(rs, { column_list = { { column = "v", width = 7, height = 2 } } })
+  eq({ o.lines[4], o.lines[5], o.lines[6] }, { "│ one two │", "│ three…  │", "└─────────┘" })
+  o = out(rs, { style = { cell_width = 9, cell_height = 1 } })
+  eq({ o.lines[4], o.lines[5] }, { "│ one two…  │", "└───────────┘" })
+end
+
+T["a wrapped row keeps its colors on every line"] = function()
+  local rs = resultset.new({ { name = "n", type = "integer" }, { name = "t", type = "string" } }, { { 9, "aa bb" } })
+  local o = out(rs, { column_list = { { column = "n", thresholds = { { value = 5, color = "red" } } }, { column = "t", width = 2 } } })
+  local rows = {}
+  for _, h in ipairs(o.hl) do
+    if h.group:match("^DbDashC_") then
+      rows[h.row] = true
+    end
+  end
+  eq({ rows[3], rows[4] }, { true, true })
+end
+
 return T

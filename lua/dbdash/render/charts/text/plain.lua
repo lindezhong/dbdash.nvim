@@ -71,25 +71,6 @@ local function expand_tabs(line)
   return table.concat(out)
 end
 
----Split a line into pieces of at most `width` display cells.
-local function wrap(line, width)
-  if W.width(line) <= width then
-    return { line }
-  end
-  local pieces, cur, used = {}, {}, 0
-  for ch in W.chars(line) do
-    local w = W.width(ch)
-    if used + w > width and used > 0 then
-      pieces[#pieces + 1] = table.concat(cur)
-      cur, used = {}, 0
-    end
-    cur[#cur + 1] = ch
-    used = used + w
-  end
-  pieces[#pieces + 1] = table.concat(cur)
-  return pieces
-end
-
 ---@param rs dbdash.db.ResultSet
 ---@param show table
 ---@param ctx dbdash.render.Ctx
@@ -98,7 +79,8 @@ function M.render(rs, show, ctx)
   local style = nn(show.style) or {}
   local sep = nn(style.separator) or " "
   local null_text = nn(style.null_text) or ""
-  local do_wrap = nn(style.wrap) ~= false
+  local wrap = nn(style.wrap)
+  local do_wrap = wrap ~= false
   local lines, hl = {}, {}
   local title = nn(show.title)
   if title and title ~= "" then
@@ -121,7 +103,7 @@ function M.render(rs, show, ctx)
     for line in (text .. "\n"):gmatch("([^\n]*)\n") do
       line = expand_tabs(line)
       if do_wrap then
-        vim.list_extend(lines, wrap(line, ctx.width))
+        vim.list_extend(lines, W.wrap(line, ctx.width, wrap == "char" and "char" or "word"))
       else
         lines[#lines + 1] = W.truncate(line, ctx.width, "")
       end

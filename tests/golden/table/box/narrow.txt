@@ -14,34 +14,112 @@
   ^ 54-58 DbDashBorder
 │┡━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━━━━╇━━━━━┩
   ^ 0-120 DbDashBorder
-││  1 │ IT  │     42 │ 1250000.50 │ Al… │
+││  1 │ IT  │     42 │ 1250000.50 │ Ali │
   ^ 0-3 DbDashBorder
   ^ 6-10 DbDashBorder
   ^ 14-18 DbDashBorder
   ^ 25-29 DbDashBorder
   ^ 40-44 DbDashBorder
-  ^ 50-54 DbDashBorder
-││  2 │ HR  │      7 │  310000.00 │ NU… │
+  ^ 48-52 DbDashBorder
+││    │     │        │            │ ce  │
   ^ 0-3 DbDashBorder
   ^ 6-10 DbDashBorder
   ^ 14-18 DbDashBorder
   ^ 25-29 DbDashBorder
   ^ 40-44 DbDashBorder
-  ^ 45-50 DbDashNull
-  ^ 50-54 DbDashBorder
-││  3 │ Fi… │     15 │  880000.25 │ 王… │
+  ^ 48-52 DbDashBorder
+││  2 │ HR  │      7 │  310000.00 │ NUL │
   ^ 0-3 DbDashBorder
   ^ 6-10 DbDashBorder
-  ^ 16-20 DbDashBorder
-  ^ 27-31 DbDashBorder
-  ^ 42-46 DbDashBorder
-  ^ 53-57 DbDashBorder
-││  4 │ Re… │    120 │ 4200000.00 │ Bob │
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 45-48 DbDashNull
+  ^ 48-52 DbDashBorder
+││    │     │        │            │ L   │
   ^ 0-3 DbDashBorder
   ^ 6-10 DbDashBorder
-  ^ 16-20 DbDashBorder
-  ^ 27-31 DbDashBorder
-  ^ 42-46 DbDashBorder
-  ^ 50-54 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 45-48 DbDashNull
+  ^ 48-52 DbDashBorder
+││  3 │ Fin │     15 │  880000.25 │ 王  │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 49-53 DbDashBorder
+││    │ anc │        │            │ 小  │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 49-53 DbDashBorder
+││    │ e   │        │            │ 明  │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 49-53 DbDashBorder
+││  4 │ Res │    120 │ 4200000.00 │ Bob │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 48-52 DbDashBorder
+││    │ ear │        │            │     │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 48-52 DbDashBorder
+││    │ ch  │        │            │     │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 48-52 DbDashBorder
+││    │ &   │        │            │     │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 48-52 DbDashBorder
+││    │ Dev │        │            │     │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 48-52 DbDashBorder
+││    │ elo │        │            │     │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 48-52 DbDashBorder
+││    │ pme │        │            │     │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 48-52 DbDashBorder
+││    │ nt  │        │            │     │
+  ^ 0-3 DbDashBorder
+  ^ 6-10 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 25-29 DbDashBorder
+  ^ 40-44 DbDashBorder
+  ^ 48-52 DbDashBorder
 │└────┴─────┴────────┴────────────┴─────┘
   ^ 0-120 DbDashBorder

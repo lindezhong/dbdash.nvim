@@ -34,12 +34,26 @@
   ^ 38-42 DbDashBorder
   ^ 43-50 DbDashNull
   ^ 50-54 DbDashBorder
-││ Research … │  120 │ Bob     │ NULL    │
+││ Research & │  120 │ Bob     │ NULL    │
   ^ 0-3 DbDashBorder
-  ^ 16-20 DbDashBorder
-  ^ 25-29 DbDashBorder
-  ^ 37-41 DbDashBorder
-  ^ 42-49 DbDashNull
-  ^ 49-53 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 23-27 DbDashBorder
+  ^ 35-39 DbDashBorder
+  ^ 40-47 DbDashNull
+  ^ 47-51 DbDashBorder
+││ Developmen │      │         │         │
+  ^ 0-3 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 23-27 DbDashBorder
+  ^ 35-39 DbDashBorder
+  ^ 40-47 DbDashNull
+  ^ 47-51 DbDashBorder
+││ t          │      │         │         │
+  ^ 0-3 DbDashBorder
+  ^ 14-18 DbDashBorder
+  ^ 23-27 DbDashBorder
+  ^ 35-39 DbDashBorder
+  ^ 40-47 DbDashNull
+  ^ 47-51 DbDashBorder
 │└────────────┴──────┴─────────┴─────────┘
   ^ 0-123 DbDashBorder
