@@ -1,13 +1,15 @@
 -- Template parser: token stream -> AST, following Jinja's grammar and operator precedence.
 --
 -- Statements: If{branches, else_}, For{targets, iter, test, recursive, body, else_},
---             Set{targets, expr}, SetBlock{targets, filters, body}, SetArg, With{assigns,
+--             Set{targets, expr}, SetBlock{targets, filters, body}, SetArg, SetAttr{obj,
+--             attr, expr}, With{assigns,
 --             body}, Do{expr}, Break, Continue, FilterBlock{filters, body}, Macro,
 --             CallBlock{params, call, body}, Import, FromImport, Include{target,
 --             ignore_missing, with_context}, Extends{target}, Block{name, scoped,
 --             required, body}, Autoescape{expr, body}, Lua, Data{v}, Output{expr}
--- Expressions: Const, Name, List, Dict, Getattr, Getitem, Call, Filter, Test, Neg, Pos,
---              Bin{op}, Compare{first, ops}, And, Or, Not, Cond
+-- Expressions: Const, Name, List, Dict, Getattr, Getitem, Slice{obj, start, stop, step},
+--              Call, Filter, Test, Neg, Pos, Bin{op}, Compare{first, ops}, And, Or, Not,
+--              Cond
 local errors = require("dbdash.template.errors")
 
 local M = {}
@@ -363,17 +365,20 @@ function P:parse_for(tok)
 end
 
 function P:parse_set(tok)
-  -- {% set args.name = expr %}: assigns a dashboard argument ({% set meta.x %} cannot).
+  -- {% set ns.attr = expr %}: an attribute of a namespace(); {% set args.name = expr %}
+  -- assigns a dashboard argument ({% set meta.x %} cannot).
   local t, dot, attr = self:peek(), self:peek(1), self:peek(2)
-  if t.t == "name" and (t.v == "args" or t.v == "meta") and dot.t == "op" and dot.v == "."
-    and attr.t == "name" and self:is_op("=", 3) then
+  if t.t == "name" and dot.t == "op" and dot.v == "." and attr.t == "name" and self:is_op("=", 3) then
     if t.v == "meta" then
       self:fail(t, "'meta' is read-only (dashboard metadata)")
     end
     self.i = self.i + 4
-    local e = self:expression()
+    local e = self:tuple_expression()
     self:expect_block_end()
-    return { k = "SetArg", name = attr.v, expr = e, line = tok.line }
+    if t.v == "args" then
+      return { k = "SetArg", name = attr.v, expr = e, line = tok.line }
+    end
+    return { k = "SetAttr", obj = { k = "Name", name = t.v, line = t.line, col = t.col }, attr = attr.v, expr = e, line = tok.line }
   end
   local targets = self:targets()
   if not self:skip_op("=") then
@@ -711,15 +716,26 @@ function P:p_postfix(n)
       end
     elseif self:is_op("[") then
       self:next()
-      if self:is_op(":") then
-        self:fail(self:peek(), "slices are not supported")
+      -- xs[i], or a slice xs[start:stop:step] (each part optional)
+      local start, stop, step, slice
+      if not self:is_op(":") then
+        start = self:expression()
       end
-      local key = self:expression()
-      if self:is_op(":") then
-        self:fail(self:peek(), "slices are not supported")
+      if self:skip_op(":") then
+        slice = true
+        if not (self:is_op("]") or self:is_op(":")) then
+          stop = self:expression()
+        end
+        if self:skip_op(":") and not self:is_op("]") then
+          step = self:expression()
+        end
       end
       self:expect_op("]")
-      n = node("Getitem", t, { obj = n, key = key })
+      if slice then
+        n = node("Slice", t, { obj = n, start = start, stop = stop, step = step })
+      else
+        n = node("Getitem", t, { obj = n, key = start })
+      end
     elseif self:is_op("(") then
       n = self:p_call(n)
     else

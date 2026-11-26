@@ -821,6 +821,7 @@ Expressions:
   literals     'text' "text" 42 0x1f 0o17 0b101 1_000 3.14 1e3 true false
                none (True/False/None too) [1, 2] (1, 2) {'key': value}
   access       m.key  m['key']  xs[0]  xs[-1]  'text'[1]
+  slices       xs[1:]  xs[:-1]  'text'[::-1]  xs[a:b:step]
   math         + - * / // % **      (/ always divides, // floors)
   strings      'a' ~ b (concatenate as text)   'a' + 'b'
   compare      == != < <= > >=   x in xs   x not in xs
@@ -866,6 +867,12 @@ SQL filters, quoted for the panel's database (|dbdash-template-dialects|):
 Functions:
 
   range(stop) range(start, stop[, step])   integers, like Python
+  dict(a=1, ...)         a mapping
+  namespace(a=1, ...)    an object whose attributes `{% set ns.a = v %}`
+                         changes from inside loops (where `set` is local)
+  cycler(a, b, ...)      .next() gives a, b, a, ...; .current, .reset()
+  joiner(sep=', ')       a function giving "" the first time, then sep
+  lipsum(n=5, html=true, min=20, max=100)   lorem ipsum paragraphs
   sql_case(conditions, default)  CASE WHEN <key> THEN <value> ... ELSE
                          <default> END from a mapping; keys and values are
                          inserted as written
@@ -1010,8 +1017,7 @@ descriptions (a description's error is notified when it is shown), e.g.
 in an imported template or `.lua` module. A bare argument name says how to
 write it: "'days' is undefined; arguments are written args.days".
 
-Not supported (error with the reason): namespace(), slices, custom
-filters/tests.
+Not supported: custom filters and tests.
 
 Numbers are ints and floats as in Python: `{{ 4 / 2 }}` is `2.0`. Numbers
 from the database and from Lua are ints when they have no fraction.

@@ -41,7 +41,6 @@ end
 
 T["unsupported constructs are explained"] = function()
   local cases = {
-    ["{{ [1, 2][0:1] }}"] = "slices are not supported",
     ["{{ x is odd }}"] = "No test named 'odd'",
   }
   for src, want in pairs(cases) do

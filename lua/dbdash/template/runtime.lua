@@ -53,6 +53,15 @@ function R.is_safe(v)
   return getmetatable(v) == Safe
 end
 
+---The text of a string or safe string; nil for other values.
+local function as_str(v)
+  if type(v) == "string" then
+    return v
+  elseif getmetatable(v) == Safe then
+    return v.s
+  end
+end
+
 -- Loop object ------------------------------------------------------------------------------
 
 local Loop = {}
@@ -196,9 +205,15 @@ end
 
 -- Type helpers -----------------------------------------------------------------------------
 
+-- Type names of other values (namespace, cycler, ...).
+R.typenames = setmetatable({}, { __mode = "k" })
+
 ---Python type name used in error messages.
 function R.typename(v)
   local t = type(v)
+  if t == "table" and R.typenames[v] then
+    return R.typenames[v]
+  end
   if v == R.NONE then
     return "NoneType"
   elseif t == "boolean" then
@@ -632,6 +647,34 @@ function R.call_attr(env, obj, name, args, kwargs)
   raise("undefined", "'%s object' has no attribute '%s'", typename(obj), name)
 end
 
+-- Keyword arguments keep their order (a side table: they are plain Lua tables).
+local kw_order = setmetatable({}, { __mode = "k" })
+
+---Keyword arguments `t` written in the order `names`.
+function R.kw(t, names)
+  kw_order[t] = names
+  return t
+end
+
+---Names of keyword arguments in the order they were written.
+function R.kw_keys(t)
+  local out, seen = {}, {}
+  for _, k in ipairs(kw_order[t] or {}) do
+    if t[k] ~= nil and not seen[k] then
+      out[#out + 1] = k
+      seen[k] = true
+    end
+  end
+  local rest = {}
+  for k in pairs(t) do
+    if not seen[k] then
+      rest[#rest + 1] = k
+    end
+  end
+  table.sort(rest)
+  return vim.list_extend(out, rest)
+end
+
 ---*list in a call: extra positional arguments.
 function R.dyn_args(args, extra)
   check(extra)
@@ -648,17 +691,19 @@ function R.dyn_kwargs(kwargs, extra)
   if not map.is_map(extra) then
     raise("type", "argument after ** must be a mapping, not %s", typename(extra))
   end
-  local out = {}
-  for k, v in pairs(kwargs) do
-    out[k] = v
+  local out, names = {}, {}
+  for _, k in ipairs(R.kw_keys(kwargs)) do
+    out[k] = kwargs[k]
+    names[#names + 1] = k
   end
   for k, v in map.pairs(extra) do
     if out[k] ~= nil then
       raise("type", "got multiple values for keyword argument '%s'", tostring(k))
     end
     out[k] = v
+    names[#names + 1] = k
   end
-  return out
+  return R.kw(out, names)
 end
 
 ---Call a global function value: fn(args, kwargs, env).
@@ -916,9 +961,7 @@ function R.check_args(name, args, kwargs, params, flags)
     end
   end
   local extra_kw = map.new()
-  local keys = vim.tbl_keys(kwargs)
-  table.sort(keys)
-  for _, k in ipairs(keys) do
+  for _, k in ipairs(R.kw_keys(kwargs)) do
     if k == "caller" and flags.caller then
       info.caller = kwargs[k]
     elseif not known[k] then
@@ -1015,7 +1058,7 @@ end
 
 ---Load template `name` (trust checked for dashboards). Returns nil for a missing file
 ---when `missing_ok`.
-local function load(env, name, missing_ok)
+local function load_named(env, name, missing_ok)
   if type(name) ~= "string" then
     raise("type", "template name must be a string, not %s", typename(name))
   end
@@ -1068,7 +1111,7 @@ function R.include(env, target, ignore_missing, wctx)
   check(target)
   local names = is_list(target) and target or { target }
   for _, name in ipairs(names) do
-    local tpl, path = load(env, check(name), ignore_missing or #names > 1)
+    local tpl, path = load_named(env, check(name), ignore_missing or #names > 1)
     if tpl then
       return run_template(env, tpl, path, wctx or env.context or {}, nil)
     end
@@ -1130,7 +1173,7 @@ end
 ---The output of a template that extends `reg.parent`: its text before the extends tag,
 ---then the parent rendered with this template's blocks and top-level variables.
 function R.render_parent(env, reg, ctx, top, o)
-  local tpl, path = load(env, reg.parent, false)
+  local tpl, path = load_named(env, reg.parent, false)
   local before = table.concat(o, "", 1, reg.cut)
   return before .. run_template(env, tpl, path, R.layer(ctx, top), R.blocks(reg))
 end
@@ -1159,6 +1202,66 @@ function R.dict(flat)
     map.set(d, key_of(check(flat[i])), flat[i + 1])
   end
   return d
+end
+
+---Python slice bounds for a sequence of `n` items: start, stop, step (0-based indexes).
+local function slice_bounds(n, start, stop, step)
+  local function int(v, default)
+    if v == nil or v == R.NONE then
+      return default
+    end
+    local x, isf = num(check(v))
+    if not x or isf then
+      raise("type", "slice indices must be integers or None")
+    end
+    return x
+  end
+  step = int(step, 1)
+  if step == 0 then
+    raise("value", "slice step cannot be zero")
+  end
+  local lower, upper = 0, n
+  if step < 0 then
+    lower, upper = -1, n - 1
+  end
+  local function clamp(i, default)
+    if i == nil then
+      return default
+    end
+    if i < 0 then
+      i = i + n
+      return i < lower and lower or i
+    end
+    return i > upper and upper or i
+  end
+  return clamp(int(start, nil), step > 0 and lower or upper), clamp(int(stop, nil), step > 0 and upper or lower), step
+end
+
+---obj[start:stop:step] of a string (code points), list or tuple.
+function R.slice(obj, start, stop, step)
+  check(obj)
+  local seq
+  local str = as_str(obj)
+  if str then
+    seq = R.chars(str)
+  elseif is_list(obj) then
+    seq = obj
+  else
+    raise("type", "'%s' object is not subscriptable", typename(obj))
+  end
+  local a, b, c = slice_bounds(#seq, start, stop, step)
+  local out = {}
+  local i = a
+  while (c > 0 and i < b) or (c < 0 and i > b) do
+    out[#out + 1] = seq[i + 1]
+    i = i + c
+  end
+  if str then
+    return table.concat(out)
+  elseif R.is_tuple(obj) then
+    return R.tuple(out)
+  end
+  return out
 end
 
 ---Items to iterate over in a for loop.
@@ -1195,13 +1298,6 @@ local function op_error(op, a, b)
   raise("type", "unsupported operand type(s) for %s: '%s' and '%s'", op, typename(a), typename(b))
 end
 
-local function as_str(v)
-  if type(v) == "string" then
-    return v
-  elseif getmetatable(v) == Safe then
-    return v.s
-  end
-end
 
 function R.add(a, b)
   check(a)

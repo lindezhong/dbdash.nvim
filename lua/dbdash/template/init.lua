@@ -6,6 +6,7 @@ local errors = require("dbdash.template.errors")
 local R = require("dbdash.template.runtime")
 
 require("dbdash.template.filters").install()
+require("dbdash.template.globals").install()
 require("dbdash.template.sql").install()
 
 local M = {}

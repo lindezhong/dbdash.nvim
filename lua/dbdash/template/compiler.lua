@@ -142,11 +142,17 @@ function C:list(nodes)
 end
 
 function C:kwargs(kws)
-  local parts = {}
+  local parts, names = {}, {}
   for i, kv in ipairs(kws) do
     parts[i] = ("[%q] = %s"):format(kv[1], self:expr(kv[2]))
+    names[i] = ("%q"):format(kv[1])
   end
-  return "{" .. table.concat(parts, ", ") .. "}"
+  local t = "{" .. table.concat(parts, ", ") .. "}"
+  if #kws > 1 then
+    -- Keep the order (dict(a=1, b=2), a macro's kwargs).
+    return ("rt.kw(%s, { %s })"):format(t, table.concat(names, ", "))
+  end
+  return t
 end
 
 ---Positional and keyword arguments of a call, with *list and **mapping merged in.

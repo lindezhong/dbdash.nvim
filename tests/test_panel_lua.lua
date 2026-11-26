@@ -460,7 +460,9 @@ T["assigning args: unknown names, wrong types, the whole args or meta are errors
   eq(err_of("e2", db .. "query:\n  args: [{ name: n, type: int }]\n  sql: \"{% set args.n = 'x' %}SELECT 1\"\n"):find("argument 'n' is an int, got a string", 1, true) ~= nil, true)
   eq(err_of("e3", db .. "query:\n  sql: \"{% set args = 1 %}SELECT 1\"\n"):find("'args' is reserved", 1, true) ~= nil, true)
   eq(err_of("e4", db .. "query:\n  sql: \"{% set meta.x = 1 %}SELECT 1\"\n"):find("'meta' is read-only", 1, true) ~= nil, true)
-  eq(err_of("e5", db .. "query:\n  sql: \"{% set foo.x = 1 %}SELECT 1\"\n"):find("assigning to attributes or items is not supported", 1, true) ~= nil, true)
+  -- {% set obj.x %} is for namespace() objects (Jinja); here foo is undefined.
+  eq(err_of("e5", db .. "query:\n  sql: \"{% set foo.x = 1 %}SELECT 1\"\n"):find("'foo' is undefined", 1, true) ~= nil, true)
+  eq(err_of("e5b", db .. "query:\n  sql: \"{% set foo = {} %}{% set foo.x = 1 %}SELECT 1\"\n"):find("cannot assign attribute on non-namespace object", 1, true) ~= nil, true)
   eq(err_of("e6", db .. "query:\n  args: [{ name: n }]\n  sql: \"{% set args['n'] = 1 %}SELECT 1\"\n"):find("not supported", 1, true) ~= nil, true)
   eq(err_of("e7", "database: { url: 'lua://' }\nquery:\n  args: [{ name: n, type: int }]\n  sql: \"args.n = 'x'; return {}\"\n"):find("argument 'n' is an int, got a string", 1, true) ~= nil, true)
 end

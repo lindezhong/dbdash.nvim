@@ -1809,5 +1809,94 @@
   "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
   "files": {},
   "expected": "&lt;a&gt;<b><c>"
+ },
+ {
+  "name": "slices",
+  "template": "{{ 'hello'[1:3] }} {{ 'hello'[::-1] }} {{ [1, 2, 3, 4][::2] }} {{ (1, 2, 3)[1:] }} {{ 'abc'[-2:] }} {{ items[:-1] }} {{ items[5:] }} {{ items[-10:2] }} {{ '中文字'[1:] }} {{ [1, 2, 3][::-2] }} {{ items[1:2:0] if false else 'x' }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "expected": "el olleh [1, 3] (2, 3) bc [3, 1] [] [3, 1] 文字 [3, 1] x"
+ },
+ {
+  "name": "slice step zero",
+  "template": "{{ items[::0] }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "error": {
+   "type": "value",
+   "line": 1,
+   "message": "slice step cannot be zero"
+  }
+ },
+ {
+  "name": "slice of a number",
+  "template": "{{ x[1:] }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "error": {
+   "type": "type",
+   "line": 1,
+   "message": "'int' object is not subscriptable"
+  }
+ },
+ {
+  "name": "namespace",
+  "template": "{% set ns = namespace(n=0, s='') %}{% for i in range(3) %}{% set ns.n = ns.n + i %}{% set ns.s = ns.s ~ i %}{% endfor %}{{ ns.n }} {{ ns.s }} {{ ns }} {{ ns.missing is defined }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "expected": "3 012 <Namespace {'n': 3, 's': '012'}> False"
+ },
+ {
+  "name": "namespace from a dict",
+  "template": "{% set ns = namespace({'a': 1}, b=2) %}{{ ns.a }}{{ ns.b }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "expected": "12"
+ },
+ {
+  "name": "set attribute of a dict",
+  "template": "{% set e = {} %}{% set e.x = 1 %}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "error": {
+   "type": "value",
+   "line": 1,
+   "message": "cannot assign attribute on non-namespace object"
+  }
+ },
+ {
+  "name": "dict global",
+  "template": "{{ dict(a=1, b=2) }} {{ dict() }} {{ dict({'z': 1}, y=2) }} {{ dict([('k', 'v')]) }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "expected": "{'a': 1, 'b': 2} {} {'z': 1, 'y': 2} {'k': 'v'}"
+ },
+ {
+  "name": "cycler",
+  "template": "{% set c = cycler('a', 'b') %}{{ c.next() }}{{ c.next() }}{{ c.current }}{{ c.next() }}{% do c.reset() %}{{ c.current }}{{ c.next() }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "expected": "abaaaa"
+ },
+ {
+  "name": "joiner",
+  "template": "{% set j = joiner('|') %}{% for x in items %}{{ j() }}{{ x }}{% endfor %} {% set k = joiner() %}{{ k() }}a{{ k() }}b",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "expected": "3|1|2 a, b"
+ },
+ {
+  "name": "lipsum shape",
+  "template": "{{ lipsum(2, false, 5, 6).split('\\n\\n')|length }} {{ lipsum(1, min=3, max=4).startswith('<p>') }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "expected": "2 True"
+ },
+ {
+  "name": "kwargs keep their order",
+  "template": "{% macro m() %}{{ kwargs }}{% endmacro %}{{ m(z=1, a=2, m=3) }} {{ m(**{'b': 1, 'a': 2}) }}",
+  "ctx": "{\"x\": 5, \"s\": \"Hello\", \"name\": \"it's\", \"items\": [3, 1, 2], \"names\": [\"IT\", \"HR\", \"Finance\"], \"d\": {\"b\": 2, \"a\": 1, \"nested\": {\"k\": \"v\"}}, \"users\": [{\"name\": \"ann\", \"age\": 30}, {\"name\": \"bob\", \"age\": 25}], \"empty_list\": [], \"empty_map\": {}, \"zero\": 0, \"blank\": \"\", \"nothing\": null, \"flag\": true, \"off\": false, \"pi\": 3.14159, \"tree\": [{\"n\": \"a\", \"c\": [{\"n\": \"b\", \"c\": []}, {\"n\": \"c\", \"c\": [{\"n\": \"d\", \"c\": []}]}]}]}",
+  "files": {},
+  "expected": "{'z': 1, 'a': 2, 'm': 3} {'b': 1, 'a': 2}"
  }
 ]

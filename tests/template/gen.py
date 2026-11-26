@@ -324,6 +324,19 @@ MACRO_CASES = [
     ("macro in extending template", "{% extends 'base.sql' %}{% macro m() %}M{% endmacro %}{% block a %}{{ m() }}{% endblock %}", {"base.sql": "[{% block a %}{% endblock %}]"}, None),
     # --- autoescape --------------------------------------------------------------------------
     ("autoescape tag", "{% autoescape true %}{{ '<a>' }}{{ '<b>'|safe }}{% endautoescape %}{{ '<c>' }}", {}, None),
+    # --- slices --------------------------------------------------------------------------------
+    ("slices", "{{ 'hello'[1:3] }} {{ 'hello'[::-1] }} {{ [1, 2, 3, 4][::2] }} {{ (1, 2, 3)[1:] }} {{ 'abc'[-2:] }} {{ items[:-1] }} {{ items[5:] }} {{ items[-10:2] }} {{ '中文字'[1:] }} {{ [1, 2, 3][::-2] }} {{ items[1:2:0] if false else 'x' }}", {}, None),
+    ("slice step zero", "{{ items[::0] }}", {}, None),
+    ("slice of a number", "{{ x[1:] }}", {}, None),
+    # --- namespace, dict, cycler, joiner, lipsum ---------------------------------------------
+    ("namespace", "{% set ns = namespace(n=0, s='') %}{% for i in range(3) %}{% set ns.n = ns.n + i %}{% set ns.s = ns.s ~ i %}{% endfor %}{{ ns.n }} {{ ns.s }} {{ ns }} {{ ns.missing is defined }}", {}, None),
+    ("namespace from a dict", "{% set ns = namespace({'a': 1}, b=2) %}{{ ns.a }}{{ ns.b }}", {}, None),
+    ("set attribute of a dict", "{% set e = {} %}{% set e.x = 1 %}", {}, None),
+    ("dict global", "{{ dict(a=1, b=2) }} {{ dict() }} {{ dict({'z': 1}, y=2) }} {{ dict([('k', 'v')]) }}", {}, None),
+    ("cycler", "{% set c = cycler('a', 'b') %}{{ c.next() }}{{ c.next() }}{{ c.current }}{{ c.next() }}{% do c.reset() %}{{ c.current }}{{ c.next() }}", {}, None),
+    ("joiner", "{% set j = joiner('|') %}{% for x in items %}{{ j() }}{{ x }}{% endfor %} {% set k = joiner() %}{{ k() }}a{{ k() }}b", {}, None),
+    ("lipsum shape", "{{ lipsum(2, false, 5, 6).split('\\n\\n')|length }} {{ lipsum(1, min=3, max=4).startswith('<p>') }}", {}, None),
+    ("kwargs keep their order", "{% macro m() %}{{ kwargs }}{% endmacro %}{{ m(z=1, a=2, m=3) }} {{ m(**{'b': 1, 'a': 2}) }}", {}, None),
 ]
 
 
