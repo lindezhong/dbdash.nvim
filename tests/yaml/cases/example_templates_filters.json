@@ -1,0 +1,51 @@
+{
+ "title": "Template filters",
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "show": {
+  "interval": "1h"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "{% from 'parts/show.sql' import show %}\n{{ show(\"'hello world' | capitalize\", 'hello world' | capitalize) }}\nUNION ALL {{ show(\"'they''re here' | title\", \"they're here\" | title) }}\nUNION ALL {{ show(\"'Mixed' | upper / lower\", 'Mixed' | upper ~ ' ' ~ 'Mixed' | lower) }}\nUNION ALL {{ show(\"'ab' | center(6)\", '[' ~ 'ab' | center(6) ~ ']') }}\nUNION ALL {{ show(\"'  x  ' | trim, 'xxaxx' | trim('x')\", ('  x  ' | trim) ~ ',' ~ ('xxaxx' | trim('x'))) }}\nUNION ALL {{ show(\"'a-b-c' | replace('-', '+', 1)\", 'a-b-c' | replace('-', '+', 1)) }}\nUNION ALL {{ show(\"'foo bar baz qux' | truncate(9)\", 'foo bar baz qux' | truncate(9)) }}\nUNION ALL {{ show(\"truncate(9, true, '~', 0)\", 'foo bar baz qux' | truncate(9, true, '~', 0)) }}\nUNION ALL {{ show(\"'a b c d e' | wordwrap(5)\", 'a b c d e' | wordwrap(5) | replace('\\n', '/')) }}\nUNION ALL {{ show(\"'Hello, big world!' | wordcount\", 'Hello, big world!' | wordcount) }}\nUNION ALL {{ show(\"'a\\\\nb' | indent(2, first=true)\", 'a\\nb' | indent(2, first=true) | replace('\\n', '/')) }}\nUNION ALL {{ show(\"'%s: %d' | format('n', 3)\", '%s: %d' | format('n', 3)) }}\nUNION ALL {{ show(\"x | default('none'), '' | d('empty', true)\", undefined_name | default('none') ~ ',' ~ '' | d('empty', true)) }}\nUNION ALL {{ show(\"42 | string ~ '!'\", 42 | string ~ '!') }}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "text"
+   }
+  },
+  {
+   "query": {
+    "sql": "{% from 'parts/show.sql' import show %}\n{{ show(\"'<b>a & b</b>' | striptags\", '<b>a &amp; b</b> <!-- note -->' | striptags) }}\nUNION ALL {{ show(\"'a b/c?' | urlencode\", 'a b/c?' | urlencode) }}\nUNION ALL {{ show(\"{'q': 'x y'} | urlencode\", {'q': 'x y', 'n': 1} | urlencode) }}\nUNION ALL {{ show(\"'see www.example.com' | urlize\", 'see www.example.com' | urlize) }}\nUNION ALL {{ show(\"{'id': 'x', 'k': none} | xmlattr\", {'id': 'x', 'class': 'a b', 'k': none} | xmlattr) }}\nUNION ALL {{ show(\"'<x>' | escape (here: a SQL literal)\", '<x>' | escape) }}\nUNION ALL {{ show(\"'<x>' | e, forceescape\", ('<x>' | e) ~ ' ' ~ ('y' | safe | forceescape)) }}\nUNION ALL {{ show(\"'raw' | safe\", 'raw' | safe) }}\nUNION ALL {{ show(\"{'b': 1, 'a': [1, none]} | tojson\", {'b': 1, 'a': [1, none]} | tojson) }}\nUNION ALL {{ show(\"{'a': 1} | tojson(2)\", {'a': 1} | tojson(2) | replace('\\n', '/')) }}\nUNION ALL {{ show(\"{'b': 2, 'a': 1} | pprint\", {'b': 2, 'a': 1} | pprint) }}\nUNION ALL {{ show(\"1500000 | filesizeformat / (true)\", (1500000 | filesizeformat) ~ ', ' ~ (2048 | filesizeformat(true))) }}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "HTML, URLs, JSON, sizes"
+   }
+  },
+  {
+   "query": {
+    "sql": "{% from 'parts/show.sql' import show %}\n{{ show(\"-3.5 | abs\", -3.5 | abs) }}\nUNION ALL {{ show(\"'42' | int, 'ff' | int(base=16), 'x' | int(7)\", ('42' | int) ~ ' ' ~ ('ff' | int(base=16)) ~ ' ' ~ ('x' | int(7))) }}\nUNION ALL {{ show(\"'1.5' | float, 3 | float\", ('1.5' | float) ~ ' ' ~ (3 | float)) }}\nUNION ALL {{ show(\"2.567 | round(2), round(1, 'floor'), 2.5 | round\", (2.567 | round(2)) ~ ' ' ~ (2.567 | round(1, 'floor')) ~ ' ' ~ (2.5 | round)) }}\nUNION ALL {{ show(\"[3, 1, 2] | sum, sum(start=10)\", ([3, 1, 2] | sum) ~ ' ' ~ ([3, 1, 2] | sum(start=10))) }}\nUNION ALL {{ show(\"[3, 1, 2] | min / max\", ([3, 1, 2] | min) ~ ' ' ~ ([3, 1, 2] | max)) }}\nUNION ALL {{ show(\"['b', 'A'] | max(case_sensitive=true)\", ['b', 'A'] | max(case_sensitive=true)) }}\nUNION ALL {{ show(\"[7] | random\", [7] | random) }}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "numbers"
+   }
+  },
+  {
+   "query": {
+    "sql": "{% from 'parts/show.sql' import show %}\n{% set users = [{'name': 'ann', 'age': 31, 'city': 'NY'}, {'name': 'bob', 'age': 25, 'city': 'LA'}, {'name': 'cy', 'age': 40, 'city': 'ny'}] %}\n{{ show(\"users | map(attribute='name') | join(', ')\", users | map(attribute='name') | join(', ')) }}\nUNION ALL {{ show(\"['a', 'b'] | map('upper') | list\", ['a', 'b'] | map('upper') | list) }}\nUNION ALL {{ show(\"users | selectattr('age', '>', 30) | map(attribute='name') | list\", users | selectattr('age', '>', 30) | map(attribute='name') | list) }}\nUNION ALL {{ show(\"users | rejectattr('city', 'eq', 'LA') | list | length\", users | rejectattr('city', 'eq', 'LA') | list | length) }}\nUNION ALL {{ show(\"range(10) | select('odd') | list\", range(10) | select('odd') | list) }}\nUNION ALL {{ show(\"range(10) | reject('divisibleby', 3) | list\", range(10) | reject('divisibleby', 3) | list) }}\nUNION ALL {{ show(\"users | sort(attribute='age', reverse=true) | map(attribute='name') | list\", users | sort(attribute='age', reverse=true) | map(attribute='name') | list) }}\nUNION ALL {{ show(\"users | groupby('city') (case-insensitive)\", users | groupby('city') | map(attribute='grouper') | list) }}\nUNION ALL {{ show(\"{'b': 2, 'a': 1} | dictsort\", {'b': 2, 'a': 1} | dictsort) }}\nUNION ALL {{ show(\"{'k': 'v'} | items | list\", {'k': 'v'} | items | list) }}\nUNION ALL {{ show(\"['a', 'A', 'b'] | unique | list\", ['a', 'A', 'b'] | unique | list) }}\nUNION ALL {{ show(\"[1, 2, 3] | reverse | list, 'abc' | reverse\", ([1, 2, 3] | reverse | list) ~ ' ' ~ 'abc' | reverse) }}\nUNION ALL {{ show(\"range(5) | batch(2) | list\", range(5) | batch(2) | list) }}\nUNION ALL {{ show(\"range(5) | slice(2) | list\", range(5) | slice(2) | list) }}\nUNION ALL {{ show(\"[4, 5] | first / last, 'abc' | first\", ([4, 5] | first) ~ ([4, 5] | last) ~ ('abc' | first)) }}\nUNION ALL {{ show(\"users | length, 'abc' | count\", (users | length) ~ ' ' ~ ('abc' | count)) }}\nUNION ALL {{ show(\"users[0] | attr('name') (an attribute, not a key)\", users[0] | attr('name') is defined) }}\nUNION ALL {{ show(\"'abc' | list\", 'abc' | list) }}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "lists and mappings",
+    "span": 2
+   }
+  }
+ ]
+}

@@ -1,0 +1,99 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Every built-in filter (:help dbdash-template-filters), as Jinja2 has them; each panel is a
+# table of what a filter gives. SQL filters are in sql.yaml. Filters that give a generator
+# in Jinja2 (map, select, reverse, ...) give a list here.
+
+title: "Template filters"
+
+database:
+  url: "sqlite:///:memory:"
+
+show:
+  interval: 1h
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {{ show("'hello world' | capitalize", 'hello world' | capitalize) }}
+        UNION ALL {{ show("'they''re here' | title", "they're here" | title) }}
+        UNION ALL {{ show("'Mixed' | upper / lower", 'Mixed' | upper ~ ' ' ~ 'Mixed' | lower) }}
+        UNION ALL {{ show("'ab' | center(6)", '[' ~ 'ab' | center(6) ~ ']') }}
+        UNION ALL {{ show("'  x  ' | trim, 'xxaxx' | trim('x')", ('  x  ' | trim) ~ ',' ~ ('xxaxx' | trim('x'))) }}
+        UNION ALL {{ show("'a-b-c' | replace('-', '+', 1)", 'a-b-c' | replace('-', '+', 1)) }}
+        UNION ALL {{ show("'foo bar baz qux' | truncate(9)", 'foo bar baz qux' | truncate(9)) }}
+        UNION ALL {{ show("truncate(9, true, '~', 0)", 'foo bar baz qux' | truncate(9, true, '~', 0)) }}
+        UNION ALL {{ show("'a b c d e' | wordwrap(5)", 'a b c d e' | wordwrap(5) | replace('\n', '/')) }}
+        UNION ALL {{ show("'Hello, big world!' | wordcount", 'Hello, big world!' | wordcount) }}
+        UNION ALL {{ show("'a\\nb' | indent(2, first=true)", 'a\nb' | indent(2, first=true) | replace('\n', '/')) }}
+        UNION ALL {{ show("'%s: %d' | format('n', 3)", '%s: %d' | format('n', 3)) }}
+        UNION ALL {{ show("x | default('none'), '' | d('empty', true)", undefined_name | default('none') ~ ',' ~ '' | d('empty', true)) }}
+        UNION ALL {{ show("42 | string ~ '!'", 42 | string ~ '!') }}
+    show:
+      type: table
+      title: "text"
+
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {{ show("'<b>a & b</b>' | striptags", '<b>a &amp; b</b> <!-- note -->' | striptags) }}
+        UNION ALL {{ show("'a b/c?' | urlencode", 'a b/c?' | urlencode) }}
+        UNION ALL {{ show("{'q': 'x y'} | urlencode", {'q': 'x y', 'n': 1} | urlencode) }}
+        UNION ALL {{ show("'see www.example.com' | urlize", 'see www.example.com' | urlize) }}
+        UNION ALL {{ show("{'id': 'x', 'k': none} | xmlattr", {'id': 'x', 'class': 'a b', 'k': none} | xmlattr) }}
+        UNION ALL {{ show("'<x>' | escape (here: a SQL literal)", '<x>' | escape) }}
+        UNION ALL {{ show("'<x>' | e, forceescape", ('<x>' | e) ~ ' ' ~ ('y' | safe | forceescape)) }}
+        UNION ALL {{ show("'raw' | safe", 'raw' | safe) }}
+        UNION ALL {{ show("{'b': 1, 'a': [1, none]} | tojson", {'b': 1, 'a': [1, none]} | tojson) }}
+        UNION ALL {{ show("{'a': 1} | tojson(2)", {'a': 1} | tojson(2) | replace('\n', '/')) }}
+        UNION ALL {{ show("{'b': 2, 'a': 1} | pprint", {'b': 2, 'a': 1} | pprint) }}
+        UNION ALL {{ show("1500000 | filesizeformat / (true)", (1500000 | filesizeformat) ~ ', ' ~ (2048 | filesizeformat(true))) }}
+    show:
+      type: table
+      title: "HTML, URLs, JSON, sizes"
+
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {{ show("-3.5 | abs", -3.5 | abs) }}
+        UNION ALL {{ show("'42' | int, 'ff' | int(base=16), 'x' | int(7)", ('42' | int) ~ ' ' ~ ('ff' | int(base=16)) ~ ' ' ~ ('x' | int(7))) }}
+        UNION ALL {{ show("'1.5' | float, 3 | float", ('1.5' | float) ~ ' ' ~ (3 | float)) }}
+        UNION ALL {{ show("2.567 | round(2), round(1, 'floor'), 2.5 | round", (2.567 | round(2)) ~ ' ' ~ (2.567 | round(1, 'floor')) ~ ' ' ~ (2.5 | round)) }}
+        UNION ALL {{ show("[3, 1, 2] | sum, sum(start=10)", ([3, 1, 2] | sum) ~ ' ' ~ ([3, 1, 2] | sum(start=10))) }}
+        UNION ALL {{ show("[3, 1, 2] | min / max", ([3, 1, 2] | min) ~ ' ' ~ ([3, 1, 2] | max)) }}
+        UNION ALL {{ show("['b', 'A'] | max(case_sensitive=true)", ['b', 'A'] | max(case_sensitive=true)) }}
+        UNION ALL {{ show("[7] | random", [7] | random) }}
+    show:
+      type: table
+      title: "numbers"
+
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {% set users = [{'name': 'ann', 'age': 31, 'city': 'NY'}, {'name': 'bob', 'age': 25, 'city': 'LA'}, {'name': 'cy', 'age': 40, 'city': 'ny'}] %}
+        {{ show("users | map(attribute='name') | join(', ')", users | map(attribute='name') | join(', ')) }}
+        UNION ALL {{ show("['a', 'b'] | map('upper') | list", ['a', 'b'] | map('upper') | list) }}
+        UNION ALL {{ show("users | selectattr('age', '>', 30) | map(attribute='name') | list", users | selectattr('age', '>', 30) | map(attribute='name') | list) }}
+        UNION ALL {{ show("users | rejectattr('city', 'eq', 'LA') | list | length", users | rejectattr('city', 'eq', 'LA') | list | length) }}
+        UNION ALL {{ show("range(10) | select('odd') | list", range(10) | select('odd') | list) }}
+        UNION ALL {{ show("range(10) | reject('divisibleby', 3) | list", range(10) | reject('divisibleby', 3) | list) }}
+        UNION ALL {{ show("users | sort(attribute='age', reverse=true) | map(attribute='name') | list", users | sort(attribute='age', reverse=true) | map(attribute='name') | list) }}
+        UNION ALL {{ show("users | groupby('city') (case-insensitive)", users | groupby('city') | map(attribute='grouper') | list) }}
+        UNION ALL {{ show("{'b': 2, 'a': 1} | dictsort", {'b': 2, 'a': 1} | dictsort) }}
+        UNION ALL {{ show("{'k': 'v'} | items | list", {'k': 'v'} | items | list) }}
+        UNION ALL {{ show("['a', 'A', 'b'] | unique | list", ['a', 'A', 'b'] | unique | list) }}
+        UNION ALL {{ show("[1, 2, 3] | reverse | list, 'abc' | reverse", ([1, 2, 3] | reverse | list) ~ ' ' ~ 'abc' | reverse) }}
+        UNION ALL {{ show("range(5) | batch(2) | list", range(5) | batch(2) | list) }}
+        UNION ALL {{ show("range(5) | slice(2) | list", range(5) | slice(2) | list) }}
+        UNION ALL {{ show("[4, 5] | first / last, 'abc' | first", ([4, 5] | first) ~ ([4, 5] | last) ~ ('abc' | first)) }}
+        UNION ALL {{ show("users | length, 'abc' | count", (users | length) ~ ' ' ~ ('abc' | count)) }}
+        UNION ALL {{ show("users[0] | attr('name') (an attribute, not a key)", users[0] | attr('name') is defined) }}
+        UNION ALL {{ show("'abc' | list", 'abc' | list) }}
+    show:
+      type: table
+      title: "lists and mappings"
+      span: 2

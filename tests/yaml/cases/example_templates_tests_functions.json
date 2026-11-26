@@ -1,0 +1,42 @@
+{
+ "title": "Tests, functions, expressions",
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "show": {
+  "interval": "1h"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "{% from 'parts/show.sql' import show %}\n{% macro m() %}{% endmacro %}\n{{ show(\"x is defined / undefined\", (args is defined) ~ ' ' ~ (nothing_here is undefined)) }}\nUNION ALL {{ show(\"none is none, true is true, false is false\", (none is none) ~ ' ' ~ (true is true) ~ ' ' ~ (false is false)) }}\nUNION ALL {{ show(\"true is boolean, 1 is boolean\", (true is boolean) ~ ' ' ~ (1 is boolean)) }}\nUNION ALL {{ show(\"1 is integer, 1.0 is float, 2 is number\", (1 is integer) ~ ' ' ~ (1.0 is float) ~ ' ' ~ (2 is number)) }}\nUNION ALL {{ show(\"3 is odd, 4 is even, 9 is divisibleby 3\", (3 is odd) ~ ' ' ~ (4 is even) ~ ' ' ~ (9 is divisibleby 3)) }}\nUNION ALL {{ show(\"'a' is string, {} is mapping, [] is sequence, 'x' is iterable\", ('a' is string) ~ ' ' ~ ({} is mapping) ~ ' ' ~ ([] is sequence) ~ ' ' ~ ('x' is iterable)) }}\nUNION ALL {{ show(\"'abc' is lower, 'ABC' is upper\", ('abc' is lower) ~ ' ' ~ ('ABC' is upper)) }}\nUNION ALL {{ show(\"m is callable, 'x' | safe is escaped\", (m is callable) ~ ' ' ~ ('x' | safe is escaped)) }}\nUNION ALL {{ show(\"none is sameas none, 2 is in [1, 2]\", (none is sameas none) ~ ' ' ~ (2 is in [1, 2])) }}\nUNION ALL {{ show(\"'upper' is filter, 'odd' is test\", ('upper' is filter) ~ ' ' ~ ('odd' is test)) }}\nUNION ALL {{ show(\"3 is eq 3, ne, gt, ge, lt, le\", (3 is eq 3) ~ (3 is ne 4) ~ (3 is gt 2) ~ (3 is ge 3) ~ (3 is lt 4) ~ (3 is le 3)) }}\nUNION ALL {{ show(\"3 is equalto 3, greaterthan 2, lessthan 4\", (3 is equalto 3) ~ (3 is greaterthan 2) ~ (3 is lessthan 4)) }}\nUNION ALL {{ show(\"x is not none\", 1 is not none) }}\nUNION ALL {{ show(\"range(6) | select('>', 2) / ('==', 1) / ('<=', 1) / ('!=', 0) / ('>=', 5) / ('<', 1)\", (range(6) | select('>', 2) | list) ~ (range(6) | select('==', 1) | list) ~ (range(6) | select('<=', 1) | list) ~ (range(3) | select('!=', 0) | list) ~ (range(6) | select('>=', 5) | list) ~ (range(6) | select('<', 1) | list)) }}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "tests: x is name",
+    "span": 2
+   }
+  },
+  {
+   "query": {
+    "sql": "{% from 'parts/show.sql' import show %}\n{{ show(\"range(3), range(1, 10, 3), range(3, 0, -1)\", (range(3) | list) ~ (range(1, 10, 3) | list) ~ (range(3, 0, -1) | list)) }}\nUNION ALL {{ show(\"dict(a=1, b=2)\", dict(a=1, b=2)) }}\n{% set c = cycler('red', 'green') %}\nUNION ALL {{ show(\"cycler: c.next(), c.next(), c.next(), c.current\", c.next() ~ ' ' ~ c.next() ~ ' ' ~ c.next() ~ ' ' ~ c.current) }}\n{% do c.reset() %}\nUNION ALL {{ show(\"c.reset(); c.current\", c.current) }}\n{% set j = joiner(' | ') %}\n{% set out %}{% for x in ['a', 'b', 'c'] %}{{ j() }}{{ x }}{% endfor %}{% endset %}\nUNION ALL {{ show(\"joiner(' | ')\", out) }}\n{% set ns = namespace(n=1) %}{% set ns.n = ns.n * 10 %}\nUNION ALL {{ show(\"namespace(n=1); set ns.n = ns.n * 10\", ns.n) }}\nUNION ALL {{ show(\"lipsum(1, html=false, min=5, max=6) | wordcount\", lipsum(1, html=false, min=5, max=6) | wordcount) }}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "global functions"
+   }
+  },
+  {
+   "query": {
+    "sql": "{% from 'parts/show.sql' import show %}\n{{ show(\"7 // 2, -7 // 2, 7 % 3, 2 ** 10\", (7 // 2) ~ ' ' ~ (-7 // 2) ~ ' ' ~ (7 % 3) ~ ' ' ~ (2 ** 10)) }}\nUNION ALL {{ show(\"4 / 2 (a float), 1e3, 0x1f, 1_000\", (4 / 2) ~ ' ' ~ 1e3 ~ ' ' ~ 0x1f ~ ' ' ~ 1_000) }}\nUNION ALL {{ show(\"'a' ~ 1 ~ none, 'ab' * 2, [1] + [2]\", ('a' ~ 1 ~ none) ~ ' ' ~ ('ab' * 2) ~ ' ' ~ ([1] + [2])) }}\nUNION ALL {{ show(\"1 < 2 < 3, 'b' in 'abc', 1 not in [2]\", (1 < 2 < 3) ~ ' ' ~ ('b' in 'abc') ~ ' ' ~ (1 not in [2])) }}\nUNION ALL {{ show(\"none or 'x', 0 and 1, not ''\", (none or 'x') ~ ' ' ~ (0 and 1) ~ ' ' ~ (not '')) }}\nUNION ALL {{ show(\"(1, 2), (1,), {'k': [1, 2.0]}\", (1, 2) ~ ' ' ~ (1,) ~ ' ' ~ {'k': [1, 2.0]}) }}\nUNION ALL {{ show(\"'hello'[1:4], 'hello'[::-1], [1, 2, 3, 4][::2], [1, 2, 3][-1]\", 'hello'[1:4] ~ ' ' ~ 'hello'[::-1] ~ ' ' ~ [1, 2, 3, 4][::2] ~ ' ' ~ [1, 2, 3][-1]) }}\nUNION ALL {{ show(\"'%s=%05.1f|%-4s|%x' % ('a', 3.14159, 'b', 255)\", '%s=%05.1f|%-4s|%x' % ('a', 3.14159, 'b', 255)) }}\nUNION ALL {{ show(\"'%(n)d%%' % {'n': 50}\", '%(n)d%%' % {'n': 50}) }}\nUNION ALL {{ show(\"'{:>6}|{:<4}|{:^7}|{:,}|{:.1%}|{!r}'.format(...)\", '{:>6}|{:<4}|{:^7}|{:,}|{:.1%}|{!r}'.format('r', 'l', 'c', 1234567, 0.25, 'q')) }}\nUNION ALL {{ show(\"'{0}-{name}-{0}'.format('a', name='n')\", '{0}-{name}-{0}'.format('a', name='n')) }}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "expressions: numbers, strings, tuples, slices, formatting"
+   }
+  }
+ ]
+}

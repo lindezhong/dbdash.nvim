@@ -442,8 +442,9 @@ topic (the sidebar shows them as a tree):
 
   charts/       one chart type per file, the alternative styles (styles.yaml)
   dashboards/   several panels in a grid (multi_panel.yaml)
-  templates/    arguments, macros and autoescape, extends / include / call,
-                Lua in templates
+  templates/    arguments; every statement, filter, test, function and
+                method; SQL filters and autoescape; macros; extends,
+                include and import; Lua in templates; every meta field
   lua/          a lua:// source, query.transform, store, callbacks, run
                 records
   push/         luastream://, exec:// and webhook:// (|dbdash-push|)

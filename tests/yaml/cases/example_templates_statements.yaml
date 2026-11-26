@@ -1,0 +1,107 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Template statements (:help dbdash-templates): each panel is a table of what a statement
+# gives. The templates are Jinja2 (3.1), with trim_blocks / lstrip_blocks, undefined values
+# as errors, and the loopcontrols ({% break %}, {% continue %}) and do extensions built in.
+# parts/show.sql has the show(code, value) macro that makes one row.
+
+title: "Template statements"
+
+database:
+  url: "sqlite:///:memory:"
+
+args:
+  - name: level
+    type: int
+    default: 2
+    description: "Used by if / elif / else"
+
+show:
+  interval: 1h
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {% if args.level > 3 %}{% set word = "high" %}{% elif args.level > 1 %}{% set word = "medium" %}{% else %}{% set word = "low" %}{% endif %}
+        {{ show("if / elif / else (args.level)", word) }}
+        UNION ALL {{ show("x if cond else y", "even" if args.level % 2 == 0 else "odd") }}
+        {% set out %}{% for x in [1, 2, 3, 4, 5, 6] if x is even %}{{ x }}{% endfor %}{% endset %}
+        UNION ALL {{ show("for ... if (filter the items)", out) }}
+        {% set out %}{% for x in [] %}{{ x }}{% else %}empty{% endfor %}{% endset %}
+        UNION ALL {{ show("for ... else (no items)", out) }}
+        {% set out %}{% for x in range(10) %}{% if x == 2 %}{% continue %}{% endif %}{% if x == 5 %}{% break %}{% endif %}{{ x }}{% endfor %}{% endset %}
+        UNION ALL {{ show("break / continue", out) }}
+        {% set out %}{% for a, b in [(1, 'x'), (2, 'y')] %}{{ a }}{{ b }} {% endfor %}{% endset %}
+        UNION ALL {{ show("for a, b in pairs", out | trim) }}
+        {% set out %}{% for k, v in {'one': 1, 'two': 2}.items() %}{{ k }}={{ v }};{% endfor %}{% endset %}
+        UNION ALL {{ show("for k, v in d.items()", out) }}
+    show:
+      type: table
+      title: "if, for ... if / else, break, continue"
+
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {% set out %}{% for x in ['a', 'b', 'c'] %}{{ loop.index }}{{ loop.index0 }}{{ loop.revindex }}{{ loop.revindex0 }}{{ loop.first | int }}{{ loop.last | int }}{{ loop.length }} {% endfor %}{% endset %}
+        {{ show("loop.index index0 revindex revindex0 first last length", out | trim) }}
+        {% set out %}{% for x in ['a', 'b', 'c'] %}{{ loop.cycle('odd', 'even') }} {% endfor %}{% endset %}
+        UNION ALL {{ show("loop.cycle('odd', 'even')", out | trim) }}
+        {% set out %}{% for x in [1, 1, 2, 2, 3] %}{{ loop.changed(x) | int }}{% endfor %}{% endset %}
+        UNION ALL {{ show("loop.changed(x)", out) }}
+        {% set out %}{% for x in [1, 2, 3] %}{{ loop.previtem | default('-') }}<{{ x }}>{{ loop.nextitem | default('-') }} {% endfor %}{% endset %}
+        UNION ALL {{ show("loop.previtem / loop.nextitem", out | trim) }}
+        {% set tree = [{'name': 'a', 'kids': [{'name': 'b', 'kids': [{'name': 'c', 'kids': []}]}]}, {'name': 'd', 'kids': []}] %}
+        {% set out %}{% for n in tree recursive %}{{ n.name }}{{ loop.depth }}{{ loop.depth0 }}{% if n.kids %}({{ loop(n.kids) }}){% endif %} {% endfor %}{% endset %}
+        UNION ALL {{ show("for ... recursive, loop(children), loop.depth / depth0", out | trim) }}
+    show:
+      type: table
+      title: "the loop variable and recursive loops"
+
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {% set word = 'top' %}
+        {% set out %}{% with word = 'inside', n = 2 %}{{ word }} x{{ n }}{% endwith %}{% endset %}
+        {{ show("with (its own scope)", out ~ ', then ' ~ word) }}
+        {% set shout | upper %}set with a filter{% endset %}
+        UNION ALL {{ show("set name | filter ... endset", shout) }}
+        {% set out %}{% filter replace(' ', '_') | title %}a filter block{% endfilter %}{% endset %}
+        UNION ALL {{ show("filter ... endfilter", out) }}
+        {% set seen = [] %}{% do seen.append('do') %}{% do seen.extend(['runs', 'expressions']) %}
+        UNION ALL {{ show("do (an expression, no output)", seen | join(' ')) }}
+        {% set ns = namespace(total=0, names=[]) %}
+        {% for x in [3, 4, 5] %}{% set ns.total = ns.total + x %}{% endfor %}
+        UNION ALL {{ show("namespace(): set ns.total inside a loop", ns.total) }}
+        {% set out %}{% raw %}{{ not rendered }}{% endraw %}{% endset %}
+        UNION ALL {{ show("raw ... endraw", out) }}
+        {% set out %}{% autoescape true %}{{ "it's" }}{% endautoescape %}{% endset %}
+        UNION ALL {{ show("autoescape true ... (a SQL literal here)", out) }}
+        {# a comment: not in the output #}
+        UNION ALL {{ show("set a, b = 1, 2 (tuples)", (1, 2)) }}
+    show:
+      type: table
+      title: "with, set blocks, filter, do, namespace, raw, autoescape"
+
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {% macro tag(name, cls='plain', open=True) -%}
+          <{{ name }} class="{{ cls }}"{{ '' if open else ' /' }}>{{ varargs | join(',') }}{{ kwargs }}
+        {%- endmacro %}
+        {% macro list(items) -%}
+          {% for i in items %}[{{ caller(i, loop.index) }}]{% endfor %}
+        {%- endmacro %}
+        {{ show("macro with defaults", tag('b')) }}
+        UNION ALL {{ show("keyword arguments", tag('i', open=False)) }}
+        UNION ALL {{ show("extra arguments: varargs / kwargs", tag('a', 'x', 1, 2, href='/')) }}
+        UNION ALL {{ show("f(*list, **mapping)", tag(*['p', 'big'], **{'open': False})) }}
+        {% set out %}{% call(item, n) list(['x', 'y']) %}{{ n }}:{{ item }}{% endcall %}{% endset %}
+        UNION ALL {{ show("call(args) macro() ... endcall, caller(args)", out) }}
+        UNION ALL {{ show("macro attributes", tag.name ~ ' ' ~ tag.arguments | string ~ ' ' ~ tag.catch_varargs | string) }}
+    show:
+      type: table
+      title: "macros, call blocks, *args / **kwargs"

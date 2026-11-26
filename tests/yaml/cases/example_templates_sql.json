@@ -1,0 +1,66 @@
+{
+ "title": "SQL filters, functions and autoescape",
+ "database": {
+  "url": "sqlite:///:memory:"
+ },
+ "args": [
+  {
+   "name": "name",
+   "default": "O'Neil"
+  },
+  {
+   "name": "depts",
+   "type": "list",
+   "default": [
+    "IT",
+    "HR"
+   ]
+  },
+  {
+   "name": "limit",
+   "type": "int",
+   "default": 5
+  },
+  {
+   "name": "column",
+   "default": "users.name"
+  }
+ ],
+ "show": {
+  "interval": "1h"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "{% from 'parts/show.sql' import show %}\n{{ show(\"args.name | sql_quote\", args.name | sql_quote) }}\nUNION ALL {{ show(\"args.name | sql_escape (no quotes)\", args.name | sql_escape) }}\nUNION ALL {{ show(\"args.depts | sql_in, [] | sql_in\", (args.depts | sql_in) ~ ' ' ~ ([] | sql_in)) }}\nUNION ALL {{ show(\"args.column | sql_id\", args.column | sql_id) }}\nUNION ALL {{ show(\"args.limit | sql_limit, none | sql_limit\", 'LIMIT ' ~ (args.limit | sql_limit) ~ '|' ~ (none | sql_limit)) }}\nUNION ALL {{ show(\"none / true / 2.5 | sql_quote\", (none | sql_quote) ~ ' ' ~ (true | sql_quote) ~ ' ' ~ (2.5 | sql_quote)) }}\nUNION ALL {{ show(\"sql_case({'n > 10': '''big''', 'n > 0': '''small'''}, '''none''')\", sql_case({'n > 10': \"'big'\", 'n > 0': \"'small'\"}, \"'none'\")) }}\nUNION ALL {{ show(\"sql_concat('id-', 42)\", sql_concat('id-', 42)) }}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "SQL filters and functions (the SQL they write)",
+    "span": 2
+   }
+  },
+  {
+   "query": {
+    "autoescape": true,
+    "sql": "-- query.autoescape: every value written with {% raw %}{{ }}{% endraw %} is a literal of the database; SQL from\n-- the filters, | safe and macros is not escaped again.\nWITH t(name) AS (VALUES ('O''Neil'))\nSELECT {{ args.name }} AS arg,\n       {{ args.depts | length }} AS depts,\n       {{ 'name' | safe }} = {{ args.name }} AS same,\n       {% autoescape false %}'{{ args.limit }}'{% endautoescape %} AS autoescape_off\nFROM t\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "query.autoescape: true"
+   }
+  },
+  {
+   "query": {
+    "sql": "-- Without autoescape: values are inserted as written; quote them with the filters.\nWITH users(name, dept) AS (VALUES ('O''Neil', 'IT'), ('ann', 'HR'), ('bob', 'Ops'))\nSELECT name, dept FROM users\nWHERE dept IN {{ args.depts | sql_in }} OR name = {{ args.name | sql_quote }}\nORDER BY {{ 'name' | sql_id }}\nLIMIT {{ args.limit | sql_limit }}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "a query with the filters"
+   }
+  }
+ ]
+}

@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# SQL in templates (:help dbdash-template-filters, dbdash-template-autoescape,
+# dbdash-template-dialects): filters and functions that write SQL for the panel's
+# database (SQLite here; the files in ../databases/ use them on the others), and
+# query.autoescape, which writes every {{ value }} as a literal.
+
+title: "SQL filters, functions and autoescape"
+
+database:
+  url: "sqlite:///:memory:"
+
+args:
+  - name: name
+    default: "O'Neil"
+  - name: depts
+    type: list
+    default: [IT, HR]
+  - name: limit
+    type: int
+    default: 5
+  - name: column
+    default: "users.name"
+
+show:
+  interval: 1h
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {{ show("args.name | sql_quote", args.name | sql_quote) }}
+        UNION ALL {{ show("args.name | sql_escape (no quotes)", args.name | sql_escape) }}
+        UNION ALL {{ show("args.depts | sql_in, [] | sql_in", (args.depts | sql_in) ~ ' ' ~ ([] | sql_in)) }}
+        UNION ALL {{ show("args.column | sql_id", args.column | sql_id) }}
+        UNION ALL {{ show("args.limit | sql_limit, none | sql_limit", 'LIMIT ' ~ (args.limit | sql_limit) ~ '|' ~ (none | sql_limit)) }}
+        UNION ALL {{ show("none / true / 2.5 | sql_quote", (none | sql_quote) ~ ' ' ~ (true | sql_quote) ~ ' ' ~ (2.5 | sql_quote)) }}
+        UNION ALL {{ show("sql_case({'n > 10': '''big''', 'n > 0': '''small'''}, '''none''')", sql_case({'n > 10': "'big'", 'n > 0': "'small'"}, "'none'")) }}
+        UNION ALL {{ show("sql_concat('id-', 42)", sql_concat('id-', 42)) }}
+    show:
+      type: table
+      title: "SQL filters and functions (the SQL they write)"
+      span: 2
+
+  - query:
+      autoescape: true
+      sql: |
+        -- query.autoescape: every value written with {% raw %}{{ }}{% endraw %} is a literal of the database; SQL from
+        -- the filters, | safe and macros is not escaped again.
+        WITH t(name) AS (VALUES ('O''Neil'))
+        SELECT {{ args.name }} AS arg,
+               {{ args.depts | length }} AS depts,
+               {{ 'name' | safe }} = {{ args.name }} AS same,
+               {% autoescape false %}'{{ args.limit }}'{% endautoescape %} AS autoescape_off
+        FROM t
+    show:
+      type: table
+      title: "query.autoescape: true"
+
+  - query:
+      sql: |
+        -- Without autoescape: values are inserted as written; quote them with the filters.
+        WITH users(name, dept) AS (VALUES ('O''Neil', 'IT'), ('ann', 'HR'), ('bob', 'Ops'))
+        SELECT name, dept FROM users
+        WHERE dept IN {{ args.depts | sql_in }} OR name = {{ args.name | sql_quote }}
+        ORDER BY {{ 'name' | sql_id }}
+        LIMIT {{ args.limit | sql_limit }}
+    show:
+      type: table
+      title: "a query with the filters"

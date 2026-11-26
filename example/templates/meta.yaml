@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# meta: what templates and Lua know about the dashboard, the panel and the run (:help
+# dbdash-meta, dbdash-runs). The first panel lists every field (lua:// walks `meta`); the
+# second uses some in a SQL template.
+# It runs Lua, so dbdash asks whether you trust this file first.
+
+title: "meta"
+
+layout:
+  columns: 2
+
+panels:
+  - database: { url: "lua://" }
+    query:
+      sql: |
+        local names = {
+          "cwd", "config_file", "config_dir", "config_name", "dashboard_title",
+          "db_type", "db_host", "db_port", "db_name", "db_user", "db_url",
+          "panel_index", "panel_title", "chart_type", "interval", "max_rows",
+          "timeout", "refresh_count", "now", "today", "hostname", "user", "os",
+          "nvim_version", "arch",
+        }
+        local rows = {}
+        for _, n in ipairs(names) do
+          rows[#rows + 1] = { n, tostring(meta[n]) }
+        end
+        -- Run records: this run, its life, the previous refreshes.
+        rows[#rows + 1] = { "run.kind / run.depth", meta.run.kind .. " / " .. meta.run.depth }
+        rows[#rows + 1] = { "#runs", tostring(#meta.runs) }
+        rows[#rows + 1] = { "prev.ok", tostring(meta.prev and meta.prev.ok) }
+        rows[#rows + 1] = { "prev_ok.id", tostring(meta.prev_ok and meta.prev_ok.id) }
+        rows[#rows + 1] = { "#prev_runs / #prev_ok_runs", ("%d / %d"):format(meta.prev_runs and #meta.prev_runs or 0, meta.prev_ok_runs and #meta.prev_ok_runs or 0) }
+        return { columns = { "meta", "value" }, rows = rows }
+    show:
+      type: table
+      title: "every meta field (refresh with r to fill prev)"
+      interval: 30s
+
+  - database: { url: "sqlite:///:memory:" }
+    query:
+      max_rows: 100
+      timeout: 5s
+      sql: |
+        SELECT {{ meta.config_name | sql_quote }} AS config,
+               {{ meta.panel_index }} AS panel,
+               {{ meta.panel_title | sql_quote }} AS title,
+               {{ meta.chart_type | sql_quote }} AS chart,
+               {{ meta.max_rows }} AS max_rows,
+               {{ meta.timeout }} AS timeout_ms,
+               {{ meta.refresh_count }} AS refreshes,
+               {{ meta.today | sql_quote }} AS today
+    show:
+      type: table
+      title: "meta in a SQL template"
+      interval: 30s

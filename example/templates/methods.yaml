@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Methods of strings, mappings, lists and tuples, as in Python / Jinja2 (:help
+# dbdash-templates). Methods that change a value work on the template's own values, not
+# on args and meta (read-only). Each panel is a table of what a method gives.
+
+title: "Methods"
+
+database:
+  url: "sqlite:///:memory:"
+
+show:
+  interval: 1h
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {{ show("'a,b,c'.split(','), 'a b'.split(), 'a,b,c'.rsplit(',', 1)", 'a,b,c'.split(',') ~ 'a b'.split() ~ 'a,b,c'.rsplit(',', 1)) }}
+        UNION ALL {{ show("'-'.join(['a', 'b'])", '-'.join(['a', 'b'])) }}
+        UNION ALL {{ show("'abcb'.replace('b', 'x', 1)", 'abcb'.replace('b', 'x', 1)) }}
+        UNION ALL {{ show("find / rfind / index / rindex / count", 'abcb'.find('b') ~ 'abcb'.rfind('b') ~ 'abcb'.index('c') ~ 'abcb'.rindex('b') ~ 'abcb'.count('b')) }}
+        UNION ALL {{ show("startswith / endswith", 'abc'.startswith(('x', 'a')) ~ ' ' ~ 'abc'.endswith('bc')) }}
+        UNION ALL {{ show("upper / lower / title / capitalize / swapcase / casefold", 'aB'.upper() ~ 'aB'.lower() ~ ' ' ~ 'ab cd'.title() ~ ' ' ~ 'aB'.capitalize() ~ 'aB'.swapcase() ~ 'ẞ'.casefold()) }}
+        UNION ALL {{ show("strip / lstrip / rstrip", '[' ~ '  a  '.strip() ~ '|' ~ '  a'.lstrip() ~ '|' ~ 'a  '.rstrip() ~ '|' ~ 'xxaxx'.strip('x') ~ ']') }}
+        UNION ALL {{ show("center / ljust / rjust / zfill", '[' ~ 'ab'.center(6, '*') ~ '|' ~ 'a'.ljust(3, '.') ~ '|' ~ 'a'.rjust(3) ~ '|' ~ '7'.zfill(3) ~ ']') }}
+        UNION ALL {{ show("partition / rpartition", 'k=v=w'.partition('=') ~ 'k=v=w'.rpartition('=')) }}
+        UNION ALL {{ show("removeprefix / removesuffix", 'v1.2'.removeprefix('v') ~ ' ' ~ 'a.sql'.removesuffix('.sql')) }}
+        UNION ALL {{ show("splitlines / expandtabs", 'a\nb\r\nc'.splitlines() ~ ' [' ~ 'a\tb'.expandtabs(4) ~ ']') }}
+        UNION ALL {{ show("isdigit isdecimal isnumeric isalpha isalnum isspace", '12'.isdigit() ~ '12'.isdecimal() ~ '12'.isnumeric() ~ 'ab'.isalpha() ~ 'a1'.isalnum() ~ ' '.isspace()) }}
+        UNION ALL {{ show("islower isupper istitle isidentifier isascii", 'ab'.islower() ~ 'AB'.isupper() ~ 'Ab Cd'.istitle() ~ 'a_1'.isidentifier() ~ 'é'.isascii()) }}
+        UNION ALL {{ show("'{} {}'.format(1, 2), '{a}'.format_map({'a': 3})", '{} {}'.format(1, 2) ~ ' ' ~ '{a}'.format_map({'a': 3})) }}
+    show:
+      type: table
+      title: "strings"
+      span: 2
+
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {% set d = {'a': 1} %}
+        {{ show("d.keys() / values() / items()", d.keys() ~ d.values() ~ d.items()) }}
+        UNION ALL {{ show("d.get('a'), d.get('z', 0), d.copy()", d.get('a') ~ ' ' ~ d.get('z', 0) ~ ' ' ~ d.copy()) }}
+        {% do d.update({'b': 2}, c=3) %}
+        UNION ALL {{ show("d.update({'b': 2}, c=3)", d) }}
+        UNION ALL {{ show("d.pop('a'), d.pop('z', 'none')", d.pop('a') ~ ' ' ~ d.pop('z', 'none')) }}
+        UNION ALL {{ show("d.setdefault('e', 5)", d.setdefault('e', 5) ~ ' ' ~ d) }}
+        UNION ALL {{ show("d.popitem()", d.popitem()) }}
+        {% do d.clear() %}
+        UNION ALL {{ show("d.clear()", d) }}
+    show:
+      type: table
+      title: "mappings"
+
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {% set l = [3, 1, 2] %}
+        {{ show("l.index(1), l.count(3)", l.index(1) ~ ' ' ~ l.count(3)) }}
+        {% do l.append(5) %}{% do l.extend([9, 0]) %}{% do l.insert(0, 7) %}
+        UNION ALL {{ show("append(5), extend([9, 0]), insert(0, 7)", l) }}
+        UNION ALL {{ show("l.pop(), l.pop(0)", l.pop() ~ ' ' ~ l.pop(0)) }}
+        {% do l.remove(9) %}{% do l.sort() %}
+        UNION ALL {{ show("remove(9), sort()", l) }}
+        {% do l.sort(reverse=true) %}{% set c = l.copy() %}{% do l.reverse() %}
+        UNION ALL {{ show("sort(reverse=true), copy(), reverse()", c ~ ' ' ~ l) }}
+        {% do l.clear() %}
+        UNION ALL {{ show("l.clear()", l) }}
+        UNION ALL {{ show("(1, 2, 1).count(1), (1, 2).index(2)", (1, 2, 1).count(1) ~ ' ' ~ (1, 2).index(2)) }}
+    show:
+      type: table
+      title: "lists and tuples"

@@ -78,3 +78,35 @@ panels:
       x_column: rank
       y_column: players
       span: 2
+
+  - query:
+      sql: |
+        {# A child two levels down: page.sql <- section.sql <- this. #}
+        {% extends 'parts/section.sql' %}
+        {% block line %}{{ super() }} (child, n={{ n }}){% endblock %}
+    show:
+      type: table
+      title: "extends (two levels), super(), self.title(), scoped, required"
+
+  - query:
+      sql: |
+        {% from 'parts/show.sql' import show %}
+        {% set who = 'ann' %}
+        {% import 'parts/consts.sql' as c %}
+        {% import 'parts/consts.sql' as cc with context %}
+        {% from 'parts/consts.sql' import version, greet without context %}
+        {{ show("import: top-level variables (c.version, c._private)", c.version ~ ' ' ~ (c._private is defined)) }}
+        UNION ALL {{ show("macro without / with context", c.greet() ~ ' / ' ~ cc.greet()) }}
+        UNION ALL {{ show("from ... import version, greet", version ~ ' ' ~ greet()) }}
+        {% set out %}{% include 'parts/greeting.sql' %}{% endset %}
+        UNION ALL {{ show("include (with context, the default)", out | trim) }}
+        {% set out %}{% include 'parts/greeting.sql' without context %}{% endset %}
+        UNION ALL {{ show("include ... without context", out | trim) }}
+        {% set out %}{% include 'parts/missing.sql' ignore missing %}{% endset %}
+        UNION ALL {{ show("include ... ignore missing", '[' ~ out ~ ']') }}
+        {% set out %}{% include ['parts/missing.sql', 'parts/greeting.sql'] %}{% endset %}
+        UNION ALL {{ show("include [list]: the first that exists", out | trim) }}
+    show:
+      type: table
+      title: "import and include: context, exports, missing files"
+
