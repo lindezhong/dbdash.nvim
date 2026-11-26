@@ -307,7 +307,7 @@ configs (|dbdash-examples|). Every field has a tag:
         sql:
           type: string
           description: |-
-            Query template (Jinja subset, see :help dbdash-templates): arguments are
+            Query template (Jinja2, see :help dbdash-templates): arguments are
             {{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta, e.g.
             run records with ids, times and results: meta.run (meta.run.kind: "refresh" or
             "callback"; meta.run.depth: 0 in a refresh, n in a callback), meta.runs,

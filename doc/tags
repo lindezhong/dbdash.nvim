@@ -20,6 +20,7 @@ dbdash-api	dbdash.txt	/*dbdash-api*
 dbdash-arguments	dbdash.txt	/*dbdash-arguments*
 dbdash-assign-args	dbdash.txt	/*dbdash-assign-args*
 dbdash-callback	dbdash.txt	/*dbdash-callback*
+dbdash-cancel	dbdash.txt	/*dbdash-cancel*
 dbdash-charts	dbdash.txt	/*dbdash-charts*
 dbdash-commands	dbdash.txt	/*dbdash-commands*
 dbdash-config	dbdash.txt	/*dbdash-config*
@@ -156,6 +157,7 @@ dbdash-styles	dbdash.txt	/*dbdash-styles*
 dbdash-template-autoescape	dbdash.txt	/*dbdash-template-autoescape*
 dbdash-template-dialects	dbdash.txt	/*dbdash-template-dialects*
 dbdash-template-errors	dbdash.txt	/*dbdash-template-errors*
+dbdash-template-extensions	dbdash.txt	/*dbdash-template-extensions*
 dbdash-template-filters	dbdash.txt	/*dbdash-template-filters*
 dbdash-template-imports	dbdash.txt	/*dbdash-template-imports*
 dbdash-template-lua	dbdash.txt	/*dbdash-template-lua*

@@ -1,4 +1,4 @@
--- Jinja-subset template engine (design §6): lexer -> parser -> Lua codegen -> load().
+-- Jinja2 template engine (design §6): lexer -> parser -> Lua codegen -> load().
 local lexer = require("dbdash.template.lexer")
 local parser = require("dbdash.template.parser")
 local compiler = require("dbdash.template.compiler")

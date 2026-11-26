@@ -26,7 +26,7 @@ no external dependencies: no Python, no database command-line tools. SQLite
 is used through LuaJIT FFI and the system `libsqlite3`.
 
 Each config file (YAML) describes one dashboard: the database, the query (a
-Jinja-like template) and how to show the result.
+Jinja2 template) and how to show the result.
 
 ==============================================================================
 2. SETUP                                                        *dbdash-setup*
@@ -113,7 +113,8 @@ fails, the error has a phase: template (the query template), connect,
 tls, auth, query (the database rejected the query, e.g. a SQL syntax
 error, or the result is not rows, |dbdash-result|), transform (the
 `query.transform` script failed or did not return rows), timeout
-(`connect_timeout` + `timeout` elapsed) or decode. Then:
+(`connect_timeout` + `timeout` elapsed; the query is stopped on the server
+too, |dbdash-cancel|) or decode. Then:
 
 - the last good result stays on screen, with the error as a red `✗` line
   above it (with panels: in the panel's header);
@@ -160,10 +161,10 @@ database:
     for interactively; without it only `required` arguments without a value.
 
 :DbDashRestart                                                *:DbDashRestart*
-    Run the current dashboard's query now and restart its countdown. If a
-    query is still running, it runs again as soon as that one finishes (the
-    same happens when an argument changes); timer refreshes that come while
-    a query runs are skipped instead.
+    Run the current dashboard's query now and restart its countdown. A
+    query still running is cancelled and the new one starts at once (the
+    same happens when an argument changes, |dbdash-cancel|); timer
+    refreshes that come while a query runs are skipped instead.
 
 :DbDashStop [{config}]                                           *:DbDashStop*
     Stop a dashboard (default: the current one) and close its buffer.
@@ -584,10 +585,14 @@ are rejected with a line and column.
 
 `query.sql` and `query.transform` are templates rendered before every run,
 both the same way (the transform is never autoescaped); descriptions
-(|dbdash-description|) are rendered the same way when shown. The language is a
-subset of Jinja2 with `trim_blocks` and `lstrip_blocks` enabled, and behaves
-like Jinja2 (Python semantics) for everything it supports. The rendered text
-is what |:DbDashShowSQL| (`s`) shows.
+(|dbdash-description|) are rendered the same way when shown. The language is
+Jinja2 (3.1) with `trim_blocks` and `lstrip_blocks` enabled, undefined
+values as errors (StrictUndefined) and the `loopcontrols` and `do`
+extensions built in: statements, expressions, filters, tests and functions
+behave as in Jinja2 (Python semantics), checked against Jinja2 itself.
+dbdash adds SQL quoting, `args` / `meta` and Lua
+(|dbdash-template-extensions|). The rendered text is what |:DbDashShowSQL|
+(`s`) shows.
 
 Variables                                              *dbdash-template-vars*
 
@@ -1037,6 +1042,29 @@ timeout. Errors name the file and line: the config's line for a block, the
 A config with Lua in its templates or imports is trusted before it runs,
 together with the files it imports, includes or extends (|dbdash-lua|).
 
+Extensions and differences                    *dbdash-template-extensions*
+
+What dbdash adds to Jinja2, or does differently:
+
+- `args` and `meta` are global variables: every template sees them,
+  including imported and included ones (with or without context). They
+  are read-only: methods that change a value (`append`, `update`, ...)
+  refuse them, and `{% set meta.x %}` is an error.
+- `{% set args.name = value %}` sets an argument (|dbdash-assign-args|).
+- `{% lua %} ... {% endlua %}` and importing `.lua` modules
+  (|dbdash-template-lua|).
+- The SQL filters and functions (`sql_quote`, `sql_in`, ..., `sql_case`,
+  `sql_concat`) and `query.autoescape`, which writes literals of the
+  database (|dbdash-template-autoescape|). In SQL templates `escape`, `e`
+  and `forceescape` write such literals too (not HTML), and the output of
+  `urlize` and `xmlattr` is still autoescaped. Elsewhere (descriptions)
+  autoescape and `escape` are HTML escaping, as in Jinja2.
+- Filters that return a generator in Jinja2 (`map`, `select`, `reverse`,
+  ...) return a list.
+- Numbers from the database and from Lua are ints when they have no
+  fraction (Lua has one number type).
+- Custom filters and tests cannot be added.
+
 Errors                                                *dbdash-template-errors*
 
 Syntax and runtime errors stop the refresh and are shown in the dashboard
@@ -1045,8 +1073,6 @@ descriptions (a description's error is notified when it is shown), e.g.
 "board.yaml:12: 'region' is undefined", the imported file's own for an error
 in an imported template or `.lua` module. A bare argument name says how to
 write it: "'days' is undefined; arguments are written args.days".
-
-Not supported: custom filters and tests.
 
 Numbers are ints and floats as in Python: `{{ 4 / 2 }}` is `2.0`. Numbers
 from the database and from Lua are ints when they have no fraction.
@@ -1145,6 +1171,35 @@ SQLite options (`database.options`): `lib_path`, `readonly`, `create`
 https://sqlite.org/download.html) next to nvim.exe or on PATH, or point
 `lib_path` at it; winsqlite3.dll of newer Windows versions is used
 otherwise. `sqlite:///C:/data/app.db` is a drive path there.
+
+Cancelling queries                                           *dbdash-cancel*
+
+A running query is cancelled when the dashboard stops (|:DbDashStop|,
+closing its last window, deleting its buffer, quitting Neovim), when a new
+refresh replaces it (|:DbDashRestart|, `r`, changed or reset arguments) and
+when its time is up (`connect_timeout` + `timeout`). Timer refreshes do not
+cancel: they are skipped while a query runs.
+
+Cancelling always goes the same way: dbdash stops waiting at once (the
+result is dropped), then stops the query on the server, then closes the
+connection. The callbacks of the refresh (|dbdash-callback|) and its Lua
+code are cancelled with it. On the server:
+
+  PostgreSQL   a CancelRequest on a new connection
+  MySQL        KILL QUERY on a new connection (a user can kill the
+               queries of its own connections)
+  SQL Server   an attention packet on the query's connection
+  MongoDB      killOp of the operation, found by its comment with
+               $currentOp (servers 4.4 and newer; users can kill their own
+               operations; `operation: command` is only disconnected)
+  SQLite       the query is interrupted
+  lua://       the script stops (|dbdash-lua|)
+  Redis, Cassandra, HTTP   nothing: the connection is closed
+
+A cancelled refresh is not an error: the panel keeps its result, its run
+record (|dbdash-runs|) has `ok = false` and the error "query cancelled:
+<reason>", and |:DbDashStatus| lists it as cancelled. When Neovim quits it
+waits up to a second for the cancels to reach the servers.
 
 Passwords                                                 *dbdash-passwords*
 
@@ -1348,15 +1403,17 @@ its refresh, and the caller finds it in `meta.runs`.
 
 A `lua://` query returns rows (|dbdash-result|), or any value that its
 `query.transform` turns into rows. Errors name the config file and line; a
-script still running at the query timeout is stopped (loops that never call a
-function may only stop then). Blocking calls such as `vim.fn.system()` freeze
+script still running at the query timeout, or when its refresh is cancelled
+(|dbdash-cancel|), is stopped (loops that never call a function may only stop
+then). Blocking calls such as `vim.fn.system()` freeze
 the editor: use `dbdash.system()`.
 
 Trust: Lua runs with your permissions, so a config that runs Lua is trusted
 before it starts. The unit is the config: one question covers all the Lua it
 runs, its own (`lua://`, `transform`, `{% lua %}` blocks) and the files it
-imports (`.lua` modules and templates with `{% lua %}` blocks, found through
-imports whose target is a quoted name). The question lists those files:
+imports, includes or extends (`.lua` modules and templates with `{% lua %}`
+blocks, found through imports, includes and extends whose target is a
+quoted name). The question lists those files:
 Allow, View, Deny or Not now. View shows them in one floating window: the
 config (named in the title), then each imported file after a separator line
 with its path; `a` allows (and starts it), `d` denies, `q` closes without

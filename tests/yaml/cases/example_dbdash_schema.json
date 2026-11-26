@@ -2,65 +2,93 @@
  "$schema": "http://json-schema.org/draft-07/schema#",
  "$id": "dbdash.schema.yaml",
  "title": "dbdash.nvim dashboard",
- "description": "One dashboard: either a single chart (database / query / show) or several panels (panels / layout). See :help dbdash-config.",
+ "description": "One dashboard: either a single chart (database / query / show) or several panels (panels / layout). Top-level bare fields (interval, args, layout) are dashboard-wide; the top-level database, query and show are the panels' defaults (without panels: the only panel). See :help dbdash-config.",
  "type": "object",
- "oneOf": [
-  {
-   "title": "single chart",
-   "required": [
-    "database"
-   ],
-   "not": {
-    "required": [
-     "panels"
-    ]
-   }
-  },
-  {
-   "title": "several panels",
-   "required": [
-    "panels"
-   ],
-   "not": {
-    "anyOf": [
-     {
-      "required": [
-       "query"
-      ]
-     },
-     {
-      "required": [
-       "show"
-      ]
-     }
-    ]
+ "if": {
+  "required": [
+   "panels"
+  ]
+ },
+ "then": {
+  "properties": {
+   "query": {
+    "properties": {
+     "sql": false,
+     "transform": false,
+     "args": false
+    }
+   },
+   "show": {
+    "properties": {
+     "type": false,
+     "title": false,
+     "description": false,
+     "span": false,
+     "column_list": false,
+     "x_label": false,
+     "y_label": false
+    },
+    "patternProperties": {
+     "_columns?$": false
+    }
    }
   }
- ],
+ },
+ "else": {
+  "required": [
+   "database"
+  ],
+  "not": {
+   "required": [
+    "layout"
+   ]
+  }
+ },
+ "dependencies": {
+  "show_countdown": [
+   "interval"
+  ]
+ },
  "properties": {
   "database": {
-   "$ref": "#/definitions/database"
+   "$ref": "#/definitions/database",
+   "description": "The database of a single chart; with panels, the default of every panel that does not set its own (replaced as a whole by a panel's database; optional when every panel sets one)."
   },
   "query": {
-   "$ref": "#/definitions/query"
+   "$ref": "#/definitions/query",
+   "description": "The single chart's query; with panels, defaults of every panel's query (timeout, max_rows, autoescape)."
   },
   "show": {
-   "$ref": "#/definitions/show"
+   "$ref": "#/definitions/show",
+   "description": "The single chart's show; with panels, defaults of every panel's show (interval, show_countdown, countdown_format, args_show, refresh_hidden, style, ...), merged key by key."
   },
   "interval": {
    "$ref": "#/definitions/duration",
-   "description": "Default refresh interval. With panels it is also a global timer: when it elapses every panel refreshes and the panels' own timers restart."
+   "description": "Global refresh: when it elapses every panel refreshes and the panels' own timers restart. Also the last default of show.interval (after the top-level show.interval). At least 1s."
+  },
+  "title": {
+   "type": "string",
+   "description": "The dashboard's title: on the header line above the charts, in notifications and :DbDashStatus, and meta.dashboard_title."
+  },
+  "description": {
+   "type": "string",
+   "description": "The dashboard's description: a template (the shared args; meta without panel fields; it cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe; ⓘ in the header says there is one."
+  },
+  "show_countdown": {
+   "type": "boolean",
+   "default": false,
+   "description": "Count down to the next refresh of every panel (needs interval), right of the title."
+  },
+  "countdown_format": {
+   "type": "string",
+   "description": "Text of that countdown ({time} seconds, {clock} m:ss; default setup defaults.countdown_format)."
   },
   "args": {
    "type": "array",
-   "description": "Arguments shared by all panels, merged by name with each panel's query.args (the same name must be declared identically).",
+   "description": "Shared arguments: every panel can use them. A panel's query.args are its own (only that panel sees them) and shadow a shared argument of the same name there. On the command line name=value sets every argument of that name, <panel id>.name=value one panel's own (a local name nothing else has is plain name too).",
    "items": {
     "$ref": "#/definitions/arg"
    }
-  },
-  "args_show": {
-   "type": "boolean",
-   "description": "Show the argument values above the charts."
   },
   "layout": {
    "type": "object",
@@ -229,7 +257,7 @@
     "show": {
      "type": "boolean",
      "default": true,
-     "description": "Include the argument in the args_show line."
+     "description": "Include the argument in show.args_show lines (when args_show is true)."
     },
     "description": {
      "type": "string"
@@ -247,22 +275,18 @@
    "properties": {
     "sql": {
      "type": "string",
-     "description": "Query template (Jinja subset, see :help dbdash-templates): arguments are\n{{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta). Lua runs in\n{% lua %} ... {% endlua %} blocks and in modules imported with\n{% import 'x.lua' as h %} (:help dbdash-template-lua); a config with Lua is\ntrusted once, with the files it imports (:help dbdash-lua). Its language depends\non the database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\": {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)\n  lua://         Lua code returning rows (see \"Result format\" at the top\n                 of this file, :help dbdash-result), or a value that\n                 query.transform turns into rows; it sees args, meta\n                 and dbdash.system/query/sleep (:help dbdash-lua)\n  http(s)://     a JSON request description (empty: GET the URL):\n                 {\"method\": \"POST\", \"path\": \"search\", \"query\": {...},\n                  \"headers\": {...}, \"cookies\": \"a=1; b=2\" | \"cookies.txt\",\n                  \"body\": {...} | \"text\", \"form\": {...}, \"redirects\": 5}\n                 JSON responses are decoded, other bodies stay text; the\n                 result must be rows (\"Result format\", :help\n                 dbdash-result): a JSON list of objects or {\"columns\",\n                 \"rows\"} shows directly, anything else needs\n                 query.transform (:help dbdash-http)"
+     "description": "Query template (Jinja2, see :help dbdash-templates): arguments are\n{{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta, e.g.\nrun records with ids, times and results: meta.run (meta.run.kind: \"refresh\" or\n\"callback\"; meta.run.depth: 0 in a refresh, n in a callback), meta.runs,\nmeta.prev, meta.prev_ok (the last successful refresh, its rows in\nmeta.prev_ok.result): :help dbdash-runs), and\n{% set args.<name> = value %} sets an argument (:help dbdash-assign-args). Lua\nruns in {% lua %} ... {% endlua %} blocks and in modules imported with\n{% import 'x.lua' as h %} (:help dbdash-template-lua), with args, meta, store and\nthe dbdash.* helpers (dbdash.run(args): this query again with other arguments);\na config with Lua is trusted once, with the files it imports (:help dbdash-lua).\nIts language depends on the database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\": {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)\n  lua://         Lua code returning rows (see \"Result format\" at the top\n                 of this file, :help dbdash-result), or a value that\n                 query.transform turns into rows; it sees args, meta,\n                 store and dbdash.system/query/sleep/run (:help\n                 dbdash-lua)\n  http(s)://     a JSON request description (empty: GET the URL):\n                 {\"method\": \"POST\", \"path\": \"search\", \"query\": {...},\n                  \"headers\": {...}, \"cookies\": \"a=1; b=2\" | \"cookies.txt\",\n                  \"body\": {...} | \"text\", \"form\": {...}, \"redirects\": 5}\n                 JSON responses are decoded, other bodies stay text; the\n                 result must be rows (\"Result format\", :help\n                 dbdash-result): a JSON list of objects or {\"columns\",\n                 \"rows\"} shows directly, anything else needs\n                 query.transform (:help dbdash-http)"
     },
     "transform": {
      "type": "string",
-     "description": "Lua code that reshapes the result of any database before it is shown (after the\nsame template as query.sql - args, meta, {% lua %}, .lua imports - without\nautoescape; :help dbdash-transform). Every query goes:\nquery -> transform -> rows check. It gets\n  rs        SQL and other databases: { columns (names), types, rows (nil for\n            NULL) }; lua://: the script's value; http(s)://: the decoded body\n  response  http(s)://: { status, reason, headers, body, url }\n  args      the arguments, meta the metadata, and the dbdash.* helpers\nand returns rows (see \"Result format\" at the top of this file, :help\ndbdash-result). Configs with Lua ask for trust first (:help dbdash-lua)."
+     "description": "Lua code that reshapes the result of any database before it is shown (after the\nsame template as query.sql - args, meta, {% lua %}, .lua imports - without\nautoescape; :help dbdash-transform). Every query goes:\nquery -> transform -> rows check. It gets\n  rs        SQL and other databases: { columns (names), types, rows (nil for\n            NULL) }; lua://: the script's value; http(s)://: the decoded body\n  response  http(s)://: { status, reason, headers, body, url }\n  args      the arguments, meta the metadata, store the panel's table kept while\n            the dashboard runs, and the dbdash.* helpers (dbdash.run(args)\n            runs this panel's query again with other arguments)\nand returns rows (see \"Result format\" at the top of this file, :help\ndbdash-result). Configs with Lua ask for trust first (:help dbdash-lua)."
     },
     "args": {
      "type": "array",
+     "description": "This chart's own arguments (only its templates see them); one with the name of a shared (top-level) argument shadows it here.",
      "items": {
       "$ref": "#/definitions/arg"
      }
-    },
-    "args_show": {
-     "type": "boolean",
-     "default": false,
-     "description": "Show the argument values above the chart."
     },
     "autoescape": {
      "type": "boolean",
@@ -286,9 +310,14 @@
    "description": "One chart; query is required except for http(s):// (a GET of the URL).",
    "additionalProperties": false,
    "properties": {
+    "id": {
+     "type": "string",
+     "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+     "description": "Name of the panel for its local arguments on the command line (<id>.name=value); default its number (1, 2, ...)."
+    },
     "database": {
      "$ref": "#/definitions/database",
-     "description": "Overrides the top-level database for this panel."
+     "description": "This panel's database; default the top-level database (replaced as a whole). A panel needs one of the two."
     },
     "query": {
      "$ref": "#/definitions/query"
@@ -349,18 +378,28 @@
     "title": {
      "type": "string"
     },
+    "description": {
+     "type": "string",
+     "description": "This chart's description: a template (args, meta, as its query sees them; it cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe; ⓘ after the panel's title (in a one-chart dashboard: in the header) says there is one. With panels, it belongs in each panel."
+    },
     "interval": {
      "$ref": "#/definitions/duration",
-     "description": "Refresh interval of this chart (default the top-level interval, else 30s from setup defaults.interval). At least 1s."
+     "description": "Refresh interval of this chart (default the top-level show.interval, then the top-level interval, else 30s from setup defaults.interval). At least 1s."
     },
     "show_countdown": {
      "type": "boolean",
-     "default": false
+     "default": false,
+     "description": "This chart's own countdown to its next refresh."
+    },
+    "refresh_hidden": {
+     "type": "boolean",
+     "default": false,
+     "description": "Keep refreshing this chart while the dashboard is not visible (paused, see dashboard.pause_hidden in setup): thresholds and errors still notify."
     },
     "countdown_format": {
      "type": "string",
      "default": "Next update: {time}s",
-     "description": "{time} is replaced by the seconds left (default: setup defaults.countdown_format)."
+     "description": "{time} is replaced by the seconds left, {clock} by m:ss (default: setup defaults.countdown_format)."
     },
     "renderer": {
      "type": "string",
@@ -389,6 +428,21 @@
      "minimum": 1,
      "default": 1,
      "description": "Grid columns this panel spans."
+    },
+    "args_show": {
+     "description": "Show argument values above this chart: true for the arguments its query reads (and its own query.args; not those with show: false), or a list of names.",
+     "oneOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     ],
+     "default": false
     },
     "style": {
      "type": "object",

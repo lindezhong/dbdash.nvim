@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=./dbdash.schema.yaml
+#
+# Jinja2 templates beyond macros (:help dbdash-templates):
+# - {% extends %} / {% block %}: templates/report.sql lays out the query, the first panel
+#   fills its blocks; {{ super() }} keeps the base's own columns.
+# - {% include %}: templates/filters.sql is a shared WHERE fragment; it sees args and the
+#   including template's variables.
+# - {% call %} wraps text in a macro (caller()), namespace() keeps a count across a loop,
+#   {% set x %}...{% endset %} captures output, {% for ... if ... %} filters a loop, and
+#   filters such as sort, map, join and groupby work on lists.
+# - "+%}" keeps the line break after a tag, which trim_blocks would remove (an included
+#   file's output does not end with one).
+
+title: "Jinja2 templates"
+
+database:
+  url: "sqlite:///:memory:"
+
+args:
+  - name: teams
+    type: list
+    default: [red, blue, green]
+  - name: min_score
+    type: int
+    default: 20
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        {% extends 'templates/report.sql' %}
+        {% set min_score = args.min_score %}
+        {% block columns %}team, count(*) AS players, {{ super() }}{% endblock %}
+        {% block where %}{% include 'templates/filters.sql' %}{% endblock %}
+        {% block rest %}GROUP BY team ORDER BY team{% endblock %}
+    show:
+      type: table
+      title: "extends, block, include"
+
+  - query:
+      sql: |
+        {% import 'templates/helpers.sql' as h %}
+        {% set ns = namespace(counted=[]) %}
+        {% set columns %}
+        {% for team in args.teams | sort if team != 'green' %}
+          {% do ns.counted.append(team) %}
+          {{ h.count_if('team', team) }} AS {{ team }},
+        {% endfor %}
+        {% endset %}
+        {% include 'templates/players.sql' +%}
+        SELECT {{ columns }}
+               {% call h.column('all_players') %}count(*){% endcall %},
+               {{ ns.counted | map('upper') | join('/') | sql_quote }} AS counted,
+               {{ '%d team(s)' | format(ns.counted | length) | sql_quote }} AS teams
+        FROM players
+    show:
+      type: table
+      title: "call, namespace, set block, filters"
+
+  - query:
+      sql: |
+        {% set ranks = [{'name': 'gold', 'min': 80}, {'name': 'silver', 'min': 50},
+                        {'name': 'bronze', 'min': 0}] %}
+        {% include 'templates/players.sql' +%}
+        SELECT CASE
+          {% for r in ranks | sort(attribute='min', reverse=true) %}
+          WHEN score >= {{ r.min }} THEN {{ r.name | title | sql_quote }}
+          {% endfor %}
+          END AS rank, count(*) AS players
+        FROM players
+        GROUP BY rank
+        ORDER BY min(score) DESC
+    show:
+      type: bar
+      title: "Players per rank (a loop over sorted mappings)"
+      x_column: rank
+      y_column: players
+      span: 2

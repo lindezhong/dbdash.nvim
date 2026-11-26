@@ -23,8 +23,11 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
   a `store` table kept per panel, run records with the previous results (`meta.prev_ok`),
   `dbdash.run()` to run a panel's query again with other arguments, and assigning
   arguments from templates and Lua.
-- **Query templates**: a Jinja2 subset with SQL-safe quoting filters, autoescape, macros
-  and imports.
+- **Query templates**: Jinja2 (statements, filters, tests and functions, checked against
+  Jinja2 itself), with SQL-safe quoting filters and autoescape; include, extends and
+  imports from files next to the config.
+- **Cancelling**: a refresh you ask for, stopping a dashboard and timeouts cancel the
+  running query, on the server too (PostgreSQL, MySQL, SQL Server, MongoDB, SQLite, Lua).
 - **Thresholds**: color values (stat cards, table cells) and notify when a value crosses a level.
 - **Arguments**: typed variables set from the command line, prompts or in the dashboard;
   shared by all panels or a panel's own.
@@ -170,6 +173,7 @@ Examples, all runnable as they are:
 | [`multi_panel.yaml`](example/multi_panel.yaml) | several panels in a grid: top-level defaults, per-panel intervals and databases (SQLite and an HTTPS API, needs network), title, global countdown, descriptions, argument lines |
 | [`template_example.yaml`](example/template_example.yaml) | every argument type and the template syntax |
 | [`macros.yaml`](example/macros.yaml) | macros, imports, autoescape |
+| [`templates.yaml`](example/templates.yaml) | extends and blocks, include, call, namespace, set blocks, filters |
 | [`sqlite_file.yaml`](example/sqlite_file.yaml) | a SQLite file database |
 | [`lua.yaml`](example/lua.yaml) | a `lua://` data source (Lua code, a command's output) |
 | [`transform.yaml`](example/transform.yaml) | `query.transform` reshaping a query result with Lua |
@@ -197,7 +201,8 @@ Passwords do not have to be in config files: use `${ENV_VAR}` in the URL,
 
 Common parameters: `tls=disable|require|pin|verify-ca|verify-full`,
 `fingerprint=sha256:...` (for `pin`), `ca=bundle.pem`, `tls_host=name`,
-`connect_timeout=10s`, `timeout=30s` (defaults changeable in `setup({ defaults })`).
+`connect_timeout=10s`, `timeout=30s` (defaults changeable in `setup({ defaults })`); a
+query that runs out of time is stopped on the server too (`:help dbdash-cancel`).
 Passwords are percent-decoded. Also accepted: `sqlite3://`, `postgresql://`, `mariadb://`,
 `cql://`, `sqlserver://`. The query language
 follows the database: SQL, CQL, one Redis command, or a JSON document for MongoDB.
