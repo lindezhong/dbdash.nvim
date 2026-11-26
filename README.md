@@ -169,6 +169,15 @@ share the rest of the window; a grid taller than the window scrolls instead of s
 the charts. See `:help dbdash-layout` and
 [`example/dashboards/grid.yaml`](example/dashboards/grid.yaml).
 
+`show.style` takes CSS-like properties that every chart understands: `color`, `background`,
+a color per part (`title_style`, `axis_style`, `legend_style`, ...), `title_align`, `border`
+line styles, `panel_border`, `padding`, `justify` / `align` in the cell, `ellipsis`; they
+cascade from `setup({ styles })` to the top-level `show` to each panel. Each chart type adds
+the options of the common chart libraries (Chart.js, ECharts, Grafana, DataTables): stacked
+and grouped series, reference lines, log axes, donuts, reduce functions, sorting, row colors,
+and more; long table cells wrap. See `:help dbdash-css`, `:help dbdash-charts` and
+[`example/charts/`](example/charts), where every option has its own panel.
+
 [`example/dbdash.schema.yaml`](example/dbdash.schema.yaml) is a JSON Schema of the whole
 format (also in `:help dbdash-schema`, with a tag for every field); editors with
 yaml-language-server validate and complete a config that starts with:
