@@ -455,8 +455,8 @@ topic (the sidebar shows them as a tree):
                 config, cancelling a slow query; an HTTPS API (github.yaml,
                 needs network)
 
-Most use an in-memory SQLite database and run as they are. Those that run Lua
-or a script ask for trust first (|dbdash-lua|).
+The others use an in-memory SQLite database and run as they are. Those that
+run Lua or a script ask for trust first (|dbdash-lua|).
 
 `example/dbdash.schema.yaml` is a JSON Schema for config files. It lists every
 field and the URL format of each database; |dbdash-schema| shows it, with a
@@ -1231,7 +1231,8 @@ wins, then `database.password_cmd`, then `passwords.json`:
     database:
       url: "postgres://app@db.internal:5432/app"
       password_cmd: "pass show db/app"     # or [pass, show, db/app]
-<  The output is cached until Neovim exits or the server rejects it.
+<  It runs in Neovim's current directory. The output is cached until Neovim
+  exits or the server rejects it.
 - `stdpath("data")/dbdash/passwords.json` (e.g.
   ~/.local/share/nvim/dbdash/passwords.json) maps URLs without passwords to
   passwords, most specific first: `scheme://user@host:port/db`, then
@@ -1450,18 +1451,24 @@ Transforms                                                  *dbdash-transform*
 Every query, of any database, goes the same way: the query, then
 `query.transform` if the config has one, then the rows check
 (|dbdash-result|). Results of SQL databases pass as they are; a `lua://`
-script or an HTTP response may return anything, and the transform makes rows
-of it. The transform is Lua (|dbdash-lua|: template, globals, helpers,
-trust) and sees:
+script, an HTTP response or an item of a push source (|dbdash-push|) may be
+anything, and the transform makes rows of it. The transform is Lua
+(|dbdash-lua|: template, globals, helpers, trust) and sees:
 
   rs         SQL and the other databases: the result as plain data,
              `rs.columns` (names), `rs.types`, `rs.rows` (lists, nil for
              NULL); `lua://`: what the script returned; `http(s)://`: the
              response body, decoded when it is JSON (null becomes nil in
              objects and `dbdash.null` in lists), else the text
+             push sources: one item (text, or the value `dbdash.emit()` or
+             a request gave)
   response   (`http(s)://`) `{ status, reason, headers, body, url }`:
              header names in lower case, `body` the raw text, `url` the
              final URL after redirects
+  stream     (`exec://`) "stdout" or "stderr" (|dbdash-exec|)
+  params     (`webhook://`) `{ path, query, header, cookie }` and
+  request    `{ method, path, operation_id, content_type, headers }`
+             (|dbdash-webhook|)
   args, meta the dashboard arguments and metadata (assigning `args.x`
              sets it, |dbdash-assign-args|)
   store      the panel's table (|dbdash-store|)
@@ -1483,7 +1490,7 @@ request; an empty or missing `query.sql` GETs the URL: >yaml
     sql: |
       {
         "method": "POST",
-        "path": "search",
+        "path": "/search",
         "query": {"limit": {{ args.limit }}},
         "headers": {"Authorization": "Bearer {{ args.token }}"},
         "cookies": "session=abc; lang=en",
@@ -1521,6 +1528,9 @@ starts with `[` or `{` when there is none) is decoded, anything else stays
 text. It is then checked as rows (|dbdash-result|): a JSON list of objects or
 `{"columns": [...], "rows": [...]}` shows directly; other JSON and text need
 `query.transform`, which also gets `response` (|dbdash-transform|).
+
+A failed request names the URL it went to (the URL and the path joined); an
+error status (not 2xx) also gives the start of the body.
 
 Cookies the server sets (Set-Cookie) are kept in memory for the running
 dashboard and sent on later refreshes and redirects, following their Domain,
@@ -1802,8 +1812,19 @@ or existing highlight groups ("DiagnosticOk").
 require("dbdash").start({config}, {tokens})   start a dashboard
 require("dbdash").stop({config})              stop it
 require("dbdash").query({url}, {query}, {opts}, {callback})
-    run a query through the data layer; callback(err, resultset)
+    run a query through the data layer; callback(err, resultset) is called
+    once, on the main loop. Returns a handle: `handle:cancel(reason)` stops
+    the query (|dbdash-cancel|). Push sources (|dbdash-push|) cannot be
+    queried this way: they run as a panel's stream.
 require("dbdash.db").register({driver})        add a database driver
+    {driver} has `name`, `schemes` (default { name }), `connect(info)`
+    returning a connection with `execute(query, opts)`, `close()` and
+    `server_version()`, and optionally `capabilities`, `dialect`,
+    `parse_url(info)`, `cancel(conn, info)` (stop the running query on the
+    server, |dbdash-cancel|) and `produce(info, query, ctx)` (a push source:
+    `ctx.writer(delimiter)` or `ctx.emit(value)` passes items until it
+    returns; set `capabilities.push`). See lua/dbdash/db/init.lua for the
+    exact types.
 
                                                         *dbdash-session-state*
 require("dbdash").mksession({file})

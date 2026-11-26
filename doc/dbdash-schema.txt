@@ -22,10 +22,11 @@ configs (|dbdash-examples|). Every field has a tag:
   # Defaults below marked "setup" can be changed for all configs with
   # require("dbdash").setup({ defaults = { ... } }); see :help dbdash-setup.
   #
-  # Result format (:help dbdash-result) - referred to by query.sql (lua://, http(s)://) and
-  # query.transform below. Every query goes: query -> query.transform (if any) -> a check
-  # that the result is rows. SQL databases, Redis, MongoDB and Cassandra return rows; a
-  # lua:// script, an HTTP response (decoded JSON) and a transform must return one of:
+  # Result format (:help dbdash-result) - referred to by query.sql (lua://, http(s)://, the
+  # push sources) and query.transform below. Every query goes: query -> query.transform (if
+  # any) -> a check that the result is rows. SQL databases, Redis, MongoDB and Cassandra
+  # return rows; a lua:// script, an HTTP response (decoded JSON), an item of a push source
+  # (luastream://, exec://, webhook://: JSON text) and a transform must return one of:
   #   { columns = { "a", "b" }, rows = { { 1, "x" } } }        rows by position
   #   { columns = { "a", "b" }, rows = { { a = 1, b = "x" } } } rows by name
   #   { { a = 1, b = "x" }, ... }                               records (columns sorted by
@@ -54,7 +55,7 @@ configs (|dbdash-examples|). Every field has a tag:
           { type: false, title: false, description: false, span: false, column_list: false, x_label: false, y_label: false }
         patternProperties: { "_columns?$": false }
   else:
-    required: [database] # query too, except for http(s):// (a GET of the URL)
+    required: [database] # query too, except for http(s):// (a GET of the URL) and webhook://
     not: { required: [layout] } # layout only applies with panels
   dependencies:
     show_countdown: [interval] # it counts down to the global refresh
@@ -236,7 +237,8 @@ configs (|dbdash-examples|). Every field has a tag:
         password_cmd:
           description: >-
             Command printing the password (first line), used when the URL has none. A string
-            runs through sh -c (cmd /c on Windows); a list runs directly.
+            runs through sh -c (cmd /c on Windows); a list runs directly. It runs in Neovim's
+            current directory.
           oneOf:
             - { type: string, minLength: 1 }
             - { type: array, minItems: 1, items: { type: string } }
@@ -394,7 +396,9 @@ configs (|dbdash-examples|). Every field has a tag:
                                                *dbdash-schema-def-query* >yaml
     query:
       type: object
-      description: The query; sql is required except for http(s):// (an empty request GETs the URL).
+      description: >-
+        The query; sql is required except for http(s):// (an empty request GETs the URL) and
+        webhook:// (empty: POST or PUT of anything).
       additionalProperties: false
       properties:
 <
@@ -433,7 +437,7 @@ configs (|dbdash-examples|). Every field has a tag:
               webhook://     an OpenAPI 3.1 document (YAML or JSON) describing the
                              requests it accepts (empty: POST or PUT of anything)
               http(s)://     a JSON request description (empty: GET the URL):
-                             {"method": "POST", "path": "search", "query": {...},
+                             {"method": "POST", "path": "/search", "query": {...},
                               "headers": {...}, "cookies": "a=1; b=2" | "cookies.txt",
                               "body": {...} | "text", "form": {...}, "redirects": 5}
                              JSON responses are decoded, other bodies stay text; the
@@ -451,8 +455,13 @@ configs (|dbdash-examples|). Every field has a tag:
             autoescape; :help dbdash-transform). Every query goes:
             query -> transform -> rows check. It gets
               rs        SQL and other databases: { columns (names), types, rows (nil for
-                        NULL) }; lua://: the script's value; http(s)://: the decoded body
+                        NULL) }; lua://: the script's value; http(s)://: the decoded body;
+                        push sources: one item (text, or what dbdash.emit() or a request
+                        gave; :help dbdash-push)
               response  http(s)://: { status, reason, headers, body, url }
+              stream    exec://: "stdout" or "stderr", the stream the item came from
+              params    webhook://: { path, query, header, cookie }, converted
+              request   webhook://: { method, path, operation_id, content_type, headers }
               args      the arguments, meta the metadata, store the panel's table kept while
                         the dashboard runs, and the dbdash.* helpers (dbdash.run(args)
                         runs this panel's query again with other arguments)
@@ -489,7 +498,7 @@ configs (|dbdash-examples|). Every field has a tag:
                                                *dbdash-schema-def-panel* >yaml
     panel:
       type: object
-      description: One chart; query is required except for http(s):// (a GET of the URL).
+      description: One chart; query is required except for http(s):// (a GET of the URL) and webhook://.
       additionalProperties: false
       properties:
 <

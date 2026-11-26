@@ -134,7 +134,8 @@ titles that have one). Global mappings: `<leader>ds` start, `<leader>dr` refresh
 
 Every key, the `ⓘ` icon, the sidebar (width, position, directory, file globs, cursor line),
 where dashboards open, the popup border and size, the default interval, timeouts and row
-limit, and the `dbdash.run()` limits can be set in `setup()`; see `:help dbdash-setup`.
+limit, the `dbdash.run()` limits and the push sources' queue can be set in `setup()`; see
+`:help dbdash-setup`.
 Colors use highlight groups (`:help dbdash-highlights`), e.g. `DbDashSidebarDir` for
 sidebar directories.
 
@@ -194,6 +195,9 @@ mongodb://user:pass@h1:27017,h2:27017/db?readPreference=secondaryPreferred
 mongodb+srv://user:pass@cluster0.example.net/db
 cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_QUORUM
 mssql://user:pass@host:1433/db
+lua://                                               (the query is Lua code)
+https://api.example.com/v1                           (or http://; the query is a request)
+luastream://   exec://   webhook://127.0.0.1:8765/hooks   (push sources, see below)
 ```
 
 Passwords do not have to be in config files: use `${ENV_VAR}` in the URL,
@@ -205,8 +209,8 @@ Common parameters: `tls=disable|require|pin|verify-ca|verify-full`,
 `connect_timeout=10s`, `timeout=30s` (defaults changeable in `setup({ defaults })`); a
 query that runs out of time is stopped on the server too (`:help dbdash-cancel`).
 Passwords are percent-decoded. Also accepted: `sqlite3://`, `postgresql://`, `mariadb://`,
-`cql://`, `sqlserver://`. The query language
-follows the database: SQL, CQL, one Redis command, or a JSON document for MongoDB.
+`cql://`, `sqlserver://`. The query language follows the database: SQL, CQL, one Redis
+command, a JSON document for MongoDB, Lua for `lua://`, a JSON request for HTTP.
 Details: `:help dbdash-databases` and `:help dbdash-tls`.
 
 ### Templates
@@ -284,7 +288,7 @@ database:
   url: https://api.example.com/v1
 query:
   sql: |
-    {"method": "POST", "path": "search", "query": {"limit": {{ args.limit }}},
+    {"method": "POST", "path": "/search", "query": {"limit": {{ args.limit }}},
      "headers": {"Authorization": "Bearer {{ args.token }}"},
      "cookies": "session=abc", "body": {"q": "{{ args.keyword }}"}}
   transform: |
@@ -293,12 +297,41 @@ query:
     return out
 ```
 
-The transform gets the decoded JSON as `rs` and `response` (status, headers, body). A JSON
-list of objects or `{"columns": [...], "rows": [...]}` shows without a transform; every
-result must end up in one of these row shapes (`:help dbdash-result`).
+`path` is appended to the URL's path as written: `/v1` + `/search` requests `/v1/search`
+(a failed request names the full URL). The transform gets the decoded JSON as `rs` and
+`response` (status, reason, headers, body, url). A JSON list of objects or
+`{"columns": [...], "rows": [...]}` shows without a transform; every result must end up
+in one of these row shapes (`:help dbdash-result`).
 `cookies` takes curl's `-b` forms (`"a=1; b=2"` or a Netscape cookie file); cookies the
 server sets are kept in memory for the dashboard and sent on the next refresh, without
 touching the config. `https` verifies certificates by default. See `:help dbdash-http`.
+
+### Push sources
+
+`luastream://`, `exec://` and `webhook://` receive data instead of querying it on an
+interval: Lua code that prints, a script's output, or HTTP requests to a local endpoint.
+Their output is cut into items (by default one per line); each item goes through
+`query.transform` (or must be JSON rows) and the panel is redrawn on its `show.interval`
+when something is new, so a fast source does not redraw for every item.
+
+```yaml
+database:
+  url: "exec://"
+  options: { capture: both, cwd: logs, ok_codes: [0, 1] }
+query:
+  sql: tail -n 0 -F app.log
+  transform: |
+    store.lines = store.lines or {}
+    table.insert(store.lines, 1, { stream = stream, line = rs })
+    return store.lines
+```
+
+`luastream://` and `exec://` end when the code or script ends; `webhook://` listens until
+the dashboard stops, takes an OpenAPI 3.1 document as `query.sql` to describe the
+requests it accepts (parameters, bodies, security), and follows MCP's rules for HTTP
+endpoints: 127.0.0.1 by default, a security requirement on any other address, Host and
+Origin checks, limits on bodies and connections. Examples are in
+[`example/push/`](example/push); see `:help dbdash-push`.
 
 ## Limitations
 
@@ -330,8 +363,9 @@ Integration tests run against the services in `tests/docker/compose.yaml`: Redis
 PostgreSQL, MySQL, MongoDB, Cassandra, SQL Server and nginx (HTTP/HTTPS), all official
 images with the configs and test certificates (`tests/fixtures/`) mounted read-only. They
 are skipped unless `DBDASH_IT=1` is set. With `DBDASH_IT=1` the examples test also runs
-`example/connections/github.yaml` and `example/dashboards/multi_panel.yaml`, which call the public GitHub API
-(network access needed).
+the examples that use these services (`example/databases/`, `example/connections/`) and
+`example/connections/github.yaml` and `example/dashboards/multi_panel.yaml`, which call
+the public GitHub API (network access needed).
 
 **On one machine** with Docker (your user needs access to it, e.g. in the `docker` group,
 or prefix the command with `sg docker -c "..."`):
