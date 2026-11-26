@@ -1,33 +1,124 @@
 {
+ "title": "Bubble chart",
+ "description": "A bubble chart is a scatter plot with sizes: (`x_column`, `y_column`) per row, the\ncircle's area by `size_column`, groups by `color_column`, a text by `label_column`.\nSee `:help dbdash-chart-types`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
- "query": {
-  "sql": "WITH companies AS (\n  SELECT 'Apple' AS company, abs(random() % 50) + 30 AS revenue,\n         abs(random() % 20) + 10 AS profit_margin,\n         abs(random() % 1000) + 500 AS market_cap\n  UNION SELECT 'Google', abs(random() % 45) + 25, abs(random() % 18) + 8, abs(random() % 900) + 400\n  UNION SELECT 'Microsoft', abs(random() % 40) + 35, abs(random() % 22) + 12, abs(random() % 800) + 600\n  UNION SELECT 'Amazon', abs(random() % 60) + 20, abs(random() % 15) + 5, abs(random() % 700) + 300\n  UNION SELECT 'Tesla', abs(random() % 30) + 15, abs(random() % 25) + 15, abs(random() % 600) + 200\n  UNION SELECT 'Meta', abs(random() % 35) + 20, abs(random() % 20) + 10, abs(random() % 500) + 250\n  UNION SELECT 'Netflix', abs(random() % 25) + 10, abs(random() % 18) + 8, abs(random() % 300) + 100\n  UNION SELECT 'Adobe', abs(random() % 20) + 15, abs(random() % 30) + 20, abs(random() % 400) + 150\n)\nSELECT\n  company,\n  revenue,\n  profit_margin,\n  market_cap,\n  CASE\n    WHEN market_cap > 800 THEN 'Large Cap'\n    WHEN market_cap > 400 THEN 'Mid Cap'\n    ELSE 'Small Cap'\n  END AS category\nFROM companies\n"
- },
  "show": {
-  "type": "bubble",
-  "title": "Tech companies",
-  "interval": "50s",
-  "x_column": "revenue",
-  "y_column": "profit_margin",
-  "size_column": "market_cap",
-  "color_column": "category",
-  "label_column": "company",
-  "colors": {
-   "Large Cap": "#e74c3c",
-   "Mid Cap": "#f39c12",
-   "Small Cap": "#3498db"
-  },
-  "axes": {
-   "x_axis": {
-    "title": "Revenue"
+  "interval": "5m"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "SELECT company, revenue, margin, cap,\n       CASE WHEN cap > 800 THEN 'Large' WHEN cap > 400 THEN 'Mid' ELSE 'Small' END AS class\nFROM (\n  SELECT 'Apple' AS company, 80 AS revenue, 25 AS margin, 1400 AS cap\n  UNION ALL SELECT 'Google', 70, 22, 1100 UNION ALL SELECT 'Tesla', 30, 35, 600\n  UNION ALL SELECT 'Netflix', 20, 15, 250 UNION ALL SELECT 'Adobe', 25, 40, 300\n  UNION ALL SELECT 'Meta', 50, 30, 700\n)\n"
    },
-   "y_axis": {
-    "title": "Profit margin (%)"
+   "show": {
+    "type": "bubble",
+    "title": "size, color and label columns (canvas: braille)",
+    "description": "`size_column` sets each circle's area, `color_column` groups and colors the bubbles\n(`colors` by name), `label_column` writes a text next to each.\n",
+    "x_column": "revenue",
+    "y_column": "margin",
+    "size_column": "cap",
+    "color_column": "class",
+    "label_column": "company",
+    "colors": {
+     "Large": "#61afef",
+     "Mid": "#98c379",
+     "Small": "#e5c07b"
+    },
+    "axes": {
+     "x_axis": {
+      "title": "Revenue"
+     },
+     "y_axis": {
+      "title": "Margin %"
+     }
+    }
    }
   },
-  "show_countdown": true,
-  "countdown_format": "Next update: {time}s"
- }
+  {
+   "query": {
+    "sql": "SELECT company, revenue, margin, cap,\n       CASE WHEN cap > 800 THEN 'Large' WHEN cap > 400 THEN 'Mid' ELSE 'Small' END AS class\nFROM (\n  SELECT 'Apple' AS company, 80 AS revenue, 25 AS margin, 1400 AS cap\n  UNION ALL SELECT 'Google', 70, 22, 1100 UNION ALL SELECT 'Tesla', 30, 35, 600\n  UNION ALL SELECT 'Netflix', 20, 15, 250 UNION ALL SELECT 'Adobe', 25, 40, 300\n  UNION ALL SELECT 'Meta', 50, 30, 700\n)\n"
+   },
+   "show": {
+    "type": "bubble",
+    "title": "style: size_range, point, trend_line",
+    "description": "`size_range: [min, max]` is the smallest and largest radius in canvas pixels (Chart.js\n`radius`); `point` marks each center with a character; `trend_line: linear` fits a\ndashed line through the centers.\n",
+    "x_column": "revenue",
+    "y_column": "margin",
+    "size_column": "cap",
+    "style": {
+     "size_range": [
+      2,
+      10
+     ],
+     "point": "+",
+     "trend_line": "linear"
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT company, revenue, margin, cap,\n       CASE WHEN cap > 800 THEN 'Large' WHEN cap > 400 THEN 'Mid' ELSE 'Small' END AS class\nFROM (\n  SELECT 'Apple' AS company, 80 AS revenue, 25 AS margin, 1400 AS cap\n  UNION ALL SELECT 'Google', 70, 22, 1100 UNION ALL SELECT 'Tesla', 30, 35, 600\n  UNION ALL SELECT 'Netflix', 20, 15, 250 UNION ALL SELECT 'Adobe', 25, 40, 300\n  UNION ALL SELECT 'Meta', 50, 30, 700\n)\n"
+   },
+   "show": {
+    "type": "bubble",
+    "title": "canvas: quadrant",
+    "description": "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
+    "canvas": "quadrant",
+    "x_column": "revenue",
+    "y_column": "margin",
+    "size_column": "cap",
+    "color_column": "class"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT company, revenue, margin, cap,\n       CASE WHEN cap > 800 THEN 'Large' WHEN cap > 400 THEN 'Mid' ELSE 'Small' END AS class\nFROM (\n  SELECT 'Apple' AS company, 80 AS revenue, 25 AS margin, 1400 AS cap\n  UNION ALL SELECT 'Google', 70, 22, 1100 UNION ALL SELECT 'Tesla', 30, 35, 600\n  UNION ALL SELECT 'Netflix', 20, 15, 250 UNION ALL SELECT 'Adobe', 25, 40, 300\n  UNION ALL SELECT 'Meta', 50, 30, 700\n)\n"
+   },
+   "show": {
+    "type": "bubble",
+    "title": "canvas: block",
+    "description": "`canvas: block`: one full block per pixel: coarse but bold.",
+    "canvas": "block",
+    "x_column": "revenue",
+    "y_column": "margin",
+    "size_column": "cap",
+    "color_column": "class"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT company, revenue, margin, cap,\n       CASE WHEN cap > 800 THEN 'Large' WHEN cap > 400 THEN 'Mid' ELSE 'Small' END AS class\nFROM (\n  SELECT 'Apple' AS company, 80 AS revenue, 25 AS margin, 1400 AS cap\n  UNION ALL SELECT 'Google', 70, 22, 1100 UNION ALL SELECT 'Tesla', 30, 35, 600\n  UNION ALL SELECT 'Netflix', 20, 15, 250 UNION ALL SELECT 'Adobe', 25, 40, 300\n  UNION ALL SELECT 'Meta', 50, 30, 700\n)\n"
+   },
+   "show": {
+    "type": "bubble",
+    "title": "canvas: halfblock",
+    "description": "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄).",
+    "canvas": "halfblock",
+    "x_column": "revenue",
+    "y_column": "margin",
+    "size_column": "cap",
+    "color_column": "class"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT company, revenue, margin, cap,\n       CASE WHEN cap > 800 THEN 'Large' WHEN cap > 400 THEN 'Mid' ELSE 'Small' END AS class\nFROM (\n  SELECT 'Apple' AS company, 80 AS revenue, 25 AS margin, 1400 AS cap\n  UNION ALL SELECT 'Google', 70, 22, 1100 UNION ALL SELECT 'Tesla', 30, 35, 600\n  UNION ALL SELECT 'Netflix', 20, 15, 250 UNION ALL SELECT 'Adobe', 25, 40, 300\n  UNION ALL SELECT 'Meta', 50, 30, 700\n)\n"
+   },
+   "show": {
+    "type": "bubble",
+    "title": "canvas: ascii",
+    "description": "`canvas: ascii`: plain ASCII, for any terminal or font.",
+    "canvas": "ascii",
+    "x_column": "revenue",
+    "y_column": "margin",
+    "size_column": "cap",
+    "color_column": "class"
+   }
+  }
+ ]
 }

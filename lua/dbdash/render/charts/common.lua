@@ -78,6 +78,38 @@ function M.x_axis(rs, name)
   return { numeric = numeric, values = values, labels = labels }
 end
 
+---Long data (one row per x and series, show.series_column) as series: the distinct x
+---values in order of appearance, one series per distinct series_column value.
+---@return { numeric: boolean, values: number[], labels: string[] } xaxis, { label: string, points: { x: number, y: number }[] }[] series
+function M.long(rs, show)
+  local xi = M.col(rs, nn(show.x_column), "x_column")
+  local yi = M.col(rs, nn(show.y_column), "y_column")
+  local si = M.col(rs, nn(show.series_column), "series_column")
+  local numeric = NUMERIC[rs.columns[xi].type] == true
+  local xs, labels, index = {}, {}, {}
+  local series, by_name = {}, {}
+  for _, row in ipairs(rs.rows) do
+    local label = M.text(row[xi])
+    if index[label] == nil then
+      labels[#labels + 1] = label
+      index[label] = numeric and M.num(row[xi]) or #labels
+      xs[#xs + 1] = index[label]
+    end
+    local name = M.text(row[si])
+    local s = by_name[name]
+    if not s then
+      s = { label = name, points = {} }
+      by_name[name] = s
+      series[#series + 1] = s
+    end
+    local x, y = index[label], M.num(row[yi])
+    if x and y then
+      s.points[#s.points + 1] = { x = x, y = y }
+    end
+  end
+  return { numeric = numeric, values = xs, labels = labels }, series
+end
+
 ---@class dbdash.render.Series
 ---@field column string
 ---@field index integer
@@ -155,6 +187,13 @@ function M.axes(show)
     xmax = tonumber(nn(xa.max_value)),
     yformat = nn(ya.format),
     xformat = nn(xa.format),
+    -- Chart.js scales: type (linear | log), ticks.count, grid.display
+    yscale = nn(ya.scale) or "linear",
+    xscale = nn(xa.scale) or "linear",
+    yticks = tonumber(nn(ya.ticks)),
+    xticks = tonumber(nn(xa.ticks)),
+    ygrid = nn(ya.grid) == true,
+    xgrid = nn(xa.grid) == true,
   }
 end
 
@@ -182,17 +221,33 @@ end
 
 ---Numeric y ticks for a canvas with `rows` character rows: labels on rows that are hit.
 ---@return { row: integer, label: string }[] ticks, string[] all_labels
-function M.y_ticks(ctx, lo, hi, rows, yformat)
-  local values, labels = ctx.ticks(lo, hi, math.max(2, math.min(6, math.floor(rows / 2) + 1)))
+function M.y_ticks(ctx, lo, hi, rows, yformat, count, log)
+  local values, labels
+  if log then
+    values, labels = M.log_ticks(lo, hi)
+  else
+    values, labels = ctx.ticks(lo, hi, count or math.max(2, math.min(6, math.floor(rows / 2) + 1)))
+  end
   local ticks, all = {}, {}
   for i, v in ipairs(values) do
-    local label = yformat and fmt.python(v, yformat) or labels[i]
+    local label = yformat and fmt.python(log and 10 ^ v or v, yformat) or labels[i]
     local frac = (hi == lo) and 0 or (v - lo) / (hi - lo)
     local row = rows - 1 - math.floor(frac * (rows - 1) + 0.5)
     ticks[#ticks + 1] = { row = row, label = label }
     all[#all + 1] = label
   end
   return ticks, all
+end
+
+---Ticks of a log10 axis: lo and hi are exponents; one tick per power of ten.
+---@return number[] values (exponents), string[] labels
+function M.log_ticks(lo, hi)
+  local values, labels = {}, {}
+  for e = math.ceil(lo - 1e-9), math.floor(hi + 1e-9) do
+    values[#values + 1] = e
+    labels[#labels + 1] = fmt.number(10 ^ e)
+  end
+  return values, labels
 end
 
 ---Data limits over several series, with optional overrides and padding for ticks.

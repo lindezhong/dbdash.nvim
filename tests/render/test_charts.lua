@@ -3,6 +3,7 @@
 local fx = require("tests.render.fixtures")
 local helpers = require("tests.helpers")
 local render = require("dbdash.render")
+local resultset = require("dbdash.db.resultset")
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()
 
@@ -143,6 +144,67 @@ T["python format subset"] = function()
   eq(f.python(42, "{:d}"), "42")
   eq(f.python(1234.5, "{:,}"), "1,234.5")
   eq(f.python(1, "{:x}"), nil)
+  -- text around the field, as in Python
+  eq(f.python(42.4, "{:.0f}%"), "42%")
+  eq(f.python(1234.5, "$ {:,.2f} USD"), "$ 1,234.50 USD")
+  eq(f.python(3, "{} users"), "3 users")
+end
+
+-- xy options (Chart.js / ECharts) ------------------------------------------------------
+
+local function xy(rows, show, cols)
+  cols = cols or { { name = "x", type = "integer" }, { name = "y", type = "integer" } }
+  show.x_column, show.y_column = show.x_column or "x", show.y_column or "y"
+  local out = render.render(resultset.new(cols, rows), show, { width = 60, height = 14 })
+  return out, table.concat(out.lines, "\n")
+end
+
+T["xy: series_column pivots long rows into series"] = function()
+  local cols = { { name = "d", type = "string" }, { name = "s", type = "string" }, { name = "v", type = "integer" } }
+  local _, text = xy({ { "a", "EU", 1 }, { "a", "US", 2 }, { "b", "EU", 3 }, { "b", "US", 1 } }, {
+    type = "line",
+    x_column = "d",
+    y_column = "v",
+    series_column = "s",
+  }, cols)
+  eq({ text:find("■ EU", 1, true) ~= nil, text:find("■ US", 1, true) ~= nil }, { true, true })
+  local _, n = text:gsub("\n%s+a%s+b%s*$", "")
+  eq(n, 1) -- the x axis has a and b once each
+end
+
+T["xy: point markers, mark_points, mark_lines labels"] = function()
+  local rows = { { 1, 5 }, { 2, 9 }, { 3, 2 } }
+  local _, text = xy(rows, { type = "line", line_style = { point = "●" }, mark_points = { "max", "min" } })
+  local _, n = text:gsub("●", "")
+  eq(n, 3)
+  eq({ text:find("▲9", 1, true) ~= nil, text:find("▼2", 1, true) ~= nil }, { true, true })
+  _, text = xy(rows, { type = "line", mark_lines = { { value = 7, label = "limit" }, { value = "mean" } } })
+  eq({ text:find("limit", 1, true) ~= nil, text:find("mean 5.33", 1, true) ~= nil }, { true, true })
+end
+
+T["xy: log scale ticks are powers of ten"] = function()
+  local _, text = xy({ { 1, 1 }, { 2, 1000 } }, { type = "line", axes = { y_axis = { scale = "log" } } })
+  for _, label in ipairs({ "1000", "100", "10" }) do
+    eq(text:find("\n%s*" .. label .. " [│┃]") ~= nil, true)
+  end
+end
+
+T["xy: stepped lines, NULL gaps, percent stacking"] = function()
+  local o1 = xy({ { 1, 1 }, { 2, 5 } }, { type = "line" })
+  local o2 = xy({ { 1, 1 }, { 2, 5 } }, { type = "line", line_style = { stepped = "after" } })
+  eq(table.concat(o1.lines) ~= table.concat(o2.lines), true)
+  local cols = { { name = "x", type = "integer" }, { name = "y", type = "integer" } }
+  local gap = xy({ { 1, 1 }, { 2, vim.NIL }, { 3, 1 } }, { type = "line", line_style = { span_gaps = false } }, cols)
+  local joined = xy({ { 1, 1 }, { 2, vim.NIL }, { 3, 1 } }, { type = "line" }, cols)
+  eq(table.concat(gap.lines) ~= table.concat(joined.lines), true)
+  local pcols = { { name = "x", type = "integer" }, { name = "a", type = "integer" }, { name = "b", type = "integer" } }
+  local _, text = xy({ { 1, 1, 3 }, { 2, 2, 2 } }, { type = "area", y_columns = { "a", "b" }, style = { stacked = "percent" } }, pcols)
+  eq(text:find("100 │", 1, true) ~= nil, true)
+end
+
+T["xy: subtitle under the title"] = function()
+  local out = xy({ { 1, 1 }, { 2, 2 } }, { type = "line", title = "T", subtitle = "sub" })
+  eq({ vim.trim(out.lines[1]), vim.trim(out.lines[2]) }, { "T", "sub" })
 end
 
 -- stat ----------------------------------------------------------------------------------

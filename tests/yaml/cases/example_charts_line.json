@@ -1,51 +1,259 @@
 {
+ "title": "Line chart",
+ "description": "A line chart draws one or more series over an x axis: `x_column` and `y_column` (or\n`y_columns`, or `series_column` for long data). The default style is a braille canvas;\n`canvas` picks another pixel grid and `renderer: asciichart` draws box lines.\nSee `:help dbdash-chart-types`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
- "query": {
-  "sql": "WITH RECURSIVE time_series AS (\n  SELECT 0 AS hour, abs(random() % 100) + 50 AS visitors\n  UNION ALL\n  SELECT hour + 1,\n         abs(random() % 50) + visitors + CASE WHEN hour % 6 = 0 THEN 20 ELSE 0 END\n  FROM time_series\n  WHERE hour < 23\n)\nSELECT\n  printf('%02d:00', hour) AS time_label,\n  visitors,\n  visitors * 0.8 AS mobile_visitors,\n  visitors * 0.2 AS desktop_visitors\nFROM time_series\n"
- },
  "show": {
-  "type": "line",
-  "title": "Website visits (24 hours)",
-  "interval": "60s",
-  "x_column": "time_label",
-  "y_columns": [
-   {
-    "column": "visitors",
-    "label": "All visits",
-    "color": "#3498db"
+  "interval": "5m"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)\nSELECT printf('%02d:00', n) AS hour, 60 + 40 * sin(n / 3.0) + abs(random() % 20) AS visits,\n       (60 + 40 * sin(n / 3.0)) * 0.6 AS mobile, (60 + 40 * sin(n / 3.0)) * 0.4 AS desktop\nFROM h\n"
    },
-   {
-    "column": "mobile_visitors",
-    "label": "Mobile",
-    "color": "#e74c3c"
-   },
-   {
-    "column": "desktop_visitors",
-    "label": "Desktop",
-    "color": "#2ecc71"
+   "show": {
+    "type": "line",
+    "title": "y_columns, legend, axes (canvas: braille, the default)",
+    "description": "Three series from `y_columns`, each with a `label` and a `color`; the legend sits on\nthe `right` (default) or `bottom`; `axes.y_axis` sets a title, `min_value` and a\nPython `format` for the tick labels. Braille draws 2 x 4 dots per character.\n",
+    "x_column": "hour",
+    "y_columns": [
+     {
+      "column": "visits",
+      "label": "All",
+      "color": "#61afef"
+     },
+     {
+      "column": "mobile",
+      "label": "Mobile",
+      "color": "#e06c75"
+     },
+     {
+      "column": "desktop",
+      "label": "Desktop",
+      "color": "#98c379"
+     }
+    ],
+    "legend": {
+     "show": true,
+     "position": "right"
+    },
+    "axes": {
+     "x_axis": {
+      "title": "Hour"
+     },
+     "y_axis": {
+      "title": "Visits",
+      "min_value": 0,
+      "format": "{:,.0f}"
+     }
+    },
+    "show_countdown": true,
+    "countdown_format": "Next update: {time}s"
    }
-  ],
-  "line_style": {
-   "fill_area": false,
-   "show_points": true
   },
-  "axes": {
-   "x_axis": {
-    "title": "Time"
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)\nSELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h\n"
    },
-   "y_axis": {
-    "title": "Visits",
-    "min_value": 0,
-    "format": "{:,.0f}"
+   "show": {
+    "type": "line",
+    "title": "canvas: quadrant",
+    "description": "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
+    "canvas": "quadrant",
+    "x_column": "hour",
+    "y_column": "visits"
    }
   },
-  "legend": {
-   "show": true,
-   "position": "right"
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)\nSELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "canvas: block",
+    "description": "`canvas: block`: one full block per pixel (coarse but bold).",
+    "canvas": "block",
+    "x_column": "hour",
+    "y_column": "visits"
+   }
   },
-  "show_countdown": true,
-  "countdown_format": "Next update: {time}s"
- }
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)\nSELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "canvas: halfblock",
+    "description": "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄).",
+    "canvas": "halfblock",
+    "x_column": "hour",
+    "y_column": "visits"
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)\nSELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "canvas: ascii",
+    "description": "`canvas: ascii`: plain ASCII characters, for any terminal or font.",
+    "canvas": "ascii",
+    "x_column": "hour",
+    "y_column": "visits"
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)\nSELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "renderer: asciichart",
+    "description": "`renderer: asciichart` draws the line with box characters (╭─╯) instead of a pixel\ncanvas. Try it on any line chart with `:DbDashStyle line asciichart`.\n",
+    "renderer": "asciichart",
+    "x_column": "hour",
+    "y_column": "visits"
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE d(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM d WHERE n < 13)\nSELECT printf('%02d', n) AS day, k AS region, 50 + abs(random() % 50) AS orders\nFROM d, (SELECT 'EU' AS k UNION ALL SELECT 'US' UNION ALL SELECT 'APAC')\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "series_column: long data",
+    "description": "Long data (one row per x and series) with `series_column`: one line per value of\n`region`, colored from the `palette` (`tableau` here; `theme` follows the\ncolorscheme).\n",
+    "x_column": "day",
+    "y_column": "orders",
+    "series_column": "region",
+    "palette": "tableau",
+    "legend": {
+     "position": "bottom"
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 11)\nSELECT n AS x, 20 + 15 * sin(n / 2.0) AS y FROM h\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "line_style: fill_area, show_points",
+    "description": "`fill_area` fills under the line (Chart.js `fill`); `show_points` marks every point.",
+    "x_column": "x",
+    "y_column": "y",
+    "line_style": {
+     "fill_area": true,
+     "show_points": true
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 1 AS t, 3 AS level UNION ALL SELECT 2, 3 UNION ALL SELECT 3, 7 UNION ALL SELECT 4, 5\nUNION ALL SELECT 5, 9 UNION ALL SELECT 6, 9 UNION ALL SELECT 7, 4\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "line_style.stepped",
+    "description": "Steps instead of slopes (Chart.js `stepped`): `true` / `before` (the value changes\nat the start), `after`, `middle`. Good for states and counters.\n",
+    "x_column": "t",
+    "y_column": "level",
+    "line_style": {
+     "stepped": "after"
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 1 AS t, 4 AS v UNION ALL SELECT 2, 6 UNION ALL SELECT 3, NULL UNION ALL SELECT 4, NULL\nUNION ALL SELECT 5, 8 UNION ALL SELECT 6, 5 UNION ALL SELECT 7, 7\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "line_style: point, span_gaps: false",
+    "description": "`point` marks each point with a character (Chart.js `pointStyle`); `span_gaps:\nfalse` leaves a gap where the value is NULL instead of joining across it.\n",
+    "x_column": "t",
+    "y_column": "v",
+    "line_style": {
+     "point": "●",
+     "span_gaps": false
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 11)\nSELECT n AS month, round(power(2.4, n)) AS users FROM h\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "axes: scale: log, ticks, grid",
+    "subtitle": "users per month, log scale",
+    "description": "A log y axis (Chart.js `type: logarithmic`) for growth over orders of magnitude;\n`ticks` asks for about that many x ticks, `grid` draws grid lines at the ticks.\n`subtitle` adds a muted line under the title.\n",
+    "x_column": "month",
+    "y_column": "users",
+    "axes": {
+     "x_axis": {
+      "ticks": 6,
+      "grid": true
+     },
+     "y_axis": {
+      "scale": "log",
+      "grid": true
+     }
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)\nSELECT printf('%02d', n) AS hour, 50 + 30 * sin(n / 4.0) + abs(random() % 15) AS latency FROM h\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "mark_lines, mark_points",
+    "description": "Reference lines (ECharts `markLine`): a fixed value with a label, or `mean`, `min`,\n`max` of the data, on the `y` (default) or `x` axis. `mark_points` labels each\nseries' `max` and `min` (ECharts `markPoint`).\n",
+    "x_column": "hour",
+    "y_column": "latency",
+    "mark_lines": [
+     {
+      "value": 90,
+      "label": "SLO 90 ms",
+      "color": "#e06c75"
+     },
+     {
+      "value": "mean"
+     },
+     {
+      "value": "12",
+      "axis": "x",
+      "label": "noon"
+     }
+    ],
+    "mark_points": [
+     "max",
+     "min"
+    ]
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)\nSELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h\n"
+   },
+   "show": {
+    "type": "line",
+    "title": "x_label, y_label, height, width, legend: false",
+    "description": "`x_label` / `y_label` are short for the axis titles; `height` fixes the plot rows,\n`width` caps the chart width; `legend: false` hides the legend.\n",
+    "x_column": "hour",
+    "y_column": "visits",
+    "x_label": "hour of day",
+    "y_label": "visits",
+    "height": 6,
+    "width": 60,
+    "legend": false
+   }
+  }
+ ]
 }

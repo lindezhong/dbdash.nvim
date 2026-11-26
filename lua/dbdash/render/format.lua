@@ -16,9 +16,14 @@ end
 ---@param spec string
 ---@return string?
 function M.python(v, spec)
-  local inner = spec:match("^{:?(.-)}$")
+  -- Text around one field is kept, as in Python: "{:.0f}%", "$ {:,.2f}", "{:,} users".
+  local pre, inner, post = spec:match("^([^{]*){:?([^}]*)}(.*)$")
   if not inner then
     return nil
+  end
+  if pre ~= "" or post ~= "" then
+    local s = M.python(v, "{:" .. inner .. "}")
+    return s and (pre .. s .. post) or nil
   end
   local comma, prec, kind = inner:match("^(,?)%.?(%d*)([fd%%eg]?)$")
   if not comma then

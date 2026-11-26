@@ -587,16 +587,21 @@ database.
 
 Chart fields:                                                  *dbdash-charts*
 
-  line       x_column, y_columns [{column, label, color}] (or y_column),
-             line_style.{fill_area, show_points}, legend.{show, position},
-             axes.{x_axis,y_axis}.{title, min_value, max_value, format}
-  area       x_column, y_columns, style.stacked
+  line       x_column, y_columns [{column, label, color}] (or y_column, or
+             series_column for long data), line_style.{fill_area,
+             show_points, stepped, point, span_gaps}, legend.{show,
+             position}, axes.{x_axis,y_axis}.{title, min_value, max_value,
+             format, scale, ticks, grid}, mark_lines, mark_points,
+             style.trend_line
+  area       the line fields, style.stacked (true or percent)
   bar        x_column, y_column, style.{color, show_values}, colors
   histogram  value_column, bins, style.color
   boxplot    category_column, value_column, style.{show_outliers, show_means}
   heatmap    x_column, y_column, value_column, style.show_values
-  scatter    x_column, y_column, color_column, colors
-  bubble     x_column, y_column, size_column, color_column, label_column
+  scatter    x_column, y_column, color_column, colors, style.{point,
+             trend_line}, axes, mark_lines
+  bubble     x_column, y_column, size_column, color_column, label_column,
+             style.{size_range, point, trend_line}
   pie        label_column, value_column,
              style.{show_percentages, show_values, show_labels}, colors
   stat       value_column (default: the first numeric column; first row),
@@ -673,7 +678,22 @@ be rows (|dbdash-result|): turn a string from `lua://` or HTTP into
 `colors` is a list (by series index) or a mapping (by category name). `width`
 caps the chart width (default: the window), `height` sets the plot rows
 (default: `defaults.height`, else 15). `axes.y_axis.format` takes a Python
-format such as "{:,.0f}" or "{:.1%}".
+format such as "{:,.0f}", "{:.1%}" or "{:.0f} ms" (text around the field is
+kept). `subtitle` is a muted line under the title.
+
+Line, area, scatter and bubble charts take Chart.js / ECharts options:
+`series_column` turns long data (one row per x and series) into one series
+per value; `line_style.stepped` draws steps (true or "before", "after",
+"middle"); `line_style.point` marks every point with a character;
+`line_style.span_gaps: false` breaks the line at NULLs; an axis takes
+`scale: log` (one tick per power of ten), `ticks` (about how many) and `grid:
+true`; `mark_lines: [{ value, axis, label, color }]` draws reference lines at
+a value or at the data's `mean`, `min` or `max` (on the x axis: a number or
+a category); `mark_points: [max, min]` labels each series' extremes;
+`style.trend_line: linear` adds a dashed least-squares line; `style.stacked:
+percent` stacks areas to 100%; bubbles take `style.size_range: [min, max]`
+(radius in canvas pixels). `example/charts/line.yaml` and the area, scatter
+and bubble files show each option.
 
 Styles                                                         *dbdash-styles*
 

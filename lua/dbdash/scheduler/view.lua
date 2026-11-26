@@ -174,8 +174,15 @@ local function panel_cell(p, width, height, fill, exact)
     end
     header = nil
   end
+  local subtitle = show.subtitle ~= vim.NIL and show.subtitle or nil
+  if subtitle and header then
+    local sl, ss, se = box.title_line(subtitle, iw, st.title_align or "left", st.ellipsis)
+    header.lines[2] = sl
+    header.hl[#header.hl + 1] = { row = 1, col_s = ss, col_e = se, group = "DbDashMuted" }
+  end
+  show.subtitle = nil
   local args_line = M.args_line(p, iw)
-  local bh = ih - (header and 1 or 0) - (args_line and 1 or 0)
+  local bh = ih - (header and #header.lines or 0) - (args_line and 1 or 0)
   local body = render_panel(p, show, iw, bh, fill)
   body = box.position(body, st, iw, exact and bh or nil)
   local parts = {}

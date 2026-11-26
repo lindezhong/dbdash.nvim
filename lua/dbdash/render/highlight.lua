@@ -27,6 +27,8 @@ M.BASE = {
   DbDashLabel = { link = "Normal" },
   DbDashLegend = { link = "DbDashLabel" }, -- legend labels (style.legend_style)
   DbDashText = { link = "Normal" }, -- text chart lines (style.color)
+  DbDashGrid = { link = "NonText" }, -- grid lines (axes.*.grid)
+  DbDashMark = { link = "WarningMsg" }, -- reference lines and points (mark_lines, mark_points)
   DbDashError = { link = "DiagnosticError" },
   DbDashWarn = { link = "DiagnosticWarn" },
   DbDashCountdown = { link = "Comment" },

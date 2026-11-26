@@ -1,25 +1,160 @@
 {
+ "title": "Scatter plot",
+ "description": "A scatter plot puts one point per row at (`x_column`, `y_column`); `color_column`\nsplits the points into colored groups (`colors` by name). See `:help dbdash-chart-types`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
- "query": {
-  "sql": "WITH sales_data AS (\n  SELECT\n    abs(random() % 100) + 10 AS ad_spend,\n    abs(random() % 200) + 50 AS sales,\n    abs(random() % 50) + 20 AS profit_margin\n  FROM (\n    SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5\n    UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10\n    UNION SELECT 11 UNION SELECT 12 UNION SELECT 13 UNION SELECT 14 UNION SELECT 15\n  )\n)\nSELECT\n  ad_spend,\n  sales,\n  profit_margin,\n  CASE\n    WHEN profit_margin > 40 THEN 'High'\n    WHEN profit_margin > 25 THEN 'Medium'\n    ELSE 'Low'\n  END AS profit_category\nFROM sales_data\n"
- },
  "show": {
-  "type": "scatter",
-  "title": "Sales vs. advertising",
-  "interval": "50s",
-  "x_column": "ad_spend",
-  "y_column": "sales",
-  "x_label": "Advertising",
-  "y_label": "Sales",
-  "color_column": "profit_category",
-  "colors": {
-   "High": "#2ecc71",
-   "Medium": "#f39c12",
-   "Low": "#e74c3c"
+  "interval": "5m"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),\nd AS (SELECT 10 + (i * 37) % 90 AS ad_spend, i % 3 AS k FROM n)\nSELECT ad_spend, ad_spend * 2 + abs(random() % 60) AS sales,\n       CASE k WHEN 0 THEN 'High' WHEN 1 THEN 'Medium' ELSE 'Low' END AS margin\nFROM d\n"
+   },
+   "show": {
+    "type": "scatter",
+    "title": "color_column, colors, x_label / y_label (canvas: braille)",
+    "description": "`color_column` makes one group per value, colored by `colors` (a mapping by name, or a\nlist by position); `x_label` / `y_label` title the axes.\n",
+    "x_column": "ad_spend",
+    "y_column": "sales",
+    "color_column": "margin",
+    "colors": {
+     "High": "#98c379",
+     "Medium": "#e5c07b",
+     "Low": "#e06c75"
+    },
+    "x_label": "Advertising",
+    "y_label": "Sales"
+   }
   },
-  "show_countdown": true,
-  "countdown_format": "Next update: {time}s"
- }
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),\nd AS (SELECT 10 + (i * 37) % 90 AS ad_spend, i % 3 AS k FROM n)\nSELECT ad_spend, ad_spend * 2 + abs(random() % 60) AS sales,\n       CASE k WHEN 0 THEN 'High' WHEN 1 THEN 'Medium' ELSE 'Low' END AS margin\nFROM d\n"
+   },
+   "show": {
+    "type": "scatter",
+    "title": "style: point, trend_line: linear",
+    "description": "`point` draws each point as a character (Chart.js `pointStyle`); `trend_line: linear`\nadds a dashed least-squares line per group (ECharts regression).\n",
+    "x_column": "ad_spend",
+    "y_column": "sales",
+    "style": {
+     "point": "●",
+     "trend_line": "linear"
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),\nd AS (SELECT 10 + (i * 37) % 90 AS ad_spend, i % 3 AS k FROM n)\nSELECT ad_spend, ad_spend * 2 + abs(random() % 60) AS sales,\n       CASE k WHEN 0 THEN 'High' WHEN 1 THEN 'Medium' ELSE 'Low' END AS margin\nFROM d\n"
+   },
+   "show": {
+    "type": "scatter",
+    "title": "axes: grid, ticks; mark_lines",
+    "description": "`axes.*.grid` draws grid lines at the ticks, `ticks` asks for about that many ticks;\n`mark_lines` adds reference lines: the mean sales, and x = 50.\n",
+    "x_column": "ad_spend",
+    "y_column": "sales",
+    "axes": {
+     "x_axis": {
+      "grid": true,
+      "ticks": 5
+     },
+     "y_axis": {
+      "grid": true
+     }
+    },
+    "mark_lines": [
+     {
+      "value": "mean"
+     },
+     {
+      "value": 50,
+      "axis": "x",
+      "label": "budget"
+     }
+    ]
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 30)\nSELECT power(10, (abs(random() % 400) / 100.0)) AS size_kb,\n       power(10, (abs(random() % 300) / 100.0)) AS ms\nFROM n\n"
+   },
+   "show": {
+    "type": "scatter",
+    "title": "axes: scale: log on both axes",
+    "description": "Log scales (Chart.js `type: logarithmic`) for values over several orders of magnitude:\none tick per power of ten.\n",
+    "x_column": "size_kb",
+    "y_column": "ms",
+    "axes": {
+     "x_axis": {
+      "scale": "log",
+      "title": "size (KB)"
+     },
+     "y_axis": {
+      "scale": "log",
+      "title": "time (ms)"
+     }
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),\nd AS (SELECT 10 + (i * 37) % 90 AS ad_spend, i % 3 AS k FROM n)\nSELECT ad_spend, ad_spend * 2 + abs(random() % 60) AS sales,\n       CASE k WHEN 0 THEN 'High' WHEN 1 THEN 'Medium' ELSE 'Low' END AS margin\nFROM d\n"
+   },
+   "show": {
+    "type": "scatter",
+    "title": "canvas: quadrant",
+    "description": "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
+    "canvas": "quadrant",
+    "x_column": "ad_spend",
+    "y_column": "sales",
+    "color_column": "margin"
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),\nd AS (SELECT 10 + (i * 37) % 90 AS ad_spend, i % 3 AS k FROM n)\nSELECT ad_spend, ad_spend * 2 + abs(random() % 60) AS sales,\n       CASE k WHEN 0 THEN 'High' WHEN 1 THEN 'Medium' ELSE 'Low' END AS margin\nFROM d\n"
+   },
+   "show": {
+    "type": "scatter",
+    "title": "canvas: block",
+    "description": "`canvas: block`: one full block per pixel: coarse but bold.",
+    "canvas": "block",
+    "x_column": "ad_spend",
+    "y_column": "sales",
+    "color_column": "margin"
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),\nd AS (SELECT 10 + (i * 37) % 90 AS ad_spend, i % 3 AS k FROM n)\nSELECT ad_spend, ad_spend * 2 + abs(random() % 60) AS sales,\n       CASE k WHEN 0 THEN 'High' WHEN 1 THEN 'Medium' ELSE 'Low' END AS margin\nFROM d\n"
+   },
+   "show": {
+    "type": "scatter",
+    "title": "canvas: halfblock",
+    "description": "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄).",
+    "canvas": "halfblock",
+    "x_column": "ad_spend",
+    "y_column": "sales",
+    "color_column": "margin"
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),\nd AS (SELECT 10 + (i * 37) % 90 AS ad_spend, i % 3 AS k FROM n)\nSELECT ad_spend, ad_spend * 2 + abs(random() % 60) AS sales,\n       CASE k WHEN 0 THEN 'High' WHEN 1 THEN 'Medium' ELSE 'Low' END AS margin\nFROM d\n"
+   },
+   "show": {
+    "type": "scatter",
+    "title": "canvas: ascii",
+    "description": "`canvas: ascii`: plain ASCII, for any terminal or font.",
+    "canvas": "ascii",
+    "x_column": "ad_spend",
+    "y_column": "sales",
+    "color_column": "margin"
+   }
+  }
+ ]
 }

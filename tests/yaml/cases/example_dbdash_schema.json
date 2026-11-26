@@ -22,6 +22,7 @@
     "properties": {
      "type": false,
      "title": false,
+     "subtitle": false,
      "description": false,
      "span": false,
      "area": false,
@@ -547,6 +548,10 @@
     "title": {
      "type": "string"
     },
+    "subtitle": {
+     "type": "string",
+     "description": "A muted line under the title (Chart.js subtitle)."
+    },
     "description": {
      "type": "string",
      "description": "This chart's description: a template (args, meta, as its query sees them; it cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe; ⓘ after the panel's title (in a one-chart dashboard: in the header) says there is one. With panels, it belongs in each panel."
@@ -813,6 +818,35 @@
        "type": "string",
        "description": "table: background of every other row (CSS :nth-child(even))."
       },
+      "stacked": {
+       "description": "area: stack the series (true), or stack them to 100% (percent).",
+       "oneOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "const": "percent"
+        }
+       ]
+      },
+      "trend_line": {
+       "const": "linear",
+       "description": "scatter, bubble, line: a dashed least-squares line per series."
+      },
+      "point": {
+       "type": "string",
+       "description": "scatter, bubble: a character for every point instead of a dot."
+      },
+      "size_range": {
+       "type": "array",
+       "minItems": 2,
+       "maxItems": 2,
+       "items": {
+        "type": "number",
+        "minimum": 0
+       },
+       "description": "bubble: smallest and largest radius, in canvas pixels."
+      },
       "caption": {
        "enum": [
         "top",
@@ -938,7 +972,82 @@
       },
       "show_points": {
        "type": "boolean"
+      },
+      "stepped": {
+       "description": "Steps instead of slopes (Chart.js stepped): true (= before), before, after, middle.",
+       "oneOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "enum": [
+          "before",
+          "after",
+          "middle"
+         ]
+        }
+       ]
+      },
+      "point": {
+       "type": "string",
+       "description": "A character marking every point (Chart.js pointStyle), e.g. \"●\", \"×\"."
+      },
+      "span_gaps": {
+       "type": "boolean",
+       "default": true,
+       "description": "false: a NULL breaks the line (Chart.js spanGaps)."
       }
+     }
+    },
+    "mark_lines": {
+     "type": "array",
+     "description": "Reference lines (ECharts markLine): a value, or mean / min / max of the data.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "value": {
+        "anyOf": [
+         {
+          "type": "number"
+         },
+         {
+          "enum": [
+           "mean",
+           "average",
+           "min",
+           "max"
+          ]
+         },
+         {
+          "type": "string"
+         }
+        ],
+        "description": "A number, mean, min, max, or (x axis) a category."
+       },
+       "axis": {
+        "enum": [
+         "x",
+         "y"
+        ],
+        "default": "y"
+       },
+       "label": {
+        "type": "string"
+       },
+       "color": {
+        "$ref": "#/definitions/color"
+       }
+      }
+     }
+    },
+    "mark_points": {
+     "type": "array",
+     "description": "Mark each series' max / min point with its value (ECharts markPoint).",
+     "items": {
+      "enum": [
+       "max",
+       "min"
+      ]
      }
     },
     "value_column": {
@@ -1214,6 +1323,24 @@
     },
     "max_value": {
      "type": "number"
+    },
+    "scale": {
+     "enum": [
+      "linear",
+      "log"
+     ],
+     "default": "linear",
+     "description": "log: one tick per power of ten (Chart.js type: logarithmic)."
+    },
+    "ticks": {
+     "type": "integer",
+     "minimum": 2,
+     "description": "About how many ticks (Chart.js ticks.count)."
+    },
+    "grid": {
+     "type": "boolean",
+     "default": false,
+     "description": "Grid lines at the ticks (Chart.js grid.display)."
     },
     "format": {
      "type": "string",

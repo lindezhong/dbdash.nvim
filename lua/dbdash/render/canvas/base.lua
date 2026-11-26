@@ -91,8 +91,16 @@ function Canvas:point(x, y, color)
   self:pixel(math.floor(self:to_px(x) + 0.5), math.floor(self:to_py(y) + 0.5), color)
 end
 
----Line between data points (DDA in pixel space).
-function Canvas:line(x1, y1, x2, y2, color)
+---The character cell (row, col; 0-based from the top-left) of a data point.
+function Canvas:cell_of(x, y)
+  local px, py = math.floor(self:to_px(x) + 0.5), math.floor(self:to_py(y) + 0.5)
+  local col = math.floor(px / self.px_x)
+  local row = self.rows - 1 - math.floor(py / self.px_y)
+  return math.max(0, math.min(row, self.rows - 1)), math.max(0, math.min(col, self.cols - 1))
+end
+
+---Line between data points (DDA in pixel space); `dash` draws every dash-th pixel only.
+function Canvas:line(x1, y1, x2, y2, color, dash)
   local ax, ay = self:to_px(x1), self:to_py(y1)
   local bx, by = self:to_px(x2), self:to_py(y2)
   local dx, dy = bx - ax, by - ay
@@ -102,8 +110,10 @@ function Canvas:line(x1, y1, x2, y2, color)
     return
   end
   for i = 0, math.ceil(n) do
-    local t = i / math.ceil(n)
-    self:pixel(math.floor(ax + dx * t + 0.5), math.floor(ay + dy * t + 0.5), color)
+    if not dash or i % dash == 0 then
+      local t = i / math.ceil(n)
+      self:pixel(math.floor(ax + dx * t + 0.5), math.floor(ay + dy * t + 0.5), color)
+    end
   end
 end
 

@@ -1,42 +1,169 @@
 {
+ "title": "Area chart",
+ "description": "An area chart fills under each series: `x_column` and `y_columns` (or `y_column`,\n`series_column`). `style.stacked` piles the series up, `stacked: percent` scales every\nx to 100%. See `:help dbdash-chart-types`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
- "query": {
-  "sql": "WITH RECURSIVE months AS (\n  SELECT 1 AS month, 'Jan' AS month_name\n  UNION ALL\n  SELECT month + 1,\n         CASE month + 1\n           WHEN 2 THEN 'Feb' WHEN 3 THEN 'Mar' WHEN 4 THEN 'Apr'\n           WHEN 5 THEN 'May' WHEN 6 THEN 'Jun' WHEN 7 THEN 'Jul'\n           WHEN 8 THEN 'Aug' WHEN 9 THEN 'Sep' WHEN 10 THEN 'Oct'\n           WHEN 11 THEN 'Nov' WHEN 12 THEN 'Dec'\n         END\n  FROM months WHERE month < 12\n)\nSELECT\n  month_name,\n  abs(random() % 50) + 20 AS desktop_users,\n  abs(random() % 80) + 30 AS mobile_users,\n  abs(random() % 30) + 10 AS tablet_users\nFROM months\n"
- },
  "show": {
-  "type": "area",
-  "title": "Users by device type",
-  "interval": "35s",
-  "x_column": "month_name",
-  "y_columns": [
-   {
-    "column": "desktop_users",
-    "label": "Desktop",
-    "color": "#3498db"
+  "interval": "5m"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)\nSELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,\n       30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,\n       10 + abs(random() % 15) AS tablet\nFROM m\n"
    },
-   {
-    "column": "mobile_users",
-    "label": "Mobile",
-    "color": "#e74c3c"
+   "show": {
+    "type": "area",
+    "title": "style.stacked: true (canvas: braille)",
+    "description": "`stacked: true` piles the series up, each on the one before (ECharts `stack`); the\ntop line is the total. Braille draws 2 x 4 dots per character.\n",
+    "x_column": "month",
+    "y_columns": [
+     {
+      "column": "desktop",
+      "label": "Desktop",
+      "color": "#61afef"
+     },
+     {
+      "column": "mobile",
+      "label": "Mobile",
+      "color": "#e06c75"
+     },
+     {
+      "column": "tablet",
+      "label": "Tablet",
+      "color": "#98c379"
+     }
+    ],
+    "style": {
+     "stacked": true
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)\nSELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,\n       30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,\n       10 + abs(random() % 15) AS tablet\nFROM m\n"
    },
-   {
-    "column": "tablet_users",
-    "label": "Tablet",
-    "color": "#2ecc71"
+   "show": {
+    "type": "area",
+    "title": "style.stacked: percent",
+    "description": "`stacked: percent` scales every month to 100% (a 100% stacked area): the share of each\nseries, not its size.\n",
+    "x_column": "month",
+    "y_columns": [
+     {
+      "column": "desktop",
+      "label": "Desktop",
+      "color": "#61afef"
+     },
+     {
+      "column": "mobile",
+      "label": "Mobile",
+      "color": "#e06c75"
+     },
+     {
+      "column": "tablet",
+      "label": "Tablet",
+      "color": "#98c379"
+     }
+    ],
+    "style": {
+     "stacked": "percent"
+    },
+    "axes": {
+     "y_axis": {
+      "max_value": 100,
+      "format": "{:.0f}%"
+     }
+    }
    }
-  ],
-  "style": {
-   "stacked": true
   },
-  "axes": {
-   "y_axis": {
-    "min_value": 0,
-    "max_value": 250
+  {
+   "query": {
+    "sql": "WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)\nSELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,\n       30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,\n       10 + abs(random() % 15) AS tablet\nFROM m\n"
+   },
+   "show": {
+    "type": "area",
+    "title": "overlapping (stacked: false), axes.y_axis.max_value",
+    "description": "Without `stacked` the areas overlap, the first series in front. `axes.y_axis`\n`min_value` / `max_value` fix the scale so refreshes do not rescale it.\n",
+    "x_column": "month",
+    "y_columns": [
+     {
+      "column": "desktop",
+      "label": "Desktop",
+      "color": "#61afef"
+     },
+     {
+      "column": "mobile",
+      "label": "Mobile",
+      "color": "#e06c75"
+     },
+     {
+      "column": "tablet",
+      "label": "Tablet",
+      "color": "#98c379"
+     }
+    ],
+    "axes": {
+     "y_axis": {
+      "min_value": 0,
+      "max_value": 100
+     }
+    }
    }
   },
-  "show_countdown": true,
-  "countdown_format": "Next update: {time}s"
- }
+  {
+   "query": {
+    "sql": "WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)\nSELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,\n       30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,\n       10 + abs(random() % 15) AS tablet\nFROM m\n"
+   },
+   "show": {
+    "type": "area",
+    "title": "canvas: quadrant",
+    "description": "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
+    "canvas": "quadrant",
+    "x_column": "month",
+    "y_column": "mobile"
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)\nSELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,\n       30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,\n       10 + abs(random() % 15) AS tablet\nFROM m\n"
+   },
+   "show": {
+    "type": "area",
+    "title": "canvas: block",
+    "description": "`canvas: block`: one full block per pixel: coarse but bold.",
+    "canvas": "block",
+    "x_column": "month",
+    "y_column": "mobile"
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)\nSELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,\n       30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,\n       10 + abs(random() % 15) AS tablet\nFROM m\n"
+   },
+   "show": {
+    "type": "area",
+    "title": "canvas: halfblock",
+    "description": "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄).",
+    "canvas": "halfblock",
+    "x_column": "month",
+    "y_column": "mobile"
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)\nSELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,\n       30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,\n       10 + abs(random() % 15) AS tablet\nFROM m\n"
+   },
+   "show": {
+    "type": "area",
+    "title": "canvas: ascii",
+    "description": "`canvas: ascii`: plain ASCII, for any terminal or font.",
+    "canvas": "ascii",
+    "x_column": "month",
+    "y_column": "mobile"
+   }
+  }
+ ]
 }

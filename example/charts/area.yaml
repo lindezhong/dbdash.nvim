@@ -1,56 +1,138 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# Area chart: users per device type over a year, stacked.
-# Set style.stacked to false to draw overlapping areas. The y axis has a fixed range.
+# Area chart: every canvas and option, one panel each (press K on a panel). An area is a
+# line filled down to zero; several series stack (style.stacked) or overlap. The line
+# options (axes, legend, mark_lines, ...) work here too, see line.yaml.
+
+title: "Area chart"
+description: |
+  An area chart fills under each series: `x_column` and `y_columns` (or `y_column`,
+  `series_column`). `style.stacked` piles the series up, `stacked: percent` scales every
+  x to 100%. See `:help dbdash-chart-types`.
 
 database:
   url: "sqlite:///:memory:"
 
-query:
-  sql: |
-    WITH RECURSIVE months AS (
-      SELECT 1 AS month, 'Jan' AS month_name
-      UNION ALL
-      SELECT month + 1,
-             CASE month + 1
-               WHEN 2 THEN 'Feb' WHEN 3 THEN 'Mar' WHEN 4 THEN 'Apr'
-               WHEN 5 THEN 'May' WHEN 6 THEN 'Jun' WHEN 7 THEN 'Jul'
-               WHEN 8 THEN 'Aug' WHEN 9 THEN 'Sep' WHEN 10 THEN 'Oct'
-               WHEN 11 THEN 'Nov' WHEN 12 THEN 'Dec'
-             END
-      FROM months WHERE month < 12
-    )
-    SELECT
-      month_name,
-      abs(random() % 50) + 20 AS desktop_users,
-      abs(random() % 80) + 30 AS mobile_users,
-      abs(random() % 30) + 10 AS tablet_users
-    FROM months
-
 show:
-  type: area
-  title: "Users by device type"
-  interval: 35s
+  interval: 5m
 
-  x_column: month_name
-  y_columns:
-    - column: desktop_users
-      label: "Desktop"
-      color: "#3498db"
-    - column: mobile_users
-      label: "Mobile"
-      color: "#e74c3c"
-    - column: tablet_users
-      label: "Tablet"
-      color: "#2ecc71"
+layout:
+  columns: 2
 
-  style:
-    stacked: true
-
-  axes:
-    y_axis:
-      min_value: 0
-      max_value: 250                 # a fixed scale: refreshes do not rescale it
-
-  show_countdown: true
-  countdown_format: "Next update: {time}s"
+panels:
+  - query:
+      sql: |
+        WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
+        SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,
+               30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,
+               10 + abs(random() % 15) AS tablet
+        FROM m
+    show:
+      type: area
+      title: "style.stacked: true (canvas: braille)"
+      description: |
+        `stacked: true` piles the series up, each on the one before (ECharts `stack`); the
+        top line is the total. Braille draws 2 x 4 dots per character.
+      x_column: month
+      y_columns:
+        - { column: desktop, label: "Desktop", color: "#61afef" }
+        - { column: mobile, label: "Mobile", color: "#e06c75" }
+        - { column: tablet, label: "Tablet", color: "#98c379" }
+      style: { stacked: true }
+  - query:
+      sql: |
+        WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
+        SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,
+               30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,
+               10 + abs(random() % 15) AS tablet
+        FROM m
+    show:
+      type: area
+      title: "style.stacked: percent"
+      description: |
+        `stacked: percent` scales every month to 100% (a 100% stacked area): the share of each
+        series, not its size.
+      x_column: month
+      y_columns:
+        - { column: desktop, label: "Desktop", color: "#61afef" }
+        - { column: mobile, label: "Mobile", color: "#e06c75" }
+        - { column: tablet, label: "Tablet", color: "#98c379" }
+      style: { stacked: percent }
+      axes:
+        y_axis: { max_value: 100, format: "{:.0f}%" }
+  - query:
+      sql: |
+        WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
+        SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,
+               30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,
+               10 + abs(random() % 15) AS tablet
+        FROM m
+    show:
+      type: area
+      title: "overlapping (stacked: false), axes.y_axis.max_value"
+      description: |
+        Without `stacked` the areas overlap, the first series in front. `axes.y_axis`
+        `min_value` / `max_value` fix the scale so refreshes do not rescale it.
+      x_column: month
+      y_columns:
+        - { column: desktop, label: "Desktop", color: "#61afef" }
+        - { column: mobile, label: "Mobile", color: "#e06c75" }
+        - { column: tablet, label: "Tablet", color: "#98c379" }
+      axes:
+        y_axis: { min_value: 0, max_value: 100 }
+  - query:
+      sql: |
+        WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
+        SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,
+               30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,
+               10 + abs(random() % 15) AS tablet
+        FROM m
+    show:
+      type: area
+      title: "canvas: quadrant"
+      description: "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts."
+      canvas: quadrant
+      x_column: month
+      y_column: mobile
+  - query:
+      sql: |
+        WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
+        SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,
+               30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,
+               10 + abs(random() % 15) AS tablet
+        FROM m
+    show:
+      type: area
+      title: "canvas: block"
+      description: "`canvas: block`: one full block per pixel: coarse but bold."
+      canvas: block
+      x_column: month
+      y_column: mobile
+  - query:
+      sql: |
+        WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
+        SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,
+               30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,
+               10 + abs(random() % 15) AS tablet
+        FROM m
+    show:
+      type: area
+      title: "canvas: halfblock"
+      description: "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄)."
+      canvas: halfblock
+      x_column: month
+      y_column: mobile
+  - query:
+      sql: |
+        WITH RECURSIVE m(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM m WHERE n < 12)
+        SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', n * 3 - 2, 3) AS month,
+               30 + abs(random() % 30) AS desktop, 40 + abs(random() % 40) AS mobile,
+               10 + abs(random() % 15) AS tablet
+        FROM m
+    show:
+      type: area
+      title: "canvas: ascii"
+      description: "`canvas: ascii`: plain ASCII, for any terminal or font."
+      canvas: ascii
+      x_column: month
+      y_column: mobile

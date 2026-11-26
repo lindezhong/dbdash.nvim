@@ -105,7 +105,7 @@ end
 local LEFT_TITLES = { stat = true, text = true }
 
 ---Put the title line above a chart: aligned over the chart's width.
-function M.with_title(out, title, style, width, chart_type)
+function M.with_title(out, title, style, width, chart_type, subtitle)
   local w = 0
   for _, l in ipairs(out.lines) do
     w = math.max(w, W.width(l))
@@ -115,6 +115,14 @@ function M.with_title(out, title, style, width, chart_type)
   local line, s, e = require("dbdash.render.box").title_line(title, w, align, nn(style.ellipsis))
   local group = highlight.color(nn(style.title_style), "DbDashTitle")
   line = line:gsub("%s+$", "")
+  if subtitle then -- a muted second line (Chart.js subtitle)
+    local sl, ss, se = require("dbdash.render.box").title_line(subtitle, w, align, nn(style.ellipsis))
+    out = M.with_title(out, sl:sub(ss + 1, se), vim.tbl_extend("force", {}, style, {
+      title_style = "DbDashMuted",
+      title_align = align,
+    }), width, chart_type)
+    -- the subtitle is now the first line; keep the title above (or below) it
+  end
   -- caption: bottom puts it under the chart (CSS caption-side)
   if nn(style.caption) == "bottom" then
     local lines = vim.list_extend({}, out.lines)
@@ -174,21 +182,22 @@ function M.render(rs, show, opts)
       title = nil
     end
     local inner = show
-    if nn(show.title) ~= nil then
+    if nn(show.title) ~= nil or nn(show.subtitle) ~= nil then
       inner = {}
       for k, v in pairs(show) do
         inner[k] = v
       end
-      inner.title = vim.NIL
+      inner.title, inner.subtitle = vim.NIL, vim.NIL
       setmetatable(inner, getmetatable(show))
     end
+    local subtitle = nn(show.subtitle)
     if title and title ~= "" then
-      ctx.height = math.max(ctx.height - 1, 5)
+      ctx.height = math.max(ctx.height - (subtitle and 2 or 1), 5)
     end
     local out = (style.render or style)(rs, inner, ctx)
     out = M.restyle(out, st)
     if title and title ~= "" then
-      out = M.with_title(out, title, st, ctx.width, show.type)
+      out = M.with_title(out, title, st, ctx.width, show.type, subtitle)
     end
     return out
   end)

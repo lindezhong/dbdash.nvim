@@ -375,6 +375,7 @@ local PANEL_ONLY = {
   show = {
     type = true,
     title = true,
+    subtitle = true,
     description = true,
     span = true,
     area = true,

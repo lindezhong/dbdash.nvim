@@ -52,7 +52,7 @@ configs (|dbdash-examples|). Every field has a tag:
         properties: { sql: false, transform: false, args: false }
       show:
         properties:
-          { type: false, title: false, description: false, span: false, area: false, row: false, column: false, row_span: false, column_list: false, x_label: false, y_label: false }
+          { type: false, title: false, subtitle: false, description: false, span: false, area: false, row: false, column: false, row_span: false, column_list: false, x_label: false, y_label: false }
         patternProperties: { "_columns?$": false }
   else:
     required: [database] # query too, except for http(s):// (a GET of the URL) and webhook://
@@ -606,6 +606,9 @@ configs (|dbdash-examples|). Every field has a tag:
                                               *dbdash-schema-show.title* >yaml
         title: { type: string }
 <
+                                           *dbdash-schema-show.subtitle* >yaml
+        subtitle: { type: string, description: "A muted line under the title (Chart.js subtitle)." }
+<
                                         *dbdash-schema-show.description* >yaml
         description:
           type: string
@@ -811,6 +814,27 @@ configs (|dbdash-examples|). Every field has a tag:
                                       *dbdash-schema-show.style.striped* >yaml
             striped: { type: string, description: "table: background of every other row (CSS :nth-child(even))." }
 <
+                                      *dbdash-schema-show.style.stacked* >yaml
+            stacked:
+              description: "area: stack the series (true), or stack them to 100% (percent)."
+              oneOf:
+                - type: boolean
+                - const: percent
+<
+                                   *dbdash-schema-show.style.trend_line* >yaml
+            trend_line: { const: linear, description: "scatter, bubble, line: a dashed least-squares line per series." }
+<
+                                        *dbdash-schema-show.style.point* >yaml
+            point: { type: string, description: "scatter, bubble: a character for every point instead of a dot." }
+<
+                                   *dbdash-schema-show.style.size_range* >yaml
+            size_range:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items: { type: number, minimum: 0 }
+              description: "bubble: smallest and largest radius, in canvas pixels."
+<
                                       *dbdash-schema-show.style.caption* >yaml
             caption: { enum: [top, bottom], description: "Where the title goes (CSS caption-side; default top)." }
 <
@@ -906,6 +930,45 @@ configs (|dbdash-examples|). Every field has a tag:
 <
                              *dbdash-schema-show.line_style.show_points* >yaml
             show_points: { type: boolean }
+<
+                                 *dbdash-schema-show.line_style.stepped* >yaml
+            stepped:
+              description: "Steps instead of slopes (Chart.js stepped): true (= before), before, after, middle."
+              oneOf:
+                - type: boolean
+                - enum: [before, after, middle]
+<
+                                   *dbdash-schema-show.line_style.point* >yaml
+            point: { type: string, description: 'A character marking every point (Chart.js pointStyle), e.g. "●", "×".' }
+<
+                               *dbdash-schema-show.line_style.span_gaps* >yaml
+            span_gaps: { type: boolean, default: true, description: "false: a NULL breaks the line (Chart.js spanGaps)." }
+<
+                                         *dbdash-schema-show.mark_lines* >yaml
+        mark_lines:
+          type: array
+          description: "Reference lines (ECharts markLine): a value, or mean / min / max of the data."
+          items:
+            type: object
+            properties:
+<
+                                   *dbdash-schema-show.mark_lines.value* >yaml
+              value: { anyOf: [{ type: number }, { enum: [mean, average, min, max] }, { type: string }], description: "A number, mean, min, max, or (x axis) a category." }
+<
+                                    *dbdash-schema-show.mark_lines.axis* >yaml
+              axis: { enum: [x, y], default: y }
+<
+                                   *dbdash-schema-show.mark_lines.label* >yaml
+              label: { type: string }
+<
+                                   *dbdash-schema-show.mark_lines.color* >yaml
+              color: { $ref: "#/definitions/color" }
+<
+                                        *dbdash-schema-show.mark_points* >yaml
+        mark_points:
+          type: array
+          description: "Mark each series' max / min point with its value (ECharts markPoint)."
+          items: { enum: [max, min] }
 <
                                        *dbdash-schema-show.value_column* >yaml
         value_column: { type: string, description: "histogram, boxplot, heatmap, pie; stat: the value (default the first numeric column)." }
@@ -1038,6 +1101,15 @@ configs (|dbdash-examples|). Every field has a tag:
 <
                                           *dbdash-schema-axis.max_value* >yaml
         max_value: { type: number }
+<
+                                              *dbdash-schema-axis.scale* >yaml
+        scale: { enum: [linear, log], default: linear, description: "log: one tick per power of ten (Chart.js type: logarithmic)." }
+<
+                                              *dbdash-schema-axis.ticks* >yaml
+        ticks: { type: integer, minimum: 2, description: "About how many ticks (Chart.js ticks.count)." }
+<
+                                               *dbdash-schema-axis.grid* >yaml
+        grid: { type: boolean, default: false, description: "Grid lines at the ticks (Chart.js grid.display)." }
 <
                                              *dbdash-schema-axis.format* >yaml
         format: { type: string, description: 'Python format, e.g. "{:,.0f}" or "{:.1%}".' }

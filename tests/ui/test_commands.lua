@@ -1025,7 +1025,13 @@ T["query.transform: shown by :DbDashShowSQL, exported as transformed"] = functio
 end
 
 T[":DbDashStyle re-renders cached data with another style"] = function()
-  child.cmd("DbDashStart " .. ROOT .. "/example/charts/line.yaml")
+  vim.fn.writefile({
+    "database: { url: 'sqlite:///:memory:' }",
+    "query:",
+    "  sql: WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23) SELECT n AS hour, n * n AS v FROM h",
+    "show: { type: line, x_column: hour, y_column: v, interval: 1h }",
+  }, dir .. "/oneline.yaml")
+  child.cmd("DbDashStart oneline.yaml")
   child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("┌") end)]])
   local function text()
     return table.concat(lines(), "\n")
