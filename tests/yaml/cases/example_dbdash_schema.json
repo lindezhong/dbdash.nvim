@@ -812,6 +812,56 @@
       "striped": {
        "type": "string",
        "description": "table: background of every other row (CSS :nth-child(even))."
+      },
+      "caption": {
+       "enum": [
+        "top",
+        "bottom"
+       ],
+       "description": "Where the title goes (CSS caption-side; default top)."
+      },
+      "sort": {
+       "description": "table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last.",
+       "oneOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "object",
+         "properties": {
+          "column": {
+           "type": "string"
+          },
+          "order": {
+           "enum": [
+            "asc",
+            "desc"
+           ]
+          }
+         }
+        }
+       ]
+      },
+      "max_rows_shown": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "table: show the first N rows, then how many more."
+      },
+      "row_thresholds": {
+       "type": "object",
+       "description": "table: color whole rows by one column's value (AG Grid rowStyle).",
+       "properties": {
+        "column": {
+         "type": "string"
+        },
+        "steps": {
+         "$ref": "#/definitions/thresholds"
+        },
+        "below": {
+         "type": "boolean",
+         "description": "Steps apply at or below their value."
+        }
+       }
       }
      }
     },
@@ -975,6 +1025,14 @@
            "right"
           ],
           "description": "Text alignment (default: numbers right)."
+         },
+         "format": {
+          "type": "string",
+          "description": "Python format of numbers, e.g. \"{:,.2f}\", \"{:.1%}\"."
+         },
+         "style": {
+          "type": "string",
+          "description": "Color of the column's cells."
          },
          "thresholds": {
           "$ref": "#/definitions/thresholds",

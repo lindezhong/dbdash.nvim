@@ -1,66 +1,178 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# Table: a small status board with generated data.
-# Shows column_list (selection, aliases, widths), table styles, arguments in the query,
-# and the countdown.
+# Table: every option, one panel each (press K on a panel for what it shows). The options
+# follow Bootstrap tables and DataTables / AG Grid columns: column_list picks, renames,
+# sizes, formats and colors columns; style sets borders, padding, stripes, wrapping,
+# sorting and row colors. The CSS-like styles of every chart are in css.yaml.
+
+title: "Table"
+description: |
+  A table shows the rows as they are: every column (or `column_list`), one row per result
+  row, long cells wrapping inside their column. See `:help dbdash-chart-types` and
+  `:help dbdash-css`.
 
 database:
   url: "sqlite:///:memory:"          # in-memory database, no file needed
 
-query:
-  # Generated data, no tables required. {{ args.key1 }} / {{ args.key2 }} come from args below.
-  sql: |
-    SELECT
-      datetime('now', 'localtime') AS current_time,
-      abs(random() % 100) AS random_number,
-      abs(random() % 1000) AS sales_amount,
-      CASE abs(random() % 3)
-        WHEN 0 THEN 'Active'
-        WHEN 1 THEN 'Pending'
-        ELSE 'Inactive'
-      END AS status,
-      'User' || (abs(random() % 10) + 1) AS username,
-      {{ args.key1 | sql_quote }} AS k1,
-      {{ args.key2 | sql_quote }} AS k2
-  args:
-    - name: key1
-      default: value1
-    - name: key2
-      default: value2
+args:
+  - name: team
+    default: "core"
+    description: "Shown in the first panel's query"
 
 show:
-  type: table
-  title: "System status"
-  interval: 30s
+  interval: 1m
 
-  # Columns to show, in order; alias renames the header, width fixes the column width.
-  column_list:
-    - column: current_time
-      alias: "Time"
-      width: 20
-    - column: random_number
-      alias: "Random"
-      width: 10
-      # Color cells by value: >= 50 yellow, >= 90 red (thresholds_below: true reverses).
-      thresholds:
-        - { value: 50, color: yellow }
-        - { value: 90, color: red }
-    - column: sales_amount
-      alias: "Sales"
-      width: 12
-    - column: status
-      alias: "Status"
-      width: 10
-    - column: username
-      alias: "User"
-      width: 12
-    - column: k1
-    - column: k2
+layout:
+  columns: 2
 
-  style:
-    border: true                     # box borders (false: plain columns)
-    header_style: bold blue          # color spec: hex, name, "bold blue on black", or a highlight group
-    show_lines: false                # lines between rows
+panels:
+  - query:
+      sql: |
+        SELECT datetime('now', 'localtime') AS current_time,
+               abs(random() % 100) AS load,
+               abs(random() % 1000) AS sales,
+               CASE abs(random() % 3) WHEN 0 THEN 'Active' WHEN 1 THEN 'Pending' ELSE 'Inactive' END AS status,
+               {{ args.team | sql_quote }} AS team
+    show:
+      type: table
+      title: "column_list: alias, width, thresholds"
+      description: |
+        `column_list` picks the columns in order: `alias` renames the header, `width` fixes
+        the width, `thresholds` color a column's cells by value (>= 50 yellow, >= 90 red).
+        The query reads the argument `team` (shown above the table by `args_show`).
+      args_show: true
+      column_list:
+        - { column: current_time, alias: "Time", width: 20 }
+        - column: load
+          alias: "Load %"
+          thresholds:
+            - { value: 50, color: yellow }
+            - { value: 90, color: red }
+        - { column: sales, alias: "Sales" }
+        - { column: status, alias: "Status" }
+        - team
+      show_countdown: true
+      countdown_format: "Next update: {time}s"
 
-  show_countdown: true
-  countdown_format: "Next update: {time}s"
+  - query:
+      sql: |
+        SELECT 'disk ' || n AS volume, abs(random() % 100) AS free_pct
+        FROM (SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4)
+    show:
+      type: table
+      title: "thresholds_below: lower is worse"
+      description: |
+        `thresholds_below: true` turns the steps around: a value at or below a step gets
+        its color (free space under 30% yellow, under 10% red).
+      column_list:
+        - volume
+        - column: free_pct
+          alias: "Free %"
+          thresholds_below: true
+          thresholds:
+            - { value: 30, color: yellow }
+            - { value: 10, color: red }
+
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 9)
+        SELECT 'job-' || i AS job, abs(random() % 500) AS ms FROM n
+    show:
+      type: table
+      title: "sort, max_rows_shown"
+      description: |
+        `sort` orders the rows here, whatever the query did (DataTables `order`):
+        `{ column, order: asc | desc }`, NULLs last. `max_rows_shown` shows the first N
+        and says how many more there are.
+      style: { sort: { column: ms, order: desc }, max_rows_shown: 5 }
+
+  - query:
+      sql: |
+        SELECT 'Widgets' AS product, 1234567.891 AS revenue, 0.1834 AS margin
+        UNION ALL SELECT 'Gadgets', 98765.4, 0.0712
+        UNION ALL SELECT 'Gizmos', 4321.0, -0.021
+    show:
+      type: table
+      title: "column_list: format, style, align"
+      description: |
+        `format` is a Python format for a numeric column (`{:,.2f}`, `{:.1%}`;
+        DataTables `render`), `style` colors a whole column (AG Grid `cellStyle`), `align`
+        is its CSS `text-align` (numbers are right-aligned by default).
+      column_list:
+        - { column: product, align: center }
+        - { column: revenue, format: "{:,.2f}", style: "#98c379" }
+        - { column: margin, format: "{:.1%}", align: left }
+
+  - query:
+      sql: |
+        SELECT 'api' AS service, 12 AS errors UNION ALL SELECT 'web', 0
+        UNION ALL SELECT 'worker', 3 UNION ALL SELECT 'cron', 41
+    show:
+      type: table
+      title: "row_thresholds: color whole rows"
+      description: |
+        `row_thresholds` colors every cell of a row by one column's value (AG Grid
+        `rowStyle`): rows with 1+ errors yellow, 10+ red. `below: true` turns it around.
+      style:
+        row_thresholds:
+          column: errors
+          steps:
+            - { value: 1, color: yellow }
+            - { value: 10, color: red }
+
+  - query:
+      sql: |
+        SELECT 'alpha' AS name, 1 AS n UNION ALL SELECT 'beta', NULL UNION ALL SELECT 'gamma', 3
+        UNION ALL SELECT 'delta', NULL
+    show:
+      type: table
+      title: "compact and striped, null_text"
+      description: |
+        Bootstrap `.table-sm` (`cell_padding: 0`) and `.table-striped` (`striped`: the
+        background of every other row), the header and border colors, and how NULL looks
+        (`null_text`, `null_style`).
+      style:
+        cell_padding: 0
+        striped: "#2c313a"
+        header_style: "bold #61afef"
+        border_style: "#5c6370"
+        null_text: "-"
+        null_style: "italic #e06c75"
+
+  - query:
+      sql: |
+        SELECT 1 AS id, 'single' AS line UNION ALL SELECT 2, 'between the rows'
+    show:
+      type: table
+      title: "border: heavy, show_lines, caption: bottom"
+      description: |
+        One line style for the whole table (`border`: single, rounded, heavy, double,
+        dashed, ascii; `false` / `none` for none; the default mixes a heavy header with a
+        light body), lines between the rows (`show_lines`), and the title under the table
+        (`caption: bottom`, CSS `caption-side`).
+      style: { border: heavy, show_lines: true, caption: bottom }
+
+  - query:
+      sql: |
+        SELECT 'Long text wraps inside its column; a word longer than the column is cut.' AS note,
+               'first line' || char(10) || 'second line' AS lines
+    show:
+      type: table
+      title: "wrap, cell_width, cell_height, column height"
+      description: |
+        Long cells wrap at spaces (`wrap: true`, the default; `"char"` breaks anywhere,
+        `false` keeps one line cut with "…"), newlines in a value start a new line.
+        `cell_width` / `cell_height` limit every column, `column_list[].width` / `height`
+        one column; a cell still too long ends with "…".
+      column_list:
+        - { column: note, height: 2 }
+        - lines
+      style: { cell_width: 22, cell_height: 4 }
+
+  - query:
+      sql: SELECT 'no border' AS plain, 'no lines at all' AS columns
+    show:
+      type: table
+      title: "border: false"
+      description: "No border: plain columns under a rule (Bootstrap `.table-borderless`)."
+      style: { border: false }

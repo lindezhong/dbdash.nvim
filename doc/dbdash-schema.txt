@@ -811,6 +811,41 @@ configs (|dbdash-examples|). Every field has a tag:
                                       *dbdash-schema-show.style.striped* >yaml
             striped: { type: string, description: "table: background of every other row (CSS :nth-child(even))." }
 <
+                                      *dbdash-schema-show.style.caption* >yaml
+            caption: { enum: [top, bottom], description: "Where the title goes (CSS caption-side; default top)." }
+<
+                                         *dbdash-schema-show.style.sort* >yaml
+            sort:
+              description: 'table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last.'
+              oneOf:
+                - type: string
+                - type: object
+                  properties:
+<
+                                  *dbdash-schema-show.style.sort.column* >yaml
+                    column: { type: string }
+<
+                                   *dbdash-schema-show.style.sort.order* >yaml
+                    order: { enum: [asc, desc] }
+<
+                               *dbdash-schema-show.style.max_rows_shown* >yaml
+            max_rows_shown: { type: integer, minimum: 1, description: "table: show the first N rows, then how many more." }
+<
+                               *dbdash-schema-show.style.row_thresholds* >yaml
+            row_thresholds:
+              type: object
+              description: "table: color whole rows by one column's value (AG Grid rowStyle)."
+              properties:
+<
+                        *dbdash-schema-show.style.row_thresholds.column* >yaml
+                column: { type: string }
+<
+                         *dbdash-schema-show.style.row_thresholds.steps* >yaml
+                steps: { $ref: "#/definitions/thresholds" }
+<
+                         *dbdash-schema-show.style.row_thresholds.below* >yaml
+                below: { type: boolean, description: "Steps apply at or below their value." }
+<
                                              *dbdash-schema-show.colors* >yaml
         colors:
           description: Series / slice colors, by position (list) or by category name (mapping).
@@ -937,6 +972,12 @@ configs (|dbdash-examples|). Every field has a tag:
 <
                                   *dbdash-schema-show.column_list.align* >yaml
                   align: { enum: [left, center, right], description: "Text alignment (default: numbers right)." }
+<
+                                 *dbdash-schema-show.column_list.format* >yaml
+                  format: { type: string, description: 'Python format of numbers, e.g. "{:,.2f}", "{:.1%}".' }
+<
+                                  *dbdash-schema-show.column_list.style* >yaml
+                  style: { type: string, description: "Color of the column's cells." }
 <
                              *dbdash-schema-show.column_list.thresholds* >yaml
                   thresholds:

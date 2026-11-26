@@ -114,13 +114,22 @@ function M.with_title(out, title, style, width, chart_type)
   local align = nn(style.title_align) or (LEFT_TITLES[chart_type] and "left" or "center")
   local line, s, e = require("dbdash.render.box").title_line(title, w, align, nn(style.ellipsis))
   local group = highlight.color(nn(style.title_style), "DbDashTitle")
+  line = line:gsub("%s+$", "")
+  -- caption: bottom puts it under the chart (CSS caption-side)
+  if nn(style.caption) == "bottom" then
+    local lines = vim.list_extend({}, out.lines)
+    lines[#lines + 1] = line
+    local hl = vim.list_extend({}, out.hl)
+    hl[#hl + 1] = { row = #lines - 1, col_s = s, col_e = e, group = group }
+    return { lines = lines, hl = hl }
+  end
   local hl = { { row = 0, col_s = s, col_e = e, group = group } }
   for _, h in ipairs(out.hl) do
     local c = vim.deepcopy(h)
     c.row = h.row + 1
     hl[#hl + 1] = c
   end
-  local lines = { (line:gsub("%s+$", "")) }
+  local lines = { line }
   vim.list_extend(lines, out.lines)
   return { lines = lines, hl = hl }
 end

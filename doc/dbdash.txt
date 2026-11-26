@@ -386,6 +386,14 @@ and `style.cell_height` set them for every column. A cell that still does not
 fit ends with "…". When the window is narrower than the table, the widest
 text columns shrink first and their cells wrap more.
 
+Like DataTables / AG Grid columns, `column_list[]` also takes `format` (a
+Python format for numbers: "{:,.2f}", "{:.1%}"), `style` (the column's color)
+and `align` (left, center, right). `style.sort` orders the rows (a column, or
+`{ column, order: asc | desc }`; NULLs last), `style.max_rows_shown` shows
+the first N and how many more there are, and `style.row_thresholds: { column,
+steps, below }` colors whole rows by one column's value. `example/charts/
+table.yaml` shows each option.
+
 Refresh intervals                                            *dbdash-interval*
 
 The top-level `interval` refreshes every panel when it elapses and restarts

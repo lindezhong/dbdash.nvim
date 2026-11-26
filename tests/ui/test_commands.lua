@@ -1143,9 +1143,9 @@ end
 
 T["example table.yaml runs"] = function()
   child.cmd("DbDashStart " .. ROOT .. "/example/charts/table.yaml")
-  child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("value1") end)]])
+  child.lua([[_G.wait_for(function() return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false)):find("no lines at all") end)]])
   eq(find_line("Time") ~= nil, true)
-  eq(find_line("value1") ~= nil, true)
+  eq(find_line("team=core") ~= nil, true)
   eq(child.lua_get("#_G.notes"), 0)
 end
 

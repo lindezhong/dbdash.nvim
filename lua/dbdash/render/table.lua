@@ -73,6 +73,8 @@ local function select_columns(rs, show)
           label = type(spec) == "table" and nn(spec.alias) or name,
           width = type(spec) == "table" and tonumber(nn(spec.width)) or nil,
           height = type(spec) == "table" and tonumber(nn(spec.height)) or nil,
+          format = type(spec) == "table" and nn(spec.format) or nil,
+          style = type(spec) == "table" and nn(spec.style) or nil,
           align = (type(spec) == "table" and nn(spec.align)) or ((ltype and NUMERIC[ltype]) and "right" or "left"),
           ltype = ltype,
           thresholds = type(spec) == "table" and nn(spec.thresholds) and require("dbdash.render.thresholds").steps(
@@ -168,21 +170,84 @@ function M.render(rs, show, ctx)
     return { lines = lines, hl = hl }
   end
 
+  -- Rows to show: sorted (DataTables order) and at most max_rows_shown.
+  local rows = rs.rows
+  local sort = nn(style.sort)
+  if sort then
+    local sc = type(sort) == "table" and nn(sort.column) or sort
+    local desc = type(sort) == "table" and nn(sort.order) == "desc"
+    local si = rs:col_index(sc)
+    if not si then
+      error({ phase = "render", message = ("style.sort: no column '%s'"):format(tostring(sc)) }, 0)
+    end
+    rows = vim.list_extend({}, rows)
+    local function key(r)
+      local v = r[si]
+      if v == vim.NIL then
+        return nil
+      end
+      return v
+    end
+    table.sort(rows, function(a, b)
+      local x, y = key(a), key(b)
+      if x == nil or y == nil then
+        return y == nil and x ~= nil -- NULLs last
+      end
+      if type(x) ~= type(y) then
+        x, y = tostring(x), tostring(y)
+      end
+      if desc then
+        return x > y
+      end
+      return x < y
+    end)
+  end
+  local hidden = 0
+  local limit = tonumber(nn(style.max_rows_shown))
+  if limit and #rows > limit then
+    hidden = #rows - limit
+    rows = { unpack(rows, 1, limit) }
+  end
+  -- Whole rows colored by one column's thresholds (AG Grid rowStyle).
+  local row_th = nn(style.row_thresholds)
+  local row_steps, row_col, row_below
+  if row_th then
+    local T = require("dbdash.render.thresholds")
+    row_col = rs:col_index(nn(row_th.column) or "")
+    if not row_col then
+      error({ phase = "render", message = "style.row_thresholds: no column '" .. tostring(nn(row_th.column)) .. "'" }, 0)
+    end
+    row_below = nn(row_th.below) == true
+    row_steps = T.steps(nn(row_th.steps) or {}, row_below)
+  end
+  for _, col in ipairs(cols) do
+    col.group = col.style and ctx.color(col.style) or nil
+  end
+
   -- Cell texts and natural widths.
   local cells = {}
+  local row_groups = {}
   local widths, data_w = {}, {}
   for c, col in ipairs(cols) do
     widths[c] = col.width or W.width(col.label)
     data_w[c] = 0
   end
-  for r, row in ipairs(rs.rows) do
+  for r, row in ipairs(rows) do
     cells[r] = {}
+    if row_steps then
+      local T = require("dbdash.render.thresholds")
+      local _, step = T.level(row[row_col], row_steps, row_below)
+      row_groups[r] = step and T.group(step) or nil
+    end
     for c, col in ipairs(cols) do
       local v
       if col.index then
         v = row[col.index] -- not `and ... or nil`: that turned false into NULL
       end
       local text, is_null = M.format_value(v, col.ltype, null_text, wrap_mode ~= nil)
+      if col.format and type(v) == "number" then
+        text = require("dbdash.render.format").python(v, col.format) or text
+      end
       local group
       if col.thresholds and not is_null then
         local T = require("dbdash.render.thresholds")
@@ -304,7 +369,7 @@ function M.render(rs, show, ctx)
     for c, cell in ipairs(row) do
       parts[c] = cell_lines(cell.text, c)
       n = math.max(n, #parts[c])
-      groups[c] = cell.null and "DbDashNull" or cell.group or cols[c].group
+      groups[c] = cell.null and "DbDashNull" or cell.group or row_groups[r] or cols[c].group
     end
     for k = 1, n do
       local texts = {}
@@ -331,6 +396,8 @@ function M.render(rs, show, ctx)
   local note
   if #rs.rows == 0 then
     note = "(no rows)"
+  elseif hidden > 0 then
+    note = ("… %d more rows (style.max_rows_shown)"):format(hidden)
   elseif rs.truncated then
     note = ("… showing the first %d rows (query.max_rows)"):format(#rs.rows)
   end

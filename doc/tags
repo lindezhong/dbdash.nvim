@@ -135,7 +135,9 @@ dbdash-schema-show.column_list	dbdash-schema.txt	/*dbdash-schema-show.column_lis
 dbdash-schema-show.column_list.alias	dbdash-schema.txt	/*dbdash-schema-show.column_list.alias*
 dbdash-schema-show.column_list.align	dbdash-schema.txt	/*dbdash-schema-show.column_list.align*
 dbdash-schema-show.column_list.column	dbdash-schema.txt	/*dbdash-schema-show.column_list.column*
+dbdash-schema-show.column_list.format	dbdash-schema.txt	/*dbdash-schema-show.column_list.format*
 dbdash-schema-show.column_list.height	dbdash-schema.txt	/*dbdash-schema-show.column_list.height*
+dbdash-schema-show.column_list.style	dbdash-schema.txt	/*dbdash-schema-show.column_list.style*
 dbdash-schema-show.column_list.thresholds	dbdash-schema.txt	/*dbdash-schema-show.column_list.thresholds*
 dbdash-schema-show.column_list.thresholds_below	dbdash-schema.txt	/*dbdash-schema-show.column_list.thresholds_below*
 dbdash-schema-show.column_list.width	dbdash-schema.txt	/*dbdash-schema-show.column_list.width*
@@ -168,6 +170,7 @@ dbdash-schema-show.style.axis_style	dbdash-schema.txt	/*dbdash-schema-show.style
 dbdash-schema-show.style.background	dbdash-schema.txt	/*dbdash-schema-show.style.background*
 dbdash-schema-show.style.border	dbdash-schema.txt	/*dbdash-schema-show.style.border*
 dbdash-schema-show.style.border_style	dbdash-schema.txt	/*dbdash-schema-show.style.border_style*
+dbdash-schema-show.style.caption	dbdash-schema.txt	/*dbdash-schema-show.style.caption*
 dbdash-schema-show.style.cell_height	dbdash-schema.txt	/*dbdash-schema-show.style.cell_height*
 dbdash-schema-show.style.cell_padding	dbdash-schema.txt	/*dbdash-schema-show.style.cell_padding*
 dbdash-schema-show.style.cell_width	dbdash-schema.txt	/*dbdash-schema-show.style.cell_width*
@@ -177,11 +180,19 @@ dbdash-schema-show.style.header_style	dbdash-schema.txt	/*dbdash-schema-show.sty
 dbdash-schema-show.style.justify	dbdash-schema.txt	/*dbdash-schema-show.style.justify*
 dbdash-schema-show.style.label_style	dbdash-schema.txt	/*dbdash-schema-show.style.label_style*
 dbdash-schema-show.style.legend_style	dbdash-schema.txt	/*dbdash-schema-show.style.legend_style*
+dbdash-schema-show.style.max_rows_shown	dbdash-schema.txt	/*dbdash-schema-show.style.max_rows_shown*
 dbdash-schema-show.style.null_style	dbdash-schema.txt	/*dbdash-schema-show.style.null_style*
 dbdash-schema-show.style.padding	dbdash-schema.txt	/*dbdash-schema-show.style.padding*
 dbdash-schema-show.style.panel_border	dbdash-schema.txt	/*dbdash-schema-show.style.panel_border*
+dbdash-schema-show.style.row_thresholds	dbdash-schema.txt	/*dbdash-schema-show.style.row_thresholds*
+dbdash-schema-show.style.row_thresholds.below	dbdash-schema.txt	/*dbdash-schema-show.style.row_thresholds.below*
+dbdash-schema-show.style.row_thresholds.column	dbdash-schema.txt	/*dbdash-schema-show.style.row_thresholds.column*
+dbdash-schema-show.style.row_thresholds.steps	dbdash-schema.txt	/*dbdash-schema-show.style.row_thresholds.steps*
 dbdash-schema-show.style.show_axes	dbdash-schema.txt	/*dbdash-schema-show.style.show_axes*
 dbdash-schema-show.style.show_title	dbdash-schema.txt	/*dbdash-schema-show.style.show_title*
+dbdash-schema-show.style.sort	dbdash-schema.txt	/*dbdash-schema-show.style.sort*
+dbdash-schema-show.style.sort.column	dbdash-schema.txt	/*dbdash-schema-show.style.sort.column*
+dbdash-schema-show.style.sort.order	dbdash-schema.txt	/*dbdash-schema-show.style.sort.order*
 dbdash-schema-show.style.striped	dbdash-schema.txt	/*dbdash-schema-show.style.striped*
 dbdash-schema-show.style.title_align	dbdash-schema.txt	/*dbdash-schema-show.style.title_align*
 dbdash-schema-show.style.title_style	dbdash-schema.txt	/*dbdash-schema-show.style.title_style*

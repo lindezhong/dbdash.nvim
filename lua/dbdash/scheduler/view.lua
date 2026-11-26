@@ -179,13 +179,17 @@ local function panel_cell(p, width, height, fill, exact)
   local body = render_panel(p, show, iw, bh, fill)
   body = box.position(body, st, iw, exact and bh or nil)
   local parts = {}
-  if header then
+  local bottom = style.caption == "bottom" -- CSS caption-side: the title under the chart
+  if header and not bottom then
     parts[#parts + 1] = header
   end
   if args_line then
     parts[#parts + 1] = args_line
   end
   local out = prepend(body, parts)
+  if header and bottom then
+    out = prepend(header, { out })
+  end
   return box.wrap(out, st, width, exact and height or nil, border_title)
 end
 

@@ -164,4 +164,28 @@ T["CSS-like options: border styles, padding, align, vertical_align, striped, ell
   eq(bg[1].row, 4)
 end
 
+T["DataTables-like: sort, rows shown, column format and style, row thresholds, caption"] = function()
+  local rs = resultset.new(
+    { { name = "k", type = "string" }, { name = "n", type = "number" } },
+    { { "a", 1234.5 }, { "b", vim.NIL }, { "c", 99 } }
+  )
+  local o = out(rs, { style = { sort = { column = "n", order = "desc" } } })
+  eq({ o.lines[4]:sub(1, 6), o.lines[5]:sub(1, 6), o.lines[6]:sub(1, 6) }, { "│ a ", "│ c ", "│ b " })
+  o = out(rs, { style = { sort = "k", max_rows_shown = 1 } })
+  eq(o.lines[#o.lines], "… 2 more rows (style.max_rows_shown)")
+  o = out(rs, { column_list = { "k", { column = "n", format = "{:,.1f}", style = "Special" } } })
+  eq(o.lines[4], "│ a │ 1,234.5 │")
+  local special = vim.tbl_filter(function(h)
+    return h.group == "Special"
+  end, o.hl)
+  eq(#special, 2) -- a and c; the NULL keeps its own color
+  o = out(rs, { style = { row_thresholds = { column = "n", steps = { { value = 1000, color = "red" } } } } })
+  local red = vim.tbl_filter(function(h)
+    return h.row == 3 and h.group:match("^DbDashC_")
+  end, o.hl)
+  eq(#red, 2) -- both cells of the row with 1234.5
+  o = out(rs, { title = "T", style = { caption = "bottom" } })
+  eq(vim.trim(o.lines[#o.lines]), "T")
+end
+
 return T
