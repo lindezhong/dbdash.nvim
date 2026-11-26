@@ -14,7 +14,14 @@ M.DB_TYPES = {
   mssql = true,
   lua = true,
   http = true,
+  -- push sources (:help dbdash-push)
+  luastream = true,
+  exec = true,
+  webhook = true,
 }
+
+---Database types whose data is pushed (a stream) instead of queried on an interval.
+M.PUSH_TYPES = { luastream = true, exec = true, webhook = true }
 -- Alternative URL schemes and type names (keep in sync with the drivers' `schemes`).
 local SCHEME_ALIASES = {
   postgresql = "postgres",
@@ -238,7 +245,7 @@ end
 ---@param db table the panel's database (http(s):// may leave out the request: a GET of the URL)
 function Ctx:query(q, prefix, db)
   prefix = prefix or ""
-  local optional = db and db.type == "http"
+  local optional = db and (db.type == "http" or db.type == "webhook")
   if optional and nn(q) == nil then
     q = map.new()
   end
@@ -566,6 +573,10 @@ function Ctx:panel(raw, prefix, cfg, index, id, top_interval)
   end
   local query = self:query(raw.query, prefix, db)
   local show = self:show(raw.show, top_interval, prefix)
+  if M.PUSH_TYPES[db.type] and show.refresh_hidden then
+    -- A push source keeps receiving while hidden anyway; only drawing waits.
+    self:fail(prefix .. "show.refresh_hidden", "refresh_hidden does not apply to %s:// (push sources keep receiving while hidden)", db.type)
+  end
   local panel = {
     index = index,
     id = id,

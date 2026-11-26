@@ -29,6 +29,8 @@ M.Error = dberr
 ---@field dialect dbdash.db.Dialect?
 ---@field capabilities { tls: boolean, sql: boolean, query_language: string }
 ---@field parse_url (fun(u: dbdash.db.ConnInfo): dbdash.db.ConnInfo)?
+---@field produce (fun(info: dbdash.db.ConnInfo, query: string, ctx: dbdash.db.StreamCtx))? a push
+---   source (capabilities.push): produces data until it returns (:help dbdash-push)
 ---@field cancel (fun(conn: dbdash.db.Connection, info: dbdash.db.ConnInfo))? stop the query
 ---   running on `conn` on the server (inside a task, while the query's own task waits)
 ---@field connect fun(info: dbdash.db.ConnInfo): dbdash.db.Connection
@@ -49,6 +51,9 @@ local BUILTIN = {
   cql = "dbdash.db.drivers.cassandra",
   mongodb = "dbdash.db.drivers.mongodb",
   lua = "dbdash.db.drivers.lua",
+  luastream = "dbdash.db.drivers.luastream",
+  exec = "dbdash.db.drivers.exec",
+  webhook = "dbdash.db.drivers.webhook",
   http = "dbdash.db.drivers.http",
   https = "dbdash.db.drivers.http",
   mssql = "dbdash.db.drivers.mssql",
@@ -246,6 +251,10 @@ function M.query(raw_url, query, opts, callback)
     return handle
   end
   driver, info = prep.driver, prep.info
+  if driver.produce then
+    finish(dberr.new({ driver = driver_name, phase = "config", message = driver.name .. ":// is a push source: it runs as a stream (:help dbdash-push)" }))
+    return handle
+  end
   local q_timeout = opts.timeout or info.timeout
   local exec_opts = {
     max_rows = opts.max_rows or require("dbdash").options.defaults.max_rows,
@@ -299,6 +308,176 @@ function M.query(raw_url, query, opts, callback)
       credentials.forget(opts.password_cmd, info) -- the password may have changed
     end
     finish(err, rs)
+  end)
+  return handle
+end
+
+-- Push sources --------------------------------------------------------------------------------
+
+---@class dbdash.db.StreamCtx what a push source's producer gets
+---@field writer fun(delimiter: string?, vars: table?): fun(text: string) a stream: the text
+---   written is cut at `delimiter` (default "\n"), each piece is one item
+---@field emit fun(value: any, vars: table?) one item as it is
+---@field cancel dbdash.db.CancelToken cancelled when the stream stops
+---@field on_stop fun(fn: fun()) cleanup when the stream ends or stops (kill a process, ...)
+---@field base_dir string? the config file's directory
+---@field options table database.options
+---@field args table?, meta table?, lua table?, source string?, line integer? as for lua://
+---@field timeout integer ms (query.timeout, else the URL's)
+
+---Cut text at `delimiter` and pass each complete piece to `emit`. Pieces longer than
+---`max` bytes are cut there (counted in stats.truncated); empty pieces are skipped.
+---@return fun(text: string) write, fun() flush (the rest, at the end)
+function M.splitter(delimiter, max, emit, stats)
+  delimiter = delimiter or "\n"
+  local buf, dropping = "", false
+  local function piece(p)
+    if delimiter == "\n" and p:sub(-1) == "\r" then
+      p = p:sub(1, -2)
+    end
+    if p ~= "" then
+      emit(p)
+    end
+  end
+  local function write(text)
+    buf = buf .. text
+    while true do
+      local i, j = buf:find(delimiter, 1, true)
+      if not i then
+        break
+      end
+      if dropping then
+        dropping = false -- the rest of a piece that was too long
+      else
+        piece(buf:sub(1, i - 1))
+      end
+      buf = buf:sub(j + 1)
+    end
+    if #buf > max and not dropping then
+      -- Too long without a delimiter: pass the first `max` bytes, drop the rest of it.
+      stats.truncated = stats.truncated + 1
+      piece(buf:sub(1, max))
+      dropping = true
+    end
+    if dropping then
+      buf = buf:sub(-(#delimiter - 1)) -- (a delimiter may start at the end)
+      if #delimiter == 1 then
+        buf = ""
+      end
+    end
+  end
+  local function flush()
+    if not dropping then
+      piece(buf)
+    end
+    buf, dropping = "", false
+  end
+  return write, flush
+end
+
+---Run a push source: its producer runs until it returns (on_end(nil)), fails (on_end(err))
+---or is stopped (handle:stop(reason), or opts.cancel; on_end gets a "cancelled" error).
+---Every item goes to on_item(value, vars) on the main loop, in order, before on_end.
+---@param opts dbdash.db.QueryOpts
+---@param on_item fun(value: any, vars: table)
+---@param on_end fun(err: dbdash.db.DbError?)
+---@return { stop: fun(self, reason: string?), stats: { items: integer, truncated: integer } }
+function M.stream(raw_url, query, opts, on_item, on_end)
+  opts = opts or {}
+  local token = require("dbdash.db.cancel").new(opts.cancel)
+  local stats = { items = 0, truncated = 0 }
+  local handle = {
+    stats = stats,
+    stop = function(_, reason)
+      token:cancel(reason or "stopped")
+    end,
+  }
+  local driver_name
+  local done = false
+  local stops, flushes = {}, {}
+  local function finish(err)
+    if done then
+      return
+    end
+    done = true
+    token:release()
+    for i = #stops, 1, -1 do
+      pcall(stops[i])
+    end
+    vim.schedule(function()
+      on_end(err and dberr.wrap(err, driver_name) or nil)
+    end)
+  end
+  token:on_cancel(function(reason)
+    finish(dberr.new({ driver = driver_name, phase = "cancelled", message = "stream stopped: " .. reason }))
+  end)
+  local ok, prep = pcall(function()
+    local expanded, env_err = require("dbdash.db.credentials").expand_env(raw_url)
+    if not expanded then
+      dberr.raise("config", env_err)
+    end
+    local d = M.driver_for(expanded)
+    driver_name = d.name
+    if not d.produce then
+      dberr.raise("config", ("%s is not a push source"):format(d.name))
+    end
+    local i = url.parse(expanded)
+    i.options = opts.options or {}
+    i.base_dir = opts.base_dir
+    if d.parse_url then
+      i = d.parse_url(i)
+    end
+    return { driver = d, info = i }
+  end)
+  if not ok then
+    finish(prep)
+    return handle
+  end
+  local max = require("dbdash.util.bytes").parse(require("dbdash").options.push.max_record) or 1048576
+  local function emit(value, vars)
+    if done then
+      return
+    end
+    stats.items = stats.items + 1
+    vim.schedule(function()
+      if not token.cancelled then
+        on_item(value, vars or {})
+      end
+    end)
+  end
+  ---@type dbdash.db.StreamCtx
+  local ctx = {
+    emit = emit,
+    writer = function(delimiter, vars)
+      local write, flush = M.splitter(delimiter, max, function(piece)
+        emit(piece, vars)
+      end, stats)
+      flushes[#flushes + 1] = flush
+      return write
+    end,
+    cancel = token,
+    on_stop = function(fn)
+      stops[#stops + 1] = fn
+    end,
+    base_dir = opts.base_dir,
+    options = prep.info.options,
+    args = opts.args,
+    meta = opts.meta,
+    lua = opts.lua,
+    source = opts.source,
+    line = opts.line,
+    max_rows = opts.max_rows or require("dbdash").options.defaults.max_rows,
+    timeout = opts.timeout or prep.info.timeout, -- (luastream: the longest stretch without waiting)
+  }
+  async.run(function()
+    prep.driver.produce(prep.info, query, ctx)
+  end, function(err)
+    if not err then
+      for _, flush in ipairs(flushes) do
+        flush() -- the last piece without a delimiter
+      end
+    end
+    finish(err)
   end)
   return handle
 end

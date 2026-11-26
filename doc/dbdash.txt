@@ -86,6 +86,10 @@ defaults: >lua
       max_callbacks = 100, -- dbdash.run() calls in one refresh, all levels
       max_callback_depth = 10,  -- dbdash.run() nesting, |dbdash-callback|
     },
+    push = {               -- push sources (exec://, luastream://, webhook://)
+      max_queue = 1000,    -- items waiting per panel; more drop the oldest
+      max_record = "1MB",  -- longest item; longer ones are cut there
+    },
   })
 <
 Only the options you pass change; nested tables merge with the defaults, while

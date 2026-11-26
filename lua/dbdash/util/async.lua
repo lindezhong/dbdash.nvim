@@ -48,6 +48,11 @@ function M.run(fn, cb)
   step()
 end
 
+---When task `co` last got the CPU (hrtime), or nil outside a task.
+function M.slice_start(co)
+  return slice_start[co]
+end
+
 ---True when called from inside a task started with `run`.
 ---@return boolean
 function M.in_task()

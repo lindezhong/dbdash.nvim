@@ -109,7 +109,9 @@ function M.collect(path, cfg)
   end
   for _, p in ipairs(cfg.panels) do
     local q = p.query
-    if p.database.type == "lua" or q.transform or M.has_lua_block(q.sql or "") or M.has_lua_block(q.transform or "") then
+    -- lua://, luastream:// and exec:// run code or commands from the config
+    local runs = p.database.type == "lua" or p.database.type == "luastream" or p.database.type == "exec"
+    if runs or q.transform or M.has_lua_block(q.sql or "") or M.has_lua_block(q.transform or "") then
       has_lua = true
     end
     visit(q.sql or "")

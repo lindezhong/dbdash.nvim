@@ -106,6 +106,15 @@ T["collect: the config first, then imported .lua files and {% lua %} templates"]
   eq({ #files, has_lua }, { 1, true })
 end
 
+T["exec:// and luastream:// configs need trust like lua://"] = function()
+  for _, url in ipairs({ "exec://", "luastream://" }) do
+    local path = write("push.yaml", { ("database: { url: '%s' }"):format(url), "query: { sql: 'echo 1' }" })
+    local files, needs = trust.collect(path, require("dbdash.config").load(path))
+    eq({ url, needs, files[1].kind }, { url, true, "config" })
+    eq(files[1].text:find("echo 1", 1, true) ~= nil, true) -- the View shows the script
+  end
+end
+
 T["collect: files reached through include and extends count too"] = function()
   write("base.sql", { "{% block q %}{% endblock %}{% lua %}return ''{% endlua %}" })
   write("part.sql", { "{% lua %}return 'x'{% endlua %}" })

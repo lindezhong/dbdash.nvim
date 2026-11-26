@@ -59,6 +59,7 @@ local M = {}
 ---@field defaults dbdash.DefaultsOptions
 ---@field errors dbdash.ErrorsOptions
 ---@field lua dbdash.LuaOptions
+---@field push { max_queue: integer, max_record: integer|string } push sources (:help dbdash-push)
 local defaults = {
   mappings = true,
   countdown_interval = 10000,
@@ -108,6 +109,10 @@ local defaults = {
     trusted_dirs = {},
     max_callbacks = 100,
     max_callback_depth = 10,
+  },
+  push = {
+    max_queue = 1000,
+    max_record = "1MB",
   },
 }
 M.DEFAULTS = defaults
@@ -260,6 +265,10 @@ local SPEC = {
     trusted_dirs = string_list,
     max_callbacks = int(1),
     max_callback_depth = int(1),
+  },
+  push = {
+    max_queue = int(1),
+    max_record = require("dbdash.util.bytes").check,
   },
 }
 
