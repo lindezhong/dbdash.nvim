@@ -77,14 +77,13 @@ end
 function Document:take_dirty()
   local root, pending, reasons = self.dirty_root, self.pending, self.reasons
   self.dirty_root, self.pending, self.reasons = nil, {}, {}
-  if root then
-    -- the flags are set from each dirty node up to the document root
-    self.root:walk(function(n)
-      if not n.dirty_descendants and n ~= root then
-        return n.parent == nil -- nothing flagged below a clean node, except at the root
-      end
-      n.dirty_descendants = false
-    end)
+  -- the flags were set from each dirty node up: clear those paths only
+  for n in pairs(pending) do
+    local p = n.parent
+    while p and p.dirty_descendants do
+      p.dirty_descendants = false
+      p = p.parent
+    end
   end
   return root, pending, reasons
 end

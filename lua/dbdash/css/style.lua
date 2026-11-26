@@ -142,14 +142,46 @@ function M.restyle(doc)
   local root, pending, reasons = doc:take_dirty()
   local stats = { nodes = 0, damage = D.none, pending = pending }
   if next(reasons) then
-    root = doc.root
-  end
-  if not root then
+    -- a document-wide reason (sheets, theme): everything
+    stats.root = doc.root
+    restyle_subtree(doc, doc.root, nil, stats)
+  elseif root then
+    stats.root = root
+    -- only the nodes whose style may have changed (a new node, a class or attribute
+    -- change) and their subtrees, shallowest first; a content change needs no restyle
+    -- (Servo traverses from the dirty root but skips clean subtrees)
+    local list = {}
+    for n, kind in pairs(pending) do
+      if kind ~= "content" then
+        list[#list + 1] = { n = n, depth = #n:ancestors() }
+      end
+    end
+    table.sort(list, function(a, b)
+      return a.depth < b.depth
+    end)
+    local done = {}
+    for _, e in ipairs(list) do
+      local n = e.n
+      -- a node without a styled parent is styled with its nearest unstyled ancestor
+      while n.parent and not n.parent.style_data do
+        n = n.parent
+      end
+      local covered = false
+      for _, a in ipairs(n:ancestors()) do
+        if done[a] then
+          covered = true
+          break
+        end
+      end
+      if not covered and n.document == doc then
+        done[n] = true
+        local parent = n.parent and n.parent.style_data and n.parent.style_data.computed or nil
+        restyle_subtree(doc, n, parent, stats)
+      end
+    end
+  else
     return stats
   end
-  stats.root = root
-  local parent = root.parent and root.parent.style_data and root.parent.style_data.computed or nil
-  restyle_subtree(doc, root, parent, stats)
   -- what restyles did since the last rendering update (a query flushes styles early)
   local acc = doc.restyled or { nodes = 0, damage = D.none }
   doc.restyled = { nodes = acc.nodes + stats.nodes, damage = math.max(acc.damage, stats.damage) }

@@ -122,12 +122,7 @@ function Scope:part(tag, spec)
     n = dom.new(tag, { classes = spec.classes, attrs = spec.attrs })
     -- position among siblings: pad with placeholders so :nth-child sees the index
     if spec.index then
-      local count = 0
-      for _, c in ipairs(self.node.children) do
-        if c.tag == tag then
-          count = count + 1
-        end
-      end
+      local count = (self.node.tag_counts or {})[tag] or 0
       for _ = count + 1, spec.index - 1 do
         self.node:append(dom.new(tag, { attrs = { placeholder = "1" } }))
       end

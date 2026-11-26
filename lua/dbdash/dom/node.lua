@@ -24,6 +24,10 @@ local M = {}
 ---  inclusive_descendants_version): caches of a subtree's layout and paint key on it
 ---@field layout_version integer bumped only by changes that can change sizes (DOM changes,
 ---  relayout or rebuild damage); caches of intrinsic sizes key on it
+---@field tag_index integer? position among the parent's children of the same tag, kept on
+---  insertion so :nth-child does not count siblings
+---@field tag_counts table<string, integer>? children per tag
+---@field last_by_tag table<string, dbdash.dom.Node>? the last child of each tag
 local Node = {}
 Node.__index = Node
 
@@ -51,15 +55,34 @@ end
 ---  other    anything else: rebuild it
 M.STYLE, M.CONTENT, M.OTHER = "style", "content", "other"
 
+---Record a child's position among its siblings of the same tag.
+local function place(self, child)
+  self.tag_counts = self.tag_counts or {}
+  self.last_by_tag = self.last_by_tag or {}
+  local prev = self.last_by_tag[child.tag]
+  child.tag_index = (self.tag_counts[child.tag] or 0) + 1
+  self.tag_counts[child.tag] = child.tag_index
+  self.last_by_tag[child.tag] = child
+  return prev
+end
+
+---Insert a child at the end. The new child needs a style (Servo: an inserted element is
+---dirty), the previous last sibling of its tag too (it is no longer :last-child); the
+---parent only changed content: it is laid out again, not restyled.
 ---@param child dbdash.dom.Node
 ---@return dbdash.dom.Node child
 function Node:append(child)
   child.parent = self
   child.document = self.document
   self.children[#self.children + 1] = child
+  local prev = place(self, child)
   if self.document then
     child:adopt(self.document)
     self:dirty(M.CONTENT)
+    child:dirty(M.OTHER)
+    if prev then
+      prev:dirty(M.STYLE)
+    end
   end
   return child
 end
@@ -79,11 +102,14 @@ function Node:set_children(children)
     c.parent = nil
   end
   self.children = {}
+  self.tag_counts, self.last_by_tag = {}, {}
   for _, c in ipairs(children) do
     c.parent = self
     self.children[#self.children + 1] = c
+    place(self, c)
     if self.document then
       c:adopt(self.document)
+      c:dirty(M.OTHER)
     end
   end
   self:dirty(M.CONTENT)
@@ -129,16 +155,7 @@ function Node:position()
   if not p then
     return 1, 1
   end
-  local index, count = 0, 0
-  for _, c in ipairs(p.children) do
-    if c.tag == self.tag then
-      count = count + 1
-      if c == self then
-        index = count
-      end
-    end
-  end
-  return index, count
+  return self.tag_index or 1, (p.tag_counts or {})[self.tag] or 1
 end
 
 ---Record a change: the document restyles from the dirty root on the next update.

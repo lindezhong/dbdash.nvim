@@ -115,6 +115,28 @@ T["damage: by property, new nodes rebuild, only the dirty root restyles"] = func
   eq(n.panel.dirty_descendants, false)
 end
 
+T["appending one by one restyles the new node and its previous sibling only"] = function()
+  local doc = document.new("dashboard")
+  doc:set_sheet("author", sheet({
+    ["row:nth-child(even)"] = { color = "#222222" },
+    ["row:last-child"] = { ["font-weight"] = "bold" },
+  }))
+  local t = doc.root:append(dom.new("table"))
+  style.restyle(doc)
+  local restyled, rows = 0, {}
+  for i = 1, 300 do
+    rows[i] = t:append(dom.new("row"))
+    style.get(rows[i]) -- a query after each insertion, as a renderer does
+    restyled = restyled + doc.restyled.nodes
+    doc.restyled = nil
+  end
+  eq({ restyled <= 2 * 300 + 2, restyled }, { true, restyled }) -- linear, not quadratic
+  -- positions kept on insertion: :nth-child and :last-child stay right
+  eq({ style.get(rows[2]).color, style.get(rows[3]).color }, { "#222222", nil })
+  eq({ style.get(rows[299])["font-weight"], style.get(rows[300])["font-weight"] }, { "normal", "bold" })
+  eq({ rows[300]:position() }, { 300, 300 })
+end
+
 T["highlight groups: a group as is, generated groups, refresh"] = function()
   vim.api.nvim_set_hl(0, "TestCssGroup", { fg = "#112233", bold = true })
   eq(hl.group({ color = "TestCssGroup", ["font-weight"] = "normal", ["text-decoration"] = "none" }), "TestCssGroup")
