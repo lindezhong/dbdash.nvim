@@ -106,6 +106,45 @@ T["collect: the config first, then imported .lua files and {% lua %} templates"]
   eq({ #files, has_lua }, { 1, true })
 end
 
+T["collect: files reached through include and extends count too"] = function()
+  write("base.sql", { "{% block q %}{% endblock %}{% lua %}return ''{% endlua %}" })
+  write("part.sql", { "{% lua %}return 'x'{% endlua %}" })
+  write("other.sql", { "{% import 'deep.lua' as d %}" })
+  write("deep.lua", { "return {}" })
+  local path = write("board.yaml", {
+    "database: { url: 'sqlite:///:memory:' }",
+    "query:",
+    "  sql: |",
+    "    {% extends 'base.sql' %}",
+    "    {% block q %}{% include ['missing.sql', 'part.sql'] ignore missing %}{% include 'other.sql' %}{% endblock %}",
+  })
+  local files, has_lua = trust.collect(path, require("dbdash.config").load(path))
+  eq(has_lua, true)
+  eq(vim.tbl_map(function(f)
+    return vim.fs.basename(f.path) .. ":" .. f.kind
+  end, files), { "board.yaml:config", "base.sql:template", "deep.lua:lua", "part.sql:template" })
+end
+
+T["an included template with Lua that the trust does not cover asks again"] = function()
+  write("part.sql", { "SELECT 1 AS x" })
+  local path = write("board.yaml", {
+    "database: { url: 'sqlite:///:memory:' }",
+    "query:",
+    "  sql: \"{% set name = 'part' %}{% include name ~ '.sql' %}\"",
+  })
+  eq(started(path), true) -- no Lua anywhere: runs without asking
+  eq(asked, 0)
+  -- The computed include now has Lua: it is checked when it is loaded.
+  write("part.sql", { "SELECT {% lua %}return 1{% endlua %} AS x" })
+  sched.start(path, { no_show = true })
+  local d = sched.get(sched.normalize(path))
+  vim.wait(3000, function()
+    return d.panels[1].error ~= nil or d.panels[1].rs ~= nil
+  end, 10)
+  eq(asked, 1)
+  eq(d.panels[1].error ~= nil and sched.format_error(d.panels[1].error):find("not trusted") ~= nil, true)
+end
+
 T["one question per config, listing every file; allowed until any of them changes"] = function()
   write("helpers.lua", { "return {}" })
   write("plain.sql", { "{% macro m() %}1{% endmacro %}" })

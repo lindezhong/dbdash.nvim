@@ -1,4 +1,4 @@
--- Files for {% import %} / {% from %} (design §6.2): paths are relative to the config
+-- Files for {% import %}, {% from %}, {% include %} and {% extends %} (design §6.2): paths are relative to the config
 -- file's directory. Templates are compiled and cached by path and modification time;
 -- *.lua files are Lua modules, returned as { lua = true } and run by the runtime.
 local M = {}
@@ -7,6 +7,12 @@ local cache = {} ---@type table<string, { mtime: integer, tpl: table }>
 
 local function fail(msg, ...)
   error(require("dbdash.template.errors").new("value", msg:format(...)), 0)
+end
+
+local function not_found(name)
+  local e = require("dbdash.template.errors").new("value", "template not found: " .. name)
+  e.not_found = true -- {% include ... ignore missing %}
+  error(e, 0)
 end
 
 ---Loader function for env.load_template.
@@ -18,7 +24,7 @@ function M.files(base_dir)
     local path = vim.fs.normalize(absolute and name or vim.fs.joinpath(base_dir, name))
     local stat = vim.uv.fs_stat(path)
     if not stat then
-      fail("template not found: %s", path)
+      not_found(path)
     end
     local mtime = stat.mtime.sec * 1e9 + stat.mtime.nsec
     local c = cache[path]
@@ -40,7 +46,7 @@ function M.dict(files)
   return function(name)
     local src = files[name]
     if not src then
-      fail("template not found: %s", name)
+      not_found(name)
     end
     if name:match("%.lua$") then
       return { lua = true }, name, src

@@ -88,4 +88,15 @@ T["floats: 2.0 stays 2.0 in SQL; sql_limit takes an integral float"] = function(
   eq(render("{{ true | sql_limit }}"):find("Invalid LIMIT") ~= nil, true)
 end
 
+T["autoescape with blocks: template text stays SQL, values are literals"] = function()
+  local src = table.concat({
+    "{% set cond %}name = {{ n }}{% endset %}",
+    "{% macro col(c) %}{{ c | sql_id }}{% endmacro %}",
+    "SELECT {{ col('t.a') }} FROM t WHERE {{ cond }}",
+    " {% filter upper %}and x = {{ name }}{% endfilter %}",
+    " {% autoescape false %}{{ name }}{% endautoescape %} {{ name }}",
+  })
+  eq(render(src, ctx, "postgres", true), [[SELECT "t"."a" FROM t WHERE name = 10 AND X = 'IT''S' it's 'it''s']])
+end
+
 return T

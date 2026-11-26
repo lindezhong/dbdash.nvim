@@ -1,26 +1,16 @@
 -- Template parser: token stream -> AST, following Jinja's grammar and operator precedence.
 --
--- Statements: If{branches, else_}, For{targets, iter, body, else_}, Set{targets, expr},
---             Data{v}, Output{expr}
+-- Statements: If{branches, else_}, For{targets, iter, test, recursive, body, else_},
+--             Set{targets, expr}, SetBlock{targets, filters, body}, SetArg, With{assigns,
+--             body}, Do{expr}, Break, Continue, FilterBlock{filters, body}, Macro,
+--             CallBlock{params, call, body}, Import, FromImport, Include{target,
+--             ignore_missing, with_context}, Extends{target}, Block{name, scoped,
+--             required, body}, Autoescape{expr, body}, Lua, Data{v}, Output{expr}
 -- Expressions: Const, Name, List, Dict, Getattr, Getitem, Call, Filter, Test, Neg, Pos,
 --              Bin{op}, Compare{first, ops}, And, Or, Not, Cond
 local errors = require("dbdash.template.errors")
 
 local M = {}
-
-local UNSUPPORTED = {
-  extends = true,
-  block = true,
-  include = true,
-  call = true,
-  filter = true,
-  with = true,
-  autoescape = true,
-  ["break"] = true,
-  continue = true,
-  ["do"] = true,
-  endset = true,
-}
 
 local CMP = { ["=="] = true, ["!="] = true, ["<"] = true, ["<="] = true, [">"] = true, [">="] = true }
 
@@ -155,10 +145,144 @@ function P:statement()
     return self:parse_import(tok)
   elseif n == "from" then
     return self:parse_from(tok)
-  elseif UNSUPPORTED[n] then
-    self:fail(tok, "'%s' is not supported in dbdash templates", n)
+  elseif n == "with" then
+    return self:parse_with(tok)
+  elseif n == "do" then
+    local e = self:tuple_expression()
+    self:expect_block_end()
+    return { k = "Do", expr = e, line = tok.line }
+  elseif n == "break" or n == "continue" then
+    self:expect_block_end()
+    return { k = n == "break" and "Break" or "Continue", line = tok.line, col = tok.col }
+  elseif n == "filter" then
+    local filters = self:filter_chain()
+    self:expect_block_end()
+    local body = self:end_block("endfilter")
+    return { k = "FilterBlock", filters = filters, body = body, line = tok.line }
+  elseif n == "call" then
+    return self:parse_call_block(tok)
+  elseif n == "include" then
+    return self:parse_include(tok)
+  elseif n == "extends" then
+    local target = self:expression()
+    self:expect_block_end()
+    return { k = "Extends", target = target, line = tok.line }
+  elseif n == "block" then
+    return self:parse_block(tok)
+  elseif n == "autoescape" then
+    local e = self:expression()
+    self:expect_block_end()
+    local body = self:end_block("endautoescape")
+    return { k = "Autoescape", expr = e, body = body, line = tok.line }
   end
   self:fail(tok, "Encountered unknown tag '%s'.", n)
+end
+
+---The body up to {% <tag> %}, consuming the end tag.
+function P:end_block(tag)
+  local body = self:subparse({ [tag] = true }, "'" .. tag .. "'")
+  self:next()
+  self:expect_block_end()
+  return body
+end
+
+---Filters of {% filter %} and {% set x | f %}: name(args) | name ...
+function P:filter_chain()
+  local out = {}
+  repeat
+    local t = self:next()
+    if t.t ~= "name" then
+      self:fail(t, "expected filter name, got '%s'", describe(t))
+    end
+    local f = { name = t.v, args = {}, kwargs = {}, line = t.line, col = t.col }
+    if self:is_op("(") then
+      self:next()
+      f.args, f.kwargs, f.dyn_args, f.dyn_kwargs = self:p_args()
+    end
+    out[#out + 1] = f
+  until not self:skip_op("|")
+  return out
+end
+
+---{% with a = 1, b = 2 %} ... {% endwith %}
+function P:parse_with(tok)
+  local assigns = {}
+  while self:peek().t ~= "block_end" do
+    if #assigns > 0 then
+      self:expect_op(",")
+    end
+    local targets = self:targets()
+    self:expect_op("=")
+    assigns[#assigns + 1] = { targets = targets, expr = self:expression() }
+  end
+  self:expect_block_end()
+  local body = self:end_block("endwith")
+  return { k = "With", assigns = assigns, body = body, line = tok.line }
+end
+
+---{% call(params) macro(args) %} ... {% endcall %}
+function P:parse_call_block(tok)
+  local params = {}
+  if self:is_op("(") then
+    self:next()
+    params = self:macro_params()
+  end
+  local call = self:expression()
+  if call.k ~= "Call" then
+    self:fail(tok, "expected call")
+  end
+  self:expect_block_end()
+  local body = self:end_block("endcall")
+  return { k = "CallBlock", params = params, call = call, body = body, line = tok.line }
+end
+
+---{% include 'file' [ignore missing] [with context | without context] %}
+function P:parse_include(tok)
+  local target = self:expression()
+  local ignore = false
+  if self:is_name("ignore") and self:is_name("missing", 1) then
+    self:next()
+    self:next()
+    ignore = true
+  end
+  local with_context = self:context_clause(true)
+  self:expect_block_end()
+  return { k = "Include", target = target, ignore_missing = ignore, with_context = with_context, line = tok.line }
+end
+
+---{% block name [scoped] [required] %} ... {% endblock [name] %}
+function P:parse_block(tok)
+  local nt = self:next()
+  if nt.t ~= "name" then
+    self:fail(nt, "expected block name")
+  end
+  local scoped, required = false, false
+  if self:is_name("scoped") then
+    self:next()
+    scoped = true
+  end
+  if self:is_name("required") then
+    self:next()
+    required = true
+  end
+  self:expect_block_end()
+  local body = self:subparse({ endblock = true }, "'endblock'")
+  self:next()
+  if self:peek().t == "name" then
+    local en = self:next()
+    if en.v ~= nt.v then
+      self:fail(en, "mismatching name of block: '%s' closed with '%s'", nt.v, en.v)
+    end
+  end
+  self:expect_block_end()
+  if required then
+    for _, st in ipairs(body) do
+      if not (st.k == "Data" and st.v:match("^%s*$")) then
+        self:fail(tok, "Required blocks can only contain comments or whitespace")
+      end
+    end
+  end
+  return { k = "Block", name = nt.v, scoped = scoped, required = required, body = body, line = tok.line, col = nt.col }
 end
 
 function P:parse_if(tok)
@@ -216,10 +340,14 @@ function P:parse_for(tok)
   end
   self:next()
   local iter = self:tuple_expression(false)
+  local test, recursive
   if self:is_name("if") then
-    self:fail(self:peek(), "loop filtering ('for ... if ...') is not supported")
-  elseif self:is_name("recursive") then
-    self:fail(self:peek(), "recursive loops are not supported")
+    self:next()
+    test = self:expression()
+  end
+  if self:is_name("recursive") then
+    self:next()
+    recursive = true
   end
   self:expect_block_end()
   local body, e = self:subparse({ endfor = true, ["else"] = true }, "'endfor' or 'else'")
@@ -231,7 +359,7 @@ function P:parse_for(tok)
     self:next()
   end
   self:expect_block_end()
-  return { k = "For", targets = targets, iter = iter, body = body, else_ = else_, line = tok.line }
+  return { k = "For", targets = targets, iter = iter, test = test, recursive = recursive, body = body, else_ = else_, line = tok.line }
 end
 
 function P:parse_set(tok)
@@ -249,20 +377,22 @@ function P:parse_set(tok)
   end
   local targets = self:targets()
   if not self:skip_op("=") then
-    self:fail(tok, "block set ({% set x %}...{% endset %}) is not supported")
+    -- {% set x %}...{% endset %} (optionally {% set x | filter %}): the body's output.
+    local filters = {}
+    if self:skip_op("|") then
+      filters = self:filter_chain()
+    end
+    self:expect_block_end()
+    local body = self:end_block("endset")
+    return { k = "SetBlock", targets = targets, filters = filters, body = body, line = tok.line }
   end
   local e = self:tuple_expression()
   self:expect_block_end()
   return { k = "Set", targets = targets, expr = e, line = tok.line }
 end
 
----{% macro name(a, b=default) %}...{% endmacro %}
-function P:parse_macro(tok)
-  local nt = self:next()
-  if nt.t ~= "name" then
-    self:fail(nt, "expected macro name")
-  end
-  self:expect_op("(")
+---Parameters "a, b=default)" after "(", consuming the ")".
+function P:macro_params()
   local params, seen_default = {}, false
   while not self:is_op(")") do
     local pt = self:next()
@@ -282,6 +412,17 @@ function P:parse_macro(tok)
     end
   end
   self:expect_op(")")
+  return params
+end
+
+---{% macro name(a, b=default) %}...{% endmacro %}
+function P:parse_macro(tok)
+  local nt = self:next()
+  if nt.t ~= "name" then
+    self:fail(nt, "expected macro name")
+  end
+  self:expect_op("(")
+  local params = self:macro_params()
   self:expect_block_end()
   local body = self:subparse({ endmacro = true }, "'endmacro'")
   self:next()
@@ -290,7 +431,7 @@ function P:parse_macro(tok)
 end
 
 ---"with context" / "without context" after an import or include: true for with.
-local function context_clause(self, default)
+function P:context_clause(default)
   if (self:is_name("with") or self:is_name("without")) and self:is_name("context", 1) then
     local with = self:next().v == "with"
     self:next()
@@ -310,7 +451,7 @@ function P:parse_import(tok)
   if alias.t ~= "name" then
     self:fail(alias, "expected a name after 'as'")
   end
-  local with_context = context_clause(self, false)
+  local with_context = self:context_clause(false)
   self:expect_block_end()
   return { k = "Import", target = target, alias = alias.v, with_context = with_context, line = tok.line }
 end
@@ -342,7 +483,7 @@ function P:parse_from(tok)
     end
     names[#names + 1] = { name = nt.v, alias = alias }
   until not self:skip_op(",")
-  local with_context = context_clause(self, false)
+  local with_context = self:context_clause(false)
   self:expect_block_end()
   return { k = "FromImport", target = target, names = names, with_context = with_context, line = tok.line }
 end
@@ -590,18 +731,24 @@ end
 ---Parse "(args)" after a callee. Returns a Call node.
 function P:p_call(fn)
   local t = self:next() -- "("
-  local args, kwargs = self:p_args()
-  return node("Call", t, { fn = fn, args = args, kwargs = kwargs })
+  local args, kwargs, dyn_args, dyn_kwargs = self:p_args()
+  return node("Call", t, { fn = fn, args = args, kwargs = kwargs, dyn_args = dyn_args, dyn_kwargs = dyn_kwargs })
 end
 
----Parse call arguments after "(" up to and including ")".
+---Parse call arguments after "(" up to and including ")": positional, keyword, then
+---*list and **mapping.
 function P:p_args()
-  local args, kwargs = {}, {}
+  local args, kwargs, dyn_args, dyn_kwargs = {}, {}, nil, nil
   while not self:is_op(")") do
-    if self:is_op("*") or self:is_op("**") then
-      self:fail(self:peek(), "*args and **kwargs are not supported")
-    end
-    if self:peek().t == "name" and self:is_op("=", 1) then
+    if self:is_op("*") then
+      self:next()
+      dyn_args = self:expression()
+    elseif self:is_op("**") then
+      self:next()
+      dyn_kwargs = self:expression()
+    elseif dyn_args or dyn_kwargs then
+      self:fail(self:peek(), "invalid syntax for function call expression")
+    elseif self:peek().t == "name" and self:is_op("=", 1) then
       local name = self:next().v
       self:next()
       kwargs[#kwargs + 1] = { name, self:expression() }
@@ -616,7 +763,7 @@ function P:p_args()
     end
   end
   self:expect_op(")")
-  return args, kwargs
+  return args, kwargs, dyn_args, dyn_kwargs
 end
 
 local TEST_ARG_START = { name = true, string = true, int = true, float = true }
@@ -629,12 +776,12 @@ function P:p_filter_expr(n)
       if t.t ~= "name" then
         self:fail(t, "expected filter name, got '%s'", describe(t))
       end
-      local args, kwargs = {}, {}
+      local args, kwargs, dyn_args, dyn_kwargs = {}, {}, nil, nil
       if self:is_op("(") then
         self:next()
-        args, kwargs = self:p_args()
+        args, kwargs, dyn_args, dyn_kwargs = self:p_args()
       end
-      n = node("Filter", t, { node = n, name = t.v, args = args, kwargs = kwargs })
+      n = node("Filter", t, { node = n, name = t.v, args = args, kwargs = kwargs, dyn_args = dyn_args, dyn_kwargs = dyn_kwargs })
     elseif self:is_name("is") then
       self:next()
       local neg = false
@@ -646,18 +793,18 @@ function P:p_filter_expr(n)
       if t.t ~= "name" then
         self:fail(t, "expected test name, got '%s'", describe(t))
       end
-      local args = {}
+      local args, kwargs = {}, {}
       local nx = self:peek()
       if self:is_op("(") then
         self:next()
-        args = self:p_args()
+        args, kwargs = self:p_args()
       elseif
         TEST_ARG_START[nx.t]
         and not (nx.t == "name" and (nx.v == "else" or nx.v == "or" or nx.v == "and" or nx.v == "if"))
       then
         args = { self:p_primary() }
       end
-      n = node("Test", t, { node = n, name = t.v, args = args, neg = neg })
+      n = node("Test", t, { node = n, name = t.v, args = args, kwargs = kwargs, neg = neg })
     elseif self:is_op("(") then
       n = self:p_call(n)
     else

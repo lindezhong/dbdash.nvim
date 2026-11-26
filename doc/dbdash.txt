@@ -787,19 +787,34 @@ Statements:
 
   {% if a %} ... {% elif b %} ... {% else %} ... {% endif %}
   {% for x in xs %} ... {% else %} (empty) ... {% endfor %}
-  {% for k, v in m.items() %} ... {% endfor %}
-  {% set name = expr %}       {% set a, b = pair %}
+  {% for k, v in m.items() if v %} ... {% endfor %}   (only items with v)
+  {% for x in tree recursive %} ... {{ loop(x.children) }} ... {% endfor %}
+  {% break %}  {% continue %}  {% do expr %}
+  {% set name = expr %}       {% set a, b = 1, 2 %}
+  {% set name %} ... {% endset %}        the output; {% set n | upper %} too
   {% set args.name = expr %}  assign an argument (|dbdash-assign-args|)
+  {% with a = 1, b = 2 %} ... {% endwith %}
+  {% filter upper | replace('A', 'B') %} ... {% endfilter %}
   {% raw %} {{ not rendered }} {% endraw %}
   {% macro name(a, b=default) %} ... {% endmacro %}
+  {% call(x) name(args) %} ... {% endcall %}   the macro's caller(x)
   {% import 'file.sql' as lib %}         then {{ lib.name(...) }}
   {% from 'file.sql' import name, other as alias %}
+  {% include 'file.sql' %}               |dbdash-template-imports|
+  {% extends 'base.sql' %}  {% block name %} ... {% endblock %}
+  {% autoescape false %} ... {% endautoescape %}
   {% import 'file.lua' as h %}           a Lua module, |dbdash-template-lua|
   {% lua %} ... {% endlua %}             Lua code, |dbdash-template-lua|
 
 Inside a loop: `loop.index` (from 1), `loop.index0`, `loop.revindex`,
-`loop.revindex0`, `loop.first`, `loop.last`, `loop.length`. A `set` inside a
-loop does not change the variable outside it (Jinja scoping).
+`loop.revindex0`, `loop.first`, `loop.last`, `loop.length`, `loop.depth`,
+`loop.depth0`, `loop.previtem`, `loop.nextitem`, `loop.cycle(a, b, ...)`,
+`loop.changed(value)`. A `set` inside a loop, `with`, macro or block does not
+change the variable outside it (Jinja scoping).
+
+A macro whose body uses `varargs`, `kwargs` or `caller` takes extra positional
+arguments, extra keyword arguments or a call block. Calls take `*list` and
+`**mapping` as in Python: `{{ m(*xs, **opts) }}`.
 
 Expressions:
 
@@ -912,8 +927,19 @@ The SQL filters and autoescape follow the database type:
 
 Imports                                              *dbdash-template-imports*
 
-Paths in import and from-import are relative to the config file's
-directory. An imported file exports its macros and top-level variables
+Paths in import, from-import, include and extends are relative to the config
+file's directory.
+
+`{% include 'part.sql' %}` writes another template's output where it stands;
+it sees the template's variables (`without context`: only `args` and
+`meta`). `ignore missing` skips a file that does not exist, and a list of
+names uses the first that does. `{% extends 'base.sql' %}` renders base.sql
+with this template's blocks instead: a block replaces the block of the same
+name there, `{{ super() }}` writes the replaced block and `{{ self.name() }}`
+writes a block again; `scoped` blocks see the loop around them, `required`
+blocks must be given by the extending template.
+
+An imported file exports its macros and top-level variables
 (`set`; names starting with "_" stay private). It always sees `args` and
 `meta`; the importing template's own variables (`set`, `for`) only with
 `with context` (`{% import 'x.sql' as x with context %}`), otherwise pass
@@ -973,7 +999,7 @@ timeout. Errors name the file and line: the config's line for a block, the
 .lua file's for a module.
 
 A config with Lua in its templates or imports is trusted before it runs,
-together with the files it imports (|dbdash-lua|).
+together with the files it imports, includes or extends (|dbdash-lua|).
 
 Errors                                                *dbdash-template-errors*
 
@@ -984,10 +1010,8 @@ descriptions (a description's error is notified when it is shown), e.g.
 in an imported template or `.lua` module. A bare argument name says how to
 write it: "'days' is undefined; arguments are written args.days".
 
-Not supported (error with the reason): extends, block, include, call/caller,
-filter blocks, with, block set, namespace(), break/continue, loop filtering
-(`for ... if`), recursive loops, loop.cycle/previtem/nextitem, slices,
-custom filters/tests, *args/**kwargs.
+Not supported (error with the reason): namespace(), slices, custom
+filters/tests.
 
 Numbers are ints and floats as in Python: `{{ 4 / 2 }}` is `2.0`. Numbers
 from the database and from Lua are ints when they have no fraction.

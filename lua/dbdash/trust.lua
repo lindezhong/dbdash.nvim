@@ -31,13 +31,19 @@ function M.has_lua_block(text)
   return text:find("{%%%-?%s*lua%s*%-?%%}") ~= nil
 end
 
----Targets of {% import '...' %} / {% from '...' import %} written as string literals.
+---Targets of {% import '...' %}, {% from '...' import %}, {% include '...' %} (or a list
+---of names) and {% extends '...' %} written as string literals.
 function M.import_targets(text)
   local out = {}
-  for kw, rest in text:gmatch("{%%%-?%s*(%a+)%s+(.-)%-?%%}") do
-    if kw == "import" or kw == "from" then
+  for kw, rest in text:gmatch("{%%[-+]?%s*(%a+)%s+(.-)[-+]?%%}") do
+    if kw == "import" or kw == "from" or kw == "extends" then
       local target = rest:match("^'([^']*)'") or rest:match('^"([^"]*)"')
       if target then
+        out[#out + 1] = target
+      end
+    elseif kw == "include" then
+      local list = rest:match("^%[(.-)%]") or rest:match("^%((.-)%)")
+      for _, target in (list or rest:match("^(['\"][^'\"]*['\"])") or ""):gmatch("(['\"])(.-)%1") do
         out[#out + 1] = target
       end
     end

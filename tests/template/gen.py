@@ -11,11 +11,16 @@ import pathlib
 
 import jinja2
 
+# The loopcontrols ({% break %}, {% continue %}) and do ({% do %}) extensions are on: the
+# Lua engine has them built in.
+EXTENSIONS = ["jinja2.ext.loopcontrols", "jinja2.ext.do"]
+
 env = jinja2.Environment(
     trim_blocks=True,
     lstrip_blocks=True,
     undefined=jinja2.StrictUndefined,
     autoescape=False,
+    extensions=EXTENSIONS,
 )
 
 CTX = {
@@ -34,6 +39,7 @@ CTX = {
     "flag": True,
     "off": False,
     "pi": 3.14159,
+    "tree": [{"n": "a", "c": [{"n": "b", "c": []}, {"n": "c", "c": [{"n": "d", "c": []}]}]}],
 }
 
 # (name, template, ctx_override or None, lua_expected or None)
@@ -256,6 +262,68 @@ MACRO_CASES = [
     ("import with context sees loop variables", "{% for y in [7] %}{% import 'm.sql' as m with context %}{{ m.f() }}{% endfor %}", {"m.sql": "{% macro f() %}{{ y }}{% endmacro %}"}, None),
     ("import without context", "{% set y = 1 %}{% import 'm.sql' as m without context %}{{ m.f() }}", {"m.sql": "{% macro f() %}{{ y is defined }}{{ x is defined }}{% endmacro %}"}, None),
     ("from import without context", "{% from 'm.sql' import f without context %}{{ f() }}", {"m.sql": "{% macro f() %}{{ x is defined }}{% endmacro %}"}, None),
+    # --- block set, with, do -------------------------------------------------------------
+    ("block set", "{% set q %}\nSELECT {{ x }}\n{% endset %}[{{ q }}] {% set w | upper %}abc{% endset %}{{ w }} {% set v | replace('a', 'b') | upper %}aa{% endset %}{{ v }}", {}, None),
+    ("block set has its own scope", "{% set q %}{% set inner = 1 %}in{% endset %}{{ q }} {{ inner is defined }}", {}, None),
+    ("block set in a loop", "{% for i in [1, 2] %}{% set q %}v{{ i }}{% endset %}{{ q }}{% endfor %}", {}, None),
+    ("with", "{% set a = 'outer' %}{% with a = 1, b = a %}{{ a }}{{ b }}{% set c = 3 %}{{ c }}{% endwith %}{{ a }} {{ c is defined }}", {}, None),
+    ("with without values", "{% with %}{% set q = 1 %}{{ q }}{% endwith %}{{ q is defined }}", {}, None),
+    ("do", "{% set l = [] %}{% do l.append(1) %}{% do l.extend([2, 3]) %}{{ l }}", {}, None),
+    # --- loops ---------------------------------------------------------------------------
+    ("loop filter", "{% for x in range(6) if x is not none and x % 2 == 0 %}{{ x }}/{{ loop.index }}/{{ loop.length }}/{{ loop.last }};{% else %}none{% endfor %}", {}, None),
+    ("loop filter else", "{% for x in range(3) if x > 5 %}{{ x }}{% else %}none{% endfor %}", {}, None),
+    ("loop filter with two targets", "{% for k, v in d.items() if v is number %}{{ k }}{% endfor %}", {}, None),
+    ("loop helpers", "{% for x in [1, 1, 2] %}{{ loop.cycle('a', 'b') }}{{ loop.previtem is defined }}{{ loop.nextitem|default('-') }}{{ loop.changed(x) }}{{ loop.depth }}{{ loop.depth0 }};{% endfor %}", {}, None),
+    ("previtem undefined", "{% for x in [1] %}{{ loop.previtem }}{% endfor %}", {}, None),
+    ("recursive loop", "{% for x in tree recursive %}<{{ x.n }}{{ loop.depth }}{% if x.c %}[{{ loop(x.c) }}]{% endif %}>{% endfor %}", {}, None),
+    ("recursive loop nested loop variable", "{% for x in tree recursive %}{{ loop.index }}{{ loop(x.c) }}{% endfor %}", {}, None),
+    ("calling a non recursive loop", "{% for x in [1] %}{{ loop([]) }}{% endfor %}", {}, None),
+    ("break and continue", "{% for x in range(6) %}{% if x == 1 %}{% continue %}{% endif %}{% if x == 4 %}{% break %}{% endif %}{{ x }}{% endfor %}", {}, None),
+    ("break in nested loops", "{% for a in range(3) %}{% for b in range(3) %}{% if b == 1 %}{% break %}{% endif %}{{ a }}{{ b }} {% endfor %}{% endfor %}", {}, None),
+    ("continue keeps the loop variables", "{% for x in range(4) %}{% if loop.first %}{% continue %}{% endif %}{{ loop.index }}{% endfor %}", {}, None),
+    # --- filter blocks, call blocks, macros ------------------------------------------------
+    ("filter block", "{% filter upper %}a{{ x }}b{% endfilter %} {% filter upper|replace('A', 'x') %}abc{% endfilter %} {% filter replace('a', 'b') %}aa{% endfilter %}", {}, None),
+    ("call block", "{% macro wrap(tag) %}<{{ tag }}>{{ caller() }}</{{ tag }}>{% endmacro %}{% call wrap('b') %}x={{ x }}{% endcall %}", {}, None),
+    ("call block with arguments", "{% macro each(xs) %}{% for v in xs %}{{ caller(v, loop.index) }}{% endfor %}{% endmacro %}{% call(v, i) each(['a', 'b']) %}{{ i }}:{{ v }} {% endcall %}", {}, None),
+    ("caller undefined without call", "{% macro m() %}{{ caller is defined }}{% endmacro %}{{ m() }}", {}, None),
+    ("call block into macro without caller", "{% macro m() %}x{% endmacro %}{% call m() %}y{% endcall %}", {}, None),
+    ("macro varargs and kwargs", "{% macro m(a, b=1) %}{{ a }}{{ b }}{{ varargs }}{{ kwargs }}{% endmacro %}{{ m(1, 2, 3, c=4) }} {{ m(0) }}", {}, None),
+    ("macro attributes", "{% macro m(a, b=1) %}{{ varargs }}{% endmacro %}{% macro n() %}{{ caller() }}{{ kwargs }}{% endmacro %}{{ m.name }} {{ m.arguments }} {{ m.catch_varargs }} {{ m.catch_kwargs }} {{ m.caller }} {{ n.caller }} {{ n.catch_kwargs }}", {}, None),
+    ("macro argument twice", "{% macro m(a) %}{{ a }}{% endmacro %}{{ m(1, a=2) }}", {}, None),
+    ("macro defaults see earlier arguments", "{% macro m(a, b=a * 2) %}{{ a }}{{ b }}{% endmacro %}{{ m(3) }}", {}, None),
+    ("star arguments", "{% macro m(a, b, c=0) %}{{ a }}{{ b }}{{ c }}{% endmacro %}{{ m(*[1, 2]) }} {{ m(**{'a': 3, 'b': 4}) }} {{ m(1, *[2], **{'c': 5}) }} {{ '{}-{}'.format(*items) }} {{ 'a b'.split(*[' ']) }}", {}, None),
+    ("star arguments in filters", "{{ items|join(*['-']) }} {{ 'abc'|replace(**{'old': 'b', 'new': 'x'}) }}", {}, None),
+    # --- include --------------------------------------------------------------------------
+    ("include", "{% set y = 'Y' %}A{% include 'inc.sql' %}B", {"inc.sql": "[{{ y }}|{{ x }}]"}, None),
+    ("include sees loop variables", "{% for loc in [1, 2] %}{% include 'inc.sql' %}{% endfor %}", {"inc.sql": "{{ loc }}"}, None),
+    ("include without context", "{% set y = 'Y' %}{% include 'inc.sql' without context %}", {"inc.sql": "{{ y is defined }}{{ x is defined }}"}, None),
+    ("include with context", "{% set y = 'Y' %}{% include 'inc.sql' with context %}", {"inc.sql": "{{ y }}"}, None),
+    ("include ignore missing", "a{% include 'nope.sql' ignore missing %}b", {}, None),
+    ("include a list", "{% include ['nope.sql', 'inc.sql'] %}", {"inc.sql": "second"}, None),
+    ("include missing", "{% include 'nope.sql' %}", {}, None),
+    ("include sets stay inside", "{% include 'inc.sql' %}{{ z is defined }}", {"inc.sql": "{% set z = 1 %}"}, None),
+    ("include an expression", "{% set name = 'inc' %}{% include name ~ '.sql' %}", {"inc.sql": "ok"}, None),
+    ("include error line", "{% include 'inc.sql' %}", {"inc.sql": "a\n{{ missing }}"}, None),
+    # --- extends and blocks -------------------------------------------------------------------
+    ("extends", "before{% extends 'base.sql' %}after{% block a %}child-a {{ super() }}{% endblock %}", {"base.sql": "B<{% block a %}base-a{% endblock %}>{% block b %}base-b{% endblock %}"}, None),
+    ("extends sees top-level variables", "{% extends 'base.sql' %}{% set top = 1 %}{% block a %}{{ top }}{% endblock %}", {"base.sql": "<{% block a %}{% endblock %}>{{ top is defined }}{{ x }}"}, None),
+    ("extends self", "{% extends 'base.sql' %}{% block b %}[{{ self.a() }}]{% endblock %}", {"base.sql": "{% block a %}A{% endblock %}{% block b %}B{% endblock %}"}, None),
+    ("three levels and super", "{% extends 'mid.sql' %}{% block a %}3{{ super() }}{% endblock %}", {"mid.sql": "{% extends 'base.sql' %}{% block a %}2{{ super() }}{% endblock %}", "base.sql": "[{% block a %}1{% endblock %}]"}, None),
+    ("super without parent", "{% block a %}{{ super() }}{% endblock %}", {}, None),
+    ("required block missing", "{% extends 'req.sql' %}", {"req.sql": "{% block r required %}{% endblock %}"}, None),
+    ("required block given", "{% extends 'req.sql' %}{% block r %}R{% endblock %}", {"req.sql": "<{% block r required %}{% endblock %}>"}, None),
+    ("required block with content", "{% block r required %}x{% endblock %}", {}, None),
+    ("scoped block", "{% for item in [1, 2] %}{% block s scoped %}{{ item }}{% endblock %}{% endfor %}", {}, None),
+    ("unscoped block", "{% for item in [1, 2] %}{% block s %}{{ item is defined }}{% endblock %}{% endfor %}", {}, None),
+    ("block sees top-level set", "{% set t = 5 %}{% block z %}{{ t }}{% endblock %}", {}, None),
+    ("nested blocks", "{% extends 'base.sql' %}{% block inner %}I2{% endblock %}", {"base.sql": "{% block outer %}O({% block inner %}I1{% endblock %}){% endblock %}"}, None),
+    ("block defined twice", "{% block a %}{% endblock %}{% block a %}{% endblock %}", {}, None),
+    ("endblock with name", "{% block a %}x{% endblock a %}", {}, None),
+    ("extends twice", "{% extends 'base.sql' %}{% extends 'base.sql' %}", {"base.sql": "x"}, None),
+    ("extends an expression", "{% extends 'ba' ~ 'se.sql' %}{% block a %}c{% endblock %}", {"base.sql": "[{% block a %}{% endblock %}]"}, None),
+    ("macro in extending template", "{% extends 'base.sql' %}{% macro m() %}M{% endmacro %}{% block a %}{{ m() }}{% endblock %}", {"base.sql": "[{% block a %}{% endblock %}]"}, None),
+    # --- autoescape --------------------------------------------------------------------------
+    ("autoescape tag", "{% autoescape true %}{{ '<a>' }}{{ '<b>'|safe }}{% endautoescape %}{{ '<c>' }}", {}, None),
 ]
 
 
@@ -275,6 +343,8 @@ def error_type(e):
         return "syntax"
     if isinstance(e, jinja2.UndefinedError):
         return "undefined"
+    if isinstance(e, jinja2.TemplateRuntimeError):
+        return "value"
     if isinstance(e, (TypeError, ZeroDivisionError, ValueError, LookupError, AttributeError)):
         return "type" if isinstance(e, TypeError) else "value"
     return "error"
@@ -299,6 +369,7 @@ def main():
             undefined=jinja2.StrictUndefined,
             autoescape=False,
             loader=jinja2.DictLoader(files),
+            extensions=EXTENSIONS,
         )
         case = {"name": name, "template": tpl, "ctx": json.dumps(CTX, ensure_ascii=False), "files": files}
         try:

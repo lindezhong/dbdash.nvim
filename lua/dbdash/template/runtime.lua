@@ -60,7 +60,17 @@ Loop.__index = Loop
 
 -- Macro objects (defined with the other value types so typename/str can see them).
 local Macro = {}
-function R.loop(i, n)
+
+---The state of one loop: its items, depth (recursive loops) and loop.changed() memory.
+---@param rec function? the recursive loop's function (loop(items) renders it again)
+function R.loop_state(items, depth, rec)
+  return { items = items, depth = depth, rec = rec }
+end
+
+---The `loop` variable of iteration `i`.
+function R.loop(state, i)
+  local items = state.items
+  local n = #items
   return setmetatable({
     index = i,
     index0 = i - 1,
@@ -69,7 +79,43 @@ function R.loop(i, n)
     first = i == 1,
     last = i == n,
     length = n,
+    depth = state.depth,
+    depth0 = state.depth - 1,
+    previtem = i > 1 and items[i - 1] or R.undef("there is no previous item"),
+    nextitem = i < n and items[i + 1] or R.undef("there is no next item"),
+    cycle = function(args)
+      if #args == 0 then
+        raise("type", "no items for cycling given")
+      end
+      return args[(i - 1) % #args + 1]
+    end,
+    changed = function(args)
+      local changed = state.last == nil or not R.eq(args, state.last)
+      state.last = args
+      return changed
+    end,
+    _state = state,
   }, Loop)
+end
+
+---{% for x in xs if test %}: the items for which `keep(item)` is true.
+function R.loop_filter(items, keep)
+  local out = {}
+  for _, item in ipairs(items) do
+    if keep(item) then
+      out[#out + 1] = item
+    end
+  end
+  return out
+end
+
+-- loop(items) in a recursive loop: the loop body for `items`, one level deeper.
+Loop.__call = function(self, args, _, env)
+  local state = self._state
+  if not state.rec then
+    raise("type", "Tried to call non recursive loop. Maybe you forgot the 'recursive' modifier.")
+  end
+  return R.markup(env, state.rec(args[1], state.depth + 1))
 end
 
 -- Floats with an integral value ------------------------------------------------------------
@@ -375,15 +421,33 @@ function R.str(v)
   return tostring(v)
 end
 
----Value written for {{ expr }}.
+---HTML escaping (Jinja's escape / autoescape outside SQL).
+function R.html_escape(s)
+  return (s:gsub("[&<>\"']", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ['"'] = "&#34;", ["'"] = "&#39;" }))
+end
+
+---Value written for {{ expr }}: with autoescape, the dialect's literal in SQL (env.escape),
+---HTML escaping elsewhere.
 function R.out(env, v)
   check(v)
   if getmetatable(v) == Safe then
     return v.s
-  elseif env.autoescape and env.escape then
-    return env.escape(v)
+  elseif env.autoescape then
+    if env.escape then
+      return env.escape(v)
+    end
+    return R.html_escape(R.str(v))
   end
   return R.str(v)
+end
+
+---Template output as a value: marked safe with autoescape (Jinja's Markup), so it is not
+---escaped again.
+function R.markup(env, s)
+  if env.autoescape then
+    return R.safe(s)
+  end
+  return s
 end
 
 -- Lookup and access ------------------------------------------------------------------------
@@ -501,13 +565,22 @@ end
 ---obj.name
 function R.getattr(obj, name)
   check(obj)
+  local mt = getmetatable(obj)
+  if mt == Macro then
+    local v = obj[name]
+    if v ~= nil and name ~= "fn" then
+      return v
+    end
+  elseif R.getattr_hook[mt or false] then
+    local v = R.getattr_hook[mt](obj, name)
+    if v ~= nil then
+      return v
+    end
+  end
   if getmetatable(obj) == Loop then
     local v = obj[name]
     if v ~= nil then
       return v
-    end
-    if name == "cycle" or name == "previtem" or name == "nextitem" or name == "depth" then
-      raise("value", "loop.%s is not supported", name)
     end
   elseif map.is_map(obj) and obj[name] ~= nil then
     return obj[name]
@@ -515,7 +588,10 @@ function R.getattr(obj, name)
   return R.undef(("'%s object' has no attribute '%s'"):format(typename(obj), name))
 end
 
--- Methods (whitelisted) -------------------------------------------------------------------
+---Attributes of other value types by metatable (namespace, cycler, self, ...).
+R.getattr_hook = {}
+
+-- Methods ------------------------------------------------------------------------------------
 
 ---Python str.upper(): like toupper, but "ß" becomes "SS".
 function R.upper(s)
@@ -556,10 +632,40 @@ function R.call_attr(env, obj, name, args, kwargs)
   raise("undefined", "'%s object' has no attribute '%s'", typename(obj), name)
 end
 
+---*list in a call: extra positional arguments.
+function R.dyn_args(args, extra)
+  check(extra)
+  local out = vim.list_extend({}, args)
+  for _, v in ipairs(R.iter(extra)) do
+    out[#out + 1] = v
+  end
+  return out
+end
+
+---**mapping in a call: extra keyword arguments.
+function R.dyn_kwargs(kwargs, extra)
+  check(extra)
+  if not map.is_map(extra) then
+    raise("type", "argument after ** must be a mapping, not %s", typename(extra))
+  end
+  local out = {}
+  for k, v in pairs(kwargs) do
+    out[k] = v
+  end
+  for k, v in map.pairs(extra) do
+    if out[k] ~= nil then
+      raise("type", "got multiple values for keyword argument '%s'", tostring(k))
+    end
+    out[k] = v
+  end
+  return out
+end
+
 ---Call a global function value: fn(args, kwargs, env).
 function R.call(env, fn, args, kwargs)
   check(fn)
-  if type(fn) ~= "function" and getmetatable(fn) ~= Macro then
+  local mt = getmetatable(fn)
+  if type(fn) ~= "function" and mt ~= Macro and mt ~= Loop and not (mt and mt.__call and R.callable_types[mt]) then
     raise("type", "'%s' object is not callable", typename(fn))
   end
   for i = 1, #args do
@@ -567,6 +673,9 @@ function R.call(env, fn, args, kwargs)
   end
   return fn(args, kwargs, env)
 end
+
+---Metatables of other callable values (joiner, cycler methods, ...).
+R.callable_types = {}
 
 -- Lua in templates ------------------------------------------------------------------------
 
@@ -761,36 +870,74 @@ end
 
 Macro.__index = Macro
 Macro.__call = function(self, args, kwargs, env)
-  local s = self.fn(args, kwargs, env)
-  if env.autoescape then
-    return R.safe(s) -- like Jinja's Markup: not escaped again
-  end
-  return s
+  return R.markup(env, self.fn(args, kwargs, env)) -- like Jinja's Markup: not escaped again
 end
 
----Wrap a compiled macro body as a callable value.
-function R.macro(name, fn)
-  return setmetatable({ name = name, fn = fn }, Macro)
+---Wrap a compiled macro body as a callable value. Its attributes are those of Jinja's
+---Macro: name, arguments, catch_varargs, catch_kwargs, caller.
+function R.macro(name, fn, params, flags)
+  flags = flags or {}
+  return setmetatable({
+    name = name,
+    fn = fn,
+    arguments = R.tuple(vim.list_extend({}, params or {})),
+    catch_varargs = flags.catch_varargs == true,
+    catch_kwargs = flags.catch_kwargs == true,
+    caller = flags.caller == true,
+  }, Macro)
 end
 
 function R.is_macro(v)
   return getmetatable(v) == Macro
 end
 
----Reject surplus positional or unknown keyword arguments.
-function R.check_args(name, args, kwargs, params)
+---Check a macro call's arguments against its parameters: surplus positional arguments
+---become varargs (or are an error), unknown keyword arguments kwargs (or an error), and a
+---caller is only taken by macros that use it. Returns { varargs, kwargs, caller }.
+function R.check_args(name, args, kwargs, params, flags)
+  local info = {}
   if #args > #params then
-    raise("type", "macro '%s' takes not more than %d argument(s)", name, #params)
-  end
-  for k in pairs(kwargs) do
-    local known = false
-    for _, p in ipairs(params) do
-      known = known or p == k
-    end
-    if not known then
-      raise("type", "macro '%s' takes no keyword argument '%s'", name, k)
+    if not flags.catch_varargs then
+      raise("type", "macro '%s' takes not more than %d argument(s)", name, #params)
     end
   end
+  if flags.catch_varargs then
+    local extra = {}
+    for i = #params + 1, #args do
+      extra[#extra + 1] = args[i]
+    end
+    info.varargs = R.tuple(extra)
+  end
+  local known = {}
+  for i, p in ipairs(params) do
+    known[p] = true
+    if args[i] ~= nil and kwargs[p] ~= nil then
+      raise("type", "macro '%s' got multiple values for argument '%s'", name, p)
+    end
+  end
+  local extra_kw = map.new()
+  local keys = vim.tbl_keys(kwargs)
+  table.sort(keys)
+  for _, k in ipairs(keys) do
+    if k == "caller" and flags.caller then
+      info.caller = kwargs[k]
+    elseif not known[k] then
+      if not flags.catch_kwargs then
+        if k == "caller" then
+          raise("type", "macro '%s' was invoked with two values for the special caller argument. This is most likely a bug.", name)
+        end
+        raise("type", "macro '%s' takes no keyword argument '%s'", name, k)
+      end
+      map.set(extra_kw, k, kwargs[k])
+    end
+  end
+  if flags.catch_kwargs then
+    info.kwargs = extra_kw
+  end
+  if flags.caller and info.caller == nil then
+    info.caller = R.undef("No caller defined")
+  end
+  return info
 end
 
 local module_names = setmetatable({}, { __mode = "k" })
@@ -862,6 +1009,146 @@ function R.import_name(mod, name)
     return R.undef(("the template '%s' does not export the requested name '%s'"):format(module_names[mod] or "?", name))
   end
   return v
+end
+
+-- Include, extends and blocks ----------------------------------------------------------------
+
+---Load template `name` (trust checked for dashboards). Returns nil for a missing file
+---when `missing_ok`.
+local function load(env, name, missing_ok)
+  if type(name) ~= "string" then
+    raise("type", "template name must be a string, not %s", typename(name))
+  end
+  if not env.load_template then
+    raise("value", "loading templates needs a template loader (base directory)")
+  end
+  local ok, tpl, path, text = pcall(env.load_template, name)
+  if not ok then
+    if missing_ok and type(tpl) == "table" and tpl.not_found then
+      return nil
+    end
+    error(tpl, 0)
+  end
+  if tpl.lua then
+    raise("value", "'%s' is a Lua module: import it, it cannot be included or extended", name)
+  end
+  if env.check_file then
+    env.check_file(path or name, text or "", "template")
+  end
+  return tpl, path or name
+end
+
+---Render a loaded template with `ctx` (and the block registry of a child), reporting
+---errors at its own file and line.
+local function run_template(env, tpl, path, ctx, reg)
+  env._depth = (env._depth or 0) + 1
+  if env._depth > 50 then
+    env._depth = 0
+    raise("value", "templates include or extend each other too deeply (a loop?)")
+  end
+  local L = { l = nil }
+  local outer_source = env.source
+  env.source = path -- Lua in the file reports its own name
+  local ok, out = pcall(tpl.fn, ctx, env, L, reg)
+  env.source = outer_source
+  env._depth = env._depth - 1
+  if not ok then
+    if errors.is(out) then
+      out.line = out.line or L.l
+      out.source = out.source or path
+    end
+    error(out, 0)
+  end
+  return out
+end
+
+---{% include target %}: the output of another template (the first that exists of a list),
+---with the caller's context and variables (`wctx`), or only the globals.
+function R.include(env, target, ignore_missing, wctx)
+  check(target)
+  local names = is_list(target) and target or { target }
+  for _, name in ipairs(names) do
+    local tpl, path = load(env, check(name), ignore_missing or #names > 1)
+    if tpl then
+      return run_template(env, tpl, path, wctx or env.context or {}, nil)
+    end
+  end
+  if ignore_missing then
+    return ""
+  end
+  raise("value", "template not found: %s", table.concat(vim.tbl_map(R.str, names), ", "))
+end
+
+---The block registry of a render: block name -> implementations, the most derived first.
+function R.blocks(reg)
+  return { chains = reg and reg.chains or {}, required = reg and reg.required or {} }
+end
+
+---Register a template's blocks (a child's run first, so its blocks come first).
+function R.add_blocks(reg, fns, required)
+  for name, fn in pairs(fns) do
+    reg.chains[name] = reg.chains[name] or {}
+    table.insert(reg.chains[name], { fn = fn, required = required[name] })
+  end
+end
+
+---{% extends target %}: remember the parent; the output so far (`cut` parts) is kept,
+---the rest of this template only defines blocks.
+function R.extends(env, reg, target, cut)
+  check(target)
+  if reg.parent then
+    raise("value", "extended multiple times")
+  end
+  reg.parent, reg.cut = target, cut
+end
+
+---Render implementation `i` of block `name`; super() renders the next one.
+local function call_block(env, reg, name, i, bctx)
+  local chain = reg.chains[name]
+  local impl = chain and chain[i]
+  if not impl then
+    raise("undefined", "there is no parent block called '%s'.", name)
+  end
+  if impl.required and i == 1 then
+    raise("value", "Required block '%s' not found", name)
+  end
+  local super = function()
+    return R.markup(env, call_block(env, reg, name, i + 1, bctx))
+  end
+  return impl.fn(bctx, super)
+end
+
+---{% block name %}: the most derived implementation of the block (none after extends:
+---the parent renders it).
+function R.render_block(env, reg, name, bctx)
+  if reg.parent then
+    return ""
+  end
+  return call_block(env, reg, name, 1, bctx)
+end
+
+---The output of a template that extends `reg.parent`: its text before the extends tag,
+---then the parent rendered with this template's blocks and top-level variables.
+function R.render_parent(env, reg, ctx, top, o)
+  local tpl, path = load(env, reg.parent, false)
+  local before = table.concat(o, "", 1, reg.cut)
+  return before .. run_template(env, tpl, path, R.layer(ctx, top), R.blocks(reg))
+end
+
+-- `self`: self.name() renders block `name`.
+local SelfRef = {}
+SelfRef.__index = SelfRef
+
+function R.self_ref(env, reg, ctx)
+  return setmetatable({ env = env, reg = reg, ctx = ctx }, SelfRef)
+end
+
+R.getattr_hook[SelfRef] = function(obj, name)
+  if obj.reg.chains[name] then
+    return function()
+      return R.markup(obj.env, call_block(obj.env, obj.reg, name, 1, obj.ctx))
+    end
+  end
 end
 
 -- Collections ----------------------------------------------------------------------------

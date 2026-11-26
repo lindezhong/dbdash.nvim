@@ -41,14 +41,8 @@ end
 
 T["unsupported constructs are explained"] = function()
   local cases = {
-    ["{% include 'x' %}"] = "'include' is not supported",
-    ["{% extends 'x' %}"] = "'extends' is not supported",
-    ["{% for i in [1] if i %}{% endfor %}"] = "loop filtering",
-    ["{% set x %}y{% endset %}"] = "block set",
     ["{{ [1, 2][0:1] }}"] = "slices are not supported",
     ["{{ x is odd }}"] = "No test named 'odd'",
-    ["{% for i in [1] %}{{ loop.cycle('a') }}{% endfor %}"] = "loop.cycle is not supported",
-    ["{{ f(*a) }}"] = "*args",
   }
   for src, want in pairs(cases) do
     local e = err_of(src, { x = 1 })
