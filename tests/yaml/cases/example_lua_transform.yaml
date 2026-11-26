@@ -5,6 +5,10 @@
 # and args, and returns rows like a lua:// query. Here: amounts in cents become dollars,
 # with a running total. dbdash asks whether you trust this file first (:help dbdash-lua).
 
+description: |
+  `query.transform`: Lua that reshapes any database's result before it is shown. Runs
+  Lua, so it asks for trust first. See `:help dbdash-transform`.
+
 database:
   url: "sqlite:///:memory:"
 
@@ -30,6 +34,9 @@ query:
 show:
   type: table
   title: "Sales in dollars (transformed)"
+  description: |
+    The SQL returns cents; the transform turns them into dollars and adds a column. `rs`
+    is the result as plain data, the return value is rows.
   column_list:
     - column: day
     - column: amount

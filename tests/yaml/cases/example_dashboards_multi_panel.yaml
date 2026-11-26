@@ -73,6 +73,8 @@ panels:
       type: pie
       renderer: circle
       title: "Headcount"
+      description: |
+        A round pie (`renderer: circle`) of the headcount per department.
       label_column: dept
       value_column: people
 
@@ -82,6 +84,8 @@ panels:
     show:
       type: table
       title: "Now"
+      description: |
+        A one-row table: the time of the query and a random number of orders.
 
   - database:                       # this panel's own database (e.g. another server)
       url: "sqlite:///:memory:"
@@ -91,6 +95,9 @@ panels:
     show:
       type: stat
       title: "Orders today"
+      description: |
+        One value in block digits with a thousands separator (`format: "{:,}"`); this panel
+        has its own database and refreshes every 10 s.
       format: "{:,}"
       interval: 10s
 

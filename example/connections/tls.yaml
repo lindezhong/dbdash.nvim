@@ -13,11 +13,15 @@
 #   tls=verify-full  verify-ca and the host name (the default of https:// and rediss://)
 
 title: "TLS"
+description: |
+  TLS for every protocol: verify-full with a CA file, pinning the certificate, require,
+  and HTTPS. Needs `make it-up` (its test certificates). See `:help dbdash-tls`.
 
 layout:
   columns: 2
 
 show:
+  style: { title_align: center, border: rounded }
   interval: 1m
 
 panels:
@@ -28,6 +32,9 @@ panels:
     show:
       type: table
       title: "PostgreSQL, tls=verify-full with ca="
+      description: |
+        `tls=verify-full&ca=...`: the chain must lead to the given root and the host name must
+        match; the row shows the TLS version and cipher PostgreSQL reports for this session.
 
   - database:
       url: "postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test?tls=pin&fingerprint=sha256:3D:58:A4:52:C7:22:7E:C5:12:28:DB:DA:EC:28:95:D5:CD:B4:AD:AF:6F:4D:77:57:72:EE:FE:45:43:D0:1A:BC"
@@ -36,6 +43,9 @@ panels:
     show:
       type: table
       title: "PostgreSQL, tls=pin"
+      description: |
+        `tls=pin&fingerprint=sha256:...`: the server's certificate must have exactly this
+        fingerprint (a wrong one fails and names the right one).
 
   - database:
       url: "mysql://dbdash:dbdash_pw@127.0.0.1:13306/dbdash_test?tls=require"
@@ -44,6 +54,9 @@ panels:
     show:
       type: table
       title: "MySQL, tls=require"
+      description: |
+        `tls=require` encrypts without checking the certificate; MySQL reports the version and
+        cipher of the session.
 
   - database:
       url: "redis://:dbdash_pw@127.0.0.1:16380/0?tls=pin&fingerprint=sha256:9B:B6:9C:47:01:E8:B8:C7:29:C5:D5:37:A0:F1:FA:92:3F:78:38:DB:43:B5:83:94:C7:E5:D4:31:7E:D6:E2:52"
@@ -52,6 +65,9 @@ panels:
     show:
       type: table
       title: "Redis, tls=pin"
+      description: |
+        Redis over TLS on port 16380 with a pinned fingerprint (`rediss://` would verify by
+        default).
 
   - database:
       url: "https://localhost:18443?ca=../../tests/fixtures/pki/root.pem"
@@ -60,4 +76,6 @@ panels:
     show:
       type: table
       title: "HTTPS (verify-full by default) with ca="
+      description: |
+        HTTPS verifies the certificate and host name by default; `ca=` adds the test root.
       span: 2

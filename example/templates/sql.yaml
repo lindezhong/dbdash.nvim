@@ -8,6 +8,9 @@
 # trust this file first.
 
 title: "SQL filters, functions and autoescape"
+description: |
+  SQL in templates: filters and functions that write SQL for the panel's database, and
+  `query.autoescape`. See `:help dbdash-template-filters`.
 
 database:
   url: "sqlite:///:memory:"
@@ -70,6 +73,10 @@ panels:
     show:
       type: table
       title: "query.autoescape: true"
+      description: |
+        With `query.autoescape: true` every {% raw %}`{{ value }}`{% endraw %} is a literal; filters, `| safe`,
+        macros and `dbdash.safe()` are not escaped again, and {% raw %}`{% autoescape false %}`{% endraw %} turns it
+        off for a part.
 
   - query:
       sql: |
@@ -82,3 +89,6 @@ panels:
     show:
       type: table
       title: "a query with the filters"
+      description: |
+        Without autoescape values go in as written: quote them with `sql_in`, `sql_quote`,
+        `sql_id` and `sql_limit`.

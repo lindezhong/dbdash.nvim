@@ -1,4 +1,5 @@
 {
+ "description": "An HTTPS API as a data source: a GET of the GitHub releases of a repository, the JSON\nlist of objects shown as rows. Needs network. See `:help dbdash-http`.\n",
  "database": {
   "url": "https://api.github.com"
  },
@@ -22,6 +23,7 @@
   "args_show": true,
   "type": "table",
   "title": "GitHub releases",
+  "description": "The latest releases of `{{ args.repo }}` from `{{ meta.db_url }}`: a JSON list of\nobjects needs no transform; `column_list` picks and renames the fields. Change the\nrepository with `a`.\n",
   "interval": "10m",
   "column_list": [
    {

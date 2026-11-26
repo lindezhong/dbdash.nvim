@@ -115,6 +115,35 @@ for _, name in ipairs({ "statements", "filters", "tests_functions", "methods", "
   end
 end
 
+T["every example dashboard and panel has a description that renders"] = function()
+  for _, f in ipairs(files) do
+    local cfg = assert(config.load(f))
+    eq({ f, type(cfg.description) == "string" and cfg.description ~= "" }, { f, true })
+    for i, p in ipairs(cfg.panels) do
+      eq({ f, i, type(p.show.description) == "string" and p.show.description ~= "" }, { f, i, true })
+    end
+    sched.start(f, { no_show = true })
+    local d = assert(sched.get(sched.normalize(f)))
+    local results = {}
+    local function collect(key)
+      return function(err, text)
+        results[key] = err and ("ERROR " .. tostring(type(err) == "table" and err.message or err)) or text
+      end
+    end
+    d:describe_async(collect("dashboard"))
+    for i, p in ipairs(d.panels) do
+      p:describe_async(collect(i))
+    end
+    vim.wait(5000, function()
+      return vim.tbl_count(results) == #d.panels + 1
+    end, 10)
+    for key, text in pairs(results) do
+      eq({ f, key, text:match("^ERROR") == nil and text or text }, { f, key, text:match("^ERROR") and "(no error)" or text })
+    end
+    sched.stop(d.path)
+  end
+end
+
 T["examples cover every chart type and alternative style"] = function()
   local seen = {}
   for _, f in ipairs(files) do

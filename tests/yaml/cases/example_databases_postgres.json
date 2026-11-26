@@ -1,5 +1,6 @@
 {
  "title": "PostgreSQL",
+ "description": "PostgreSQL: `generate_series` data, arguments written with `sql_in` / `sql_limit`,\nand `pg_stat_activity`. Needs `make it-up` (port 15432). See `:help dbdash-databases`.\n",
  "database": {
   "url": "postgresql://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test",
   "type": "postgres"
@@ -26,6 +27,12 @@
    "default": 5
   }
  ],
+ "show": {
+  "style": {
+   "panel_border": "rounded",
+   "border_style": "#61afef"
+  }
+ },
  "layout": {
   "columns": 2
  },
@@ -37,6 +44,7 @@
    "show": {
     "type": "line",
     "title": "Requests per kind (generate_series)",
+    "description": "One line per kind (`series_column`) over the last `{{ args.days }}` days, made with\n`generate_series` and `unnest`.\n",
     "x_column": "day",
     "y_column": "requests",
     "series_column": "kind",
@@ -50,6 +58,7 @@
    "show": {
     "type": "bar",
     "title": "Totals of the chosen kinds (sql_in, sql_limit)",
+    "description": "{% raw %}`WHERE k IN {{ args.kinds | sql_in }}`{% endraw %} and {% raw %}`LIMIT {{ args.top | sql_limit }}`{% endraw %}: the\nfilters write the arguments as PostgreSQL literals.\n",
     "x_column": "kind",
     "y_column": "total",
     "interval": "1m"
@@ -64,6 +73,7 @@
    "show": {
     "type": "table",
     "title": "Sessions (pg_stat_activity; this one is dbdash.nvim)",
+    "description": "The sessions of this database; `query.max_rows` and `query.timeout` limit the query.\n",
     "interval": "10s",
     "span": 2
    }

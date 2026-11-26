@@ -10,6 +10,10 @@
 #
 # Each refresh logs a row, so the chart grows over time.
 
+description: |
+  A SQLite file next to the config (`sqlite://dbdash-example.db`): created on the first
+  run, a row added every refresh. See `:help dbdash-databases`.
+
 database:
   url: "sqlite://dbdash-example.db"
   options:
@@ -24,6 +28,9 @@ query:
 show:
   type: line
   title: "Logged samples (newest first)"
+  description: |
+    Each refresh inserts a sample and the chart shows the last ones (newest first in the
+    query, ordered by time on the axis).
   interval: 5s
   x_column: at
   y_column: value

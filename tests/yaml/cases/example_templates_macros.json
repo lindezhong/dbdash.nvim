@@ -1,4 +1,5 @@
 {
+ "description": "Macros in a file of their own (`macros/sql_helpers.sql`), imported into the query, and\n`query.autoescape`. See `:help dbdash-template-imports`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
@@ -23,6 +24,7 @@
  "show": {
   "type": "table",
   "title": "Players per team and score bucket",
+  "description": "The query imports helper macros ({% raw %}`{% from ... import ... %}`{% endraw %}) that write SQL\nfragments; with `autoescape` every value is a SQL literal.\n",
   "interval": "30s"
  }
 }

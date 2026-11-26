@@ -1,7 +1,17 @@
 {
  "title": "HTTP",
+ "description": "HTTP APIs: a local nginx answers with lists, wrapped lists, redirects and cookies.\nNeeds `make it-up` (port 18080). See `:help dbdash-http`.\n",
  "database": {
   "url": "http://127.0.0.1:18080"
+ },
+ "show": {
+  "style": {
+   "title_align": "center",
+   "padding": [
+    0,
+    1
+   ]
+  }
  },
  "layout": {
   "columns": 2
@@ -14,6 +24,7 @@
    "show": {
     "type": "table",
     "title": "A JSON list of objects: rows as they are",
+    "description": "`{\"path\": \"/items\"}` GETs `http://127.0.0.1:18080/items`; a JSON list of objects is\nshown as rows without a transform.\n",
     "interval": "1m"
    }
   },
@@ -25,6 +36,7 @@
    "show": {
     "type": "table",
     "title": "A wrapped list: query.transform takes it out",
+    "description": "The rows are inside `data.items`: `query.transform` takes them out, and reads\n`response.status` too.\n",
     "interval": "1m"
    }
   },
@@ -35,6 +47,7 @@
    "show": {
     "type": "table",
     "title": "A redirect (301) followed",
+    "description": "`/old` answers 301; the redirect is followed (up to `redirects`, default 5).\n",
     "interval": "1m"
    }
   },
@@ -46,6 +59,7 @@
    "show": {
     "type": "table",
     "title": "Cookies kept between refreshes",
+    "description": "The first refresh logs in and the server sets a cookie; later refreshes send it (and\nthe configured `cookies`) to `/whoami`, which echoes them. Press `r`.\n",
     "interval": "5s"
    }
   }

@@ -6,6 +6,12 @@
 # It runs Lua, so dbdash asks whether you trust this file first.
 
 title: "meta"
+description: |
+  `meta`: what templates and Lua know about the dashboard, the panel and the run. Runs
+  Lua, so it asks for trust first. See `:help dbdash-meta`.
+
+show:
+  style: { title_align: center }
 
 layout:
   columns: 2
@@ -35,6 +41,8 @@ panels:
     show:
       type: table
       title: "every meta field (refresh with r to fill prev)"
+      description: |
+        Every meta field and the run records, listed by `lua://`. Press `r` to fill `prev`.
       interval: 30s
 
   - database: { url: "sqlite:///:memory:" }
@@ -53,4 +61,8 @@ panels:
     show:
       type: table
       title: "meta in a SQL template"
+      span: 2
+      description: |
+        A few meta fields in a SQL template; `query.max_rows` and `query.timeout` show up as
+        `meta.max_rows` and `meta.timeout`.
       interval: 30s

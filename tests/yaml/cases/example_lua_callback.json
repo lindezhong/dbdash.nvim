@@ -1,5 +1,6 @@
 {
  "title": "Panel state",
+ "description": "Panel state and callbacks: `store` keeps values between refreshes, `dbdash.run()`\nruns the query again with other arguments, and `meta` has the run records. Runs Lua,\nso it asks for trust first. See `:help dbdash-callback`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
@@ -29,6 +30,7 @@
    "show": {
     "type": "table",
     "title": "Orders, change since the last refresh",
+    "description": "The change of the orders since the last refresh, kept in `store`.\n",
     "refresh_hidden": true
    }
   },
@@ -39,7 +41,8 @@
    },
    "show": {
     "type": "table",
-    "title": "Twice as long: from query.transform"
+    "title": "Twice as long: from query.transform",
+    "description": "`dbdash.run({ days = ... })` from `query.transform`: the same query with another\nargument, its rows used in this result.\n"
    }
   },
   {
@@ -48,7 +51,8 @@
    },
    "show": {
     "type": "table",
-    "title": "Twice as long: from {% lua %} in query.sql"
+    "title": "Twice as long: from {% lua %} in query.sql",
+    "description": "The same callback from a {% raw %}`{% lua %}`{% endraw %} block in `query.sql`.\n"
    }
   },
   {
@@ -57,7 +61,8 @@
    },
    "show": {
     "type": "table",
-    "title": "Twice as long: from an imported module"
+    "title": "Twice as long: from an imported module",
+    "description": "The same callback from a function of an imported module (`modules/callbacks.lua`).\n"
    }
   },
   {
@@ -68,6 +73,7 @@
    "show": {
     "type": "line",
     "title": "History kept in store (last 20 refreshes)",
+    "description": "`store` keeps the last 20 values; the line shows them.\n",
     "x_column": "at",
     "y_column": "orders",
     "interval": "2s",
@@ -84,6 +90,7 @@
    "show": {
     "type": "table",
     "title": "Run records of the previous refresh (meta.prev_runs)",
+    "description": "`meta.prev_runs`: the run records of the previous refresh (ids, kinds, times,\nresults).\n",
     "span": 2
    }
   },
@@ -96,7 +103,8 @@
    },
    "show": {
     "type": "table",
-    "title": "Callbacks of callbacks, stopped at meta.run.depth 3"
+    "title": "Callbacks of callbacks, stopped at meta.run.depth 3",
+    "description": "Callbacks that call themselves stop at `meta.run.depth` 3 (and at\n`lua.max_callback_depth`).\n"
    }
   }
  ]

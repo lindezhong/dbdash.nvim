@@ -1,4 +1,5 @@
 {
+ "description": "Arguments: typed, with defaults, choices and prompts, used in the query and shown\nabove the chart. See `:help dbdash-arguments`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
@@ -86,6 +87,7 @@
   "args_show": true,
   "type": "table",
   "title": "Users",
+  "description": "The query reads `args.*` (`sql_quote`, `sql_in`, `sql_limit`); `args_show` lists\nthem above the table. Change them with `a`, or start with `:DbDashStart! ...` to be\nasked for each.\n",
   "interval": "30s",
   "column_list": [
    {

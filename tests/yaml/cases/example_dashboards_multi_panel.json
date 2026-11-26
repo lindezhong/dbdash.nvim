@@ -48,6 +48,7 @@
     "type": "pie",
     "renderer": "circle",
     "title": "Headcount",
+    "description": "A round pie (`renderer: circle`) of the headcount per department.\n",
     "label_column": "dept",
     "value_column": "people"
    }
@@ -58,7 +59,8 @@
    },
    "show": {
     "type": "table",
-    "title": "Now"
+    "title": "Now",
+    "description": "A one-row table: the time of the query and a random number of orders.\n"
    }
   },
   {
@@ -71,6 +73,7 @@
    "show": {
     "type": "stat",
     "title": "Orders today",
+    "description": "One value in block digits with a thousands separator (`format: \"{:,}\"`); this panel\nhas its own database and refreshes every 10 s.\n",
     "format": "{:,}",
     "interval": "10s"
    }

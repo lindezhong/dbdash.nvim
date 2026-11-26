@@ -16,6 +16,12 @@
 # It runs a script, so dbdash asks whether you trust this file first.
 
 title: "exec://"
+description: |
+  `exec://`: a script whose output is the data, one item per line (or delimiter). Runs
+  a script, so it asks for trust first. See `:help dbdash-exec`.
+
+show:
+  style: { panel_border: single, padding: [0, 1] }
 
 layout:
   columns: 2
@@ -48,6 +54,9 @@ panels:
     show:
       type: table
       title: "stdout and stderr of a script"
+      description: |
+        `capture: both`: lines from stdout and stderr, each item with its `stream`; the
+        transform keeps the last ten in `store`. The script ends after 30 s.
       interval: 1s
 
   - database:
@@ -75,4 +84,7 @@ panels:
     show:
       type: table
       title: "env, stdin, cwd, delimiter, ok_codes"
+      description: |
+        `cwd`, `env` and `stdin` set what the script sees, `delimiter: "|"` cuts its output,
+        and `ok_codes: [0, 2]` makes exit code 2 a normal end.
       interval: 1s

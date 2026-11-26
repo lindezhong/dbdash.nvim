@@ -7,6 +7,10 @@
 # file first, because of the transform (:help dbdash-http, :help dbdash-transform).
 # Try: :DbDashStart http.yaml repo=folke/lazy.nvim
 
+description: |
+  An HTTPS API as a data source: a GET of the GitHub releases of a repository, the JSON
+  list of objects shown as rows. Needs network. See `:help dbdash-http`.
+
 database:
   url: "https://api.github.com"
 
@@ -44,6 +48,10 @@ show:
   args_show: true
   type: table
   title: "GitHub releases"
+  description: |
+    The latest releases of `{{ args.repo }}` from `{{ meta.db_url }}`: a JSON list of
+    objects needs no transform; `column_list` picks and renames the fields. Change the
+    repository with `a`.
   interval: 10m # unauthenticated GitHub API calls are limited to 60 an hour
   column_list:
     - column: release

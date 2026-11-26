@@ -1,5 +1,6 @@
 {
  "title": "webhook://",
+ "description": "`webhook://`: an HTTP endpoint described by OpenAPI 3.1; every accepted request is an\nitem. See `:help dbdash-webhook` and the curl commands in the file.\n",
  "database": {
   "url": "webhook://127.0.0.1:8765/hooks",
   "options": {
@@ -28,6 +29,7 @@
  "show": {
   "type": "table",
   "title": "Events pushed over HTTP",
+  "description": "The events posted to the endpoints (see the curl commands at the top of the file):\nparameters, bodies and the operation of each request, the newest first.\n",
   "interval": "1s"
  }
 }

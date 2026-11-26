@@ -135,4 +135,40 @@ T["every database scheme"] = function()
   eq(missing(schemes, { '"%s://', "type:%%s*%s%%f[^%%w_]" }), {})
 end
 
+T["every chart type's example shows all of its renderers (and canvases)"] = function()
+  local registry = require("dbdash.render.registry")
+  local config = require("dbdash.config")
+  local missing = {}
+  for t, renderers in pairs(registry.BUILTIN.chart) do
+    local f = "example/charts/" .. t .. ".yaml"
+    local cfg = config.load(f)
+    if not cfg then
+      missing[#missing + 1] = f
+    else
+      local seen = {}
+      for _, p in ipairs(cfg.panels) do
+        local r, canvas = registry.resolve(p.show, {})
+        seen[r] = true
+        if r == "canvas" then
+          seen["canvas/" .. canvas] = true
+        end
+      end
+      for _, r in ipairs(renderers) do
+        if not seen[r] then
+          missing[#missing + 1] = t .. "/" .. r
+        end
+        if r == "canvas" then
+          for _, c in ipairs(registry.BUILTIN.canvas) do
+            if not seen["canvas/" .. c] then
+              missing[#missing + 1] = t .. "/canvas/" .. c
+            end
+          end
+        end
+      end
+    end
+  end
+  table.sort(missing)
+  eq(missing, {})
+end
+
 return T

@@ -320,31 +320,6 @@ function M.render(rs, show, ctx)
     return s, { { 0, #s, g_border } }
   end
 
-  -- Header.
-  local labels, hgroups = {}, {}
-  for c, col in ipairs(cols) do
-    labels[c] = col.label
-    hgroups[c] = g_header
-  end
-  if rich then
-    add(rule("┏", "━", "┳", "┓"))
-    add(row_line(labels, hgroups, "┃"))
-    add(rule("┡", "━", "╇", "┩"))
-  elseif border then
-    add(rule(chars.tl, chars.h, chars.tt, chars.tr))
-    add(row_line(labels, hgroups, chars.v))
-    add(rule(chars.lt, chars.h, chars.x, chars.rt))
-  else
-    add(row_line(labels, hgroups, ""))
-    local segs = {}
-    for c = 1, #cols do
-      segs[c] = ("─"):rep(widths[c])
-    end
-    local s = table.concat(segs, string.rep(" ", math.max(2 * pad, 1)))
-    add(s, { { 0, #s, g_border } })
-  end
-  local v = rich and "│" or (chars and chars.v or "")
-
   ---The lines of a cell in its column: wrapped (or cut) to the width, at most the height.
   local function cell_lines(text, c)
     local w, out = widths[c], {}
@@ -356,6 +331,52 @@ function M.render(rs, show, ctx)
     end
     return W.clamp(out, cols[c].height, w, ellipsis)
   end
+
+  -- Header (its labels wrap like cells, without a height limit).
+  local labels, hgroups = {}, {}
+  for c, col in ipairs(cols) do
+    labels[c] = col.label
+    hgroups[c] = g_header
+  end
+  local head_lines, hn = {}, 1
+  for c = 1, #cols do
+    if wrap_mode then
+      head_lines[c] = {}
+      for _, l in ipairs(W.wrap(labels[c], widths[c], wrap_mode)) do
+        head_lines[c][#head_lines[c] + 1] = l
+      end
+    else
+      head_lines[c] = { W.truncate(labels[c], widths[c], ellipsis) }
+    end
+    hn = math.max(hn, #head_lines[c])
+  end
+  local function header_rows(vbar)
+    for k = 1, hn do
+      local texts = {}
+      for c = 1, #cols do
+        texts[c] = head_lines[c][k] or ""
+      end
+      add(row_line(texts, hgroups, vbar))
+    end
+  end
+  if rich then
+    add(rule("┏", "━", "┳", "┓"))
+    header_rows("┃")
+    add(rule("┡", "━", "╇", "┩"))
+  elseif border then
+    add(rule(chars.tl, chars.h, chars.tt, chars.tr))
+    header_rows(chars.v)
+    add(rule(chars.lt, chars.h, chars.x, chars.rt))
+  else
+    header_rows("")
+    local segs = {}
+    for c = 1, #cols do
+      segs[c] = ("─"):rep(widths[c])
+    end
+    local s = table.concat(segs, string.rep(" ", math.max(2 * pad, 1)))
+    add(s, { { 0, #s, g_border } })
+  end
+  local v = rich and "│" or (chars and chars.v or "")
 
   for r, row in ipairs(cells) do
     if show_lines and r > 1 and border then

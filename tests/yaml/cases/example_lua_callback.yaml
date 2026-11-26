@@ -19,6 +19,10 @@
 # It runs Lua, so dbdash asks whether you trust this file first (:help dbdash-lua).
 
 title: "Panel state"
+description: |
+  Panel state and callbacks: `store` keeps values between refreshes, `dbdash.run()`
+  runs the query again with other arguments, and `meta` has the run records. Runs Lua,
+  so it asks for trust first. See `:help dbdash-callback`.
 
 database:
   url: "sqlite:///:memory:"
@@ -53,6 +57,8 @@ panels:
     show:
       type: table
       title: "Orders, change since the last refresh"
+      description: |
+        The change of the orders since the last refresh, kept in `store`.
       refresh_hidden: true          # keeps counting while the dashboard is hidden
 
   - query:
@@ -68,6 +74,9 @@ panels:
     show:
       type: table
       title: "Twice as long: from query.transform"
+      description: |
+        `dbdash.run({ days = ... })` from `query.transform`: the same query with another
+        argument, its rows used in this result.
 
   - query:
       sql: |
@@ -79,6 +88,8 @@ panels:
     show:
       type: table
       title: "Twice as long: from {% lua %} in query.sql"
+      description: |
+        The same callback from a {% raw %}`{% lua %}`{% endraw %} block in `query.sql`.
 
   - query:
       sql: |
@@ -88,6 +99,8 @@ panels:
     show:
       type: table
       title: "Twice as long: from an imported module"
+      description: |
+        The same callback from a function of an imported module (`modules/callbacks.lua`).
 
   - query:
       sql: SELECT abs(random() % 100) AS orders
@@ -104,6 +117,8 @@ panels:
     show:
       type: line
       title: "History kept in store (last 20 refreshes)"
+      description: |
+        `store` keeps the last 20 values; the line shows them.
       x_column: at
       y_column: orders
       interval: 2s
@@ -128,6 +143,9 @@ panels:
     show:
       type: table
       title: "Run records of the previous refresh (meta.prev_runs)"
+      description: |
+        `meta.prev_runs`: the run records of the previous refresh (ids, kinds, times,
+        results).
       span: 2
 
   - database: { url: "lua://" }
@@ -150,3 +168,6 @@ panels:
     show:
       type: table
       title: "Callbacks of callbacks, stopped at meta.run.depth 3"
+      description: |
+        Callbacks that call themselves stop at `meta.run.depth` 3 (and at
+        `lua.max_callback_depth`).

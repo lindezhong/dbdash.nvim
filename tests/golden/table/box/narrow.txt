@@ -1,17 +1,53 @@
 │┏━━━━┳━━━━━┳━━━━━━━━┳━━━━━━━━━━━━┳━━━━━┓
   ^ 0-120 DbDashBorder
-│┃ id ┃ de… ┃ headc… ┃     budget ┃ ma… ┃
+│┃ id ┃ dep ┃ headco ┃     budget ┃ man ┃
   ^ 0-3 DbDashBorder
   ^ 4-6 DbDashHeader
   ^ 7-10 DbDashBorder
-  ^ 11-16 DbDashHeader
-  ^ 17-20 DbDashBorder
-  ^ 21-29 DbDashHeader
-  ^ 30-33 DbDashBorder
-  ^ 34-44 DbDashHeader
-  ^ 45-48 DbDashBorder
-  ^ 49-54 DbDashHeader
-  ^ 55-58 DbDashBorder
+  ^ 11-14 DbDashHeader
+  ^ 15-18 DbDashBorder
+  ^ 19-25 DbDashHeader
+  ^ 26-29 DbDashBorder
+  ^ 30-40 DbDashHeader
+  ^ 41-44 DbDashBorder
+  ^ 45-48 DbDashHeader
+  ^ 49-52 DbDashBorder
+│┃    ┃ art ┃    unt ┃            ┃ age ┃
+  ^ 0-3 DbDashBorder
+  ^ 4-6 DbDashHeader
+  ^ 7-10 DbDashBorder
+  ^ 11-14 DbDashHeader
+  ^ 15-18 DbDashBorder
+  ^ 19-25 DbDashHeader
+  ^ 26-29 DbDashBorder
+  ^ 30-40 DbDashHeader
+  ^ 41-44 DbDashBorder
+  ^ 45-48 DbDashHeader
+  ^ 49-52 DbDashBorder
+│┃    ┃ men ┃        ┃            ┃ r   ┃
+  ^ 0-3 DbDashBorder
+  ^ 4-6 DbDashHeader
+  ^ 7-10 DbDashBorder
+  ^ 11-14 DbDashHeader
+  ^ 15-18 DbDashBorder
+  ^ 19-25 DbDashHeader
+  ^ 26-29 DbDashBorder
+  ^ 30-40 DbDashHeader
+  ^ 41-44 DbDashBorder
+  ^ 45-48 DbDashHeader
+  ^ 49-52 DbDashBorder
+│┃    ┃ t   ┃        ┃            ┃     ┃
+  ^ 0-3 DbDashBorder
+  ^ 4-6 DbDashHeader
+  ^ 7-10 DbDashBorder
+  ^ 11-14 DbDashHeader
+  ^ 15-18 DbDashBorder
+  ^ 19-25 DbDashHeader
+  ^ 26-29 DbDashBorder
+  ^ 30-40 DbDashHeader
+  ^ 41-44 DbDashBorder
+  ^ 45-48 DbDashHeader
+  ^ 49-52 DbDashBorder
 │┡━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━━━━╇━━━━━┩
   ^ 0-120 DbDashBorder
 ││  1 │ IT  │     42 │ 1250000.50 │ Ali │

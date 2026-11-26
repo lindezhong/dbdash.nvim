@@ -1,4 +1,5 @@
 {
+ "description": "A `lua://` source: Lua code returns the rows; it sees the arguments, the template and\nthe `dbdash.*` helpers. Runs Lua, so it asks for trust first. See `:help dbdash-lua`.\n",
  "database": {
   "url": "lua://"
  },
@@ -27,6 +28,7 @@
   "args_show": true,
   "type": "line",
   "title": "Lua data source",
+  "description": "`{{ args.days }}` days of load computed in Lua (`args.base`, a sine wave when\n`args.wave`), the host name from `dbdash.system()`; `dbdash.null` is NULL inside a row\nand `dbdash.checkpoint()` lets the editor run during long loops.\n",
   "x_column": "day",
   "y_column": "load",
   "interval": "60s"

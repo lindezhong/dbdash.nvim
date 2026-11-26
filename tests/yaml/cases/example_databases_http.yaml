@@ -7,9 +7,15 @@
 # Cookies the server sets are kept for the dashboard and sent on later requests.
 
 title: "HTTP"
+description: |
+  HTTP APIs: a local nginx answers with lists, wrapped lists, redirects and cookies.
+  Needs `make it-up` (port 18080). See `:help dbdash-http`.
 
 database:
   url: "http://127.0.0.1:18080"
+
+show:
+  style: { title_align: center, padding: [0, 1] }
 
 layout:
   columns: 2
@@ -20,6 +26,9 @@ panels:
     show:
       type: table
       title: "A JSON list of objects: rows as they are"
+      description: |
+        `{"path": "/items"}` GETs `http://127.0.0.1:18080/items`; a JSON list of objects is
+        shown as rows without a transform.
       interval: 1m
 
   - query:
@@ -34,6 +43,9 @@ panels:
     show:
       type: table
       title: "A wrapped list: query.transform takes it out"
+      description: |
+        The rows are inside `data.items`: `query.transform` takes them out, and reads
+        `response.status` too.
       interval: 1m
 
   - query:
@@ -41,6 +53,8 @@ panels:
     show:
       type: table
       title: "A redirect (301) followed"
+      description: |
+        `/old` answers 301; the redirect is followed (up to `redirects`, default 5).
       interval: 1m
 
   - query:
@@ -53,4 +67,7 @@ panels:
     show:
       type: table
       title: "Cookies kept between refreshes"
+      description: |
+        The first refresh logs in and the server sets a cookie; later refreshes send it (and
+        the configured `cookies`) to `/whoami`, which echoes them. Press `r`.
       interval: 5s

@@ -9,6 +9,9 @@
 # documents become columns with "flatten": n levels (a.b).
 
 title: "MongoDB"
+description: |
+  MongoDB: aggregation pipelines, commands and the current operations. Needs
+  `make it-up` (port 17017). See `:help dbdash-databases`.
 
 database:
   url: "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin&readPreference=nearest"
@@ -16,6 +19,9 @@ database:
 args:
   - name: region
     default: "eu"
+
+show:
+  style: { panel_border: rounded, border_style: "#98c379" }
 
 layout:
   columns: 2
@@ -35,6 +41,10 @@ panels:
     show:
       type: table
       title: "$documents, $match on an argument, flatten (shop.city)"
+      description: |
+        `$documents` makes rows in the pipeline, `$match` filters them by the `region`
+        argument (`| tojson` writes it as JSON), and `flatten: 1` turns `shop.city` and
+        `shop.size` into columns.
       interval: 1m
 
   - query:
@@ -47,6 +57,8 @@ panels:
     show:
       type: pie
       title: "$group"
+      description: |
+        `$group` sums `n` per region; the pie shows the totals.
       label_column: _id
       value_column: total
       interval: 1m
@@ -66,6 +78,9 @@ panels:
     show:
       type: table
       title: "command: serverStatus"
+      description: |
+        `command: serverStatus` returns one document; `query.transform` picks the version,
+        the uptime and the current connections.
       interval: 10s
 
   - query:
@@ -77,4 +92,6 @@ panels:
     show:
       type: table
       title: "$currentOp (what runs now)"
+      description: |
+        `$currentOp` lists what the server is running now (this query included).
       interval: 10s

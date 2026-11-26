@@ -7,10 +7,16 @@
 # for MySQL ('it\'s'-style escapes, `ident`).
 
 title: "MySQL"
+description: |
+  MySQL / MariaDB: a recursive CTE, `information_schema` and `SHOW` statements. Needs
+  `make it-up` (port 13306). See `:help dbdash-databases`.
 
 database:
   url: "mysql://dbdash:dbdash_pw@127.0.0.1:13306/dbdash_test"
   type: mariadb                      # (an alias of mysql: the same driver)
+
+show:
+  style: { panel_border: rounded, border_style: "#e5c07b" }
 
 layout:
   columns: 2
@@ -24,6 +30,8 @@ panels:
     show:
       type: area
       title: "Orders per hour (recursive CTE)"
+      description: |
+        Orders per hour of a day, made by a recursive CTE.
       x_column: hour
       y_column: orders
       interval: 1m
@@ -36,6 +44,8 @@ panels:
     show:
       type: table
       title: "Tables per schema (information_schema)"
+      description: |
+        Tables and approximate rows per schema from `information_schema.tables`.
       interval: 1m
 
   - query:
@@ -45,5 +55,8 @@ panels:
     show:
       type: table
       title: "SHOW GLOBAL STATUS"
+      description: |
+        A few server counters from `SHOW GLOBAL STATUS` (a SHOW statement works like a
+        query).
       interval: 10s
       span: 2

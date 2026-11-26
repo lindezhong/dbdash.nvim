@@ -1,5 +1,6 @@
 {
  "title": "Jinja2 templates",
+ "description": "Jinja2 beyond macros: extends and blocks, include, import, call blocks and namespaces.\nSee `:help dbdash-templates`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
@@ -29,7 +30,8 @@
    },
    "show": {
     "type": "table",
-    "title": "extends, block, include"
+    "title": "extends, block, include",
+    "description": "`parts/report.sql` lays out the query; this panel `extends` it and fills its blocks,\n`super()` keeping the base's own columns, and `include`s a shared WHERE fragment.\n"
    }
   },
   {
@@ -38,7 +40,8 @@
    },
    "show": {
     "type": "table",
-    "title": "call, namespace, set block, filters"
+    "title": "call, namespace, set block, filters",
+    "description": "`call` wraps text in a macro (`caller()`), `namespace()` keeps a count across a loop,\n`set` blocks capture output, `for ... if` filters a loop.\n"
    }
   },
   {
@@ -48,6 +51,7 @@
    "show": {
     "type": "bar",
     "title": "Players per rank (a loop over sorted mappings)",
+    "description": "A loop over mappings sorted with `sort(attribute=...)`, grouped and drawn as bars.\n",
     "x_column": "rank",
     "y_column": "players",
     "span": 2
@@ -59,7 +63,8 @@
    },
    "show": {
     "type": "table",
-    "title": "extends (two levels), super(), self.title(), scoped, required"
+    "title": "extends (two levels), super(), self.title(), scoped, required",
+    "description": "Two levels of `extends` (page.sql <- section.sql <- this): `super()`, `self.title()`,\n`scoped` and `required` blocks.\n"
    }
   },
   {
@@ -68,7 +73,8 @@
    },
    "show": {
     "type": "table",
-    "title": "import and include: context, exports, missing files"
+    "title": "import and include: context, exports, missing files",
+    "description": "`import` exporting top-level variables (not `_private` ones), `with` / `without\ncontext`, `include ... without context`, `ignore missing`, and a list of names (the\nfirst that exists).\n"
    }
   }
  ]

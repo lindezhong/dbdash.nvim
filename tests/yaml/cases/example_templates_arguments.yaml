@@ -8,6 +8,10 @@
 #   :DbDashStart! template_example.yaml        (asks for every argument)
 # and changed in the dashboard with a (modify), A (show), R (reset).
 
+description: |
+  Arguments: typed, with defaults, choices and prompts, used in the query and shown
+  above the chart. See `:help dbdash-arguments`.
+
 database:
   url: "sqlite:///:memory:"
 
@@ -103,6 +107,10 @@ show:
   args_show: true                    # show the argument values above the chart
   type: table
   title: "Users"
+  description: |
+    The query reads `args.*` (`sql_quote`, `sql_in`, `sql_limit`); `args_show` lists
+    them above the table. Change them with `a`, or start with `:DbDashStart! ...` to be
+    asked for each.
   interval: 30s
   column_list:
     - column: id

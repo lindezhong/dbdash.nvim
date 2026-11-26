@@ -1,9 +1,14 @@
 {
  "title": "TLS",
+ "description": "TLS for every protocol: verify-full with a CA file, pinning the certificate, require,\nand HTTPS. Needs `make it-up` (its test certificates). See `:help dbdash-tls`.\n",
  "layout": {
   "columns": 2
  },
  "show": {
+  "style": {
+   "title_align": "center",
+   "border": "rounded"
+  },
   "interval": "1m"
  },
  "panels": [
@@ -16,7 +21,8 @@
    },
    "show": {
     "type": "table",
-    "title": "PostgreSQL, tls=verify-full with ca="
+    "title": "PostgreSQL, tls=verify-full with ca=",
+    "description": "`tls=verify-full&ca=...`: the chain must lead to the given root and the host name must\nmatch; the row shows the TLS version and cipher PostgreSQL reports for this session.\n"
    }
   },
   {
@@ -28,7 +34,8 @@
    },
    "show": {
     "type": "table",
-    "title": "PostgreSQL, tls=pin"
+    "title": "PostgreSQL, tls=pin",
+    "description": "`tls=pin&fingerprint=sha256:...`: the server's certificate must have exactly this\nfingerprint (a wrong one fails and names the right one).\n"
    }
   },
   {
@@ -40,7 +47,8 @@
    },
    "show": {
     "type": "table",
-    "title": "MySQL, tls=require"
+    "title": "MySQL, tls=require",
+    "description": "`tls=require` encrypts without checking the certificate; MySQL reports the version and\ncipher of the session.\n"
    }
   },
   {
@@ -52,7 +60,8 @@
    },
    "show": {
     "type": "table",
-    "title": "Redis, tls=pin"
+    "title": "Redis, tls=pin",
+    "description": "Redis over TLS on port 16380 with a pinned fingerprint (`rediss://` would verify by\ndefault).\n"
    }
   },
   {
@@ -65,6 +74,7 @@
    "show": {
     "type": "table",
     "title": "HTTPS (verify-full by default) with ca=",
+    "description": "HTTPS verifies the certificate and host name by default; `ca=` adds the test root.\n",
     "span": 2
    }
   }

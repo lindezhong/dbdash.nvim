@@ -1,5 +1,6 @@
 {
  "title": "Cancel",
+ "description": "Cancelling a running query: `r`, a changed argument, `:DbDashStop` or `query.timeout`\nstop it on the client and on the server. Needs `make it-up`. See `:help dbdash-cancel`.\n",
  "database": {
   "url": "postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test"
  },
@@ -11,6 +12,14 @@
    "description": "How long the query sleeps"
   }
  ],
+ "show": {
+  "style": {
+   "padding": [
+    0,
+    1
+   ]
+  }
+ },
  "layout": {
   "columns": 2
  },
@@ -23,6 +32,7 @@
    "show": {
     "type": "table",
     "title": "A slow query (press r while it runs)",
+    "description": "`pg_sleep({{ args.seconds }})` keeps the query busy on the server. Press `r` while it\nruns: the query is cancelled (PostgreSQL CancelRequest) and a new one starts; the\nprevious result stays until then. Change `seconds` with `a`.\n",
     "interval": "15s",
     "args_show": true
    }
@@ -34,6 +44,7 @@
    "show": {
     "type": "table",
     "title": "Other sessions (the sleep shows here while it runs)",
+    "description": "Every other session of the database (`pg_stat_activity`), refreshed every second: the\nsleeping query shows here while it runs and disappears when it is cancelled.\n",
     "interval": "1s"
    }
   }

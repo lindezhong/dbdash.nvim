@@ -23,6 +23,9 @@
 # the URL's path (/hooks).
 
 title: "webhook://"
+description: |
+  `webhook://`: an HTTP endpoint described by OpenAPI 3.1; every accepted request is an
+  item. See `:help dbdash-webhook` and the curl commands in the file.
 
 database:
   url: "webhook://127.0.0.1:8765/hooks"
@@ -105,4 +108,7 @@ query:
 show:
   type: table
   title: "Events pushed over HTTP"
+  description: |
+    The events posted to the endpoints (see the curl commands at the top of the file):
+    parameters, bodies and the operation of each request, the newest first.
   interval: 1s

@@ -12,6 +12,9 @@
 #   file's output does not end with one).
 
 title: "Jinja2 templates"
+description: |
+  Jinja2 beyond macros: extends and blocks, include, import, call blocks and namespaces.
+  See `:help dbdash-templates`.
 
 database:
   url: "sqlite:///:memory:"
@@ -38,6 +41,9 @@ panels:
     show:
       type: table
       title: "extends, block, include"
+      description: |
+        `parts/report.sql` lays out the query; this panel `extends` it and fills its blocks,
+        `super()` keeping the base's own columns, and `include`s a shared WHERE fragment.
 
   - query:
       sql: |
@@ -58,6 +64,9 @@ panels:
     show:
       type: table
       title: "call, namespace, set block, filters"
+      description: |
+        `call` wraps text in a macro (`caller()`), `namespace()` keeps a count across a loop,
+        `set` blocks capture output, `for ... if` filters a loop.
 
   - query:
       sql: |
@@ -75,6 +84,8 @@ panels:
     show:
       type: bar
       title: "Players per rank (a loop over sorted mappings)"
+      description: |
+        A loop over mappings sorted with `sort(attribute=...)`, grouped and drawn as bars.
       x_column: rank
       y_column: players
       span: 2
@@ -87,6 +98,9 @@ panels:
     show:
       type: table
       title: "extends (two levels), super(), self.title(), scoped, required"
+      description: |
+        Two levels of `extends` (page.sql <- section.sql <- this): `super()`, `self.title()`,
+        `scoped` and `required` blocks.
 
   - query:
       sql: |
@@ -109,4 +123,8 @@ panels:
     show:
       type: table
       title: "import and include: context, exports, missing files"
+      description: |
+        `import` exporting top-level variables (not `_private` ones), `with` / `without
+        context`, `include ... without context`, `ignore missing`, and a list of names (the
+        first that exists).
 

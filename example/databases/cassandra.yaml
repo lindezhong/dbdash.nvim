@@ -6,10 +6,16 @@
 #   cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_QUORUM  (cql:// too)
 
 title: "Cassandra"
+description: |
+  Cassandra: CQL against the system keyspaces, with `consistency=ONE` in the URL. Needs
+  `make it-up` (port 19042, cassandra / cassandra). See `:help dbdash-databases`.
 
 database:
   url: "cql://cassandra:cassandra@127.0.0.1:19042/system?consistency=ONE"
   type: cassandra
+
+show:
+  style: { panel_border: rounded, border_style: "#56b6c2" }
 
 layout:
   columns: 2
@@ -20,6 +26,8 @@ panels:
     show:
       type: table
       title: "system.local"
+      description: |
+        The node's own row of `system.local`: cluster name, versions, data center and rack.
       interval: 1m
 
   - query:
@@ -27,6 +35,8 @@ panels:
     show:
       type: table
       title: "Keyspaces (system_schema)"
+      description: |
+        Every keyspace and whether its writes are durable (`system_schema.keyspaces`).
       interval: 1m
 
   - query:
@@ -42,6 +52,9 @@ panels:
     show:
       type: bar
       title: "Tables per keyspace"
+      description: |
+        Tables per keyspace: CQL has no GROUP BY across partitions here, so
+        `query.transform` counts the rows of `system_schema.tables` in Lua.
       x_column: keyspace
       y_column: tables
       interval: 1m

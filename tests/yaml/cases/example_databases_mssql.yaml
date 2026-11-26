@@ -7,6 +7,9 @@
 #   &encrypt=strict for TDS 8)
 
 title: "SQL Server"
+description: |
+  SQL Server: T-SQL with recursive CTEs, `N'...'` literals from `sql_quote`, and the
+  session views. Needs `make it-up` (port 11433, sa). See `:help dbdash-databases`.
 
 database:
   url: "sqlserver://sa:Dbdash_pw1@127.0.0.1:11433/master"
@@ -15,6 +18,9 @@ database:
 args:
   - name: city
     default: "Zürich"
+
+show:
+  style: { panel_border: rounded, border_style: "#c678dd" }
 
 layout:
   columns: 2
@@ -29,6 +35,8 @@ panels:
     show:
       type: bar
       title: "Sales per month (recursive CTE)"
+      description: |
+        Twelve months made by a recursive CTE, a random amount each.
       x_column: month
       y_column: sales
       interval: 1m
@@ -40,6 +48,9 @@ panels:
     show:
       type: table
       title: "VALUES and an N'...' literal from sql_quote"
+      description: |
+        {% raw %}`{{ args.city | sql_quote }}`{% endraw %} writes `N'Zürich'`: SQL Server needs the N prefix for
+        text beyond ASCII.
       interval: 1m
 
   - query:
@@ -49,6 +60,8 @@ panels:
     show:
       type: table
       title: "Sessions (sys.dm_exec_sessions)"
+      description: |
+        The user sessions (`sys.dm_exec_sessions`), this one included.
       interval: 10s
 
   - query:
@@ -56,4 +69,6 @@ panels:
     show:
       type: text
       title: "@@VERSION"
+      description: |
+        `@@VERSION` as plain text (the text chart wraps its lines).
       interval: 1h

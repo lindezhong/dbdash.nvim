@@ -1,5 +1,6 @@
 {
  "title": "MongoDB",
+ "description": "MongoDB: aggregation pipelines, commands and the current operations. Needs\n`make it-up` (port 17017). See `:help dbdash-databases`.\n",
  "database": {
   "url": "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin&readPreference=nearest"
  },
@@ -9,6 +10,12 @@
    "default": "eu"
   }
  ],
+ "show": {
+  "style": {
+   "panel_border": "rounded",
+   "border_style": "#98c379"
+  }
+ },
  "layout": {
   "columns": 2
  },
@@ -20,6 +27,7 @@
    "show": {
     "type": "table",
     "title": "$documents, $match on an argument, flatten (shop.city)",
+    "description": "`$documents` makes rows in the pipeline, `$match` filters them by the `region`\nargument (`| tojson` writes it as JSON), and `flatten: 1` turns `shop.city` and\n`shop.size` into columns.\n",
     "interval": "1m"
    }
   },
@@ -30,6 +38,7 @@
    "show": {
     "type": "pie",
     "title": "$group",
+    "description": "`$group` sums `n` per region; the pie shows the totals.\n",
     "label_column": "_id",
     "value_column": "total",
     "interval": "1m"
@@ -43,6 +52,7 @@
    "show": {
     "type": "table",
     "title": "command: serverStatus",
+    "description": "`command: serverStatus` returns one document; `query.transform` picks the version,\nthe uptime and the current connections.\n",
     "interval": "10s"
    }
   },
@@ -53,6 +63,7 @@
    "show": {
     "type": "table",
     "title": "$currentOp (what runs now)",
+    "description": "`$currentOp` lists what the server is running now (this query included).\n",
     "interval": "10s"
    }
   }

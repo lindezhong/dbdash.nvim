@@ -1,7 +1,14 @@
 {
  "title": "Redis",
+ "description": "Redis: one command per panel, replies turned into rows. Needs `make it-up` (port\n16379; 16380 with TLS). See `:help dbdash-databases`.\n",
  "database": {
   "url": "redis://:dbdash_pw@127.0.0.1:16379/0"
+ },
+ "show": {
+  "style": {
+   "panel_border": "rounded",
+   "border_style": "#e06c75"
+  }
  },
  "layout": {
   "columns": 2
@@ -14,6 +21,7 @@
    "show": {
     "type": "stat",
     "title": "Keys (DBSIZE)",
+    "description": "`DBSIZE`: the number of keys, as a stat.\n",
     "interval": "10s"
    }
   },
@@ -25,6 +33,7 @@
    "show": {
     "type": "bar",
     "title": "Memory (INFO memory)",
+    "description": "`INFO memory` gives section / key / value rows; `query.transform` keeps three of them\nas numbers for the bars.\n",
     "x_column": "metric",
     "y_column": "bytes",
     "interval": "10s"
@@ -37,6 +46,7 @@
    "show": {
     "type": "table",
     "title": "INFO clients",
+    "description": "`INFO clients` as it comes: one row per field.\n",
     "interval": "10s"
    }
   },
@@ -51,6 +61,7 @@
    "show": {
     "type": "table",
     "title": "CONFIG GET maxmemory* (over TLS: rediss://)",
+    "description": "`CONFIG GET maxmemory*` over TLS (`rediss://`, port 16380).\n",
     "interval": "1m"
    }
   }

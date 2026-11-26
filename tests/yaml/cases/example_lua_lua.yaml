@@ -9,6 +9,10 @@
 # values are inserted as written. Reading them from `args` inside Lua needs no quoting.
 # Try: :DbDashStart lua.yaml days=30 wave=false
 
+description: |
+  A `lua://` source: Lua code returns the rows; it sees the arguments, the template and
+  the `dbdash.*` helpers. Runs Lua, so it asks for trust first. See `:help dbdash-lua`.
+
 database:
   url: "lua://"
 
@@ -46,6 +50,10 @@ show:
   args_show: true
   type: line
   title: "Lua data source"
+  description: |
+    `{{ args.days }}` days of load computed in Lua (`args.base`, a sine wave when
+    `args.wave`), the host name from `dbdash.system()`; `dbdash.null` is NULL inside a row
+    and `dbdash.checkpoint()` lets the editor run during long loops.
   x_column: day
   y_column: load
   interval: 60s

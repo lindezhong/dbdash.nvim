@@ -9,6 +9,13 @@
 # It runs Lua, so dbdash asks whether you trust this file first.
 
 title: "luastream://"
+description: |
+  `luastream://`: Lua code whose `print()` / `io.write()` output (or `dbdash.emit()`) is
+  the data, item by item. Runs Lua, so it asks for trust first. See
+  `:help dbdash-luastream`.
+
+show:
+  style: { panel_border: single, padding: [0, 1] }
 
 layout:
   columns: 2
@@ -31,6 +38,9 @@ panels:
     show:
       type: line
       title: "print(): one reading per second"
+      description: |
+        One JSON row printed per second; the panel redraws on its `interval` when something
+        is new.
       x_column: at
       y_column: load
       interval: 2s
@@ -63,4 +73,7 @@ panels:
     show:
       type: table
       title: "io.write() with a delimiter, dbdash.emit(), cwd"
+      description: |
+        `io.write()` with `delimiter: ";"`, `dbdash.emit()` for a value as it is, and `cwd`
+        for `dbdash.cwd()`.
       interval: 1s

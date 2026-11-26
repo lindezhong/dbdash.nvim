@@ -1,5 +1,15 @@
 {
  "title": "luastream://",
+ "description": "`luastream://`: Lua code whose `print()` / `io.write()` output (or `dbdash.emit()`) is\nthe data, item by item. Runs Lua, so it asks for trust first. See\n`:help dbdash-luastream`.\n",
+ "show": {
+  "style": {
+   "panel_border": "single",
+   "padding": [
+    0,
+    1
+   ]
+  }
+ },
  "layout": {
   "columns": 2
  },
@@ -15,6 +25,7 @@
    "show": {
     "type": "line",
     "title": "print(): one reading per second",
+    "description": "One JSON row printed per second; the panel redraws on its `interval` when something\nis new.\n",
     "x_column": "at",
     "y_column": "load",
     "interval": "2s"
@@ -35,6 +46,7 @@
    "show": {
     "type": "table",
     "title": "io.write() with a delimiter, dbdash.emit(), cwd",
+    "description": "`io.write()` with `delimiter: \";\"`, `dbdash.emit()` for a value as it is, and `cwd`\nfor `dbdash.cwd()`.\n",
     "interval": "1s"
    }
   }

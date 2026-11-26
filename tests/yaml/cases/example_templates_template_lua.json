@@ -1,4 +1,5 @@
 {
+ "description": "Lua in templates: {% raw %}`{% lua %}`{% endraw %} blocks and imported `.lua` modules in `query.sql` and\n`query.transform`. Runs Lua, so it asks for trust first. See\n`:help dbdash-template-lua`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
@@ -16,6 +17,7 @@
  "show": {
   "args_show": true,
   "type": "table",
-  "title": "Visits (Lua in templates)"
+  "title": "Visits (Lua in templates)",
+  "description": "Rows made by a Lua module (`modules/helpers.lua`), a column written by a {% raw %}`{% lua %}`{% endraw %}\nblock, and a transform that adds a running total.\n"
  }
 }
