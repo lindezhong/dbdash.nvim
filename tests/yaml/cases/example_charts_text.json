@@ -1,13 +1,109 @@
 {
+ "title": "Text",
+ "description": "A text chart shows the result without a table: each row is its cells joined by\n`style.separator`; newlines in a cell start new lines and long lines wrap. Good for\nlogs, messages and `lua://` output. See `:help dbdash-chart-types`.\n",
  "database": {
   "url": "sqlite3:///:memory:"
  },
- "query": {
-  "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 6)\nSELECT time('now', '-' || (6 - i) || ' minutes') AS at,\n       CASE abs(random() % 3) WHEN 0 THEN 'WARN ' ELSE 'INFO ' END AS level,\n       'request ' || i || ' served in ' || (20 + abs(random() % 200)) || ' ms' AS message\nFROM n\nUNION ALL\nSELECT time('now'), 'ERROR', 'upstream failed:' || char(10) || '    timeout after 30s'\n"
- },
  "show": {
-  "type": "text",
-  "title": "Recent log lines",
-  "interval": "10s"
- }
+  "interval": "5m"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 12)\nSELECT strftime('%H:%M:%S', 'now', '-' || (12 - i) || ' minutes') AS at,\n       CASE WHEN i % 5 = 0 THEN 'ERROR' WHEN i % 3 = 0 THEN 'WARN ' ELSE 'INFO ' END AS level,\n       'request ' || i || ' served in ' || (i * 37 % 200) || ' ms' AS message\nFROM n\n"
+   },
+   "show": {
+    "type": "text",
+    "title": "separator, column_list",
+    "description": "`column_list` picks and orders the columns, `separator` joins them (default a space).\n",
+    "column_list": [
+     "at",
+     "level",
+     "message"
+    ],
+    "style": {
+     "separator": " │ "
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 12)\nSELECT strftime('%H:%M:%S', 'now', '-' || (12 - i) || ' minutes') AS at,\n       CASE WHEN i % 5 = 0 THEN 'ERROR' WHEN i % 3 = 0 THEN 'WARN ' ELSE 'INFO ' END AS level,\n       'request ' || i || ' served in ' || (i * 37 % 200) || ' ms' AS message\nFROM n\n"
+   },
+   "show": {
+    "type": "text",
+    "title": "highlight, reverse, line_numbers",
+    "description": "`highlight` colors the lines that match a Vim regex (the first rule wins), `reverse`\nputs the last row first (newest on top), `line_numbers` numbers the rows.\n",
+    "style": {
+     "reverse": true,
+     "line_numbers": true,
+     "highlight": [
+      {
+       "pattern": "ERROR",
+       "color": "#e06c75"
+      },
+      {
+       "pattern": "WARN",
+       "color": "#e5c07b"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 12)\nSELECT strftime('%H:%M:%S', 'now', '-' || (12 - i) || ' minutes') AS at,\n       CASE WHEN i % 5 = 0 THEN 'ERROR' WHEN i % 3 = 0 THEN 'WARN ' ELSE 'INFO ' END AS level,\n       'request ' || i || ' served in ' || (i * 37 % 200) || ' ms' AS message\nFROM n\n"
+   },
+   "show": {
+    "type": "text",
+    "title": "max_lines, color",
+    "description": "`max_lines` shows the first N lines and how many more there are; `style.color` colors\nthe text (CSS `color`).\n",
+    "style": {
+     "max_lines": 5,
+     "color": "#98c379"
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 'A long message that does not fit on one line of the panel wraps at the spaces, as text does in a browser.' AS t\nUNION ALL SELECT 'first line' || char(10) || 'second line of the same cell'\n"
+   },
+   "show": {
+    "type": "text",
+    "title": "wrap (default), newlines",
+    "description": "Long lines wrap at spaces (`wrap: true`, CSS `white-space: normal`; `\"char\"` breaks\nanywhere); newlines in a cell start new lines.\n"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 'A long message that does not fit on one line of the panel is cut at the edge, wherever that edge happens to be in your window.' AS t\n"
+   },
+   "show": {
+    "type": "text",
+    "title": "wrap: false, ellipsis",
+    "description": "`wrap: false` keeps one line per row and cuts it at the edge (`ellipsis` marks the cut,\nCSS `text-overflow`).\n",
+    "style": {
+     "wrap": false,
+     "ellipsis": "…"
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 'centered' AS t UNION ALL SELECT 'text' UNION ALL SELECT NULL\n"
+   },
+   "show": {
+    "type": "text",
+    "title": "text_align: center, null_text",
+    "description": "`text_align` is CSS `text-align` for the lines (left, center, right); `null_text` is\nwhat a NULL shows (default nothing).\n",
+    "style": {
+     "text_align": "center",
+     "null_text": "(none)"
+    }
+   }
+  }
+ ]
 }

@@ -1,51 +1,101 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# Heat map: activity per weekday and hour.
-# The default halfblock style packs two rows per line; `renderer: block` uses one line per
-# row and can print the values (style.show_values).
+# Heat map: every renderer and option, one panel each (press K on a panel). After ECharts
+# visualMap: a continuous scale with your own colors and range, or piecewise steps; the
+# values written in the cells.
+
+title: "Heat map"
+description: |
+  A heat map colors a grid: `x_column` across, `y_column` down, `value_column` the color.
+  The default style packs two rows into one line (half blocks); `renderer: block` gives
+  every row a line and can write the values. See `:help dbdash-chart-types`.
 
 database:
   url: "sqlite:///:memory:"
 
-query:
-  sql: |
-    WITH RECURSIVE hours AS (
-      SELECT 0 AS hour
-      UNION ALL
-      SELECT hour + 1 FROM hours WHERE hour < 23
-    ),
-    days AS (
-      SELECT 'Monday' AS day, 1 AS day_order
-      UNION SELECT 'Tuesday', 2
-      UNION SELECT 'Wednesday', 3
-      UNION SELECT 'Thursday', 4
-      UNION SELECT 'Friday', 5
-      UNION SELECT 'Saturday', 6
-      UNION SELECT 'Sunday', 7
-    )
-    SELECT
-      day,
-      hour,
-      abs(random() % 100) +
-        CASE
-          WHEN hour BETWEEN 9 AND 17 THEN 50
-          WHEN hour BETWEEN 18 AND 22 THEN 30
-          ELSE 10
-        END AS activity_level
-    FROM days CROSS JOIN hours
-    ORDER BY day_order, hour
-
 show:
-  type: heatmap
-  title: "Weekly activity"
-  interval: 60s
+  interval: 5m
 
-  x_column: hour
-  y_column: day
-  value_column: activity_level
+layout:
+  columns: 2
 
-  style:
-    show_values: true                # used by the block renderer
-
-  show_countdown: true
-  countdown_format: "Next update: {time}s"
+panels:
+  - query:
+      sql: |
+        WITH RECURSIVE d(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM d WHERE n < 5),
+        h(n) AS (SELECT 8 UNION ALL SELECT n + 1 FROM h WHERE n < 18)
+        SELECT 'Day ' || d.n AS day, printf('%02d', h.n) AS hour,
+               abs((d.n * 7 + h.n * 13) % 50) AS requests
+        FROM d, h
+    show:
+      type: heatmap
+      title: "halfblock (default)"
+      description: |
+        Two rows of the grid per line (▀ with a foreground and a background color), a legend of
+        the scale underneath.
+      x_column: hour
+      y_column: day
+      value_column: requests
+  - query:
+      sql: |
+        WITH RECURSIVE d(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM d WHERE n < 5),
+        h(n) AS (SELECT 8 UNION ALL SELECT n + 1 FROM h WHERE n < 18)
+        SELECT 'Day ' || d.n AS day, printf('%02d', h.n) AS hour,
+               abs((d.n * 7 + h.n * 13) % 50) AS requests
+        FROM d, h
+    show:
+      type: heatmap
+      renderer: block
+      title: "renderer: block, show_values, format"
+      description: |
+        `renderer: block` gives every row its own line; `show_values` writes each value in its
+        cell (black or white, whichever reads better), in the Python `axes.y_axis.format`.
+      x_column: hour
+      y_column: day
+      value_column: requests
+      style: { show_values: true }
+      axes:
+        y_axis: { format: "{:.0f}" }
+  - query:
+      sql: |
+        WITH RECURSIVE d(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM d WHERE n < 5),
+        h(n) AS (SELECT 8 UNION ALL SELECT n + 1 FROM h WHERE n < 18)
+        SELECT 'Day ' || d.n AS day, printf('%02d', h.n) AS hour,
+               abs((d.n * 7 + h.n * 13) % 50) AS requests
+        FROM d, h
+    show:
+      type: heatmap
+      renderer: block
+      title: "color_scale, scale_min, scale_max"
+      description: |
+        Your own colors from low to high (`color_scale`, "#rrggbb" stops, ECharts
+        `inRange.color`) over a fixed range (`scale_min` / `scale_max`): values outside take the
+        end colors.
+      x_column: hour
+      y_column: day
+      value_column: requests
+      style: { color_scale: ["#1e2030", "#61afef", "#e5c07b", "#e06c75"], scale_min: 0, scale_max: 60 }
+  - query:
+      sql: |
+        WITH RECURSIVE d(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM d WHERE n < 5),
+        h(n) AS (SELECT 8 UNION ALL SELECT n + 1 FROM h WHERE n < 18)
+        SELECT 'Day ' || d.n AS day, printf('%02d', h.n) AS hour,
+               abs((d.n * 7 + h.n * 13) % 50) AS requests
+        FROM d, h
+    show:
+      type: heatmap
+      renderer: block
+      title: "color_steps (piecewise), legend: false"
+      description: |
+        `color_steps` colors by thresholds instead of a gradient (ECharts piecewise
+        visualMap): a value takes the color of the highest step it reaches. `legend: false`
+        hides the scale.
+      x_column: hour
+      y_column: day
+      value_column: requests
+      legend: false
+      style:
+        color_steps:
+          - { value: 0, color: "#98c379" }
+          - { value: 20, color: "#e5c07b" }
+          - { value: 40, color: "#e06c75" }

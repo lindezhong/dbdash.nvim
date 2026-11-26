@@ -8,13 +8,23 @@ local M = {}
 M.STOPS = { { 0x44, 0x01, 0x54 }, { 0x3b, 0x52, 0x8b }, { 0x21, 0x91, 0x8c }, { 0x5e, 0xc9, 0x62 }, { 0xfd, 0xe7, 0x25 } }
 M.LEVELS = 9
 
----Hex color for t in [0, 1].
-function M.hex(t)
+---"#rrggbb" -> { r, g, b }, or nil.
+local function rgb_of(hex)
+  local r, g, b = tostring(hex):match("^#(%x%x)(%x%x)(%x%x)$")
+  return r and { tonumber(r, 16), tonumber(g, 16), tonumber(b, 16) } or nil
+end
+
+---Hex color for t in [0, 1] along `stops` (default the viridis-like scale).
+function M.hex(t, stops)
+  stops = stops or M.STOPS
   t = math.max(0, math.min(1, t))
-  local seg = t * (#M.STOPS - 1)
-  local i = math.min(math.floor(seg) + 1, #M.STOPS - 1)
+  if #stops == 1 then
+    return ("#%02x%02x%02x"):format(stops[1][1], stops[1][2], stops[1][3])
+  end
+  local seg = t * (#stops - 1)
+  local i = math.min(math.floor(seg) + 1, #stops - 1)
   local f = seg - (i - 1)
-  local a, b = M.STOPS[i], M.STOPS[i + 1]
+  local a, b = stops[i], stops[i + 1]
   local rgb = {}
   for k = 1, 3 do
     rgb[k] = math.floor(a[k] + (b[k] - a[k]) * f + 0.5)
@@ -30,8 +40,63 @@ function M.level(v, lo, hi)
   return math.min(M.LEVELS, math.floor((v - lo) / (hi - lo) * (M.LEVELS - 1) + 0.5) + 1)
 end
 
-function M.level_hex(l)
-  return M.hex((l - 1) / (M.LEVELS - 1))
+function M.level_hex(l, stops)
+  return M.hex((l - 1) / (M.LEVELS - 1), stops)
+end
+
+---The colors of a heat map (ECharts visualMap): style.color_scale (a list of "#rrggbb"
+---stops, continuous), style.color_steps (piecewise: [{value, color}], a value takes the
+---color of the highest step it reaches), style.scale_min / scale_max (the range).
+---@return { color: fun(v: number): string?, lo: number, hi: number, stops: table?, steps: table? }
+function M.colors(show, g)
+  local style = C.nn(show.style) or {}
+  local lo = tonumber(C.nn(style.scale_min)) or g.lo
+  local hi = tonumber(C.nn(style.scale_max)) or g.hi
+  local stops
+  local scale = C.nn(style.color_scale)
+  if type(scale) == "table" and #scale > 0 then
+    stops = {}
+    for _, c in ipairs(scale) do
+      local rgb = rgb_of(c)
+      if not rgb then
+        error({ phase = "render", message = ("style.color_scale: %q is not a #rrggbb color"):format(tostring(c)) }, 0)
+      end
+      stops[#stops + 1] = rgb
+    end
+  end
+  local steps = C.nn(style.color_steps)
+  if type(steps) == "table" and #steps > 0 then
+    local list = {}
+    for _, st in ipairs(steps) do
+      list[#list + 1] = { value = tonumber(C.nn(st.value)) or 0, color = C.nn(st.color) }
+    end
+    table.sort(list, function(a, b)
+      return a.value < b.value
+    end)
+    return {
+      lo = lo,
+      hi = hi,
+      steps = list,
+      color = function(v)
+        local c = M.level_hex(1, stops)
+        for _, st in ipairs(list) do
+          if v >= st.value then
+            c = st.color
+          end
+        end
+        return c
+      end,
+    }
+  end
+  return {
+    lo = lo,
+    hi = hi,
+    stops = stops,
+    color = function(v)
+      v = math.max(lo, math.min(hi, v))
+      return M.level_hex(M.level(v, lo, hi), stops)
+    end,
+  }
 end
 
 ---Ordered unique keys of a column: numeric columns sort ascending, others keep row order.
@@ -79,8 +144,13 @@ function M.get(g, x, y)
   return g.values[x .. "\0" .. y]
 end
 
----Scale legend line appended below the chart.
-function M.legend(ctx, out, g, indent)
+---Scale legend line appended below the chart (style.legend / show.legend false hides it).
+function M.legend(ctx, out, g, indent, scale, show)
+  if show and C.legend_position(show, 2) == "none" then
+    return out
+  end
+  scale = scale or { lo = g.lo, hi = g.hi }
+  local f = show and C.axes(show).yformat or nil
   local parts, hl = { string.rep(" ", indent) }, {}
   local pos = indent
   local function put(s, group)
@@ -90,11 +160,18 @@ function M.legend(ctx, out, g, indent)
     end
     pos = pos + #s
   end
-  put(fmt.number(g.lo) .. " ", "DbDashAxis")
-  for l = 1, M.LEVELS do
-    put("█", ctx.color(M.level_hex(l)))
+  if scale.steps then
+    for i, st in ipairs(scale.steps) do
+      put((i > 1 and "  " or "") .. "█", ctx.color(st.color))
+      put(" ≥" .. fmt.value(st.value, f), "DbDashLegend")
+    end
+  else
+    put(fmt.value(scale.lo, f) .. " ", "DbDashAxis")
+    for l = 1, M.LEVELS do
+      put("█", ctx.color(M.level_hex(l, scale.stops)))
+    end
+    put(" " .. fmt.value(scale.hi, f), "DbDashAxis")
   end
-  put(" " .. fmt.number(g.hi), "DbDashAxis")
   out.lines[#out.lines + 1] = table.concat(parts)
   for _, h in ipairs(hl) do
     h.row = #out.lines - 1

@@ -2,7 +2,9 @@
 --        ╷  ┌────┬───┐    ╷
 --    A   ├──┤    │   ├────┤  •
 --        ╵  └────┴───┘    ╵
--- Whiskers reach the furthest values within 1.5 IQR; values beyond are outliers.
+-- Whiskers reach the furthest values within 1.5 IQR (style.whiskers: iqr), the extremes
+-- (minmax), or two percentiles ([5, 95]); values beyond are outliers. show_values writes
+-- q1, the median and q3 under each box.
 local C = require("dbdash.render.charts.common")
 
 local M = { name = "boxdraw" }
@@ -19,12 +21,19 @@ local function quantile(sorted, q)
 end
 M.quantile = quantile
 
----Five-number summary plus outliers and mean.
-function M.stats(values)
+---Five-number summary plus outliers and mean. `whiskers`: "iqr" (1.5 IQR, default),
+---"minmax", or { lo_percentile, hi_percentile }.
+function M.stats(values, whiskers)
   table.sort(values)
   local q1, med, q3 = quantile(values, 0.25), quantile(values, 0.5), quantile(values, 0.75)
   local iqr = q3 - q1
   local lo_fence, hi_fence = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+  if whiskers == "minmax" then
+    lo_fence, hi_fence = -math.huge, math.huge
+  elseif type(whiskers) == "table" then
+    lo_fence = quantile(values, (tonumber(whiskers[1]) or 5) / 100)
+    hi_fence = quantile(values, (tonumber(whiskers[2]) or 95) / 100)
+  end
   local wlo, whi, outliers, sum = nil, nil, {}, 0
   for _, v in ipairs(values) do
     sum = sum + v
@@ -71,13 +80,14 @@ function M.render(rs, show, ctx)
   end
   local stats, lo, hi = {}, nil, nil
   for i, cat in ipairs(order) do
-    stats[i] = M.stats(groups[cat])
+    stats[i] = M.stats(groups[cat], C.nn(style.whiskers))
     lo = math.min(lo or stats[i].min, stats[i].min)
     hi = math.max(hi or stats[i].max, stats[i].max)
   end
   lo, hi = C.limits(ctx, lo, hi, axes.xmin or axes.ymin, axes.xmax or axes.ymax)
 
-  local rows_needed = #order * 4 - 1
+  local show_values = C.nn(style.show_values) == true
+  local rows_needed = #order * 4 - (show_values and 0 or 1)
   local spec = {
     title = C.nn(show.title),
     xlabel = axes.xlabel or axes.ylabel,
@@ -138,6 +148,19 @@ function M.render(rs, show, ctx)
     if show_outliers then
       for _, v in ipairs(s.outliers) do
         put(mid, col(v), "•", g, true)
+      end
+    end
+    if show_values then -- q1, median, q3 under the box, where they fit
+      local used = -1
+      for _, v in ipairs({ s.q1, s.median, s.q3 }) do
+        local text = require("dbdash.render.format").number(v)
+        local start = math.max(col(v) - math.floor(#text / 2), used + 1)
+        if start + #text <= cols then
+          for k = 1, #text do
+            put(bot + 1, start + k - 1, text:sub(k, k), "DbDashNumber")
+          end
+          used = start + #text
+        end
       end
     end
     spec.yticks[#spec.yticks + 1] = { row = mid, label = order[i] }

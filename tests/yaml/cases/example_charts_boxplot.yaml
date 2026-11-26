@@ -1,39 +1,85 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# Box plot: value distribution per group (median, quartiles, whiskers at 1.5 IQR).
-# The boxes take their colors from the tableau palette.
+# Box plot: every renderer and option, one panel each (press K on a panel). After ECharts
+# and Plotly box plots: whisker rules, outliers, means, the quartiles written out, and
+# vertical boxes.
+
+title: "Box plot"
+description: |
+  A box plot summarizes `value_column` per `category_column`: the box spans the first to
+  the third quartile with the median inside, whiskers reach the furthest values within
+  1.5 IQR, and points beyond are outliers. See `:help dbdash-chart-types`.
 
 database:
   url: "sqlite:///:memory:"
 
-query:
-  sql: |
-    WITH RECURSIVE data_points AS (
-      SELECT 1 AS id,
-             CASE abs(random() % 3) WHEN 0 THEN 'Group A' WHEN 1 THEN 'Group B' ELSE 'Group C' END AS category,
-             abs(random() % 100) + 20 AS value
-      UNION ALL
-      SELECT id + 1,
-             CASE abs(random() % 3) WHEN 0 THEN 'Group A' WHEN 1 THEN 'Group B' ELSE 'Group C' END,
-             abs(random() % 100) + 20
-      FROM data_points
-      WHERE id < 30
-    )
-    SELECT category, value FROM data_points
-
 show:
-  type: boxplot
-  title: "Distribution per group"
-  interval: 55s
+  interval: 5m
 
-  category_column: category          # one box per category (optional)
-  value_column: value
+layout:
+  columns: 2
 
-  style:
-    show_outliers: true              # points beyond the whiskers
-    show_means: true                 # "+" at the mean
-
-  palette: tableau                   # box colors: theme (the colorscheme's, default) or tableau
-
-  show_countdown: true
-  countdown_format: "Next update: {time}s"
+panels:
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)
+        SELECT CASE i % 3 WHEN 0 THEN 'api' WHEN 1 THEN 'web' ELSE 'db' END AS service,
+               20 + (i * 37) % 60 + CASE WHEN i % 17 = 0 THEN 120 ELSE 0 END AS ms
+        FROM n
+    show:
+      type: boxplot
+      title: "boxdraw (default): outliers, means"
+      description: |
+        One box per service; `show_outliers` (default on) marks values past the whiskers with •,
+        `show_means` marks the mean with +. `colors` sets one color per category.
+      category_column: service
+      value_column: ms
+      colors: { api: "#61afef", web: "#98c379", db: "#e5c07b" }
+      style: { show_outliers: true, show_means: true }
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)
+        SELECT CASE i % 3 WHEN 0 THEN 'api' WHEN 1 THEN 'web' ELSE 'db' END AS service,
+               20 + (i * 37) % 60 + CASE WHEN i % 17 = 0 THEN 120 ELSE 0 END AS ms
+        FROM n
+    show:
+      type: boxplot
+      renderer: vertical
+      title: "renderer: vertical"
+      description: |
+        `renderer: vertical` draws upright boxes, one column per category, with a value axis on
+        the left (`:DbDashStyle boxplot vertical`).
+      category_column: service
+      value_column: ms
+      axes:
+        y_axis: { title: "ms" }
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)
+        SELECT CASE i % 3 WHEN 0 THEN 'api' WHEN 1 THEN 'web' ELSE 'db' END AS service,
+               20 + (i * 37) % 60 + CASE WHEN i % 17 = 0 THEN 120 ELSE 0 END AS ms
+        FROM n
+    show:
+      type: boxplot
+      title: "whiskers: minmax, show_values"
+      description: |
+        `whiskers: minmax` reaches the smallest and largest values (no outliers);
+        `[5, 95]` would use two percentiles. `show_values` writes q1, the median and q3 under
+        each box.
+      category_column: service
+      value_column: ms
+      style: { whiskers: minmax, show_values: true }
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)
+        SELECT CASE i % 3 WHEN 0 THEN 'api' WHEN 1 THEN 'web' ELSE 'db' END AS service,
+               20 + (i * 37) % 60 + CASE WHEN i % 17 = 0 THEN 120 ELSE 0 END AS ms
+        FROM n
+    show:
+      type: boxplot
+      title: "one box (no category), whiskers: [10, 90]"
+      description: |
+        Without `category_column` all values make one box. `whiskers: [10, 90]` puts the
+        whiskers at the 10th and 90th percentiles; the rest are outliers.
+      value_column: ms
+      style: { whiskers: [10, 90] }

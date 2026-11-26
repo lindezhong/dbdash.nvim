@@ -31,7 +31,8 @@ function Panel:track(rs)
   if v then
     self.values = self.values or {}
     table.insert(self.values, v)
-    while #self.values > C.HISTORY do
+    local keep = math.max(C.HISTORY, tonumber(show.sparkline_length ~= vim.NIL and show.sparkline_length or nil) or 0)
+    while #self.values > keep do
       table.remove(self.values, 1)
     end
   end

@@ -1,29 +1,113 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# Stat ("KPI") chart: one value in large digits, its change since the previous refresh
-# and a sparkline of the last 20 refreshes. Leave it open for a few refreshes to see
-# the change and the sparkline.
-#
-# The value is the first row of value_column (default: the first numeric column).
-# format takes a Python format ("{:,}", "{:.1f}", "{:.1%}"); unit is shown after it.
-# delta: false / sparkline: false hide the second line's parts.
-# thresholds color the value; a step with notify: true also notifies (once) when the
-# value rises to it.
+# Stat ("KPI"): every option, one panel each (press K on a panel). After Grafana's stat
+# panel: how the value is picked from the rows, its format, prefix and unit, thresholds,
+# the change and sparkline, color mode, size, and several values side by side. Leave it
+# open for a few refreshes to see the change and the sparkline.
+
+title: "Stat"
+description: |
+  A stat shows one value in large digits, its change since the previous refresh and a
+  sparkline of the last refreshes. The value is the first row of `value_column` (default:
+  the first numeric column), or `reduce` of all rows. See `:help dbdash-chart-types`.
 
 database:
   url: "sqlite:///:memory:"
 
-query:
-  sql: |
-    SELECT 'active' AS label, 900 + abs(random() % 300) AS users
-
 show:
-  type: stat
-  title: "Active users"
-  value_column: users
-  format: "{:,}"
-  unit: users
   interval: 5s
-  thresholds:
-    - { value: 1000, color: yellow }
-    - { value: 1190, color: red, notify: true }
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        SELECT 900 + abs(random() % 300) AS users
+    show:
+      type: stat
+      title: "format, unit, thresholds (notify)"
+      description: |
+        `format` is a Python format ("{:,}"), `unit` follows the value. `thresholds` color it
+        (>= 1000 yellow, >= 1190 red); a step with `notify: true` also notifies once when the
+        value rises to it.
+      value_column: users
+      format: "{:,}"
+      unit: users
+      thresholds:
+        - { value: 1000, color: yellow }
+        - { value: 1190, color: red, notify: true }
+  - query:
+      sql: |
+        SELECT abs(random() % 100) AS free_pct
+    show:
+      type: stat
+      title: "thresholds_below, delta_mode: absolute"
+      description: |
+        `thresholds_below: true`: lower is worse (free space under 30 yellow, under 10 red).
+        `delta_mode: absolute` shows the change as an amount, not a percentage.
+      format: "{:.0f}%"
+      thresholds_below: true
+      thresholds:
+        - { value: 30, color: yellow }
+        - { value: 10, color: red }
+      delta_mode: absolute
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 10)
+        SELECT 100 + abs(random() % 50) AS amount FROM n
+    show:
+      type: stat
+      title: "reduce: sum, prefix, label"
+      description: |
+        `reduce: sum` adds up all rows (also `first`, `last`, `mean`, `min`, `max`, `count`;
+        Grafana `reduceOptions.calcs`); `prefix` comes before the value, `label` is a muted
+        line under it.
+      value_column: amount
+      reduce: sum
+      prefix: "$"
+      label: "revenue, last 10 orders"
+  - query:
+      sql: |
+        SELECT abs(random() % 500) AS queue
+    show:
+      type: stat
+      title: "color_mode: background, sparkline_length"
+      description: |
+        `color_mode: background` shows the value reversed, in its color as the background
+        (Grafana `colorMode`; `none` leaves it plain). `sparkline_length: 40` keeps the last 40
+        refreshes.
+      color_mode: background
+      sparkline_length: 40
+      thresholds:
+        - { value: 0, color: green }
+        - { value: 400, color: red }
+  - query:
+      sql: |
+        SELECT abs(random() % 10000) / 100.0 AS latency
+    show:
+      type: stat
+      title: "text_size: normal, delta: false, sparkline: false"
+      description: |
+        `text_size: normal` writes the value on one line instead of block digits; `delta:
+        false` and `sparkline: false` hide the second line.
+      format: "{:.2f} ms"
+      text_size: normal
+      delta: false
+      sparkline: false
+  - query:
+      sql: |
+        SELECT 1200 + abs(random() % 300) AS orders, abs(random() % 100) / 100.0 AS conversion,
+               40 + abs(random() % 20) AS refunds
+    show:
+      type: stat
+      title: "value_columns: several values"
+      description: |
+        `value_columns` shows several values side by side (a Grafana stat with several fields),
+        each a column name or `{ column, label, format, unit, prefix }`. The change and
+        sparkline follow the first value.
+      span: 2
+      value_columns:
+        - orders
+        - { column: conversion, label: "conversion", format: "{:.0%}" }
+        - { column: refunds, label: "refunds", prefix: "-" }

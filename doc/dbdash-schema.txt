@@ -649,7 +649,7 @@ configs (|dbdash-examples|). Every field has a tag:
             Style for the chart type (the first one is the default):
               table: box          line: canvas, asciichart     scatter/area/bubble: canvas
               bar: horizontal, vertical    histogram: horizontal, vertical
-              boxplot: boxdraw    heatmap: halfblock, block    pie: bar, circle
+              boxplot: boxdraw, vertical    heatmap: halfblock, block    pie: bar, circle
               stat: big           text: plain
             Custom styles registered with setup({ register = ... }) are accepted too.
 <
@@ -831,13 +831,82 @@ configs (|dbdash-examples|). Every field has a tag:
             bar_gap: { type: integer, minimum: 0, description: "bar: columns or lines between categories." }
 <
                                           *dbdash-schema-show.style.top* >yaml
-            top: { type: integer, minimum: 1, description: "bar: keep the first N bars (after sort)." }
+            top: { type: integer, minimum: 1, description: "bar: keep the first N bars (after sort); pie: the first N slices and one for the rest." }
 <
                                *dbdash-schema-show.style.value_position* >yaml
             value_position: { enum: [end, inside], description: "bar: the value after / above the bar (end) or inside its end." }
 <
                                    *dbdash-schema-show.style.cumulative* >yaml
             cumulative: { type: boolean, description: "histogram: add the bins up." }
+<
+                                     *dbdash-schema-show.style.whiskers* >yaml
+            whiskers:
+              description: "boxplot: whiskers at 1.5 IQR (iqr, default), the extremes (minmax), or two percentiles ([5, 95])."
+              oneOf:
+                - enum: [iqr, minmax]
+                - { type: array, minItems: 2, maxItems: 2, items: { type: number, minimum: 0, maximum: 100 } }
+<
+                                  *dbdash-schema-show.style.color_scale* >yaml
+            color_scale:
+              type: array
+              minItems: 1
+              items: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+              description: 'heatmap: the colors from low to high, "#rrggbb" (ECharts visualMap inRange.color).'
+<
+                                  *dbdash-schema-show.style.color_steps* >yaml
+            color_steps:
+              type: array
+              description: "heatmap: piecewise colors; a value takes the color of the highest step it reaches."
+              items:
+                type: object
+                properties:
+<
+                            *dbdash-schema-show.style.color_steps.value* >yaml
+                  value: { type: number }
+<
+                            *dbdash-schema-show.style.color_steps.color* >yaml
+                  color: { $ref: "#/definitions/color" }
+<
+                                    *dbdash-schema-show.style.scale_min* >yaml
+            scale_min: { type: number, description: "heatmap: the low end of the colors (default the smallest value)." }
+<
+                                    *dbdash-schema-show.style.scale_max* >yaml
+            scale_max: { type: number, description: "heatmap: the high end of the colors (default the largest value)." }
+<
+                                        *dbdash-schema-show.style.donut* >yaml
+            donut: { type: number, minimum: 0, maximum: 0.9, description: "pie (circle): the hole, a fraction of the radius (Chart.js cutout); 0.5+ shows the total." }
+<
+                                         *dbdash-schema-show.style.half* >yaml
+            half: { type: boolean, description: "pie (circle): the upper half only (Chart.js circumference: 180)." }
+<
+                                  *dbdash-schema-show.style.other_label* >yaml
+            other_label: { type: string, description: 'pie: the slice of what style.top leaves out (default "Other").' }
+<
+                                   *dbdash-schema-show.style.text_align* >yaml
+            text_align: { enum: [left, center, right], description: "text: the lines' alignment (CSS text-align)." }
+<
+                                    *dbdash-schema-show.style.max_lines* >yaml
+            max_lines: { type: integer, minimum: 1, description: "text: show the first N lines, then how many more." }
+<
+                                 *dbdash-schema-show.style.line_numbers* >yaml
+            line_numbers: { type: boolean, description: "text: number the rows." }
+<
+                                      *dbdash-schema-show.style.reverse* >yaml
+            reverse: { type: boolean, description: "text: the last row first (newest on top)." }
+<
+                                    *dbdash-schema-show.style.highlight* >yaml
+            highlight:
+              type: array
+              description: "text: color the lines matching a Vim regex (the first rule that matches wins)."
+              items:
+                type: object
+                properties:
+<
+                            *dbdash-schema-show.style.highlight.pattern* >yaml
+                  pattern: { type: string }
+<
+                              *dbdash-schema-show.style.highlight.color* >yaml
+                  color: { $ref: "#/definitions/color" }
 <
                                     *dbdash-schema-show.style.normalize* >yaml
             normalize: { enum: [count, percent, density], description: "histogram: counts, shares of all values, or density." }
@@ -1023,10 +1092,60 @@ configs (|dbdash-examples|). Every field has a tag:
                                              *dbdash-schema-show.format* >yaml
         format:
           type: string
-          description: 'stat: Python format of the value, e.g. "{:,}", "{:.1f}", "{:.1%}".'
+          description: 'stat and pie: Python format of the values, e.g. "{:,}", "{:.1f}", "{:.1%}", "{:.0f} ms".'
 <
                                                *dbdash-schema-show.unit* >yaml
         unit: { type: string, description: "stat: text shown after the value." }
+<
+                                             *dbdash-schema-show.prefix* >yaml
+        prefix: { type: string, description: 'stat: text shown before the value, e.g. "$".' }
+<
+                                              *dbdash-schema-show.label* >yaml
+        label: { type: string, description: "stat: a muted line under the value." }
+<
+                                             *dbdash-schema-show.reduce* >yaml
+        reduce:
+          enum: [first, last, mean, min, max, sum, count]
+          default: first
+          description: "stat: which value of the rows (Grafana reduceOptions.calcs)."
+<
+                                         *dbdash-schema-show.delta_mode* >yaml
+        delta_mode: { enum: [percent, absolute], default: percent, description: "stat: the change as a percentage or an amount." }
+<
+                                   *dbdash-schema-show.sparkline_length* >yaml
+        sparkline_length: { type: integer, minimum: 2, default: 20, description: "stat: how many refreshes the sparkline shows." }
+<
+                                         *dbdash-schema-show.color_mode* >yaml
+        color_mode: { enum: [value, background, none], default: value, description: "stat: color the digits, reverse them (background), or none (Grafana colorMode)." }
+<
+                                          *dbdash-schema-show.text_size* >yaml
+        text_size: { enum: [big, normal], default: big, description: "stat: block digits or one line." }
+<
+                                      *dbdash-schema-show.value_columns* >yaml
+        value_columns:
+          type: array
+          description: "stat: several values side by side, each a column name or { column, label, format, unit, prefix }."
+          items:
+            oneOf:
+              - type: string
+              - type: object
+                required: [column]
+                properties:
+<
+                               *dbdash-schema-show.value_columns.column* >yaml
+                  column: { type: string }
+<
+                                *dbdash-schema-show.value_columns.label* >yaml
+                  label: { type: string }
+<
+                               *dbdash-schema-show.value_columns.format* >yaml
+                  format: { type: string }
+<
+                                 *dbdash-schema-show.value_columns.unit* >yaml
+                  unit: { type: string }
+<
+                               *dbdash-schema-show.value_columns.prefix* >yaml
+                  prefix: { type: string }
 <
                                               *dbdash-schema-show.delta* >yaml
         delta: { type: boolean, default: true, description: "stat: show the change since the previous refresh." }

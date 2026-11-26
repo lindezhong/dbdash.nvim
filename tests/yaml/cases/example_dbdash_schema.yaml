@@ -483,7 +483,7 @@ definitions:
           Style for the chart type (the first one is the default):
             table: box          line: canvas, asciichart     scatter/area/bubble: canvas
             bar: horizontal, vertical    histogram: horizontal, vertical
-            boxplot: boxdraw    heatmap: halfblock, block    pie: bar, circle
+            boxplot: boxdraw, vertical    heatmap: halfblock, block    pie: bar, circle
             stat: big           text: plain
           Custom styles registered with setup({ register = ... }) are accepted too.
       canvas:
@@ -581,9 +581,44 @@ definitions:
           group: { enum: [grouped, stacked], description: "bar: several series side by side (default) or stacked." }
           bar_width: { type: integer, minimum: 1, description: "bar: columns (vertical) or lines (horizontal) per bar." }
           bar_gap: { type: integer, minimum: 0, description: "bar: columns or lines between categories." }
-          top: { type: integer, minimum: 1, description: "bar: keep the first N bars (after sort)." }
+          top: { type: integer, minimum: 1, description: "bar: keep the first N bars (after sort); pie: the first N slices and one for the rest." }
           value_position: { enum: [end, inside], description: "bar: the value after / above the bar (end) or inside its end." }
           cumulative: { type: boolean, description: "histogram: add the bins up." }
+          whiskers:
+            description: "boxplot: whiskers at 1.5 IQR (iqr, default), the extremes (minmax), or two percentiles ([5, 95])."
+            oneOf:
+              - enum: [iqr, minmax]
+              - { type: array, minItems: 2, maxItems: 2, items: { type: number, minimum: 0, maximum: 100 } }
+          color_scale:
+            type: array
+            minItems: 1
+            items: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+            description: 'heatmap: the colors from low to high, "#rrggbb" (ECharts visualMap inRange.color).'
+          color_steps:
+            type: array
+            description: "heatmap: piecewise colors; a value takes the color of the highest step it reaches."
+            items:
+              type: object
+              properties:
+                value: { type: number }
+                color: { $ref: "#/definitions/color" }
+          scale_min: { type: number, description: "heatmap: the low end of the colors (default the smallest value)." }
+          scale_max: { type: number, description: "heatmap: the high end of the colors (default the largest value)." }
+          donut: { type: number, minimum: 0, maximum: 0.9, description: "pie (circle): the hole, a fraction of the radius (Chart.js cutout); 0.5+ shows the total." }
+          half: { type: boolean, description: "pie (circle): the upper half only (Chart.js circumference: 180)." }
+          other_label: { type: string, description: 'pie: the slice of what style.top leaves out (default "Other").' }
+          text_align: { enum: [left, center, right], description: "text: the lines' alignment (CSS text-align)." }
+          max_lines: { type: integer, minimum: 1, description: "text: show the first N lines, then how many more." }
+          line_numbers: { type: boolean, description: "text: number the rows." }
+          reverse: { type: boolean, description: "text: the last row first (newest on top)." }
+          highlight:
+            type: array
+            description: "text: color the lines matching a Vim regex (the first rule that matches wins)."
+            items:
+              type: object
+              properties:
+                pattern: { type: string }
+                color: { $ref: "#/definitions/color" }
           normalize: { enum: [count, percent, density], description: "histogram: counts, shares of all values, or density." }
           trend_line: { const: linear, description: "scatter, bubble, line: a dashed least-squares line per series." }
           point: { type: string, description: "scatter, bubble: a character for every point instead of a dot." }
@@ -677,8 +712,32 @@ definitions:
         description: "histogram: where the bins start and end (Vega-Lite bin.extent)."
       format:
         type: string
-        description: 'stat: Python format of the value, e.g. "{:,}", "{:.1f}", "{:.1%}".'
+        description: 'stat and pie: Python format of the values, e.g. "{:,}", "{:.1f}", "{:.1%}", "{:.0f} ms".'
       unit: { type: string, description: "stat: text shown after the value." }
+      prefix: { type: string, description: 'stat: text shown before the value, e.g. "$".' }
+      label: { type: string, description: "stat: a muted line under the value." }
+      reduce:
+        enum: [first, last, mean, min, max, sum, count]
+        default: first
+        description: "stat: which value of the rows (Grafana reduceOptions.calcs)."
+      delta_mode: { enum: [percent, absolute], default: percent, description: "stat: the change as a percentage or an amount." }
+      sparkline_length: { type: integer, minimum: 2, default: 20, description: "stat: how many refreshes the sparkline shows." }
+      color_mode: { enum: [value, background, none], default: value, description: "stat: color the digits, reverse them (background), or none (Grafana colorMode)." }
+      text_size: { enum: [big, normal], default: big, description: "stat: block digits or one line." }
+      value_columns:
+        type: array
+        description: "stat: several values side by side, each a column name or { column, label, format, unit, prefix }."
+        items:
+          oneOf:
+            - type: string
+            - type: object
+              required: [column]
+              properties:
+                column: { type: string }
+                label: { type: string }
+                format: { type: string }
+                unit: { type: string }
+                prefix: { type: string }
       delta: { type: boolean, default: true, description: "stat: show the change since the previous refresh." }
       sparkline: { type: boolean, default: true, description: "stat: show the last 20 values." }
       thresholds:

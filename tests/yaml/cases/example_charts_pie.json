@@ -1,30 +1,123 @@
 {
+ "title": "Pie chart",
+ "description": "A pie chart shows each row's share: `label_column` names the slices, `value_column`\nsizes them (positive values only). The default style is one proportional bar with a\nlegend; `renderer: circle` draws a round pie. See `:help dbdash-chart-types`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
- "query": {
-  "sql": "WITH departments AS (\n  SELECT 'Research' AS department, abs(random() % 500) + 200 AS budget\n  UNION ALL SELECT 'Marketing', abs(random() % 400) + 150\n  UNION ALL SELECT 'Sales', abs(random() % 600) + 300\n  UNION ALL SELECT 'Engineering', abs(random() % 800) + 400\n  UNION ALL SELECT 'HR', abs(random() % 200) + 100\n  UNION ALL SELECT 'Operations', abs(random() % 300) + 150\n)\nSELECT department, budget\nFROM departments\nORDER BY budget DESC\n"
- },
  "show": {
-  "type": "pie",
-  "title": "Budget by department",
-  "interval": "40s",
-  "label_column": "department",
-  "value_column": "budget",
-  "style": {
-   "show_labels": true,
-   "show_values": true,
-   "show_percentages": true
+  "interval": "5m"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310\nUNION ALL SELECT 'Marketing', 180 UNION ALL SELECT 'Research', 260\nUNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40\n"
+   },
+   "show": {
+    "type": "pie",
+    "title": "bar (default): colors by position",
+    "description": "One bar split in proportion, the legend under it with the value and the percentage.\n`colors` as a list colors the slices in order.\n",
+    "label_column": "dept",
+    "value_column": "budget",
+    "colors": [
+     "#e06c75",
+     "#61afef",
+     "#98c379",
+     "#e5c07b",
+     "#c678dd",
+     "#56b6c2"
+    ]
+   }
   },
-  "colors": [
-   "#FF6B6B",
-   "#4ECDC4",
-   "#45B7D1",
-   "#96CEB4",
-   "#FFEAA7",
-   "#DDA0DD"
-  ],
-  "show_countdown": true,
-  "countdown_format": "Next update: {time}s"
- }
+  {
+   "query": {
+    "sql": "SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310\nUNION ALL SELECT 'Marketing', 180 UNION ALL SELECT 'Research', 260\nUNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40\n"
+   },
+   "show": {
+    "type": "pie",
+    "renderer": "circle",
+    "title": "renderer: circle, palette: tableau",
+    "description": "A round pie on a braille canvas, the legend beside it (`legend.position: bottom` puts\nit under); `palette: tableau` instead of the colorscheme's colors.\n",
+    "label_column": "dept",
+    "value_column": "budget",
+    "palette": "tableau"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310\nUNION ALL SELECT 'Marketing', 180 UNION ALL SELECT 'Research', 260\nUNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40\n"
+   },
+   "show": {
+    "type": "pie",
+    "renderer": "circle",
+    "title": "donut, format",
+    "description": "`donut: 0.6` leaves a hole of 60% of the radius (Chart.js `cutout`) and writes the\ntotal in it; `format` is the Python format of the values (\"{:,} k\").\n",
+    "label_column": "dept",
+    "value_column": "budget",
+    "format": "{:,} k",
+    "style": {
+     "donut": 0.6
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310\nUNION ALL SELECT 'Marketing', 180 UNION ALL SELECT 'Research', 260\nUNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40\n"
+   },
+   "show": {
+    "type": "pie",
+    "renderer": "circle",
+    "title": "half, legend: bottom",
+    "description": "`half: true` draws the upper half (Chart.js `circumference: 180`, a gauge-like pie);\nthe legend goes `bottom`.\n",
+    "label_column": "dept",
+    "value_column": "budget",
+    "legend": {
+     "position": "bottom"
+    },
+    "style": {
+     "half": true
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310\nUNION ALL SELECT 'Marketing', 180 UNION ALL SELECT 'Research', 260\nUNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40\n"
+   },
+   "show": {
+    "type": "pie",
+    "title": "sort, top, other_label",
+    "description": "`sort: desc` orders the slices by size, `top: 3` keeps the three largest and puts the\nrest in one slice named by `other_label` (default \"Other\").\n",
+    "label_column": "dept",
+    "value_column": "budget",
+    "style": {
+     "sort": "desc",
+     "top": 3,
+     "other_label": "Rest"
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310\nUNION ALL SELECT 'Marketing', 180 UNION ALL SELECT 'Research', 260\nUNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40\n"
+   },
+   "show": {
+    "type": "pie",
+    "title": "colors by name, legend parts",
+    "description": "`colors` as a mapping colors slices by name; `show_labels`, `show_values` and\n`show_percentages` pick the legend's columns.\n",
+    "label_column": "dept",
+    "value_column": "budget",
+    "colors": {
+     "Engineering": "#61afef",
+     "Sales": "#98c379"
+    },
+    "style": {
+     "show_labels": true,
+     "show_values": false,
+     "show_percentages": true
+    }
+   }
+  }
+ ]
 }

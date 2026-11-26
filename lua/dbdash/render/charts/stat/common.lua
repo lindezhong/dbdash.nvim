@@ -34,17 +34,7 @@ function M.column(rs, show)
   return nil, "the query returned no columns"
 end
 
----The value shown: first row of the value column, as a number when it is numeric.
----@return any value, string? err
-function M.value(rs, show)
-  local idx, err = M.column(rs, show)
-  if not idx then
-    return nil, err
-  end
-  local row = rs.rows[1]
-  if not row then
-    return nil, "the query returned no rows"
-  end
+local function cell(rs, idx, row)
   local v = row[idx]
   if type(v) == "cdata" then
     v = tonumber(v)
@@ -52,6 +42,53 @@ function M.value(rs, show)
     v = tonumber(v) -- decimals arrive as text
   end
   return v
+end
+
+---The value shown: the first row of the value column (as a number when it is numeric),
+---or show.reduce of all rows (Grafana reduceOptions.calcs): first, last, mean, min, max,
+---sum, count.
+---@return any value, string? err
+function M.value(rs, show)
+  local idx, err = M.column(rs, show)
+  if not idx then
+    return nil, err
+  end
+  if not rs.rows[1] then
+    return nil, "the query returned no rows"
+  end
+  local reduce = show.reduce ~= NULL and show.reduce or "first"
+  if reduce == "first" then
+    return cell(rs, idx, rs.rows[1])
+  elseif reduce == "last" then
+    return cell(rs, idx, rs.rows[#rs.rows])
+  elseif reduce == "count" then
+    return #rs.rows
+  end
+  local nums = {}
+  for _, row in ipairs(rs.rows) do
+    local v = cell(rs, idx, row)
+    if type(v) == "number" then
+      nums[#nums + 1] = v
+    end
+  end
+  if #nums == 0 then
+    return nil, "no numeric values to reduce"
+  end
+  if reduce == "min" then
+    return math.min(unpack(nums))
+  elseif reduce == "max" then
+    return math.max(unpack(nums))
+  end
+  local sum = 0
+  for _, v in ipairs(nums) do
+    sum = sum + v
+  end
+  if reduce == "sum" then
+    return sum
+  elseif reduce == "mean" then
+    return sum / #nums
+  end
+  return nil, ("unknown reduce '%s' (first, last, mean, min, max, sum, count)"):format(tostring(reduce))
 end
 
 ---Numeric value of a result for the panel history; nil when not numeric.
@@ -73,13 +110,17 @@ function M.text(v, show)
   else
     s = tostring(v)
   end
+  local prefix = show.prefix ~= NULL and show.prefix or nil
+  if prefix and v ~= nil and v ~= NULL then
+    s = tostring(prefix) .. s
+  end
   local unit = show.unit ~= NULL and show.unit or nil
   return s, unit and tostring(unit) or nil
 end
 
 ---Change against the previous value of `history` (oldest first, current last).
 ---@return { text: string, dir: "up"|"down"|"same" }?
-function M.delta(history)
+function M.delta(history, mode)
   local n = #history
   if n < 2 then
     return nil
@@ -89,7 +130,7 @@ function M.delta(history)
   local dir = d > 0 and "up" or d < 0 and "down" or "same"
   local arrow = ({ up = "↑", down = "↓", same = "=" })[dir]
   local amount
-  if prev ~= 0 then
+  if prev ~= 0 and mode ~= "absolute" then
     amount = ("%.1f%%"):format(math.abs(d) / math.abs(prev) * 100)
   else
     amount = require("dbdash.render.format").number(math.abs(d))

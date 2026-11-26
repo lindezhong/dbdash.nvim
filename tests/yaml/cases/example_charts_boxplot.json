@@ -1,22 +1,87 @@
 {
+ "title": "Box plot",
+ "description": "A box plot summarizes `value_column` per `category_column`: the box spans the first to\nthe third quartile with the median inside, whiskers reach the furthest values within\n1.5 IQR, and points beyond are outliers. See `:help dbdash-chart-types`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
- "query": {
-  "sql": "WITH RECURSIVE data_points AS (\n  SELECT 1 AS id,\n         CASE abs(random() % 3) WHEN 0 THEN 'Group A' WHEN 1 THEN 'Group B' ELSE 'Group C' END AS category,\n         abs(random() % 100) + 20 AS value\n  UNION ALL\n  SELECT id + 1,\n         CASE abs(random() % 3) WHEN 0 THEN 'Group A' WHEN 1 THEN 'Group B' ELSE 'Group C' END,\n         abs(random() % 100) + 20\n  FROM data_points\n  WHERE id < 30\n)\nSELECT category, value FROM data_points\n"
- },
  "show": {
-  "type": "boxplot",
-  "title": "Distribution per group",
-  "interval": "55s",
-  "category_column": "category",
-  "value_column": "value",
-  "style": {
-   "show_outliers": true,
-   "show_means": true
+  "interval": "5m"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)\nSELECT CASE i % 3 WHEN 0 THEN 'api' WHEN 1 THEN 'web' ELSE 'db' END AS service,\n       20 + (i * 37) % 60 + CASE WHEN i % 17 = 0 THEN 120 ELSE 0 END AS ms\nFROM n\n"
+   },
+   "show": {
+    "type": "boxplot",
+    "title": "boxdraw (default): outliers, means",
+    "description": "One box per service; `show_outliers` (default on) marks values past the whiskers with •,\n`show_means` marks the mean with +. `colors` sets one color per category.\n",
+    "category_column": "service",
+    "value_column": "ms",
+    "colors": {
+     "api": "#61afef",
+     "web": "#98c379",
+     "db": "#e5c07b"
+    },
+    "style": {
+     "show_outliers": true,
+     "show_means": true
+    }
+   }
   },
-  "palette": "tableau",
-  "show_countdown": true,
-  "countdown_format": "Next update: {time}s"
- }
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)\nSELECT CASE i % 3 WHEN 0 THEN 'api' WHEN 1 THEN 'web' ELSE 'db' END AS service,\n       20 + (i * 37) % 60 + CASE WHEN i % 17 = 0 THEN 120 ELSE 0 END AS ms\nFROM n\n"
+   },
+   "show": {
+    "type": "boxplot",
+    "renderer": "vertical",
+    "title": "renderer: vertical",
+    "description": "`renderer: vertical` draws upright boxes, one column per category, with a value axis on\nthe left (`:DbDashStyle boxplot vertical`).\n",
+    "category_column": "service",
+    "value_column": "ms",
+    "axes": {
+     "y_axis": {
+      "title": "ms"
+     }
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)\nSELECT CASE i % 3 WHEN 0 THEN 'api' WHEN 1 THEN 'web' ELSE 'db' END AS service,\n       20 + (i * 37) % 60 + CASE WHEN i % 17 = 0 THEN 120 ELSE 0 END AS ms\nFROM n\n"
+   },
+   "show": {
+    "type": "boxplot",
+    "title": "whiskers: minmax, show_values",
+    "description": "`whiskers: minmax` reaches the smallest and largest values (no outliers);\n`[5, 95]` would use two percentiles. `show_values` writes q1, the median and q3 under\neach box.\n",
+    "category_column": "service",
+    "value_column": "ms",
+    "style": {
+     "whiskers": "minmax",
+     "show_values": true
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)\nSELECT CASE i % 3 WHEN 0 THEN 'api' WHEN 1 THEN 'web' ELSE 'db' END AS service,\n       20 + (i * 37) % 60 + CASE WHEN i % 17 = 0 THEN 120 ELSE 0 END AS ms\nFROM n\n"
+   },
+   "show": {
+    "type": "boxplot",
+    "title": "one box (no category), whiskers: [10, 90]",
+    "description": "Without `category_column` all values make one box. `whiskers: [10, 90]` puts the\nwhiskers at the 10th and 90th percentiles; the rest are outliers.\n",
+    "value_column": "ms",
+    "style": {
+     "whiskers": [
+      10,
+      90
+     ]
+    }
+   }
+  }
+ ]
 }

@@ -28,8 +28,12 @@ function M.render(rs, show, ctx)
     end
     return w
   end
-  local legend = P.legend(items, sum, show)
+  local pos = P.legend_position(show)
+  local legend = pos == "none" and {} or P.legend(items, sum, show)
   local lw = legend_width(legend)
+  local style = show.style ~= vim.NIL and show.style or {}
+  local donut = math.max(0, math.min(tonumber(style.donut ~= vim.NIL and style.donut or nil) or 0, 0.9))
+  local half = style.half == true
   if lw > ctx.width then -- shorten labels until the legend fits the window
     legend = P.legend(items, sum, show, math.max(3, 30 - (lw - ctx.width)))
     lw = legend_width(legend)
@@ -39,10 +43,10 @@ function M.render(rs, show, ctx)
     return math.ceil(r * px.y / px.x)
   end
   -- The legend sits right of the circle when a reasonable circle still fits, else below.
-  local beside = cols_for(6) + 3 + lw <= ctx.width
+  local beside = pos ~= "bottom" and #legend > 0 and cols_for(6) + 3 + lw <= ctx.width
   local room = beside and (ctx.width - 3 - lw) or ctx.width
   -- The height left (at least min_height), then as wide as the room allows.
-  local rows = math.min(ctx.plot_height or 12, ctx.height - 1 - (beside and 0 or #legend))
+  local rows = math.min(ctx.plot_height or 12, (ctx.height - 1 - (beside and 0 or #legend)) * (half and 2 or 1))
   rows = math.max(rows, math.min(ctx.min_plot_height or 3, ctx.plot_height or 12))
   while rows > 3 and cols_for(rows) > room do
     rows = rows - 1
@@ -65,12 +69,19 @@ function M.render(rs, show, ctx)
   for y = 0, hpx - 1 do
     for x = 0, wpx - 1 do
       local dx, dy = x + 0.5 - cx, y + 0.5 - cy
-      if dx * dx + dy * dy <= r * r then
+      local d2 = dx * dx + dy * dy
+      -- donut: a hole of donut * r (Chart.js cutout); half: the upper half only
+      if d2 <= r * r and d2 >= (donut * r) ^ 2 and (not half or dy >= 0) then
         local a = math.atan2(dx, dy) -- 0 at the top, increasing clockwise
-        if a < 0 then
-          a = a + 2 * math.pi
+        local f
+        if half then
+          f = (a + math.pi / 2) / math.pi -- left to right over the top
+        else
+          if a < 0 then
+            a = a + 2 * math.pi
+          end
+          f = a / (2 * math.pi)
         end
-        local f = a / (2 * math.pi)
         local slice = #items
         for i, b in ipairs(bounds) do
           if f < b then
@@ -83,6 +94,35 @@ function M.render(rs, show, ctx)
     end
   end
   local body, body_hl = canvas:render()
+  if half then -- keep the upper half
+    local keep = math.ceil(rows / 2)
+    body = { unpack(body, 1, keep) }
+    body_hl = vim.tbl_filter(function(h)
+      return h.row < keep
+    end, body_hl)
+    rows = keep
+  end
+  if donut >= 0.5 and not half then -- the total in the hole
+    local text = require("dbdash.render.format").value(sum, show.format ~= vim.NIL and show.format or nil)
+    local mid = math.floor(rows / 2) + 1
+    local line = body[mid]
+    local chars = {}
+    for ch in W.chars(line) do
+      chars[#chars + 1] = ch
+    end
+    local start = math.floor((#chars - #text) / 2)
+    if start > 0 and W.width(text) < #chars * donut then
+      local byte = #table.concat(chars, "", 1, start)
+      for k = 1, #text do
+        chars[start + k] = text:sub(k, k)
+      end
+      body[mid] = table.concat(chars)
+      body_hl = vim.tbl_filter(function(h)
+        return h.row ~= mid - 1
+      end, body_hl)
+      body_hl[#body_hl + 1] = { row = mid - 1, col_s = byte, col_e = byte + #text, group = "DbDashNumber" }
+    end
+  end
 
   if title then
     add(title.text, title.spans)

@@ -33,6 +33,8 @@ local FONT = {
   ["G"] = { "█▀▀▀", "█ ▀█", "█▄▄█" },
   ["T"] = { "▀█▀", " █ ", " █ " },
   [" "] = { " ", " ", " " },
+  ["$"] = { "▄█▀", "▀█▄", "▀█▀" },
+  ["/"] = { "  █", " █ ", "█  " },
 }
 
 ---The three rows of `s` in the block font, or nil when a character has no glyph.
@@ -54,7 +56,8 @@ local function big(s)
   }
 end
 
-function M.render(rs, show, ctx)
+---One value: the number (big or normal), its label, the change and the sparkline.
+local function one(rs, show, ctx, history)
   local lines, hl = {}, {}
   local function add(s, spans)
     lines[#lines + 1] = s
@@ -81,8 +84,16 @@ function M.render(rs, show, ctx)
     local _, step = T.level(v, T.steps(show.thresholds, below), below)
     group = T.group(step) or group
   end
+  -- Grafana colorMode: value (the digits), background (reversed), none (plain text)
+  local mode = show.color_mode ~= vim.NIL and show.color_mode or "value"
+  if mode == "none" then
+    group = "DbDashText"
+  elseif mode == "background" then
+    group = require("dbdash.render.highlight").reverse(group)
+  end
 
-  local rows = big(text)
+  local size = show.text_size ~= vim.NIL and show.text_size or "big"
+  local rows = size ~= "normal" and big(text) or nil
   local fits = rows and W.width(rows[1]) + (unit and (W.width(unit) + 1) or 0) <= ctx.width
   if fits then
     for r = 1, 3 do
@@ -98,9 +109,14 @@ function M.render(rs, show, ctx)
     local s = W.truncate(text .. (unit and (" " .. unit) or ""), ctx.width)
     add(s, { { 0, math.min(#s, #text), group } })
   end
+  local label = show.label ~= vim.NIL and show.label or nil
+  if label then -- a muted line under the value (Grafana stat text)
+    local l = W.truncate(tostring(label), ctx.width)
+    add(l, { { 0, #l, "DbDashMuted" } })
+  end
 
   -- change and sparkline
-  local history = ctx.history or {}
+  history = history or {}
   local parts, spans, pos = {}, {}, 0
   local function put(s, g)
     spans[#spans + 1] = { pos, pos + #s, g }
@@ -108,14 +124,15 @@ function M.render(rs, show, ctx)
     pos = pos + #s
   end
   if show.delta ~= false then
-    local d = C.delta(history)
+    local d = C.delta(history, show.delta_mode ~= vim.NIL and show.delta_mode or nil)
     if d then
       put(d.text, ({ up = "DbDashUp", down = "DbDashDown", same = "DbDashMuted" })[d.dir])
     end
   end
   if show.sparkline ~= false then
+    local len = tonumber(show.sparkline_length ~= vim.NIL and show.sparkline_length or nil) or C.HISTORY
     local room = ctx.width - (pos > 0 and (W.width(table.concat(parts)) + 2) or 0)
-    local spark = C.sparkline(history, math.min(C.HISTORY, room))
+    local spark = C.sparkline(history, math.min(len, room))
     if spark then
       if pos > 0 then
         parts[#parts + 1] = "  "
@@ -128,6 +145,47 @@ function M.render(rs, show, ctx)
     add(table.concat(parts), spans)
   end
   return { lines = lines, hl = hl }
+end
+
+---Several values side by side (show.value_columns: names or { column, label, format,
+---unit, prefix }, like a Grafana stat with several fields); the change and sparkline
+---follow the first value only.
+function M.render(rs, show, ctx)
+  local cols = show.value_columns ~= vim.NIL and show.value_columns or nil
+  if not cols or #cols == 0 then
+    return one(rs, show, ctx, ctx.history)
+  end
+  local outs, cells, x, gap = {}, {}, 0, 4
+  local w = math.max(8, math.floor((ctx.width - gap * (#cols - 1)) / #cols))
+  for i, spec in ipairs(cols) do
+    local sub = {}
+    for k, v in pairs(show) do
+      sub[k] = v
+    end
+    sub.title, sub.value_columns = vim.NIL, vim.NIL
+    if type(spec) == "table" then
+      for k, v in pairs(spec) do
+        sub[k] = v
+      end
+      sub.value_column = spec.column
+      sub.label = spec.label ~= nil and spec.label or spec.column
+    else
+      sub.value_column, sub.label = spec, spec
+    end
+    local sctx = setmetatable({ width = w }, { __index = ctx })
+    outs[i] = one(rs, sub, sctx, i == 1 and ctx.history or {})
+    cells[i] = { x = x, width = w, y = 0, height = #outs[i].lines }
+    x = x + w + gap
+  end
+  local h = 0
+  for _, c in ipairs(cells) do
+    h = math.max(h, c.height)
+  end
+  for _, c in ipairs(cells) do
+    c.height = h
+  end
+  local out = require("dbdash.render.layout").compose(cells, outs)
+  return { lines = out.lines, hl = out.hl }
 end
 
 return M

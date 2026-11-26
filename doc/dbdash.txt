@@ -460,8 +460,8 @@ Examples and schema                                          *dbdash-examples*
 The `example/` directory of the plugin has runnable configs, one directory per
 topic (the sidebar shows them as a tree):
 
-  charts/       the CSS-like styles (css.yaml), one chart type per file, the
-                alternative styles (styles.yaml)
+  charts/       the CSS-like styles (css.yaml), and one file per chart type
+                with every style and option, one panel each
   dashboards/   several panels in a grid (multi_panel.yaml), a grid laid
                 out like CSS Grid (grid.yaml)
   templates/    arguments; every statement, filter, test, function and
@@ -600,17 +600,23 @@ Chart fields:                                                  *dbdash-charts*
              format}, mark_lines
   histogram  value_column, bins, bin_width, bin_range, style.{color,
              show_values, cumulative, normalize}, mark_lines
-  boxplot    category_column, value_column, style.{show_outliers, show_means}
-  heatmap    x_column, y_column, value_column, style.show_values
+  boxplot    category_column, value_column, colors, style.{show_outliers,
+             show_means, show_values, whiskers}
+  heatmap    x_column, y_column, value_column, style.{show_values,
+             color_scale, color_steps, scale_min, scale_max}, legend
   scatter    x_column, y_column, color_column, colors, style.{point,
              trend_line}, axes, mark_lines
   bubble     x_column, y_column, size_column, color_column, label_column,
              style.{size_range, point, trend_line}
-  pie        label_column, value_column,
-             style.{show_percentages, show_values, show_labels}, colors
+  pie        label_column, value_column, colors, format, legend,
+             style.{show_percentages, show_values, show_labels, sort, top,
+             other_label, donut, half}
   stat       value_column (default: the first numeric column; first row),
-             format (Python format), unit, delta, sparkline, thresholds
-  text       column_list, style.{separator, null_text, wrap, title_style}
+             reduce, format (Python format), prefix, unit, label,
+             thresholds, delta, delta_mode, sparkline, sparkline_length,
+             color_mode, text_size, value_columns
+  text       column_list, style.{separator, null_text, wrap, text_align,
+             max_lines, line_numbers, reverse, highlight}
 
 Style properties                                                *dbdash-css*
 
@@ -711,6 +717,23 @@ and `style.normalize: percent | density`; their `mark_lines` are values of
 the data, and the bin each falls in is colored (and labeled when
 horizontal).
 
+Box plots take `style.whiskers` (iqr, the default; minmax; or two
+percentiles such as [5, 95]) and `style.show_values` (q1, median and q3), and
+`renderer: vertical` draws upright boxes. Heat maps take `style.color_scale`
+(a list of "#rrggbb" stops), `style.color_steps: [{ value, color }]`
+(piecewise colors), `style.scale_min` / `scale_max`, and `legend: false`.
+Pie charts take `style.sort`, `style.top` (the rest in one slice named by
+`style.other_label`), `format`, `legend: false` or `{ position: bottom }`,
+and (circle) `style.donut` (the hole, a fraction of the radius; from 0.5 the
+total is written in it) and `style.half`. Stat charts take `reduce` (first,
+last, mean, min, max, sum, count of the rows), `prefix`, `label`,
+`delta_mode: absolute`, `sparkline_length`, `color_mode` (value, background,
+none), `text_size: normal` and `value_columns` (several values side by side:
+names or `{ column, label, format, unit, prefix }`). Text charts take
+`style.text_align`, `style.max_lines`, `style.line_numbers`, `style.reverse`
+(the last row first) and `style.highlight: [{ pattern, color }]` (a Vim regex
+per rule; the first match colors the line).
+
 Styles                                                         *dbdash-styles*
 
   type       renderer (first is the default)    canvas
@@ -720,7 +743,7 @@ Styles                                                         *dbdash-styles*
   bubble     canvas
   bar        horizontal, vertical
   histogram  horizontal, vertical
-  boxplot    boxdraw
+  boxplot    boxdraw, vertical
   heatmap    halfblock, block
   pie        bar, circle                        (circle: canvas)
   table      box

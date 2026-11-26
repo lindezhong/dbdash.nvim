@@ -18,10 +18,36 @@ function M.items(rs, show, ctx)
       sum = sum + v
     end
   end
+  -- style.sort (asc / desc by value) and style.top: the first N, the rest as one slice
+  -- (style.other_label, default "Other"), as ECharts examples do.
+  local style = C.nn(show.style) or {}
+  local order = C.nn(style.sort)
+  if order == "asc" or order == "desc" then
+    table.sort(items, function(a, b)
+      if order == "asc" then
+        return a.value < b.value
+      end
+      return a.value > b.value
+    end)
+  end
+  local top = tonumber(C.nn(style.top))
+  if top and #items > top then
+    local rest = 0
+    for i = top + 1, #items do
+      rest = rest + items[i].value
+    end
+    items = { unpack(items, 1, top) }
+    items[#items + 1] = { label = C.nn(style.other_label) or "Other", value = rest, other = true }
+  end
   for i, it in ipairs(items) do
-    it.group = C.color(ctx, show, i, nil, it.label)
+    it.group = it.other and "DbDashMuted" or C.color(ctx, show, i, nil, it.label)
   end
   return items, sum
+end
+
+---Where the legend goes: "right" (beside the circle, the default), "bottom" or "none".
+function M.legend_position(show)
+  return C.legend_position(show, 2)
 end
 
 ---Legend lines "■ label  value  pct%" honoring style.show_labels / show_values /
@@ -36,7 +62,7 @@ function M.legend(items, sum, show, max_label)
   local lw, vw = 0, 0
   for _, it in ipairs(items) do
     lw = math.max(lw, W.width(it.label))
-    vw = math.max(vw, #fmt.number(it.value))
+    vw = math.max(vw, #fmt.value(it.value, C.nn(show.format)))
   end
   lw = math.min(lw, max_label or 30)
   local out = {}
@@ -54,7 +80,7 @@ function M.legend(items, sum, show, max_label)
       put(" " .. W.pad(it.label, lw), "DbDashLegend")
     end
     if show_values then
-      put("  " .. W.pad(fmt.number(it.value), vw, "right"), "DbDashNumber")
+      put("  " .. W.pad(fmt.value(it.value, C.nn(show.format)), vw, "right"), "DbDashNumber")
     end
     if show_pct then
       put(("  %5.1f%%"):format(it.value / sum * 100), "DbDashMuted")

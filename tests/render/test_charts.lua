@@ -257,6 +257,73 @@ T["histogram: bin_width, bin_range, cumulative, percent"] = function()
   eq(bins[#bins].value, 100)
 end
 
+-- boxplot, heatmap, pie, stat and text options -------------------------------------------
+
+T["boxplot: whiskers, values, vertical renderer"] = function()
+  local B = require("dbdash.render.charts.boxplot.boxdraw")
+  local vals = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 100 }
+  eq(#B.stats(vim.deepcopy(vals)).outliers, 1)
+  eq(#B.stats(vim.deepcopy(vals), "minmax").outliers, 0)
+  eq(B.stats(vim.deepcopy(vals), "minmax").whi, 100)
+  local rows = vim.tbl_map(function(v)
+    return { v }
+  end, vals)
+  local rs = resultset.new({ { name = "v", type = "integer" } }, rows)
+  local text = text_of(render.render(rs, { type = "boxplot", value_column = "v", style = { show_values = true } }, { width = 60, height = 12 }))
+  eq(text:find("5.5", 1, true) ~= nil, true) -- the median under the box
+  text = text_of(render.render(rs, { type = "boxplot", renderer = "vertical", value_column = "v" }, { width = 40, height = 14 }))
+  eq({ text:find("┌", 1, true) ~= nil, text:find("├", 1, true) ~= nil }, { true, true })
+end
+
+T["heatmap: color_steps, scale range, legend off"] = function()
+  local rs = resultset.new(
+    { { name = "x", type = "string" }, { name = "y", type = "string" }, { name = "v", type = "integer" } },
+    { { "a", "r", 1 }, { "b", "r", 50 }, { "a", "s", 90 }, { "b", "s", 10 } }
+  )
+  local show = { type = "heatmap", x_column = "x", y_column = "y", value_column = "v", style = { color_steps = { { value = 0, color = "#00ff00" }, { value = 60, color = "#ff0000" } } } }
+  local text = text_of(render.render(rs, show, { width = 40, height = 10 }))
+  eq({ text:find("≥0", 1, true) ~= nil, text:find("≥60", 1, true) ~= nil }, { true, true })
+  show = { type = "heatmap", x_column = "x", y_column = "y", value_column = "v", legend = false, style = { scale_min = 0, scale_max = 200, color_scale = { "#000000", "#ffffff" } } }
+  text = text_of(render.render(rs, show, { width = 40, height = 10 }))
+  eq(text:find("200", 1, true), nil) -- no legend
+end
+
+T["pie: top + Other, donut total, half, legend off, format"] = function()
+  local rs = resultset.new({ { name = "l", type = "string" }, { name = "v", type = "integer" } }, { { "a", 50 }, { "b", 30 }, { "c", 15 }, { "d", 5 } })
+  local text = text_of(render.render(rs, { type = "pie", label_column = "l", value_column = "v", format = "{} u", style = { sort = "asc", top = 2 } }, { width = 50, height = 12 }))
+  eq({ text:find("Other", 1, true) ~= nil, text:find("80 u", 1, true) ~= nil, text:find("■ d", 1, true) ~= nil }, { true, true, true })
+  text = text_of(render.render(rs, { type = "pie", renderer = "circle", label_column = "l", value_column = "v", style = { donut = 0.6 } }, { width = 60, height = 14 }))
+  eq(text:find("100", 1, true) ~= nil, true)
+  local full = render.render(rs, { type = "pie", renderer = "circle", label_column = "l", value_column = "v", legend = false }, { width = 60, height = 14 })
+  local half = render.render(rs, { type = "pie", renderer = "circle", label_column = "l", value_column = "v", legend = false, style = { half = true } }, { width = 60, height = 14 })
+  eq(#half.lines < #full.lines, true)
+  eq(text_of(full):find("■", 1, true), nil)
+end
+
+T["stat: reduce, prefix, label, delta_mode, several values"] = function()
+  local rs = resultset.new({ { name = "a", type = "integer" }, { name = "b", type = "integer" } }, { { 10, 1 }, { 30, 2 } })
+  local C = require("dbdash.render.charts.stat.common")
+  for reduce, want in pairs({ first = 10, last = 30, sum = 40, mean = 20, min = 10, max = 30, count = 2 }) do
+    eq({ reduce, C.value(rs, { reduce = reduce }) }, { reduce, want })
+  end
+  eq(C.delta({ 10, 15 }, "absolute").text, "↑ 5")
+  local out = render.render(rs, { type = "stat", text_size = "normal", prefix = "$", label = "total", reduce = "sum" }, { width = 40, height = 8 })
+  eq({ out.lines[1], out.lines[2] }, { "$40", "total" })
+  local text = text_of(render.render(rs, { type = "stat", text_size = "normal", value_columns = { "a", { column = "b", label = "bee" } } }, { width = 40, height = 8 }))
+  eq(text:find("bee", 1, true) ~= nil, true)
+end
+
+T["text: align, numbers, max_lines, highlight, reverse"] = function()
+  local rs = resultset.new({ { name = "l", type = "string" } }, { { "INFO up" }, { "ERROR down" }, { "INFO ok" } })
+  local out = render.render(rs, { type = "text", style = { reverse = true, line_numbers = true, max_lines = 2, highlight = { { pattern = "ERROR", color = "Error" } } } }, { width = 30, height = 8 })
+  eq({ out.lines[1], out.lines[2], out.lines[3] }, { "1 INFO ok", "2 ERROR down", "… 1 more lines (style.max_lines)" })
+  eq(vim.tbl_filter(function(h)
+    return h.group == "Error"
+  end, out.hl)[1].row, 1)
+  out = render.render(rs, { type = "text", style = { text_align = "right" } }, { width = 30, height = 8 })
+  eq(#out.lines[1], 30)
+end
+
 -- stat ----------------------------------------------------------------------------------
 
 local function stat_rs(v, typ)

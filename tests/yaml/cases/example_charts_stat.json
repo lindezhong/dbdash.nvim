@@ -1,27 +1,136 @@
 {
+ "title": "Stat",
+ "description": "A stat shows one value in large digits, its change since the previous refresh and a\nsparkline of the last refreshes. The value is the first row of `value_column` (default:\nthe first numeric column), or `reduce` of all rows. See `:help dbdash-chart-types`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
- "query": {
-  "sql": "SELECT 'active' AS label, 900 + abs(random() % 300) AS users\n"
- },
  "show": {
-  "type": "stat",
-  "title": "Active users",
-  "value_column": "users",
-  "format": "{:,}",
-  "unit": "users",
-  "interval": "5s",
-  "thresholds": [
-   {
-    "value": 1000,
-    "color": "yellow"
+  "interval": "5s"
+ },
+ "layout": {
+  "columns": 2
+ },
+ "panels": [
+  {
+   "query": {
+    "sql": "SELECT 900 + abs(random() % 300) AS users\n"
    },
-   {
-    "value": 1190,
-    "color": "red",
-    "notify": true
+   "show": {
+    "type": "stat",
+    "title": "format, unit, thresholds (notify)",
+    "description": "`format` is a Python format (\"{:,}\"), `unit` follows the value. `thresholds` color it\n(>= 1000 yellow, >= 1190 red); a step with `notify: true` also notifies once when the\nvalue rises to it.\n",
+    "value_column": "users",
+    "format": "{:,}",
+    "unit": "users",
+    "thresholds": [
+     {
+      "value": 1000,
+      "color": "yellow"
+     },
+     {
+      "value": 1190,
+      "color": "red",
+      "notify": true
+     }
+    ]
    }
-  ]
- }
+  },
+  {
+   "query": {
+    "sql": "SELECT abs(random() % 100) AS free_pct\n"
+   },
+   "show": {
+    "type": "stat",
+    "title": "thresholds_below, delta_mode: absolute",
+    "description": "`thresholds_below: true`: lower is worse (free space under 30 yellow, under 10 red).\n`delta_mode: absolute` shows the change as an amount, not a percentage.\n",
+    "format": "{:.0f}%",
+    "thresholds_below": true,
+    "thresholds": [
+     {
+      "value": 30,
+      "color": "yellow"
+     },
+     {
+      "value": 10,
+      "color": "red"
+     }
+    ],
+    "delta_mode": "absolute"
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 10)\nSELECT 100 + abs(random() % 50) AS amount FROM n\n"
+   },
+   "show": {
+    "type": "stat",
+    "title": "reduce: sum, prefix, label",
+    "description": "`reduce: sum` adds up all rows (also `first`, `last`, `mean`, `min`, `max`, `count`;\nGrafana `reduceOptions.calcs`); `prefix` comes before the value, `label` is a muted\nline under it.\n",
+    "value_column": "amount",
+    "reduce": "sum",
+    "prefix": "$",
+    "label": "revenue, last 10 orders"
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT abs(random() % 500) AS queue\n"
+   },
+   "show": {
+    "type": "stat",
+    "title": "color_mode: background, sparkline_length",
+    "description": "`color_mode: background` shows the value reversed, in its color as the background\n(Grafana `colorMode`; `none` leaves it plain). `sparkline_length: 40` keeps the last 40\nrefreshes.\n",
+    "color_mode": "background",
+    "sparkline_length": 40,
+    "thresholds": [
+     {
+      "value": 0,
+      "color": "green"
+     },
+     {
+      "value": 400,
+      "color": "red"
+     }
+    ]
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT abs(random() % 10000) / 100.0 AS latency\n"
+   },
+   "show": {
+    "type": "stat",
+    "title": "text_size: normal, delta: false, sparkline: false",
+    "description": "`text_size: normal` writes the value on one line instead of block digits; `delta:\nfalse` and `sparkline: false` hide the second line.\n",
+    "format": "{:.2f} ms",
+    "text_size": "normal",
+    "delta": false,
+    "sparkline": false
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 1200 + abs(random() % 300) AS orders, abs(random() % 100) / 100.0 AS conversion,\n       40 + abs(random() % 20) AS refunds\n"
+   },
+   "show": {
+    "type": "stat",
+    "title": "value_columns: several values",
+    "description": "`value_columns` shows several values side by side (a Grafana stat with several fields),\neach a column name or `{ column, label, format, unit, prefix }`. The change and\nsparkline follow the first value.\n",
+    "span": 2,
+    "value_columns": [
+     "orders",
+     {
+      "column": "conversion",
+      "label": "conversion",
+      "format": "{:.0%}"
+     },
+     {
+      "column": "refunds",
+      "label": "refunds",
+      "prefix": "-"
+     }
+    ]
+   }
+  }
+ ]
 }

@@ -14,6 +14,7 @@ end
 
 function M.render(rs, show, ctx)
   local g = H.grid(rs, show)
+  local scale = H.colors(show, g)
   local axes = C.axes(show)
   local style = C.nn(show.style) or {}
   local spec = { title = C.nn(show.title), xlabel = axes.xlabel, ylabel = axes.ylabel, ylabels = g.ys, height = #g.ys, min_rows = #g.ys }
@@ -21,7 +22,7 @@ function M.render(rs, show, ctx)
   local vw = 0
   if C.nn(style.show_values) == true then
     for _, v in pairs(g.values) do
-      vw = math.max(vw, #fmt.number(v))
+      vw = math.max(vw, #fmt.value(v, axes.yformat))
     end
   end
   local cw = math.max(2, math.min(math.max(6, vw + 1), math.floor(cols / math.max(#g.xs, 1))))
@@ -33,10 +34,10 @@ function M.render(rs, show, ctx)
       local v = H.get(g, x, y)
       local s, group
       if v then
-        local hex = H.level_hex(H.level(v, g.lo, g.hi))
+        local hex = scale.color(v)
         if show_values then
-          s = W.pad(fmt.number(v), cw, "center")
-          group = ctx.color(text_color(hex) .. " on " .. hex)
+          s = W.pad(fmt.value(v, axes.yformat), cw, "center")
+          group = hex:match("^#%x%x%x%x%x%x$") and ctx.color(text_color(hex) .. " on " .. hex) or ctx.color("reverse " .. hex)
         else
           s = string.rep("█", cw)
           group = ctx.color(hex)
@@ -65,7 +66,7 @@ function M.render(rs, show, ctx)
   for _, l in ipairs(g.ys) do
     m = math.max(m, W.width(l))
   end
-  return H.legend(ctx, out, g, m + 2)
+  return H.legend(ctx, out, g, m + 2, scale, show)
 end
 
 return M

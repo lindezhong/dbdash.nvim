@@ -1,25 +1,99 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# Text chart: the result as plain text, without a table. Each row is its cells joined by
-# style.separator (a space), so a one-column query shows one line per row. Strings are
-# shown as they are: newlines in a cell start new lines (the last row below). NULL shows
-# as style.null_text (empty), and long lines wrap (style.wrap: false cuts them).
-# A string from lua:// or HTTP needs query.transform: return { { text = rs } }.
+# Text: every option, one panel each (press K on a panel). The rows as plain text, like a
+# log viewer: separators, wrapping, alignment, line numbers, colored matches, newest
+# first, and a line limit.
+
+title: "Text"
+description: |
+  A text chart shows the result without a table: each row is its cells joined by
+  `style.separator`; newlines in a cell start new lines and long lines wrap. Good for
+  logs, messages and `lua://` output. See `:help dbdash-chart-types`.
 
 database:
   url: "sqlite3:///:memory:"        # sqlite3:// is the same as sqlite://
 
-query:
-  sql: |
-    WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 6)
-    SELECT time('now', '-' || (6 - i) || ' minutes') AS at,
-           CASE abs(random() % 3) WHEN 0 THEN 'WARN ' ELSE 'INFO ' END AS level,
-           'request ' || i || ' served in ' || (20 + abs(random() % 200)) || ' ms' AS message
-    FROM n
-    UNION ALL
-    SELECT time('now'), 'ERROR', 'upstream failed:' || char(10) || '    timeout after 30s'
-
 show:
-  type: text
-  title: "Recent log lines"
-  interval: 10s
+  interval: 5m
+
+layout:
+  columns: 2
+
+panels:
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 12)
+        SELECT strftime('%H:%M:%S', 'now', '-' || (12 - i) || ' minutes') AS at,
+               CASE WHEN i % 5 = 0 THEN 'ERROR' WHEN i % 3 = 0 THEN 'WARN ' ELSE 'INFO ' END AS level,
+               'request ' || i || ' served in ' || (i * 37 % 200) || ' ms' AS message
+        FROM n
+    show:
+      type: text
+      title: "separator, column_list"
+      description: |
+        `column_list` picks and orders the columns, `separator` joins them (default a space).
+      column_list: [at, level, message]
+      style: { separator: " │ " }
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 12)
+        SELECT strftime('%H:%M:%S', 'now', '-' || (12 - i) || ' minutes') AS at,
+               CASE WHEN i % 5 = 0 THEN 'ERROR' WHEN i % 3 = 0 THEN 'WARN ' ELSE 'INFO ' END AS level,
+               'request ' || i || ' served in ' || (i * 37 % 200) || ' ms' AS message
+        FROM n
+    show:
+      type: text
+      title: "highlight, reverse, line_numbers"
+      description: |
+        `highlight` colors the lines that match a Vim regex (the first rule wins), `reverse`
+        puts the last row first (newest on top), `line_numbers` numbers the rows.
+      style:
+        reverse: true
+        line_numbers: true
+        highlight:
+          - { pattern: "ERROR", color: "#e06c75" }
+          - { pattern: "WARN", color: "#e5c07b" }
+  - query:
+      sql: |
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 12)
+        SELECT strftime('%H:%M:%S', 'now', '-' || (12 - i) || ' minutes') AS at,
+               CASE WHEN i % 5 = 0 THEN 'ERROR' WHEN i % 3 = 0 THEN 'WARN ' ELSE 'INFO ' END AS level,
+               'request ' || i || ' served in ' || (i * 37 % 200) || ' ms' AS message
+        FROM n
+    show:
+      type: text
+      title: "max_lines, color"
+      description: |
+        `max_lines` shows the first N lines and how many more there are; `style.color` colors
+        the text (CSS `color`).
+      style: { max_lines: 5, color: "#98c379" }
+  - query:
+      sql: |
+        SELECT 'A long message that does not fit on one line of the panel wraps at the spaces, as text does in a browser.' AS t
+        UNION ALL SELECT 'first line' || char(10) || 'second line of the same cell'
+    show:
+      type: text
+      title: "wrap (default), newlines"
+      description: |
+        Long lines wrap at spaces (`wrap: true`, CSS `white-space: normal`; `"char"` breaks
+        anywhere); newlines in a cell start new lines.
+  - query:
+      sql: |
+        SELECT 'A long message that does not fit on one line of the panel is cut at the edge, wherever that edge happens to be in your window.' AS t
+    show:
+      type: text
+      title: "wrap: false, ellipsis"
+      description: |
+        `wrap: false` keeps one line per row and cuts it at the edge (`ellipsis` marks the cut,
+        CSS `text-overflow`).
+      style: { wrap: false, ellipsis: "…" }
+  - query:
+      sql: |
+        SELECT 'centered' AS t UNION ALL SELECT 'text' UNION ALL SELECT NULL
+    show:
+      type: text
+      title: "text_align: center, null_text"
+      description: |
+        `text_align` is CSS `text-align` for the lines (left, center, right); `null_text` is
+        what a NULL shows (default nothing).
+      style: { text_align: center, null_text: "(none)" }

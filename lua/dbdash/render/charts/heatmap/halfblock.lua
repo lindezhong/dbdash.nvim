@@ -8,6 +8,7 @@ local M = { name = "halfblock" }
 
 function M.render(rs, show, ctx)
   local g = H.grid(rs, show)
+  local scale = H.colors(show, g)
   local axes = C.axes(show)
   local rows = math.ceil(#g.ys / 2)
   local ylabels = {}
@@ -21,7 +22,7 @@ function M.render(rs, show, ctx)
   local lines, hl = {}, {}
   local function color_of(x, y)
     local v = y and H.get(g, x, y)
-    return v and H.level_hex(H.level(v, g.lo, g.hi)) or nil
+    return v and scale.color(v) or nil
   end
   for r = 1, rows do
     local parts, pos = {}, 0
@@ -59,7 +60,7 @@ function M.render(rs, show, ctx)
   for _, l in ipairs(spec.ylabels) do
     m = math.max(m, W.width(l))
   end
-  return H.legend(ctx, out, g, m + 2)
+  return H.legend(ctx, out, g, m + 2, scale, show)
 end
 
 return M
