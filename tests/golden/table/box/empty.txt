@@ -3,7 +3,7 @@
 │┃ a ┃
   ^ 0-3 DbDashBorder
   ^ 4-5 DbDashHeader
-  ^ 5-9 DbDashBorder
+  ^ 6-9 DbDashBorder
 │┡━━━┩
   ^ 0-15 DbDashBorder
 │└───┘

@@ -3,57 +3,57 @@
 │┃ 部门       ┃ 人数 ┃ Manager ┃ Missing ┃
   ^ 0-3 DbDashBorder
   ^ 4-16 DbDashC_bold_blue
-  ^ 16-20 DbDashBorder
+  ^ 17-20 DbDashBorder
   ^ 21-27 DbDashC_bold_blue
-  ^ 27-31 DbDashBorder
+  ^ 28-31 DbDashBorder
   ^ 32-39 DbDashC_bold_blue
-  ^ 39-43 DbDashBorder
+  ^ 40-43 DbDashBorder
   ^ 44-51 DbDashC_bold_blue
-  ^ 51-55 DbDashBorder
+  ^ 52-55 DbDashBorder
 │┡━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
   ^ 0-123 DbDashBorder
 ││ IT         │   42 │ Alice   │ NULL    │
   ^ 0-3 DbDashBorder
-  ^ 14-18 DbDashBorder
-  ^ 23-27 DbDashBorder
-  ^ 35-39 DbDashBorder
+  ^ 15-18 DbDashBorder
+  ^ 24-27 DbDashBorder
+  ^ 36-39 DbDashBorder
   ^ 40-47 DbDashNull
-  ^ 47-51 DbDashBorder
+  ^ 48-51 DbDashBorder
 ││ HR         │    7 │ NULL    │ NULL    │
   ^ 0-3 DbDashBorder
-  ^ 14-18 DbDashBorder
-  ^ 23-27 DbDashBorder
+  ^ 15-18 DbDashBorder
+  ^ 24-27 DbDashBorder
   ^ 28-35 DbDashNull
-  ^ 35-39 DbDashBorder
+  ^ 36-39 DbDashBorder
   ^ 40-47 DbDashNull
-  ^ 47-51 DbDashBorder
+  ^ 48-51 DbDashBorder
 ││ Finance    │   15 │ 王小明  │ NULL    │
   ^ 0-3 DbDashBorder
-  ^ 14-18 DbDashBorder
-  ^ 23-27 DbDashBorder
-  ^ 38-42 DbDashBorder
+  ^ 15-18 DbDashBorder
+  ^ 24-27 DbDashBorder
+  ^ 39-42 DbDashBorder
   ^ 43-50 DbDashNull
-  ^ 50-54 DbDashBorder
+  ^ 51-54 DbDashBorder
 ││ Research & │  120 │ Bob     │ NULL    │
   ^ 0-3 DbDashBorder
-  ^ 14-18 DbDashBorder
-  ^ 23-27 DbDashBorder
-  ^ 35-39 DbDashBorder
+  ^ 15-18 DbDashBorder
+  ^ 24-27 DbDashBorder
+  ^ 36-39 DbDashBorder
   ^ 40-47 DbDashNull
-  ^ 47-51 DbDashBorder
+  ^ 48-51 DbDashBorder
 ││ Developmen │      │         │         │
   ^ 0-3 DbDashBorder
-  ^ 14-18 DbDashBorder
-  ^ 23-27 DbDashBorder
-  ^ 35-39 DbDashBorder
+  ^ 15-18 DbDashBorder
+  ^ 24-27 DbDashBorder
+  ^ 36-39 DbDashBorder
   ^ 40-47 DbDashNull
-  ^ 47-51 DbDashBorder
+  ^ 48-51 DbDashBorder
 ││ t          │      │         │         │
   ^ 0-3 DbDashBorder
-  ^ 14-18 DbDashBorder
-  ^ 23-27 DbDashBorder
-  ^ 35-39 DbDashBorder
+  ^ 15-18 DbDashBorder
+  ^ 24-27 DbDashBorder
+  ^ 36-39 DbDashBorder
   ^ 40-47 DbDashNull
-  ^ 47-51 DbDashBorder
+  ^ 48-51 DbDashBorder
 │└────────────┴──────┴─────────┴─────────┘
   ^ 0-123 DbDashBorder

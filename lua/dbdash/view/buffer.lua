@@ -106,7 +106,7 @@ function M.draw(buf, lines, hl)
     pcall(vim.api.nvim_buf_set_extmark, buf, M.ns, h.row, h.col_s, {
       end_col = h.col_e,
       hl_group = h.group,
-      priority = 100,
+      priority = h.priority or 100, -- backgrounds (style.background) lie below
     })
   end
 end

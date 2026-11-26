@@ -102,10 +102,18 @@ function M.render(rs, show, ctx)
     local text = table.concat(parts, sep):gsub("\r\n", "\n"):gsub("\r", "")
     for line in (text .. "\n"):gmatch("([^\n]*)\n") do
       line = expand_tabs(line)
+      local pieces
       if do_wrap then
-        vim.list_extend(lines, W.wrap(line, ctx.width, wrap == "char" and "char" or "word"))
+        pieces = W.wrap(line, ctx.width, wrap == "char" and "char" or "word")
       else
-        lines[#lines + 1] = W.truncate(line, ctx.width, "")
+        -- CSS text-overflow: clip by default, style.ellipsis to mark the cut
+        pieces = { W.truncate(line, ctx.width, nn(style.ellipsis) or "") }
+      end
+      for _, piece in ipairs(pieces) do
+        lines[#lines + 1] = piece
+        if piece ~= "" then
+          hl[#hl + 1] = { row = #lines - 1, col_s = 0, col_e = #piece, group = "DbDashText" }
+        end
       end
     end
   end

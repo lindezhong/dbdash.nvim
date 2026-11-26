@@ -1,0 +1,165 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# The CSS-like styles every chart takes (show.style, :help dbdash-css), one panel per
+# property, the same data each time. Press K on a panel for the CSS it stands for.
+# Colors are CSS-like values: "#3498db", "blue", "bold red on #202020", or a highlight
+# group such as "DiagnosticOk".
+
+title: "Styles (CSS)"
+description: |
+  Every chart type takes these `show.style` properties; they cascade from setup
+  `styles` to the top-level `show.style` to each panel's, key by key, like CSS rules.
+  See `:help dbdash-css`.
+
+database:
+  url: "sqlite:///:memory:"
+
+interval: 10m
+
+show:                                # shared by every panel (a cascade, like CSS)
+  interval: 10m
+
+layout:
+  columns: 3
+
+panels:
+  - query:
+      sql: SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      type: bar
+      title: "color, value_style, label_style"
+      description: |
+        CSS `color` for the data (`style.color`) and one color per part:
+        `value_style` (the numbers), `label_style` (the categories).
+      x_column: region
+      y_column: sales
+      style: { color: "#e5c07b", value_style: "bold #98c379", label_style: "italic" }
+
+  - query:
+      sql: SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      type: bar
+      title: "background, padding"
+      description: |
+        CSS `background-color` (`style.background`) and `padding` (`[1, 2]`: one line
+        above and below, two columns left and right).
+      x_column: region
+      y_column: sales
+      style: { background: "#1e2030", padding: [1, 2] }
+
+  - query:
+      sql: SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      type: bar
+      title: "panel_border, border_style"
+      description: |
+        A box around the panel (CSS `border` on the panel, `style.panel_border`: single,
+        rounded, heavy, double, dashed or ascii) with the title in its top line, colored by
+        `border_style` (CSS `border-color`).
+      x_column: region
+      y_column: sales
+      style: { panel_border: rounded, border_style: "#61afef" }
+
+  - query:
+      sql: SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      type: line
+      renderer: canvas
+      title: "border: double, axis_style"
+      description: |
+        The plot's own border line (CSS `border-style`: `style.border` single, rounded,
+        heavy, double, dashed, ascii or none) and the tick labels' color (`axis_style`).
+      x_column: region
+      y_column: sales
+      style: { border: double, axis_style: "#c678dd" }
+
+  - query:
+      sql: SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      type: line
+      title: "show_axes: false, border: none"
+      description: |
+        CSS `display: none` for parts: `show_axes: false` hides the tick labels and axis
+        titles, `border: none` the plot frame.
+      x_column: region
+      y_column: sales
+      style: { show_axes: false, border: none }
+
+  - query:
+      sql: SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      type: pie
+      title: "legend_style, title_style"
+      description: |
+        `legend_style` colors the legend labels; `title_style` the title (CSS `font-weight`
+        and `color` in one value: `"bold underline #e06c75"`).
+      label_column: region
+      value_column: sales
+      style: { legend_style: "#56b6c2", title_style: "bold underline #e06c75" }
+
+  - query:
+      sql: SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      type: stat
+      title: "justify / align: center"
+      description: |
+        Where the chart sits in its cell (CSS `justify-self` / `align-self`): `justify`
+        start, center, end or stretch; `align` start, center or end.
+      value_column: sales
+      style: { justify: center, align: center, color: "bold #98c379" }
+
+  - query:
+      sql: SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      type: bar
+      title: "title_align: right"
+      description: "The title's position (CSS `text-align`): left, center or right."
+      x_column: region
+      y_column: sales
+      style: { title_align: right }
+
+  - query:
+      sql: SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      type: bar
+      title: "show_title: false (this title is hidden)"
+      description: "CSS `display: none` for the title; K still shows this description."
+      x_column: region
+      y_column: sales
+      style: { show_title: false, panel_border: dashed }
+
+  - query:
+      sql: SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80 UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
+    show:
+      type: table
+      title: "table: border, padding, striped"
+      description: |
+        A table with one line style (`border: rounded`), no cell padding (CSS `padding: 0`
+        of the cells, Bootstrap `.table-sm`), every other row shaded (CSS
+        `:nth-child(even)`, Bootstrap `.table-striped`) and NULL in its own color.
+      style: { border: rounded, cell_padding: 0, striped: "#2c313a", null_style: "italic #5c6370", header_style: "bold" }
+
+  - query:
+      sql: SELECT 'a long text that wraps inside its column' AS text, 'top' AS a
+    show:
+      type: table
+      title: "table: wrap, vertical_align, align"
+      description: |
+        Long cells wrap (CSS `white-space: normal`); a short cell in a tall row sits by
+        `vertical_align` (top, middle, bottom); `column_list[].align` is CSS `text-align`
+        for one column. `cell_height: 3` keeps at most three lines per cell (CSS
+        `line-clamp`); the rest ends with "…".
+      column_list:
+        - { column: text, width: 14 }
+        - { column: a, align: center, width: 7 }
+      style: { vertical_align: middle, cell_height: 3 }
+
+  - query:
+      sql: SELECT 'a long text that does not fit in one line' AS text
+    show:
+      type: table
+      title: "table: wrap: false, ellipsis"
+      description: |
+        `wrap: false` keeps one line (CSS `white-space: nowrap`) and cuts with `ellipsis`
+        (CSS `text-overflow`, default "…"); `cell_width` sets every column's width.
+      style: { wrap: false, ellipsis: "...", cell_width: 16 }

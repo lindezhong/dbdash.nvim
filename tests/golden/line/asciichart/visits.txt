@@ -1,5 +1,5 @@
-│                          Hourly visits
-  ^ 26-39 DbDashTitle
+│                             Hourly visits
+  ^ 29-42 DbDashTitle
 │    ┌────────────────────────────────────────────────────────┐
   ^ 4-178 DbDashBorder
 │150 │                                  ╭──╮                  │ ─ visits
@@ -11,7 +11,7 @@
   ^ 50-53 DbDashSeries1
   ^ 71-74 DbDashBorder
   ^ 75-78 DbDashSeries1
-  ^ 78-85 DbDashLabel
+  ^ 78-85 DbDashLegend
 │    │                       ╭─╮      ╭─╯  ╰─╮                │ ─ Signups
   ^ 4-7 DbDashBorder
   ^ 30-33 DbDashSeries1
@@ -25,7 +25,7 @@
   ^ 62-65 DbDashSeries1
   ^ 81-84 DbDashBorder
   ^ 85-88 DbDashSeries2
-  ^ 88-96 DbDashLabel
+  ^ 88-96 DbDashLegend
 │    │                       │ ╰─╮  ╭─╯      │                │
   ^ 4-7 DbDashBorder
   ^ 30-33 DbDashSeries1

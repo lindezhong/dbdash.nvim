@@ -1,5 +1,5 @@
-│                               Hourly visits
-  ^ 31-44 DbDashTitle
+│                             Hourly visits
+  ^ 29-42 DbDashTitle
 │count
   ^ 0-5 DbDashLabel
 │    ┌──────────────────────────────────────────────────────────────────┐
@@ -60,6 +60,6 @@
   ^ 36-40 DbDashLabel
 │    ■ visits  ■ Signups
   ^ 4-7 DbDashSeries1
-  ^ 7-14 DbDashLabel
+  ^ 7-14 DbDashLegend
   ^ 16-19 DbDashSeries2
-  ^ 19-27 DbDashLabel
+  ^ 19-27 DbDashLegend

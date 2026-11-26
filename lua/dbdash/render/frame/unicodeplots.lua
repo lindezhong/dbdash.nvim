@@ -9,6 +9,7 @@
 --        00:00   23:00
 --             x title
 local W = require("dbdash.util.width")
+local borders = require("dbdash.render.borders")
 
 local M = { name = "unicodeplots" }
 
@@ -61,9 +62,24 @@ local function margin(spec)
   return m
 end
 
+---show.style through ctx: the border line style (CSS border-style) and show_axes
+---(display: none of the tick labels and axis titles). Charts fill in their ticks between
+---plot_size() calls, so this runs on every call.
+function M.apply_style(ctx, spec)
+  if spec.border ~= false and not spec.chars then
+    spec.chars = borders.get(ctx.border, "single")
+    spec.border = spec.chars ~= nil
+  end
+  if ctx.show_axes == false then
+    spec.ylabels, spec.yticks, spec.xticks = nil, nil, nil
+    spec.x_axis, spec.xlabel, spec.ylabel = false, nil, nil
+  end
+end
+
 ---Plot area size for the context and spec.
 ---@return integer cols, integer rows
 function M.plot_size(ctx, spec)
+  M.apply_style(ctx, spec)
   local border = spec.border ~= false and 2 or 0
   local left = margin(spec) + (margin(spec) > 0 and 1 or 0)
   local cols = ctx.width - left - border - legend_width(spec)
@@ -84,6 +100,8 @@ end
 ---@param body { lines: string[], hl: table[] }
 ---@return dbdash.render.Output
 function M.render(ctx, spec, body)
+  M.apply_style(ctx, spec)
+  local ch = spec.chars or borders.STYLES.single
   local cols, rows = 0, #body.lines
   for _, l in ipairs(body.lines) do
     cols = math.max(cols, W.width(l))
@@ -122,14 +140,14 @@ function M.render(ctx, spec, body)
     if legend_right and e then
       b.put(" ")
       b.put(e.symbol or "■", e.group)
-      b.put(" " .. W.truncate(e.label, 24), "DbDashLabel")
+      b.put(" " .. W.truncate(e.label, 24), "DbDashLegend")
     end
   end
 
   if border then
     local b = builder()
     b.put(string.rep(" ", left))
-    b.put("┌" .. string.rep("─", cols) .. "┐", "DbDashBorder")
+    b.put(ch.tl .. string.rep(ch.h, cols) .. ch.tr, "DbDashBorder")
     add(b.done())
   end
   for r = 0, rows - 1 do
@@ -143,7 +161,7 @@ function M.render(ctx, spec, body)
       b.put(" ")
     end
     if border then
-      b.put("│", "DbDashBorder")
+      b.put(ch.v, "DbDashBorder")
     end
     local line = body.lines[r + 1] or ""
     local base = b.pos
@@ -158,7 +176,7 @@ function M.render(ctx, spec, body)
       b.put(string.rep(" ", pad))
     end
     if border then
-      b.put("│", "DbDashBorder")
+      b.put(ch.v, "DbDashBorder")
     end
     legend_cell(b, r + 1)
     add(b.done())
@@ -166,7 +184,7 @@ function M.render(ctx, spec, body)
   if border then
     local b = builder()
     b.put(string.rep(" ", left))
-    b.put("└" .. string.rep("─", cols) .. "┘", "DbDashBorder")
+    b.put(ch.bl .. string.rep(ch.h, cols) .. ch.br, "DbDashBorder")
     add(b.done())
   end
 
@@ -212,7 +230,7 @@ function M.render(ctx, spec, body)
         b.put("  ")
       end
       b.put(e.symbol or "■", e.group)
-      b.put(" " .. e.label, "DbDashLabel")
+      b.put(" " .. e.label, "DbDashLegend")
     end
     add(b.done())
   end

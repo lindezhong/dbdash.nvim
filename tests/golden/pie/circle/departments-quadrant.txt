@@ -16,7 +16,7 @@
   ^ 0-18 DbDashSeries4
   ^ 18-36 DbDashSeries1
   ^ 39-42 DbDashSeries1
-  ^ 42-65 DbDashLabel
+  ^ 42-65 DbDashLegend
   ^ 65-70 DbDashNumber
   ^ 70-78 DbDashMuted
 │████████████   ■ HR                        7    3.8%
@@ -24,7 +24,7 @@
   ^ 18-33 DbDashSeries1
   ^ 33-36 DbDashSeries2
   ^ 39-42 DbDashSeries2
-  ^ 42-65 DbDashLabel
+  ^ 42-65 DbDashLegend
   ^ 65-70 DbDashNumber
   ^ 70-78 DbDashMuted
 │████████████   ■ Finance                  15    8.2%
@@ -32,14 +32,14 @@
   ^ 18-24 DbDashSeries3
   ^ 24-36 DbDashSeries2
   ^ 39-42 DbDashSeries3
-  ^ 42-65 DbDashLabel
+  ^ 42-65 DbDashLegend
   ^ 65-70 DbDashNumber
   ^ 70-78 DbDashMuted
 │▜██████████▛   ■ Research & Development  120   65.2%
   ^ 0-24 DbDashSeries4
   ^ 24-36 DbDashSeries3
   ^ 39-42 DbDashSeries4
-  ^ 42-65 DbDashLabel
+  ^ 42-65 DbDashLegend
   ^ 65-70 DbDashNumber
   ^ 70-78 DbDashMuted
 │▐██████████▌

@@ -134,4 +134,34 @@ T["a wrapped row keeps its colors on every line"] = function()
   eq({ rows[3], rows[4] }, { true, true })
 end
 
+T["CSS-like options: border styles, padding, align, vertical_align, striped, ellipsis"] = function()
+  local rs = resultset.new(
+    { { name = "k", type = "string" }, { name = "n", type = "integer" } },
+    { { "a", 1 }, { "bb", 22 } }
+  )
+  local o = out(rs, { style = { border = "rounded" } })
+  eq({ o.lines[1], o.lines[3], o.lines[6] }, { "╭────┬────╮", "├────┼────┤", "╰────┴────╯" })
+  o = out(rs, { style = { border = "ascii", cell_padding = 0 } })
+  eq({ o.lines[1], o.lines[2], o.lines[4] }, { "+--+--+", "|k | n|", "|a | 1|" })
+  o = out(rs, { style = { border = "none" } })
+  eq(o.lines[1], "k    n")
+  o = out(rs, { column_list = { { column = "k", align = "right" }, { column = "n", align = "center", width = 5 } } })
+  eq(o.lines[4], "│  a │   1   │")
+  -- vertical_align: the short cell sits in the middle of a three-line row
+  rs = resultset.new({ { name = "a", type = "string" }, { name = "b", type = "string" } }, { { "x", "one two three" } })
+  o = out(rs, { style = { vertical_align = "middle" }, column_list = { "a", { column = "b", width = 5 } } })
+  eq({ o.lines[4], o.lines[5], o.lines[6] }, { "│   │ one   │", "│ x │ two   │", "│   │ three │" })
+  -- ellipsis
+  o = out(rs, { style = { wrap = false, ellipsis = "..." }, column_list = { "a", { column = "b", width = 6 } } })
+  eq(o.lines[4], "│ x │ one... │")
+  -- striped: even rows get a background below the other colors
+  rs = resultset.new({ { name = "a", type = "integer" } }, { { 1 }, { 2 } })
+  o = out(rs, { style = { striped = "#202020" } })
+  local bg = vim.tbl_filter(function(h)
+    return h.priority == 50
+  end, o.hl)
+  eq(#bg, 1)
+  eq(bg[1].row, 4)
+end
+
 return T

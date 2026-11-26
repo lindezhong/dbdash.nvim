@@ -131,44 +131,81 @@ local function render_panel(p, show, width, height, fill)
   return { lines = {}, hl = {} }
 end
 
----Multi-panel cell: a header line (title, state, error) above the chart.
-local function panel_cell(p, width, height, fill)
+---Multi-panel cell: a header line (title, state, error) above the chart, in the panel's
+---box (render/box.lua: padding, panel_border with the title in its top line, background,
+---justify / align). `exact`: the cell is `height` lines (else as tall as its content,
+---for measuring).
+local function panel_cell(p, width, height, fill, exact)
+  local box = require("dbdash.render.box")
   local show = vim.deepcopy(p:show_config())
-  show.title = nil -- shown in the header line instead
-  local name = p:title()
-  if p.cfg.show.description then
-    name = name .. " " .. desc_icon()
-  end
-  local title = W.truncate(name, width)
-  local head, spans = title, { { 0, #title, "DbDashTitle" } }
-  if p.cfg.show.description and title == name then
-    local icon = desc_icon()
-    spans = { { 0, #title - #icon - 1, "DbDashTitle" }, { #title - #icon, #title, "DbDashDescIcon" } }
+  local st = box.settings(show)
+  show.title = nil -- shown in the header line (or the box's top border) instead
+  local iw, ih = box.inner(st, width, height)
+  local style = show.style ~= vim.NIL and show.style or {}
+  local name = style.show_title == false and "" or p:title()
+  local icon = p.cfg.show.description and desc_icon() or nil
+  -- The title, aligned by title_align, then ⓘ and the error.
+  local room = math.max(iw - (icon and (W.width(icon) + 1) or 0), 1)
+  local head, s0, e0 = box.title_line(name, room, st.title_align or "left", st.ellipsis)
+  local spans = { { s0, e0, st.title_group } }
+  if icon then
+    head = head .. " " .. icon
+    spans[#spans + 1] = { #head - #icon, #head, "DbDashDescIcon" }
   end
   if p.error then
-    local room = width - W.width(head) - 3
-    if room > 5 then
-      local e = W.truncate(M.format_error(p.error):gsub("\n", " "), room)
+    local free = iw - W.width(head) - 3
+    if free > 5 then
+      local e = W.truncate(M.format_error(p.error):gsub("\n", " "), free)
       spans[#spans + 1] = { #head + 2, #head + 2 + #("✗ " .. e), "DbDashError" }
       head = head .. "  ✗ " .. e
     end
   end
-  local args_line = M.args_line(p, width)
-  local body = render_panel(p, show, width, height - 1 - (args_line and 1 or 0), fill)
+  local border_title
+  local header = { lines = { head }, hl = {} }
+  for _, sp in ipairs(spans) do
+    header.hl[#header.hl + 1] = { row = 0, col_s = sp[1], col_e = sp[2], group = sp[3] }
+  end
+  if st.border then
+    -- fieldset style: ╭─ Title ⓘ ──╮
+    local lead = #head - #(head:gsub("^%s+", ""))
+    border_title = { text = vim.trim(head), spans = {} }
+    for _, sp in ipairs(spans) do
+      border_title.spans[#border_title.spans + 1] = { sp[1] - lead, sp[2] - lead, sp[3] }
+    end
+    header = nil
+  end
+  local args_line = M.args_line(p, iw)
+  local bh = ih - (header and 1 or 0) - (args_line and 1 or 0)
+  local body = render_panel(p, show, iw, bh, fill)
+  body = box.position(body, st, iw, exact and bh or nil)
+  local parts = {}
+  if header then
+    parts[#parts + 1] = header
+  end
   if args_line then
-    body = prepend(body, { args_line })
+    parts[#parts + 1] = args_line
   end
-  local out = { lines = { head }, hl = {} }
-  for _, s in ipairs(spans) do
-    out.hl[#out.hl + 1] = { row = 0, col_s = s[1], col_e = s[2], group = s[3] }
+  local out = prepend(body, parts)
+  return box.wrap(out, st, width, exact and height or nil, border_title)
+end
+
+---The chart of a one-chart dashboard in its box (padding, panel_border, background,
+---justify / align); the title stays the chart's own unless the border carries it.
+function M.single(p, width, height)
+  local box = require("dbdash.render.box")
+  local show = p:show_config()
+  local st = box.settings(show)
+  local iw, ih = box.inner(st, width, height)
+  local border_title
+  if st.border and show.title ~= nil and show.title ~= vim.NIL then
+    border_title = { text = show.title, spans = { { 0, #show.title, st.title_group } } }
+    show = vim.deepcopy(show)
+    show.title = nil
   end
-  for i, l in ipairs(body.lines) do
-    out.lines[i + 1] = l
-  end
-  for _, h in ipairs(body.hl) do
-    out.hl[#out.hl + 1] = { row = h.row + 1, col_s = h.col_s, col_e = h.col_e, group = h.group }
-  end
-  return out
+  local body = render_panel(p, show, iw, ih)
+  local exact = st.align ~= "start" or st.border ~= nil or st.background ~= nil
+  body = box.position(body, st, iw, exact and ih or nil)
+  return box.wrap(body, st, width, exact and height or nil, border_title)
 end
 
 ---A panel's heights at `width` (CSS min-content / max-content): with its smallest plot
@@ -231,7 +268,7 @@ function Dashboard:grid(width, avail)
       f = f or fill[r]
     end
     c.y, c.height = top[pl.row], h
-    outs[i] = panel_cell(p, c.width, h, f)
+    outs[i] = panel_cell(p, c.width, h, f, true)
   end
   return L.compose(cells, outs)
 end
@@ -253,7 +290,7 @@ function Dashboard:redraw()
     if args_line then
       h = h - 2
     end
-    body = render_panel(p, p:show_config(), width, h)
+    body = M.single(p, width, h)
     if args_line then
       body = prepend(body, { args_line, { lines = { "" }, hl = {} } })
     end

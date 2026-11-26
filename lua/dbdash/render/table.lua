@@ -73,7 +73,7 @@ local function select_columns(rs, show)
           label = type(spec) == "table" and nn(spec.alias) or name,
           width = type(spec) == "table" and tonumber(nn(spec.width)) or nil,
           height = type(spec) == "table" and tonumber(nn(spec.height)) or nil,
-          align = (ltype and NUMERIC[ltype]) and "right" or "left",
+          align = (type(spec) == "table" and nn(spec.align)) or ((ltype and NUMERIC[ltype]) and "right" or "left"),
           ltype = ltype,
           thresholds = type(spec) == "table" and nn(spec.thresholds) and require("dbdash.render.thresholds").steps(
             spec.thresholds,
@@ -146,7 +146,6 @@ function M.render(rs, show, ctx)
   local null_text = nn(style.null_text) or "NULL"
   local g_border = ctx.color(nn(style.border_style), "DbDashBorder")
   local g_header = ctx.color(nn(style.header_style), "DbDashHeader")
-  local g_title = ctx.color(nn(style.title_style), "DbDashTitle")
   local wrap = nn(style.wrap)
   local wrap_mode = wrap == "char" and "char" or (wrap ~= false and "word" or nil)
   local cell_w, cell_h = tonumber(nn(style.cell_width)), tonumber(nn(style.cell_height))
@@ -202,8 +201,20 @@ function M.render(rs, show, ctx)
     end
   end
 
-  -- Border overhead: "┃ " + " ┃" around the row and " ┃ " between columns.
-  local overhead = border and (4 + 3 * (#cols - 1)) or 2 * (#cols - 1)
+  -- Box-drawing: the default mixes a heavy header with a light body (like rich);
+  -- style.border picks one line style for all (CSS border-style), false / "none" drops it.
+  local B = require("dbdash.render.borders")
+  local chars = border and B.get(nn(style.border), "single") or nil
+  local rich = border and (nn(style.border) == nil or nn(style.border) == true)
+  border = chars ~= nil
+  local pad = math.max(tonumber(nn(style.cell_padding)) or 1, 0)
+  local sp = string.rep(" ", pad)
+  local valign = nn(style.vertical_align) or "top"
+  local ellipsis = nn(style.ellipsis) or "…"
+  local striped = nn(style.striped) and ctx.color("on " .. tostring(style.striped):gsub("^on%s+", "")) or nil
+
+  -- Overhead: the bars around and between the columns and the padding of every cell.
+  local overhead = border and (#cols + 1 + 2 * pad * #cols) or (math.max(2 * pad, 1) * (#cols - 1))
   fit(widths, math.max(ctx.width - overhead, MIN_COL * #cols), cols, data_w)
 
   ---Build one row line from cell texts; returns line and highlight spans.
@@ -216,17 +227,21 @@ function M.render(rs, show, ctx)
       parts[#parts + 1] = s
       pos = pos + #s
     end
+    local gap = string.rep(" ", math.max(2 * pad, 1))
     for c, col in ipairs(cols) do
       if border then
-        put(c == 1 and vbar or (" " .. vbar), g_border)
-        put(" ")
+        put(vbar, g_border)
+        put(sp)
       elseif c > 1 then
-        put("  ")
+        put(gap)
       end
       put(W.pad(texts[c], widths[c], col.align), groups[c])
+      if border then
+        put(sp)
+      end
     end
     if border then
-      put(" " .. vbar, g_border)
+      put(vbar, g_border)
     end
     return table.concat(parts), spans
   end
@@ -234,22 +249,10 @@ function M.render(rs, show, ctx)
   local function rule(left, fill, mid, right)
     local segs = {}
     for c = 1, #cols do
-      segs[c] = fill:rep(widths[c] + 2)
+      segs[c] = fill:rep(widths[c] + 2 * pad)
     end
     local s = left .. table.concat(segs, mid) .. right
     return s, { { 0, #s, g_border } }
-  end
-
-  local total_w = overhead
-  for _, w in ipairs(widths) do
-    total_w = total_w + w
-  end
-
-  local title = nn(show.title)
-  if title and title ~= "" then
-    local t = W.pad(title, math.min(total_w, ctx.width), "center"):gsub("%s+$", "")
-    local lead = #t:match("^%s*")
-    add(t, { { lead, #t, g_title } })
   end
 
   -- Header.
@@ -258,52 +261,71 @@ function M.render(rs, show, ctx)
     labels[c] = col.label
     hgroups[c] = g_header
   end
-  if border then
+  if rich then
     add(rule("┏", "━", "┳", "┓"))
     add(row_line(labels, hgroups, "┃"))
     add(rule("┡", "━", "╇", "┩"))
+  elseif border then
+    add(rule(chars.tl, chars.h, chars.tt, chars.tr))
+    add(row_line(labels, hgroups, chars.v))
+    add(rule(chars.lt, chars.h, chars.x, chars.rt))
   else
     add(row_line(labels, hgroups, ""))
     local segs = {}
     for c = 1, #cols do
       segs[c] = ("─"):rep(widths[c])
     end
-    local s = table.concat(segs, "  ")
+    local s = table.concat(segs, string.rep(" ", math.max(2 * pad, 1)))
     add(s, { { 0, #s, g_border } })
   end
+  local v = rich and "│" or (chars and chars.v or "")
 
   ---The lines of a cell in its column: wrapped (or cut) to the width, at most the height.
   local function cell_lines(text, c)
     local w, out = widths[c], {}
     if not wrap_mode then
-      return { W.truncate(text, w) }
+      return { W.truncate(text, w, ellipsis) }
     end
     for line in (text .. "\n"):gmatch("([^\n]*)\n") do
       vim.list_extend(out, W.wrap(line, w, wrap_mode))
     end
-    return W.clamp(out, cols[c].height, w)
+    return W.clamp(out, cols[c].height, w, ellipsis)
   end
 
   for r, row in ipairs(cells) do
     if show_lines and r > 1 and border then
-      add(rule("├", "─", "┼", "┤"))
+      if rich then
+        add(rule("├", "─", "┼", "┤"))
+      else
+        add(rule(chars.lt, chars.h, chars.x, chars.rt))
+      end
     end
     local parts, groups, n = {}, {}, 1
     for c, cell in ipairs(row) do
       parts[c] = cell_lines(cell.text, c)
       n = math.max(n, #parts[c])
-      groups[c] = cell.null and "DbDashNull" or cell.group
+      groups[c] = cell.null and "DbDashNull" or cell.group or cols[c].group
     end
     for k = 1, n do
       local texts = {}
       for c = 1, #cols do
-        texts[c] = parts[c][k] or ""
+        -- CSS vertical-align of a cell shorter than its row
+        local free = n - #parts[c]
+        local skip = valign == "middle" and math.floor(free / 2) or (valign == "bottom" and free or 0)
+        texts[c] = parts[c][k - skip] or ""
       end
-      add(row_line(texts, groups, "│"))
+      add(row_line(texts, groups, v))
+      if striped and r % 2 == 0 then
+        table.insert(hl, { row = #lines - 1, col_s = 0, col_e = #lines[#lines], group = striped, priority = 50 })
+      end
     end
   end
   if border then
-    add(rule("└", "─", "┴", "┘"))
+    if rich then
+      add(rule("└", "─", "┴", "┘"))
+    else
+      add(rule(chars.bl, chars.h, chars.bt, chars.br))
+    end
   end
 
   local note

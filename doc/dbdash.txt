@@ -452,7 +452,8 @@ Examples and schema                                          *dbdash-examples*
 The `example/` directory of the plugin has runnable configs, one directory per
 topic (the sidebar shows them as a tree):
 
-  charts/       one chart type per file, the alternative styles (styles.yaml)
+  charts/       the CSS-like styles (css.yaml), one chart type per file, the
+                alternative styles (styles.yaml)
   dashboards/   several panels in a grid (multi_panel.yaml), a grid laid
                 out like CSS Grid (grid.yaml)
   templates/    arguments; every statement, filter, test, function and
@@ -593,6 +594,45 @@ Chart fields:                                                  *dbdash-charts*
   stat       value_column (default: the first numeric column; first row),
              format (Python format), unit, delta, sparkline, thresholds
   text       column_list, style.{separator, null_text, wrap, title_style}
+
+Style properties                                                *dbdash-css*
+
+`show.style` takes CSS-like properties; every chart type takes the common
+ones, and the setup `styles`, the top-level `show.style` and a panel's
+`show.style` cascade key by key (like CSS rules). A color is a CSS-like value:
+"#3498db", a name ("blue"), attributes and a background ("bold red on
+#202020"), or a highlight group ("DiagnosticOk").
+
+CSS                       `show.style`
+color                     `color`: the data (bars, the first series, the
+                          stat value, text lines)
+background-color          `background`: the whole panel
+color of an element       `title_style`, `header_style`, `axis_style` (tick
+                          labels), `label_style` (axis titles, categories),
+                          `legend_style`, `value_style` (value labels),
+                          `null_style`, `border_style`
+text-align                `title_align`: left, center, right;
+                          `column_list[].align` (tables)
+vertical-align            `vertical_align`: top, middle, bottom (tables)
+border-style              `border`: single, rounded, heavy, double, dashed,
+                          ascii, none (plots and tables; true / false too)
+border (of the panel)     `panel_border`: a box around the panel with the
+                          title in its top line (a line style or true)
+padding                   `padding`: N, [vertical, horizontal], [top,
+                          horizontal, bottom] or [top, right, bottom, left];
+                          `cell_padding` (tables, default 1)
+justify-self / align-self `justify`: start, center, end, stretch;
+                          `align`: start, center, end (the chart in its cell)
+white-space / word-break  `wrap`: true, "char", false (tables, text)
+text-overflow             `ellipsis` (default "…")
+:nth-child(even)          `striped`: a background for every other table row
+display: none             `show_title: false`, `show_axes: false`,
+                          `legend: false`, `show_values` / `show_labels`
+width / height            `show.width`, `show.height`, `show.min_height`,
+                          `cell_width`, `cell_height` (tables)
+
+Opacity, shadows, animations and hover effects have no terminal equivalent.
+`example/charts/css.yaml` shows each property.
 
 Thresholds                                                 *dbdash-thresholds*
 

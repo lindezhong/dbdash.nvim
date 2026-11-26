@@ -51,7 +51,7 @@ function M.legend(items, sum, show, max_label)
     end
     put("■", it.group)
     if show_labels then
-      put(" " .. W.pad(it.label, lw), "DbDashLabel")
+      put(" " .. W.pad(it.label, lw), "DbDashLegend")
     end
     if show_values then
       put("  " .. W.pad(fmt.number(it.value), vw, "right"), "DbDashNumber")

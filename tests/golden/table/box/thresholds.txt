@@ -3,38 +3,38 @@
 │┃ host ┃ errors ┃ free_gb ┃
   ^ 0-3 DbDashBorder
   ^ 4-8 DbDashHeader
-  ^ 8-12 DbDashBorder
+  ^ 9-12 DbDashBorder
   ^ 13-19 DbDashHeader
-  ^ 19-23 DbDashBorder
+  ^ 20-23 DbDashBorder
   ^ 24-31 DbDashHeader
-  ^ 31-35 DbDashBorder
+  ^ 32-35 DbDashBorder
 │┡━━━━━━╇━━━━━━━━╇━━━━━━━━━┩
   ^ 0-81 DbDashBorder
 ││ a    │     20 │      80 │
   ^ 0-3 DbDashBorder
-  ^ 8-12 DbDashBorder
-  ^ 19-23 DbDashBorder
-  ^ 31-35 DbDashBorder
+  ^ 9-12 DbDashBorder
+  ^ 20-23 DbDashBorder
+  ^ 32-35 DbDashBorder
 ││ b    │    150 │      40 │
   ^ 0-3 DbDashBorder
-  ^ 8-12 DbDashBorder
+  ^ 9-12 DbDashBorder
   ^ 13-19 DbDashC_yellow
-  ^ 19-23 DbDashBorder
+  ^ 20-23 DbDashBorder
   ^ 24-31 DbDashC_yellow
-  ^ 31-35 DbDashBorder
+  ^ 32-35 DbDashBorder
 ││ c    │    900 │       5 │
   ^ 0-3 DbDashBorder
-  ^ 8-12 DbDashBorder
+  ^ 9-12 DbDashBorder
   ^ 13-19 DbDashC_red
-  ^ 19-23 DbDashBorder
+  ^ 20-23 DbDashBorder
   ^ 24-31 DbDashC_red
-  ^ 31-35 DbDashBorder
+  ^ 32-35 DbDashBorder
 ││ d    │   NULL │    NULL │
   ^ 0-3 DbDashBorder
-  ^ 8-12 DbDashBorder
+  ^ 9-12 DbDashBorder
   ^ 13-19 DbDashNull
-  ^ 19-23 DbDashBorder
+  ^ 20-23 DbDashBorder
   ^ 24-31 DbDashNull
-  ^ 31-35 DbDashBorder
+  ^ 32-35 DbDashBorder
 │└──────┴────────┴─────────┘
   ^ 0-81 DbDashBorder

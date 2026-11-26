@@ -601,11 +601,12 @@ function M.compose(cells, outputs)
     return cells[a].x < cells[b].x
   end)
   for L = 0, total - 1 do
-    local parts, pos, dcol = {}, 0, 0
+    local parts, pos, dcol, keep = {}, 0, 0, false
     for _, i in ipairs(order) do
       local c = cells[i]
       local k = L - c.y + 1
       if k >= 1 and k <= c.height then
+        keep = keep or outputs[i].full == true
         if c.x > dcol then
           local pad = string.rep(" ", c.x - dcol)
           parts[#parts + 1] = pad
@@ -617,7 +618,7 @@ function M.compose(cells, outputs)
         for _, h in ipairs(by_line[i][k - 1] or {}) do
           local s, e = math.min(h.col_s, #cut), math.min(h.col_e, #cut)
           if e > s then
-            hl[#hl + 1] = { row = L, col_s = pos + s, col_e = pos + e, group = h.group }
+            hl[#hl + 1] = { row = L, col_s = pos + s, col_e = pos + e, group = h.group, priority = h.priority }
           end
         end
         local cell = W.pad(cut, c.width)
@@ -626,7 +627,9 @@ function M.compose(cells, outputs)
         dcol = dcol + c.width
       end
     end
-    lines[#lines + 1] = (table.concat(parts):gsub("%s+$", ""))
+    -- Boxed cells (a background or border) keep their full width.
+    local line = table.concat(parts)
+    lines[#lines + 1] = keep and line or (line:gsub("%s+$", ""))
   end
   return { lines = lines, hl = hl, regions = regions }
 end

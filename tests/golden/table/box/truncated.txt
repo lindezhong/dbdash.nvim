@@ -3,15 +3,15 @@
 │┃ n ┃
   ^ 0-3 DbDashBorder
   ^ 4-5 DbDashHeader
-  ^ 5-9 DbDashBorder
+  ^ 6-9 DbDashBorder
 │┡━━━┩
   ^ 0-15 DbDashBorder
 ││ 1 │
   ^ 0-3 DbDashBorder
-  ^ 5-9 DbDashBorder
+  ^ 6-9 DbDashBorder
 ││ 2 │
   ^ 0-3 DbDashBorder
-  ^ 5-9 DbDashBorder
+  ^ 6-9 DbDashBorder
 │└───┘
   ^ 0-15 DbDashBorder
 │… showing the first 2 rows (query.max_rows)

@@ -61,6 +61,70 @@ function M.ctx(opts)
   }
 end
 
+local function nn(v)
+  if v == vim.NIL then
+    return nil
+  end
+  return v
+end
+
+-- Parts of a chart and the style.* key that colors them (CSS: one rule per element).
+M.PARTS = {
+  DbDashAxis = "axis_style",
+  DbDashLabel = "label_style",
+  DbDashLegend = "legend_style",
+  DbDashNumber = "value_style",
+  DbDashNull = "null_style",
+  DbDashBorder = "border_style",
+  DbDashHeader = "header_style",
+  DbDashStatValue = "color",
+  DbDashText = "color",
+}
+
+---Recolor the parts of an output by show.style (axis_style, label_style, ...).
+---@param out dbdash.render.Output
+---@param style table
+function M.restyle(out, style)
+  local map
+  for group, key in pairs(M.PARTS) do
+    local spec = nn(style[key])
+    if spec then
+      map = map or {}
+      map[group] = highlight.color(spec, group)
+    end
+  end
+  if map then
+    for _, h in ipairs(out.hl) do
+      h.group = map[h.group] or h.group
+    end
+  end
+  return out
+end
+
+-- Where a title sits when show.style.title_align does not say.
+local LEFT_TITLES = { stat = true, text = true }
+
+---Put the title line above a chart: aligned over the chart's width.
+function M.with_title(out, title, style, width, chart_type)
+  local w = 0
+  for _, l in ipairs(out.lines) do
+    w = math.max(w, W.width(l))
+  end
+  w = math.min(math.max(w, 1), width)
+  local align = nn(style.title_align) or (LEFT_TITLES[chart_type] and "left" or "center")
+  local line, s, e = require("dbdash.render.box").title_line(title, w, align, nn(style.ellipsis))
+  local group = highlight.color(nn(style.title_style), "DbDashTitle")
+  local hl = { { row = 0, col_s = s, col_e = e, group = group } }
+  for _, h in ipairs(out.hl) do
+    local c = vim.deepcopy(h)
+    c.row = h.row + 1
+    hl[#hl + 1] = c
+  end
+  local lines = { (line:gsub("%s+$", "")) }
+  vim.list_extend(lines, out.lines)
+  return { lines = lines, hl = hl }
+end
+
 local function message(text, group)
   return { lines = { text }, hl = { { row = 0, col_s = 0, col_e = #text, group = group } } }
 end
@@ -89,8 +153,35 @@ function M.render(rs, show, opts)
     local mh = tonumber(show.min_height ~= vim.NIL and show.min_height or nil) or defaults.min_height or 3
     ctx.min_plot_height = math.min(mh, h or 15)
     ctx.history = opts.history
+    local st = nn(show.style) or {}
+    ctx.border = nn(st.border)
+    ctx.show_axes = nn(st.show_axes) ~= false
+    ctx.ellipsis = nn(st.ellipsis) or "…"
     local style = need("chart/" .. show.type .. "/" .. renderer)
-    return (style.render or style)(rs, show, ctx)
+    -- The title is drawn here for every chart type (title_style, title_align,
+    -- show_title); the chart gets the rest of the height.
+    local title = nn(show.title)
+    if nn(st.show_title) == false then
+      title = nil
+    end
+    local inner = show
+    if nn(show.title) ~= nil then
+      inner = {}
+      for k, v in pairs(show) do
+        inner[k] = v
+      end
+      inner.title = vim.NIL
+      setmetatable(inner, getmetatable(show))
+    end
+    if title and title ~= "" then
+      ctx.height = math.max(ctx.height - 1, 5)
+    end
+    local out = (style.render or style)(rs, inner, ctx)
+    out = M.restyle(out, st)
+    if title and title ~= "" then
+      out = M.with_title(out, title, st, ctx.width, show.type)
+    end
+    return out
   end)
   if ok then
     return res

@@ -16,14 +16,14 @@
   ^ 0-36 DbDashSeries4
   ^ 36-72 DbDashSeries1
   ^ 75-78 DbDashSeries1
-  ^ 78-101 DbDashLabel
+  ^ 78-101 DbDashLegend
   ^ 101-106 DbDashNumber
   ^ 106-114 DbDashMuted
 │⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿   ■ HR                        7    3.8%
   ^ 0-36 DbDashSeries4
   ^ 36-72 DbDashSeries1
   ^ 75-78 DbDashSeries2
-  ^ 78-101 DbDashLabel
+  ^ 78-101 DbDashLegend
   ^ 101-106 DbDashNumber
   ^ 106-114 DbDashMuted
 │⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿   ■ Finance                  15    8.2%
@@ -31,14 +31,14 @@
   ^ 36-42 DbDashSeries3
   ^ 42-72 DbDashSeries2
   ^ 75-78 DbDashSeries3
-  ^ 78-101 DbDashLabel
+  ^ 78-101 DbDashLegend
   ^ 101-106 DbDashNumber
   ^ 106-114 DbDashMuted
 │⢹⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏   ■ Research & Development  120   65.2%
   ^ 0-45 DbDashSeries4
   ^ 45-72 DbDashSeries3
   ^ 75-78 DbDashSeries4
-  ^ 78-101 DbDashLabel
+  ^ 78-101 DbDashLegend
   ^ 101-106 DbDashNumber
   ^ 106-114 DbDashMuted
 │⠀⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠀

@@ -13,21 +13,21 @@
 │
 │ ■ IT                       42   22.8%
   ^ 1-4 DbDashC__ff6b6b
-  ^ 4-27 DbDashLabel
+  ^ 4-27 DbDashLegend
   ^ 27-32 DbDashNumber
   ^ 32-40 DbDashMuted
 │ ■ HR                        7    3.8%
   ^ 1-4 DbDashC__4ecdc4
-  ^ 4-27 DbDashLabel
+  ^ 4-27 DbDashLegend
   ^ 27-32 DbDashNumber
   ^ 32-40 DbDashMuted
 │ ■ Finance                  15    8.2%
   ^ 1-4 DbDashC__45b7d1
-  ^ 4-27 DbDashLabel
+  ^ 4-27 DbDashLegend
   ^ 27-32 DbDashNumber
   ^ 32-40 DbDashMuted
 │ ■ Research & Development  120   65.2%
   ^ 1-4 DbDashC__96ceb4
-  ^ 4-27 DbDashLabel
+  ^ 4-27 DbDashLegend
   ^ 27-32 DbDashNumber
   ^ 32-40 DbDashMuted

@@ -1,5 +1,5 @@
-│                                           Headcount
-  ^ 43-52 DbDashTitle
+│                               Headcount
+  ^ 31-40 DbDashTitle
 │                       ┌───────────────────────────────────────────────┐
   ^ 23-170 DbDashBorder
 │                    IT │■■■■■■■■■■■■■■■ 42                             │

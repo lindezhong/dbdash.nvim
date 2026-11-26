@@ -25,6 +25,8 @@ M.BASE = {
   DbDashNumber = { link = "Number" },
   DbDashAxis = { link = "Comment" },
   DbDashLabel = { link = "Normal" },
+  DbDashLegend = { link = "DbDashLabel" }, -- legend labels (style.legend_style)
+  DbDashText = { link = "Normal" }, -- text chart lines (style.color)
   DbDashError = { link = "DiagnosticError" },
   DbDashWarn = { link = "DiagnosticWarn" },
   DbDashCountdown = { link = "Comment" },

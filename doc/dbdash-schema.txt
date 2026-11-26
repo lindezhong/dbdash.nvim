@@ -701,6 +701,10 @@ configs (|dbdash-examples|). Every field has a tag:
         style:
           type: object
           description: |-
+            Styles, after CSS (:help dbdash-css); every chart type takes the common ones:
+              color, background, title_style, title_align, header_style, axis_style,
+              label_style, legend_style, value_style, null_style, border_style, border,
+              panel_border, padding, justify, align, ellipsis, show_title, show_axes
             Chart options:
               table      border, header_style, border_style, title_style, show_lines, null_text,
                          wrap (true: long cells wrap at spaces; "char": anywhere; false: one
@@ -714,6 +718,98 @@ configs (|dbdash-examples|). Every field has a tag:
               pie        show_labels, show_values, show_percentages
               text       separator (" "), null_text (""), wrap (true: at spaces; "char":
                          anywhere; false cuts long lines), title_style
+          properties:
+<
+                                        *dbdash-schema-show.style.color* >yaml
+            color: { type: string, description: "The data's color (CSS color): bars, the first series, stat value, text." }
+<
+                                   *dbdash-schema-show.style.background* >yaml
+            background: { type: string, description: "The panel's background color (CSS background-color)." }
+<
+                                  *dbdash-schema-show.style.title_style* >yaml
+            title_style: { type: string, description: 'Title color and attributes, e.g. "bold #e5c07b".' }
+<
+                                  *dbdash-schema-show.style.title_align* >yaml
+            title_align: { enum: [left, center, right], description: "Title position (CSS text-align)." }
+<
+                                 *dbdash-schema-show.style.header_style* >yaml
+            header_style: { type: string, description: "Table header color." }
+<
+                                   *dbdash-schema-show.style.axis_style* >yaml
+            axis_style: { type: string, description: "Tick labels." }
+<
+                                  *dbdash-schema-show.style.label_style* >yaml
+            label_style: { type: string, description: "Axis titles and category labels." }
+<
+                                 *dbdash-schema-show.style.legend_style* >yaml
+            legend_style: { type: string, description: "Legend labels." }
+<
+                                  *dbdash-schema-show.style.value_style* >yaml
+            value_style: { type: string, description: "Value labels (bars, pie)." }
+<
+                                   *dbdash-schema-show.style.null_style* >yaml
+            null_style: { type: string, description: "NULL cells." }
+<
+                                 *dbdash-schema-show.style.border_style* >yaml
+            border_style: { type: string, description: "Border color (CSS border-color)." }
+<
+                                       *dbdash-schema-show.style.border* >yaml
+            border:
+              description: "Plot and table border line (CSS border-style): single, rounded, heavy, double, dashed, ascii, none; true / false."
+              oneOf:
+                - type: boolean
+                - enum: [single, rounded, heavy, double, dashed, ascii, none]
+<
+                                 *dbdash-schema-show.style.panel_border* >yaml
+            panel_border:
+              description: "A box around the whole panel, the title in its top line (CSS border on the panel)."
+              oneOf:
+                - type: boolean
+                - enum: [single, rounded, heavy, double, dashed, ascii, none]
+<
+                                      *dbdash-schema-show.style.padding* >yaml
+            padding:
+              description: "Space inside the panel (CSS padding): N, [vertical, horizontal], [top, horizontal, bottom] or [top, right, bottom, left]."
+              oneOf:
+                - { type: integer, minimum: 0 }
+                - { type: array, minItems: 1, maxItems: 4, items: { type: integer, minimum: 0 } }
+<
+                                      *dbdash-schema-show.style.justify* >yaml
+            justify: { enum: [start, center, end, stretch], description: "Where the chart sits across its cell (CSS justify-self)." }
+<
+                                        *dbdash-schema-show.style.align* >yaml
+            align: { enum: [start, center, end], description: "Where the chart sits down its cell (CSS align-self)." }
+<
+                                     *dbdash-schema-show.style.ellipsis* >yaml
+            ellipsis: { type: string, description: 'What marks cut text (CSS text-overflow; default "…").' }
+<
+                                   *dbdash-schema-show.style.show_title* >yaml
+            show_title: { type: boolean, description: "false hides the title (CSS display: none)." }
+<
+                                    *dbdash-schema-show.style.show_axes* >yaml
+            show_axes: { type: boolean, description: "false hides tick labels and axis titles." }
+<
+                                         *dbdash-schema-show.style.wrap* >yaml
+            wrap:
+              description: 'Long text wraps at spaces (true), anywhere ("char") or is cut (false).'
+              oneOf:
+                - type: boolean
+                - const: char
+<
+                                   *dbdash-schema-show.style.cell_width* >yaml
+            cell_width: { type: integer, minimum: 1, description: "table: every column's width." }
+<
+                                  *dbdash-schema-show.style.cell_height* >yaml
+            cell_height: { type: integer, minimum: 1, description: "table: most lines per cell." }
+<
+                                 *dbdash-schema-show.style.cell_padding* >yaml
+            cell_padding: { type: integer, minimum: 0, description: "table: spaces each side of a cell (default 1)." }
+<
+                               *dbdash-schema-show.style.vertical_align* >yaml
+            vertical_align: { enum: [top, middle, bottom], description: "table: a short cell in a taller row." }
+<
+                                      *dbdash-schema-show.style.striped* >yaml
+            striped: { type: string, description: "table: background of every other row (CSS :nth-child(even))." }
 <
                                              *dbdash-schema-show.colors* >yaml
         colors:
@@ -838,6 +934,9 @@ configs (|dbdash-examples|). Every field has a tag:
 <
                                  *dbdash-schema-show.column_list.height* >yaml
                   height: { type: integer, minimum: 1, description: "Most lines a cell takes; longer ends with …" }
+<
+                                  *dbdash-schema-show.column_list.align* >yaml
+                  align: { enum: [left, center, right], description: "Text alignment (default: numbers right)." }
 <
                              *dbdash-schema-show.column_list.thresholds* >yaml
                   thresholds:

@@ -6,14 +6,14 @@
   ^ 109-121 DbDashSeries1
   ^ 175-178 DbDashBorder
   ^ 179-182 DbDashSeries1
-  ^ 182-189 DbDashLabel
+  ^ 182-189 DbDashLegend
 │    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⣀⠀⠀⠀⠀⠀⠀⢀⣴⣿⣿⣿⣿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ ■ signups
   ^ 4-7 DbDashBorder
   ^ 76-85 DbDashSeries1
   ^ 103-127 DbDashSeries1
   ^ 175-178 DbDashBorder
   ^ 179-182 DbDashSeries2
-  ^ 182-190 DbDashLabel
+  ^ 182-190 DbDashLegend
 │    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣾⣿⣿⣷⣄⠀⠀⠀⣠⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│
   ^ 4-7 DbDashBorder
   ^ 73-91 DbDashSeries1
