@@ -215,4 +215,21 @@ T["the schema rejects invalid configs"] = function()
   eq(r.stdout:find("show/type", 1, true) ~= nil, true)
 end
 
+-- After the examples ran (the cases above): what they wrote next to themselves (a SQLite
+-- file, a curl -c cookie file, ...) is hidden (a name starting with "."), so a checkout
+-- stays clean to look at.
+T["files the examples write are hidden"] = function()
+  if vim.fn.isdirectory(".git") == 0 then
+    MiniTest.skip("not a git checkout")
+  end
+  local r = vim.system({ "git", "ls-files", "--others", "--ignored", "--exclude-standard", "example" }, { text = true }):wait()
+  local visible = {}
+  for _, f in ipairs(vim.split(r.stdout or "", "\n", { trimempty = true })) do
+    if not vim.fs.basename(f):match("^%.") then
+      visible[#visible + 1] = f
+    end
+  end
+  eq(visible, {})
+end
+
 return T

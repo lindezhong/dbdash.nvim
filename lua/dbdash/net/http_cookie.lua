@@ -291,11 +291,12 @@ function Jar:netscape(now)
   return table.concat(lines, "\n") .. "\n"
 end
 
----Write the jar to a file (curl -c): a temporary file renamed over it, readable by you
----only (cookies are credentials).
+---Write the jar to a file (curl -c): a hidden temporary file next to it renamed over it,
+---readable by you only (cookies are credentials).
 ---@return boolean ok, string? err
 function Jar:write(path, now)
-  local tmp = path .. ".dbdash-tmp"
+  local dir, name = vim.fs.dirname(path), vim.fs.basename(path)
+  local tmp = vim.fs.joinpath(dir, "." .. name:gsub("^%.", "") .. ".dbdash-tmp")
   local f, err = io.open(tmp, "wb")
   if not f then
     return false, ("cannot write the cookie file %s: %s"):format(path, tostring(err))

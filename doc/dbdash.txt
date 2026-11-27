@@ -1909,7 +1909,7 @@ value wins over -b's of the same name). -c FILE writes all the cookies
 (read and set, session cookies too) to FILE in curl's Netscape format after
 the request, so a later refresh, or Neovim after a restart, reads them back
 with -b: >yaml
-  sql: curl /whoami -b cookies.txt -c cookies.txt
+  sql: curl /whoami -b .cookies.txt -c .cookies.txt
 <-c writes only inside the config's directory (a relative path without
 `..`), with permissions 600 (cookies are credentials), and a config whose
 query writes a cookie file asks whether you trust it first, as Lua does

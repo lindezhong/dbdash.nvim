@@ -3,7 +3,7 @@
 -- query.transform reshapes or that is checked as rows directly (db/lua_result.lua).
 -- :help dbdash-http.
 --
---   curl -X POST /search -H 'X-Token: t' -b cookies.txt -c cookies.txt --json '{...}' -L
+--   curl -X POST /search -H 'X-Token: t' -b .cookies.txt -c .cookies.txt --json '{...}' -L
 local dberr = require("dbdash.db.error")
 local http = require("dbdash.net.http")
 local cookie = require("dbdash.net.http_cookie")

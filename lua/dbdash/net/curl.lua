@@ -2,7 +2,7 @@
 -- databases, :help dbdash-http). The URL is a path, joined to database.url.
 --
 --   curl -X POST /search -G --data-urlencode "q=neovim" -H 'Accept: application/json' \
---     -b cookies.txt -c cookies.txt --json '{"limit": 5}' -L
+--     -b .cookies.txt -c .cookies.txt --json '{"limit": 5}' -L
 --
 -- The words follow shell quoting (POSIX sh, as curl commands are written): '...' is
 -- literal, "..." takes \" \\ \$ \` and a backslash-newline, $'...' takes C escapes

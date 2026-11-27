@@ -329,7 +329,7 @@ query:
     curl -X POST /search \
       -H 'Authorization: Bearer {{ args.token }}' \
       -G --data-urlencode q={{ args.keyword }} \
-      -b cookies.txt -c cookies.txt \
+      -b .cookies.txt -c .cookies.txt \
       --json '{"limit": 20}' -L
   transform: |
     local out = {}

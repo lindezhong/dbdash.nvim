@@ -92,10 +92,10 @@ panels:
 
   - query:
       sql: |
-        {% if meta.refresh_count == 1 %}curl /login -c cookies.txt
-        {%- else %}curl /whoami -b cookies.txt -c cookies.txt -b 'lang=zh'{% endif %}
+        {% if meta.refresh_count == 1 %}curl /login -c .cookies.txt
+        {%- else %}curl /whoami -b .cookies.txt -c .cookies.txt -b 'lang=zh'{% endif %}
       transform: |
-        -- The first refresh logs in (the server sets a cookie, written to cookies.txt);
+        -- The first refresh logs in (the server sets a cookie, written to .cookies.txt);
         -- later ones read it back and show what was sent.
         if response.url:find("/login") then return { { cookie = "(logged in; refresh with r)" } } end
         return rs
@@ -103,8 +103,8 @@ panels:
       type: table
       title: "A login kept in a cookie file (-b / -c)"
       description: |
-        As with curl: the first refresh logs in and `-c cookies.txt` writes the cookie the
-        server set (next to this file); later refreshes read it with `-b cookies.txt` (and
+        As with curl: the first refresh logs in and `-c .cookies.txt` writes the cookie the
+        server set (next to this file); later refreshes read it with `-b .cookies.txt` (and
         send `-b 'lang=zh'` too) to `/whoami`, which echoes them. Press `r`. A config that
         writes a cookie file asks whether you trust it first.
       interval: 5s
