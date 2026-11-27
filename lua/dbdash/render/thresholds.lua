@@ -120,4 +120,28 @@ function M.levels(rs, show)
   return out
 end
 
+-- The rules of a config's thresholds (config/validators.lua): show.thresholds and those of
+-- show.column_list entries.
+M.validators = {
+  {
+    field = "show",
+    validate = function(show, ctx, path)
+      if nn(show.thresholds) ~= nil then
+        local err = M.check(show.thresholds)
+        if err then
+          ctx:fail(path .. ".thresholds", "%s", err)
+        end
+      end
+      for i, spec in ipairs(nn(show.column_list) or {}) do
+        if type(spec) == "table" and nn(spec.thresholds) ~= nil then
+          local err = M.check(spec.thresholds)
+          if err then
+            ctx:fail(("%s.column_list[%d].thresholds"):format(path, i - 1), "%s", err)
+          end
+        end
+      end
+    end,
+  },
+}
+
 return M

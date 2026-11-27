@@ -19,6 +19,7 @@ local M = {
   name = "webhook",
   schemes = { "webhook" },
   capabilities = { tls = false, sql = false, query_language = "openapi" },
+  query_optional = true, -- without an OpenAPI document: anything sent to the URL's path
 }
 
 local function strings(v)

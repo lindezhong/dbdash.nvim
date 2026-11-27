@@ -442,30 +442,67 @@ function M.validate(raw_url, options)
   return d
 end
 
--- The rules of a config's database (dbdash.config.validators).
+---The message of an error raised by the data layer.
+local function message(err)
+  return type(err) == "table" and err.message or tostring(err)
+end
+
+-- The rules of a config's database (config/validators.lua): its driver (database.type, else
+-- the URL's scheme), the URL's variables and parameters, password_cmd, the driver's options.
+-- Gives the database with its type (the driver's name).
 M.validators = {
   {
     field = "database",
-    ---@param db { url: string, options: table }
+    ---@param db { type: string?, url: string, password_cmd: any, options: table }
     validate = function(db, ctx, path)
-      local expanded = require("dbdash.db.credentials").expand_env(db.url)
+      local expanded, env_err = require("dbdash.db.credentials").expand_env(db.url)
       if not expanded then
-        return -- (config.lua reports the missing variable)
+        ctx:fail(path .. ".url", "%s", env_err)
       end
-      local d
-      local ok, err = pcall(function()
-        d = M.driver_for(expanded)
-        url.parse(expanded)
-      end)
-      if not ok then
-        ctx:fail(path .. ".url", "%s", type(err) == "table" and err.message or tostring(err))
-      end
-      if d.options then
-        ok, err = pcall(require("dbdash.db.options").check, d.name, db.options or {}, d.options, {})
+      local cmd = db.password_cmd
+      if cmd ~= nil then
+        local ok = type(cmd) == "string" and cmd ~= ""
+        if type(cmd) == "table" then
+          ok = #cmd > 0
+          for _, a in ipairs(cmd) do
+            ok = ok and type(a) == "string"
+          end
+        end
         if not ok then
-          ctx:fail(path .. ".options", "%s", type(err) == "table" and err.message or tostring(err))
+          ctx:fail(
+            path .. ".password_cmd",
+            "password_cmd must be a command string or a list of strings"
+          )
         end
       end
+      local scheme = expanded:match("^([%a][%w+.-]*)://")
+      local name = db.type and db.type:lower() or scheme
+      if name == "oracle" or (scheme and scheme:lower() == "oracle") then
+        ctx:fail(path .. ".url", "Oracle is not supported by dbdash.nvim")
+      elseif not name then
+        ctx:fail(
+          path .. ".url",
+          "cannot infer database type from url %q; set database.type",
+          db.url
+        )
+      end
+      local ok, d = pcall(M.driver, name)
+      if not ok then
+        ctx:fail(path .. (db.type and ".type" or ".url"), "unsupported database type '%s'", name)
+      end
+      local uok, uerr = pcall(url.parse, expanded)
+      if not uok then
+        ctx:fail(path .. ".url", "%s", message(uerr))
+      end
+      if d.options then
+        local oknames, oerr =
+          pcall(require("dbdash.db.options").check, d.name, db.options or {}, d.options, {})
+        if not oknames then
+          ctx:fail(path .. ".options", "%s", message(oerr))
+        end
+      end
+      db.type = d.name
+      return db
     end,
   },
 }

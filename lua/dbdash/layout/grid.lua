@@ -683,4 +683,38 @@ function M.plan(spans, width, columns, gap)
   return cells
 end
 
+-- The rules of a config's grid (config/validators.lua): the panels are placed once with
+-- the config's own sheets (computed as a dashboard would), so conflicts (overlaps, unknown
+-- areas, areas that are not rectangles) are reported with the line of the declaration at
+-- fault; :DbDashStyle rules are placed again at layout.
+M.validators = {
+  {
+    field = "dashboard",
+    validate = function(cfg, ctx)
+      if not cfg.grid then
+        return
+      end
+      local doc = ctx:document(cfg)
+      local style = require("dbdash.css.style")
+      local items = {}
+      for i, p in ipairs(doc.panels) do
+        items[i] = style.get(p.node)
+      end
+      local _, err = M.from_styles(style.get(doc.doc.root), items)
+      if err then
+        -- the declaration at fault: <sheet>.<selector>.<property>, else the sheet
+        local sheet = err.index and ("panels[%d].style"):format(err.index) or "style"
+        local rules = (err.index and cfg.panels[err.index].style_rules or cfg.style_rules) or {}
+        local where = sheet
+        for _, r in ipairs(rules) do
+          if r.decls[err.field] ~= nil then
+            where = ("%s.%s.%s"):format(sheet, r.key or r.selector.text, err.field)
+          end
+        end
+        ctx:fail(where, "%s: %s", err.field, err.message)
+      end
+    end,
+  },
+}
+
 return M

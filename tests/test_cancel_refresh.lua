@@ -31,7 +31,6 @@ db.register({
 })
 
 -- (config files accept the built-in types only)
-require("dbdash.config").DB_TYPES.slowfake = true
 
 local dir
 local T = MiniTest.new_set({

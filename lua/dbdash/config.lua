@@ -5,53 +5,6 @@ local map = require("dbdash.util.map")
 
 local M = {}
 
-M.DB_TYPES = {
-  sqlite = true,
-  redis = true,
-  postgres = true,
-  mysql = true,
-  cassandra = true,
-  mongodb = true,
-  mssql = true,
-  lua = true,
-  http = true,
-  -- push sources (:help dbdash-push)
-  luastream = true,
-  exec = true,
-  webhook = true,
-}
-
----Database types whose data is pushed (a stream) instead of queried on an interval.
-M.PUSH_TYPES = { luastream = true, exec = true, webhook = true }
--- Alternative URL schemes and type names (keep in sync with the drivers' `schemes`).
-local SCHEME_ALIASES = {
-  postgresql = "postgres",
-  sqlserver = "mssql",
-  rediss = "redis",
-  mariadb = "mysql",
-  cql = "cassandra",
-  sqlite3 = "sqlite",
-  https = "http",
-}
-M.SCHEME_ALIASES = SCHEME_ALIASES
-
-M.CHART_TYPES = {
-  table = true,
-  line = true,
-  area = true,
-  bar = true,
-  histogram = true,
-  boxplot = true,
-  heatmap = true,
-  bubble = true,
-  pie = true,
-  scatter = true,
-  stat = true,
-  text = true,
-}
-
-M.ARG_TYPES = { string = true, number = true, int = true, boolean = true, list = true, map = true }
-
 -- Values a config does not set come from setup({ defaults = ... }).
 local DEFAULTS = setmetatable({}, {
   __index = function(_, k)
@@ -112,31 +65,30 @@ local nn = require("dbdash.util.null").nn
 ---Parse a duration such as 30, "30s", "5m", "1h", "500ms" into milliseconds.
 M.parse_duration = require("dbdash.util.duration").parse
 
----Infer the database type from a URL scheme.
----@param url string
----@return string?
-function M.scheme_of(url)
-  local s = url:match("^([%w+.-]+)://")
-  if not s then
-    return nil
-  end
-  s = s:lower():gsub("%+.*$", "") -- mongodb+srv -> mongodb
-  return SCHEME_ALIASES[s] or s
-end
-
 local Ctx = {}
 Ctx.__index = Ctx
 
----Run the rules other modules have for this part of the config (config/validators.lua).
+---Run the rules other modules have for this part of the config (config/validators.lua),
+---in the list's order; a rule may return the value normalized (a parsed style sheet, a
+---database with its type), which the next ones get.
 function Ctx:validate(field, value, path)
   for _, mod in ipairs(require("dbdash.config.validators")) do
     for _, v in ipairs(require(mod).validators or {}) do
       if v.field == field then
-        v.validate(value, self, path)
+        local out = v.validate(value, self, path)
+        if out ~= nil then
+          value = out
+        end
       end
     end
   end
   return value
+end
+
+---The document of the config as a dashboard would have it (dashboard/document.lua), for
+---rules that need computed styles (the grid).
+function Ctx:document(cfg)
+  return require("dbdash.dashboard.document").from_config(cfg)
 end
 
 function Ctx:fail(path, msg, ...)
@@ -192,57 +144,18 @@ function Ctx:duration(path, v)
   return ms
 end
 
+---A database: the URL, type, options and password_cmd as written; its rules (the driver,
+---the URL, the options) are the data layer's (db.validators), which gives the type.
 function Ctx:database(db, prefix)
-  prefix = prefix or ""
-  db = self:expect(prefix .. "database", db, "map")
-  local url = self:expect(prefix .. "database.url", db.url, "string")
-  local _, env_err = require("dbdash.db.credentials").expand_env(url)
-  if env_err then
-    self:fail(prefix .. "database.url", "%s", env_err)
-  end
-  local password_cmd = nn(db.password_cmd)
-  if password_cmd ~= nil then
-    local ok = type(password_cmd) == "string" and password_cmd ~= ""
-    if type(password_cmd) == "table" then
-      ok = #password_cmd > 0
-      for _, a in ipairs(password_cmd) do
-        ok = ok and type(a) == "string"
-      end
-    end
-    if not ok then
-      self:fail(
-        prefix .. "database.password_cmd",
-        "password_cmd must be a command string or a list of strings"
-      )
-    end
-  end
-  local scheme = M.scheme_of(url)
-  local typ = nn(db.type)
-  if typ ~= nil then
-    typ = self:expect(prefix .. "database.type", typ, "string"):lower()
-    typ = SCHEME_ALIASES[typ] or typ
-  else
-    typ = scheme
-  end
-  if typ == "oracle" or scheme == "oracle" then
-    self:fail(prefix .. "database.url", "Oracle is not supported by dbdash.nvim")
-  end
-  if not typ then
-    self:fail(
-      prefix .. "database.url",
-      "cannot infer database type from url %q; set database.type",
-      url
-    )
-  end
-  if not M.DB_TYPES[typ] then
-    self:fail(prefix .. "database.type", "unsupported database type '%s'", typ)
-  end
+  local path = (prefix or "") .. "database"
+  db = self:expect(path, db, "map")
+  local typ = self:expect(path .. ".type", db.type, "string", true)
   return self:validate("database", {
     type = typ,
-    url = url,
-    password_cmd = password_cmd,
-    options = self:expect(prefix .. "database.options", db.options, "map", true) or map.new(),
-  }, prefix .. "database")
+    url = self:expect(path .. ".url", db.url, "string"),
+    password_cmd = nn(db.password_cmd),
+    options = self:expect(path .. ".options", db.options, "map", true) or map.new(),
+  }, path)
 end
 
 function Ctx:arg(a, i, base)
@@ -251,48 +164,36 @@ function Ctx:arg(a, i, base)
   if nn(a.key) ~= nil and nn(a.name) == nil then
     self:fail(path .. ".key", "'key:' is no longer supported in args; rename it to 'name:'")
   end
-  local name = self:expect(path .. ".name", a.name, "string")
-  if not name:match("^[%a_][%w_]*$") then
-    self:fail(path .. ".name", "argument name '%s' must be an identifier", name)
-  end
-  local typ = self:expect(path .. ".type", a.type, "string", true) or "string"
-  if not M.ARG_TYPES[typ] then
-    self:fail(path .. ".type", "unknown argument type '%s'", typ)
-  end
   local show = nn(a.show)
   local required = nn(a.required)
-  return {
-    name = name,
-    type = typ,
+  return self:validate("arg", {
+    name = self:expect(path .. ".name", a.name, "string"),
+    type = self:expect(path .. ".type", a.type, "string", true) or "string",
     default = nn(a.default),
     required = required == true,
     show = show == nil or show == true,
     description = self:expect(path .. ".description", a.description, "string", true),
     choices = self:expect(path .. ".choices", a.choices, "list", true),
-  }
+  }, path)
 end
 
 ---Argument specs from a list at `base` (e.g. "query.args", "args").
 function Ctx:args_list(list, base)
   local raw = self:expect(base, list, "list", true) or {}
-  local out, seen = {}, {}
+  local out = {}
   for i, a in ipairs(raw) do
     local spec = self:arg(a, i, base)
-    if seen[spec.name] then
-      self:fail(("%s[%d].name"):format(base, i), "duplicate argument '%s'", spec.name)
-    end
-    seen[spec.name] = true
     spec.path = ("%s[%d].name"):format(base, i)
     out[i] = spec
   end
-  return out
+  return self:validate("args", out, base)
 end
 
 ---@param db table the panel's database (webhook:// has no request; http(s):// needs its
 ---curl command, `curl` alone being a GET of the URL)
 function Ctx:query(q, prefix, db)
   prefix = prefix or ""
-  local optional = db and db.type == "webhook"
+  local optional = db and require("dbdash.db").driver(db.type).query_optional
   if optional and nn(q) == nil then
     q = map.new()
   end
@@ -322,9 +223,6 @@ function Ctx:show(s, top_interval, prefix)
   prefix = prefix or ""
   s = self:expect(prefix .. "show", s, "map", true) or map.new()
   local typ = self:expect(prefix .. "show.type", s.type, "string", true) or "table"
-  if not M.CHART_TYPES[typ] then
-    self:fail(prefix .. "show.type", "unknown chart type '%s'", typ)
-  end
   -- Keep every field (chart-specific ones are read by the renderers) and normalize the
   -- common ones in place. Fields no renderer reads are simply ignored downstream.
   local out = map.new()
@@ -340,8 +238,9 @@ function Ctx:show(s, top_interval, prefix)
   out.interval = self:duration(prefix .. "show.interval", nn(s.interval))
     or self:duration("interval", top_interval)
     or DEFAULTS.interval
-  if out.interval < 1000 then
-    self:fail(prefix .. "show.interval", "interval must be at least 1s")
+  if nn(s.interval) == nil and top_interval ~= nil then
+    -- the top-level interval's line for the panel's
+    self.pos[prefix .. "show.interval"] = self.pos["interval"]
   end
   for k in pairs(M.MOVED) do
     local field = k:match("^show%.(.+)$")
@@ -357,21 +256,6 @@ function Ctx:show(s, top_interval, prefix)
         'grid lines are appearance: style: "grid.%s" { display: block }',
         axis:sub(1, 1)
       )
-    end
-  end
-  local T = require("dbdash.render.thresholds")
-  if nn(s.thresholds) ~= nil then
-    local terr = T.check(s.thresholds)
-    if terr then
-      self:fail(prefix .. "show.thresholds", "%s", terr)
-    end
-  end
-  for i, spec in ipairs(nn(s.column_list) or {}) do
-    if type(spec) == "table" and nn(spec.thresholds) ~= nil then
-      local terr = T.check(spec.thresholds)
-      if terr then
-        self:fail(("%sshow.column_list[%d].thresholds"):format(prefix, i - 1), "%s", terr)
-      end
     end
   end
   local as = nn(s.args_show)
@@ -394,7 +278,7 @@ function Ctx:show(s, top_interval, prefix)
     "boolean",
     true
   ) == true
-  return out
+  return self:validate("show", out, prefix .. "show")
 end
 
 ---@class dbdash.PanelConfig
@@ -448,25 +332,15 @@ function Ctx:moved(path)
   )
 end
 
----A style sheet (selector -> properties), parsed in the order written; errors name the
----selector's line. `scope`: "author" (the top level) or "inline" (a panel).
+---A style sheet (selector -> properties) as written; css.validators parses it (the rules
+---in the order written). `scope`: "author" (the top level) or "inline" (a panel).
 ---@return dbdash.css.Rule[]?
 function Ctx:style(raw, path)
   local m = self:expect(path, raw, "map", true)
   if not m then
     return nil
   end
-  local parser = require("dbdash.css.parser")
-  local keys = map.keys(m)
-  local rules, err = parser.sheet(m, keys)
-  if not rules then
-    local where = path .. "." .. err.key
-    if err.property then
-      where = where .. "." .. err.property
-    end
-    self:fail(where, "%s", err.message)
-  end
-  return self:validate("style", rules, path)
+  return self:validate("style", m, path)
 end
 
 -- Fields that describe one chart: with panels they cannot be top-level defaults.
@@ -574,9 +448,6 @@ function M.validate(data, file, positions)
     positions = ctx.pos,
     refresh_all = ctx:duration("interval", nn(data.interval)),
   }
-  if cfg.refresh_all and cfg.refresh_all < 1000 then
-    ctx:fail("interval", "interval must be at least 1s")
-  end
   -- Dashboard-wide: the title and the countdown to the global refresh.
   cfg.title = ctx:expect("title", data.title, "string", true)
   -- The dashboard's description: a template rendered as Markdown (:DbDashDescribe).
@@ -674,37 +545,8 @@ function M.validate(data, file, positions)
   if not cfg.grid then
     local p = cfg.panels[1]
     cfg.query, cfg.show = p.query, p.show
-    return cfg
   end
-  -- Place the panels once with the config's own sheets, so conflicts (overlaps, unknown
-  -- areas, areas that are not rectangles) are reported with a line; :DbDashStyle rules
-  -- are placed again at layout.
-  ctx:check_grid(cfg)
-  return cfg
-end
-
----Place the panels with the config's style sheets (computed as a dashboard would), so a
----grid that cannot be laid out is an error with the line of the rule at fault.
-function Ctx:check_grid(cfg)
-  local fake = require("dbdash.dashboard.document").from_config(cfg)
-  local style = require("dbdash.css.style")
-  local items = {}
-  for i, p in ipairs(fake.panels) do
-    items[i] = style.get(p.node)
-  end
-  local _, err = require("dbdash.layout.grid").from_styles(style.get(fake.doc.root), items)
-  if err then
-    -- the declaration at fault: <sheet>.<selector>.<property>, else the sheet
-    local sheet = err.index and ("panels[%d].style"):format(err.index) or "style"
-    local rules = (err.index and cfg.panels[err.index].style_rules or cfg.style_rules) or {}
-    local where = sheet
-    for _, r in ipairs(rules) do
-      if r.decls[err.field] ~= nil then
-        where = ("%s.%s.%s"):format(sheet, r.key or r.selector.text, err.field)
-      end
-    end
-    self:fail(where, "%s: %s", err.field, err.message)
-  end
+  return ctx:validate("dashboard", cfg, "")
 end
 
 ---@class dbdash.LayoutConfig
@@ -734,14 +576,6 @@ function Ctx:panel(raw, prefix, cfg, index, id, top_interval)
   end
   local query = self:query(raw.query, prefix, db)
   local show = self:show(raw.show, top_interval, prefix)
-  if M.PUSH_TYPES[db.type] and show.refresh_hidden then
-    -- A push source keeps receiving while hidden anyway; only drawing waits.
-    self:fail(
-      prefix .. "show.refresh_hidden",
-      "refresh_hidden does not apply to %s:// (push sources keep receiving while hidden)",
-      db.type
-    )
-  end
   local panel = {
     index = index,
     id = id,
@@ -789,7 +623,7 @@ function Ctx:panel(raw, prefix, cfg, index, id, top_interval)
       end
     end
   end
-  return panel
+  return self:validate("panel", panel, prefix)
 end
 
 ---Arguments a panel's query reads: query.sql, query.transform and the files they import.

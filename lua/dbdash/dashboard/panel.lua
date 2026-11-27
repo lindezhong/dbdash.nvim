@@ -93,7 +93,7 @@ function M.new(d, index, cfg)
     index = index,
     cfg = cfg,
     running = false,
-    push = require("dbdash.config").PUSH_TYPES[cfg.database.type] or nil, -- shown so
+    push = db.driver(cfg.database.type).produce ~= nil or nil, -- a push source (shown so)
     next_at = now(),
     history = {},
     style = {},

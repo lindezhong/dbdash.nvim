@@ -391,4 +391,35 @@ function M.reset(state)
   state.cli, state.modified, state.interactive = {}, {}, {}
 end
 
+---The types of arguments.
+M.TYPES = { string = true, number = true, int = true, boolean = true, list = true, map = true }
+
+-- The rules of a config's arguments (config/validators.lua): names are identifiers, types
+-- known, a list has each name once.
+M.validators = {
+  {
+    field = "arg",
+    validate = function(spec, ctx, path)
+      if not spec.name:match("^[%a_][%w_]*$") then
+        ctx:fail(path .. ".name", "argument name '%s' must be an identifier", spec.name)
+      end
+      if not M.TYPES[spec.type] then
+        ctx:fail(path .. ".type", "unknown argument type '%s'", spec.type)
+      end
+    end,
+  },
+  {
+    field = "args",
+    validate = function(list, ctx, path)
+      local seen = {}
+      for i, spec in ipairs(list) do
+        if seen[spec.name] then
+          ctx:fail(("%s[%d].name"):format(path, i), "duplicate argument '%s'", spec.name)
+        end
+        seen[spec.name] = true
+      end
+    end,
+  },
+}
+
 return M

@@ -22,6 +22,7 @@
 ---@field dialect (string|dbdash.template.Dialect)? how template values are written in its queries:
 ---  a name of template/dialect.lua (default: the driver's name) or a dialect
 ---@field capabilities { tls: boolean, sql: boolean, query_language: string }?
+---@field query_optional boolean? a config may leave query.sql out
 ---@field options table<string, string|fun(v: any): string?>? the database.options it reads
 ---  (db/options.lua checks them; nil: not checked)
 ---@field parse_url (fun(u: dbdash.db.ConnInfo): dbdash.db.ConnInfo)?

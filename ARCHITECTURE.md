@@ -55,10 +55,16 @@ Rules that keep it so:
       ├ dashboard.prepare(path, tokens)          dashboard/init.lua
       │   ├ config.load                          the only reader of config files
       │   │   ├ yaml.parse_file                  every value knows its line
-      │   │   ├ structure and types              (config.lua)
-      │   │   └ validators                       rules of other modules (config/validators.lua)
-      │   │       db                database: URL parameters, the driver's options
-      │   │       render.registry   style: renderer, canvas and palette names
+      │   │   ├ structure and types              (config.lua: fields, defaults, panels)
+      │   │   └ validators                       the rules of the modules (config/validators.lua)
+      │   │       css                style: the sheet parses (gives its rules)
+      │   │       args               arg, args: names, types, each name once
+      │   │       db                 database: the driver (type or URL), the URL's
+      │   │                          variables and parameters, password_cmd, the options
+      │   │       render.registry    show: the chart type; style: renderer, canvas, palette
+      │   │       render.thresholds  show: thresholds
+      │   │       layout.grid        dashboard: the panels can be placed
+      │   │       dashboard.timer    show, panel, dashboard: intervals, refresh_hidden
       │   │       → ctx:fail(path, msg) reports the line
       │   ├ trust.check                          Lua code and curl -c: ask first
       │   └ the command line's arguments
@@ -215,7 +221,7 @@ The view listens to no data event: what it shows comes from the document.
 | Interface | Defined in | Implemented by |
 |---|---|---|
 | `dbdash.db.Driver`, `Connection`, `StreamCtx` | `db/types.lua` (base: `db/driver.lua`) | `db/drivers/*` |
-| a config part's rules (`M.validators`) | `config/types.lua` (listed in `config/validators.lua`) | `db`, `render/registry` |
+| a config part's rules (`M.validators`) | `config/types.lua` (listed in `config/validators.lua`) | `css`, `args`, `db`, `render/registry`, `render/thresholds`, `layout/grid`, `dashboard/timer` |
 | chart renderers, canvases, ticks, palettes, frames | `render/types.lua` (checked by `render/registry.lua`) | `render/charts/*`, `render/{canvas,ticks,palette,frame}/*` |
 | `dbdash.render.Output` (lines and highlights) | `render/types.lua` | every renderer |
 

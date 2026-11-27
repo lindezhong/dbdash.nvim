@@ -37,13 +37,6 @@ T["parse_duration"] = function()
   eq(select(2, config.parse_duration("soon")) ~= nil, true)
 end
 
-T["scheme_of"] = function()
-  eq(config.scheme_of("postgresql://h/db"), "postgres")
-  eq(config.scheme_of("mongodb+srv://h"), "mongodb")
-  eq(config.scheme_of("sqlite:///:memory:"), "sqlite")
-  eq(config.scheme_of("nope"), nil)
-end
-
 T["minimal config gets defaults"] = function()
   local cfg = assert(load(MINIMAL))
   eq(cfg.database.type, "sqlite")
@@ -664,6 +657,78 @@ T["load-time rules of other modules: renderer names, the URL, driver options"] =
     "database:\n  url: 'postgres://h/db'\n  options: { lib_path: x }\nquery: { sql: x }\nshow: { type: table }\n"
   )
   eq(msg:find("postgres://: unknown option database.options.lib_path", 1, true) ~= nil, true)
+end
+
+T["validators: config.lua runs every module's rules on its part"] = function()
+  local calls = {}
+  local restore = {}
+  for _, mod in ipairs(require("dbdash.config.validators")) do
+    local list = require(mod).validators
+    eq({ mod, type(list) == "table" and #list > 0 }, { mod, true })
+    for i, v in ipairs(list) do
+      local key = ("%s#%d(%s)"):format(mod, i, v.field)
+      calls[key] = 0
+      local real = v.validate
+      restore[#restore + 1] = function()
+        v.validate = real
+      end
+      v.validate = function(...)
+        calls[key] = calls[key] + 1
+        return real(...)
+      end
+    end
+  end
+  MiniTest.finally(function()
+    for _, r in ipairs(restore) do
+      r()
+    end
+  end)
+  -- a config with every part: arguments, styles, a grid, thresholds, intervals
+  local cfg = load(MULTI)
+  eq(cfg ~= nil, true)
+  for key, n in pairs(calls) do
+    eq({ key, n > 0 }, { key, true })
+  end
+end
+
+-- One failing case per rule of a module (the other cases of this file have more); the
+-- passing case is MULTI and MINIMAL above.
+T["validators: each rule fails a config with the line"] = function()
+  local cases = {
+    { "args: [{ name: a, type: date }]", "unknown argument type 'date'" },
+    { "args: [{ name: 'a b' }]", "argument name 'a b' must be an identifier" },
+    { "args: [{ name: a }, { name: a }]", "duplicate argument 'a'" },
+    { "interval: 500ms", "interval must be at least 1s" },
+    { "show: { interval: 500ms }", "interval must be at least 1s" },
+    { "show: { type: radar }", "unknown chart type 'radar'" },
+    { "show: { thresholds: [{ value: x }] }", "threshold" },
+    { 'style: { "chart": { renderer: nope } }', "unknown renderer 'nope'" },
+    { 'style: { "chart": { nope: 1 } }', "nope" },
+  }
+  for _, c in ipairs(cases) do
+    local msg = err_of(MINIMAL .. c[1] .. "\n")
+    eq(
+      { c[1], msg:find(c[2], 1, true) ~= nil, msg:find("%.yaml:%d+:%d+: ") ~= nil },
+      { c[1], true, true }
+    )
+  end
+  local db = {
+    { "database: { url: 'nope' }", "cannot infer database type" },
+    { "database: { url: 'foo://h' }", "unsupported database type 'foo'" },
+    { "database: { url: 'oracle://h/x' }", "Oracle is not supported" },
+    { "database: { url: 'sqlite:///:memory:', password_cmd: [] }", "password_cmd must be" },
+    { "database: { url: 'sqlite:///:memory:', options: { nope: 1 } }", "nope" },
+  }
+  for _, c in ipairs(db) do
+    local msg = err_of(c[1] .. "\nquery: { sql: x }\n")
+    eq({ c[1], msg:find(c[2], 1, true) ~= nil }, { c[1], true })
+  end
+  local push = err_of([[
+database: { url: "luastream://" }
+query: { sql: "print(1)" }
+show: { refresh_hidden: true }
+]])
+  eq(push:find("refresh_hidden does not apply to luastream://", 1, true) ~= nil, true)
 end
 
 return T

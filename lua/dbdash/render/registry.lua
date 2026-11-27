@@ -175,9 +175,17 @@ local function known(kind)
   return M.names(kind .. "/")
 end
 
--- The rules of a config's style sheets (dbdash.config.validators): implementations named
--- in renderer, canvas and palette exist.
+-- The rules of a config's charts and style sheets (config/validators.lua): the chart type
+-- is known; implementations named in renderer, canvas and palette exist.
 M.validators = {
+  {
+    field = "show",
+    validate = function(show, ctx, path)
+      if not M.DEFAULTS[show.type] and not M.names("chart/" .. show.type .. "/")[1] then
+        ctx:fail(path .. ".type", "unknown chart type '%s'", show.type)
+      end
+    end,
+  },
   {
     field = "style",
     validate = function(rules, ctx, path)

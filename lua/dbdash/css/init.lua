@@ -177,4 +177,24 @@ function M.countdown(parent)
   return c.display ~= "none", c.content or "Next update: {time}s"
 end
 
+-- The rules of a config's style sheets (config/validators.lua): a sheet parses (the
+-- declaration at fault is reported); gives the rules in the order written.
+M.validators = {
+  {
+    field = "style",
+    validate = function(sheet, ctx, path)
+      local rules, err =
+        require("dbdash.css.parser").sheet(sheet, require("dbdash.util.map").keys(sheet))
+      if not rules then
+        local where = path .. "." .. err.key
+        if err.property then
+          where = where .. "." .. err.property
+        end
+        ctx:fail(where, "%s", err.message)
+      end
+      return rules
+    end,
+  },
+}
+
 return M
