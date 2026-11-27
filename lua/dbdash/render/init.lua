@@ -85,18 +85,6 @@ end
 -- Where a title sits when its text-align is "start".
 local LEFT_TITLES = { stat = true, text = true }
 
----The cut marker of a computed text-overflow: "ellipsis" -> "…", "clip" -> "", else
----the string itself (CSS text-overflow: "<string>").
-function M.ellipsis(c)
-  local v = c["text-overflow"]
-  if v == nil or v == "ellipsis" then
-    return "…"
-  elseif v == "clip" then
-    return ""
-  end
-  return v
-end
-
 ---Put the title line (and the subtitle under it) above a chart, aligned over the chart's
 ---width; caption-side: bottom puts them under it. Styles: the title and subtitle parts.
 function M.with_title(out, title, subtitle, width, chart_type, css)
@@ -111,7 +99,7 @@ function M.with_title(out, title, subtitle, width, chart_type, css)
     local c = css:get(part)
     local align = c["text-align"] ~= "start" and c["text-align"]
       or (LEFT_TITLES[chart_type] and "left" or "center")
-    local line, s, e = box.title_line(text, w, align, M.ellipsis(c))
+    local line, s, e = box.title_line(text, w, align, require("dbdash.css").ellipsis(c))
     return {
       lines = { (line:gsub("%s+$", "")) },
       hl = { { row = 0, col_s = s, col_e = e, group = css:hl(part) } },
@@ -121,7 +109,7 @@ function M.with_title(out, title, subtitle, width, chart_type, css)
   if subtitle and css:get("subtitle").display ~= "none" then
     parts[#parts + 1] = line_of(subtitle, "subtitle")
   end
-  local stack = require("dbdash.paint").stack
+  local stack = require("dbdash.render.output").stack
   if tc["caption-side"] == "bottom" then
     return stack(vim.list_extend({ out }, parts))
   end

@@ -153,7 +153,7 @@ function M.render(rs, show, ctx)
   end
   -- what layout needs from a cell's computed style, once per (shared) style
   local per_style = {}
-  local ellipsis_of = require("dbdash.render").ellipsis
+  local ellipsis_of = require("dbdash.css").ellipsis
   local function cell_style(cs)
     local d = per_style[cs]
     if not d then
@@ -222,7 +222,7 @@ function M.render(rs, show, ctx)
   local border = chars ~= nil
   local pad = cell.padding[2]
   local sp = string.rep(" ", pad)
-  local ellipsis = require("dbdash.render").ellipsis(cell)
+  local ellipsis = require("dbdash.css").ellipsis(cell)
 
   -- Overhead: the bars around and between the columns and the padding of every cell.
   local overhead = border and (#cols + 1 + 2 * pad * #cols) or (math.max(2 * pad, 1) * (#cols - 1))

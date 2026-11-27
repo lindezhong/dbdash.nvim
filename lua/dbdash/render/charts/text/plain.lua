@@ -85,7 +85,7 @@ function M.render(rs, show, ctx)
         pieces = W.wrap(line, width, ls["word-break"] == "break-all" and "char" or "word")
       else
         -- CSS text-overflow: clip by default (the UA sheet), a string to mark the cut
-        pieces = { W.truncate(line, width, require("dbdash.render").ellipsis(ls)) }
+        pieces = { W.truncate(line, width, require("dbdash.css").ellipsis(ls)) }
       end
       for _, piece in ipairs(pieces) do
         body[#body + 1] =

@@ -3,33 +3,9 @@
 -- box: padding, border (with the title in it), background (render/box.lua's wrap). The
 -- view's display list is the header, then each panel's layer at its position.
 local box = require("dbdash.render.box")
+local stack = require("dbdash.render.output").stack
 
 local M = {}
-
----`parts` (painted blocks) one after another.
-local function stack(parts)
-  local out = { lines = {}, hl = {} }
-  for _, part in ipairs(parts) do
-    local off = #out.lines
-    vim.list_extend(out.lines, part.lines)
-    for _, h in ipairs(part.hl) do
-      out.hl[#out.hl + 1] = {
-        row = h.row + off,
-        col_s = h.col_s,
-        col_e = h.col_e,
-        group = h.group,
-        priority = h.priority,
-      }
-    end
-    -- the rows of elements inside a part (a table's rows, a text's lines) move with it
-    for _, h in ipairs(part.hits or {}) do
-      out.hits = out.hits or {}
-      out.hits[#out.hits + 1] = { row_s = h.row_s + off, row_e = h.row_e + off, node = h.node }
-    end
-  end
-  return out
-end
-M.stack = stack
 
 ---Paint one panel fragment: its content in order, wrapped in its box.
 ---@param frag dbdash.layout.Fragment

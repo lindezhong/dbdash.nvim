@@ -158,4 +158,16 @@ end
 
 M.Scope = Scope
 
+---The cut marker of a computed text-overflow: "ellipsis" -> "…", "clip" -> "", else
+---the string itself (CSS text-overflow: "<string>").
+function M.ellipsis(c)
+  local v = c["text-overflow"]
+  if v == nil or v == "ellipsis" then
+    return "…"
+  elseif v == "clip" then
+    return ""
+  end
+  return v
+end
+
 return M

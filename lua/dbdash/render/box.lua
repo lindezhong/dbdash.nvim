@@ -45,7 +45,7 @@ function M.settings(css)
     align = c["align-self"],
     title_group = css:hl("panel-title"),
     title_align = title["text-align"] ~= "start" and title["text-align"] or nil,
-    ellipsis = require("dbdash.render").ellipsis(title),
+    ellipsis = require("dbdash.css").ellipsis(title),
   }
 end
 
