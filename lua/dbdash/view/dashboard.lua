@@ -240,6 +240,7 @@ local function show_in(buf, win, open)
         local scratch = vim.api.nvim_get_current_buf()
         vim.api.nvim_win_set_buf(0, buf)
         if scratch ~= buf and vim.fn.bufname(scratch) == "" and not vim.bo[scratch].modified then
+          -- (pcall: the scratch buffer may be gone already)
           pcall(vim.api.nvim_buf_delete, scratch, { force = true })
         end
       end
@@ -413,6 +414,7 @@ local function close_buffer(d)
       end
     end)
   end
+  -- (pcall: the buffer may be wiped already (:bwipeout started the stop))
   pcall(vim.api.nvim_buf_delete, d.buf, { force = true })
 end
 

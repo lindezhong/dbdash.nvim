@@ -85,9 +85,11 @@ function M.produce(info, script, ctx)
   local proc, exited
   ctx.on_stop(function()
     if proc and not exited then
+      -- (pcall: the process may have exited meanwhile)
       pcall(proc.kill, proc, "sigterm")
       vim.defer_fn(function()
         if not exited then
+          -- (pcall: the process may have exited meanwhile)
           pcall(proc.kill, proc, "sigkill")
         end
       end, 2000)

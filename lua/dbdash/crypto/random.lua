@@ -6,6 +6,7 @@ local ffi = require("ffi")
 
 local win_ok, bcrypt
 if jit.os == "Windows" then
+  -- (pcall: the type may be declared already (ffi.cdef cannot declare twice))
   pcall(
     ffi.cdef,
     [[

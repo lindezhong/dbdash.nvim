@@ -326,6 +326,7 @@ function Jar:write(path, now)
   end
   f:write(self:netscape(now))
   f:close()
+  -- (pcall: best effort: a file system without permissions keeps the defaults)
   pcall(vim.uv.fs_chmod, tmp, 384) -- 0600
   local ok, rerr = vim.uv.fs_rename(tmp, path)
   if not ok then

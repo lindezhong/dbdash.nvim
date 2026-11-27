@@ -61,6 +61,7 @@ end
 function M.del_mappings()
   for _, map in ipairs(vim.api.nvim_get_keymap("n")) do
     if map.desc and map.desc:find("^dbdash: ") then
+      -- (pcall: a mapping the user already removed)
       pcall(vim.keymap.del, "n", map.lhs)
     end
   end

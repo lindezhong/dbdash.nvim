@@ -10,6 +10,7 @@ function M.check()
 
   health.start("SQLite library")
   local ffi = require("ffi")
+  -- (pcall: the type may be declared already (ffi.cdef cannot declare twice))
   pcall(ffi.cdef, "const char *sqlite3_libversion(void);")
   local candidates = require("dbdash.db.drivers.sqlite").lib_candidates()
   local errors = {}

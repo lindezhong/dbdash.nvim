@@ -15,6 +15,7 @@ local function set_filetype(buf, ft)
   end
   local ei = vim.o.eventignore
   vim.o.eventignore = "FileType"
+  -- (pcall: a filetype plugin's error must not stop the float)
   pcall(function()
     vim.bo[buf].filetype = ft
   end)
@@ -60,6 +61,7 @@ function M.open(lines, opts)
   end
   local ns = require("dbdash.view.buffer").ns
   for _, h in ipairs(opts.hl or {}) do
+    -- (pcall: a highlight past the end of a changed line is skipped)
     pcall(
       vim.api.nvim_buf_set_extmark,
       buf,
@@ -108,6 +110,7 @@ function M.open(lines, opts)
     local text = table.concat(lines, "\n")
     vim.fn.setreg('"', text)
     if vim.fn.has("clipboard") == 1 then
+      -- (pcall: no clipboard provider: the text is still yanked to the unnamed register)
       pcall(vim.fn.setreg, "+", text)
     end
     close()

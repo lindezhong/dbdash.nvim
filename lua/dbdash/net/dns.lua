@@ -174,6 +174,7 @@ local function udp_query(server, packet, timeout)
       done = true
       timer:stop()
       timer:close()
+      -- (pcall: cleanup: the socket may be closed already)
       pcall(udp.recv_stop, udp)
       udp:close()
       cb(err, data)
@@ -217,6 +218,7 @@ end
 ---Windows: DnsQuery_UTF8 through dnsapi (UTF-8 names in and out).
 local function windows_query(name, qtype)
   local ffi = require("ffi")
+  -- (pcall: the types may be declared already (ffi.cdef cannot declare twice))
   pcall(
     ffi.cdef,
     [[

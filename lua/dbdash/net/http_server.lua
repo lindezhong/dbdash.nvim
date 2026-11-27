@@ -233,6 +233,7 @@ function M.listen(host, port, opts, handler)
       tcp:close()
     end
     for c in pairs(srv.clients) do
+      -- (pcall: closing: the client may be gone)
       pcall(c.close, c)
     end
   end
@@ -284,6 +285,7 @@ function M.serve(client, opts, handler)
           body = (out.detail or "") .. "\n",
         }
     end
+    -- (pcall: the client may have gone before the response)
     pcall(sock.write, sock, response(res))
   end, function()
     if srv then

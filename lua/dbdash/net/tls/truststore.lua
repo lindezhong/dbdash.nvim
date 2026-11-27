@@ -84,6 +84,7 @@ end
 ---Windows ROOT store through crypt32 (a system DLL).
 local function windows_store()
   local ffi = require("ffi")
+  -- (pcall: the types may be declared already (ffi.cdef cannot declare twice))
   pcall(
     ffi.cdef,
     [[

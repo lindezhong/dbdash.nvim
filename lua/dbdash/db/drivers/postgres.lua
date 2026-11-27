@@ -509,6 +509,7 @@ function Conn:execute(query, opts)
 end
 
 function Conn:close()
+  -- (pcall: closing: Terminate is a courtesy; the socket closes anyway)
   pcall(function()
     self.sock:write(message("X", ""))
   end)
@@ -530,6 +531,7 @@ function M.cancel(conn, info)
     info.port,
     { connect_timeout = info.connect_timeout, timeout = info.connect_timeout }
   )
+  -- (pcall: best effort: the query may have ended meanwhile)
   pcall(function()
     sock:write(i32(8 + #conn.backend_key) .. i32(80877102) .. conn.backend_key)
     sock:read_to_eof(1024) -- the server closes the connection once it has the request

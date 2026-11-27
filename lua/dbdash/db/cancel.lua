@@ -38,6 +38,7 @@ function Token:cancel(reason)
   local handlers = self.handlers
   self.handlers = {}
   for _, fn in ipairs(handlers) do
+    -- (pcall: a failing handler must not keep the others from running)
     pcall(fn, self.reason)
   end
 end
@@ -48,6 +49,7 @@ end
 ---@return fun()
 function Token:on_cancel(fn)
   if self.cancelled then
+    -- (pcall: a failing handler must not keep the others from running)
     pcall(fn, self.reason)
     return function() end
   end

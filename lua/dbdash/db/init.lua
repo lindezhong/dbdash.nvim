@@ -257,6 +257,7 @@ function M.run(raw_url, query, opts, on_result, on_end)
     done = true
     token:release()
     for i = #stops, 1, -1 do
+      -- (pcall: cleanups: each runs whatever the others do)
       pcall(stops[i])
     end
     vim.schedule(function()

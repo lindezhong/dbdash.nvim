@@ -90,6 +90,7 @@ function Filter:post_handshake(sock, content)
 end
 
 function Filter:close(sock)
+  -- (pcall: closing: the peer may be gone; the socket closes anyway)
   pcall(function()
     sock:raw_write(self.session.write:seal(TYPE.alert, "\1\0")) -- close_notify
   end)

@@ -43,6 +43,7 @@ M.ACTIONS = {
 ---(Re)define the buffer keys from setup({ dashboard = { keys = ... } }).
 function M.apply_keys(buf)
   for _, lhs in ipairs(vim.b[buf].dbdash_keys or {}) do
+    -- (pcall: a mapping the user already removed)
     pcall(vim.keymap.del, "n", lhs, { buffer = buf })
   end
   local keys = require("dbdash.options").current.dashboard.keys
@@ -102,6 +103,7 @@ M.stats = {}
 
 local function add_marks(buf, list)
   for _, h in ipairs(list or {}) do
+    -- (pcall: a highlight past the end of its line (a cut cell) is skipped)
     pcall(vim.api.nvim_buf_set_extmark, buf, M.ns, h.row, h.col_s, {
       end_col = h.col_e,
       hl_group = h.group,

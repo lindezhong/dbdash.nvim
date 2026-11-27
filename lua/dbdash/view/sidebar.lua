@@ -299,6 +299,7 @@ end
 
 local function create_buf()
   local buf = vim.api.nvim_create_buf(false, true)
+  -- (pcall: the name exists when the sidebar was opened before (a hidden buffer))
   pcall(vim.api.nvim_buf_set_name, buf, NAME)
   local bo = vim.bo[buf]
   bo.buftype = "nofile"
@@ -334,6 +335,7 @@ end
 ---(Re)define the buffer keys from sidebar.keys; keys of a previous setup() are removed.
 local function apply_keys(buf)
   for _, lhs in ipairs(vim.b[buf].dbdash_keys or {}) do
+    -- (pcall: a mapping the user already removed)
     pcall(vim.keymap.del, "n", lhs, { buffer = buf })
   end
   local mapped = {}
@@ -366,6 +368,7 @@ function M.open()
   local scratch = vim.api.nvim_get_current_buf()
   vim.api.nvim_win_set_buf(0, buf)
   if scratch ~= buf and vim.api.nvim_buf_is_valid(scratch) then
+    -- (pcall: the scratch buffer may be gone already)
     pcall(vim.api.nvim_buf_delete, scratch, { force = true })
   end
   win = vim.api.nvim_get_current_win()

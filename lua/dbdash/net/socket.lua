@@ -358,9 +358,11 @@ function Socket:close()
   end
   self.closed = true
   if self.filter and self.filter.close then
+    -- (pcall: closing: the filter's goodbye is best effort)
     pcall(self.filter.close, self.filter, self)
   end
   if self.reading then
+    -- (pcall: cleanup: reading may have stopped already)
     pcall(self.tcp.read_stop, self.tcp)
   end
   if not self.tcp:is_closing() then

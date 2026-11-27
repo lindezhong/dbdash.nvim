@@ -514,6 +514,7 @@ function Conn:execute(query, opts)
 end
 
 function Conn:close()
+  -- (pcall: closing: COM_QUIT is a courtesy; the socket closes anyway)
   pcall(function()
     self.seq = 0
     self:write_packet("\1") -- COM_QUIT
@@ -528,6 +529,7 @@ function M.cancel(conn, info)
     return
   end
   local killer = M.connect(info)
+  -- (pcall: best effort: the query may have ended meanwhile)
   pcall(killer.execute, killer, ("KILL QUERY %d"):format(conn.thread_id), { max_rows = 1 })
   killer:close()
 end

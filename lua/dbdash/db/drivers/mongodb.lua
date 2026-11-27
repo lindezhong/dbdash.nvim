@@ -436,6 +436,7 @@ function Conn:cursor(cmd, coll, max_rows)
     id = r.cursor.id
   end
   if id ~= 0 and id ~= "0" then
+    -- (pcall: best effort: the server drops an idle cursor itself)
     pcall(
       self.command,
       self,
@@ -582,6 +583,7 @@ function M.cancel(conn, info)
     return
   end
   local c = M.connect(info)
+  -- (pcall: best effort: the operation may have ended meanwhile)
   pcall(function()
     local reply = c:command(doc({
       { "aggregate", 1 },
@@ -596,6 +598,7 @@ function M.cancel(conn, info)
       { "$db", "admin" },
     }))
     for _, op in ipairs(reply.cursor and reply.cursor.firstBatch or {}) do
+      -- (pcall: best effort: the operation may have ended meanwhile)
       pcall(c.command, c, doc({ { "killOp", 1 }, { "op", op.opid }, { "$db", "admin" } }))
     end
   end)
