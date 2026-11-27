@@ -59,8 +59,10 @@ function M.stats(values, whiskers)
   }
 end
 
-function M.render(rs, show, ctx)
-  local axes = C.axes(show)
+---The values of each category (category_column, else one box of value_column), in the
+---order they come, with their statistics and the range of all values (nil: no data).
+---@return string[]? order, table[] stats, number lo, number hi
+function M.groups(rs, show)
   local vi = C.col(rs, nn(show.value_column), "value_column")
   local ci = nn(show.category_column) and C.col(rs, show.category_column, "category_column")
   local groups, order = {}, {}
@@ -76,7 +78,7 @@ function M.render(rs, show, ctx)
     end
   end
   if #order == 0 then
-    return { lines = { "(no data to plot)" }, hl = {} }
+    return nil
   end
   local stats, lo, hi = {}, nil, nil
   for i, cat in ipairs(order) do
@@ -84,112 +86,153 @@ function M.render(rs, show, ctx)
     lo = math.min(lo or stats[i].min, stats[i].min)
     hi = math.max(hi or stats[i].max, stats[i].max)
   end
-  lo, hi = C.limits(ctx, lo, hi, axes.xmin or axes.ymin, axes.xmax or axes.ymax)
+  return order, stats, lo, hi
+end
 
-  -- each box's value, outlier and mean elements (render/content/chart.lua); the values take
-  -- a line under the boxes when any box shows them (hidden by the UA sheet)
-  local show_values = false
-  for i = 1, #order do
-    show_values = show_values or (C.item_part(ctx, "series", i, "value"))
-  end
-  local rows_needed = #order * 4 - (show_values and 0 or 1)
-  local spec = {
-    title = nn(show.title),
-    xlabel = axes.xlabel or axes.ylabel,
-    ylabels = order,
-    height = rows_needed,
-    min_rows = rows_needed,
-  }
-  local cols = ctx.frame.plot_size(ctx, spec)
-  local rows = rows_needed
-  local grid, colors = {}, {}
+---@class dbdash.render.charts.boxplot.Grid cells of a box plot, row 0 at the top
+---@field rows integer
+---@field cols integer
+---@field cells table<integer, table<integer, string>>
+---@field colors table<integer, table<integer, string>>
+local Grid = {}
+Grid.__index = Grid
+
+---@return dbdash.render.charts.boxplot.Grid
+function M.grid(rows, cols)
+  local g = setmetatable({ rows = rows, cols = cols, cells = {}, colors = {} }, Grid)
   for r = 0, rows - 1 do
-    grid[r], colors[r] = {}, {}
+    g.cells[r], g.colors[r] = {}, {}
   end
-  local function col(v)
-    return math.floor((v - lo) / (hi - lo) * (cols - 1) + 0.5)
+  return g
+end
+
+---Put `ch` (highlight `group`) at (r, c) inside the grid; only_blank: not over another.
+function Grid:put(r, c, ch, group, only_blank)
+  if
+    r >= 0
+    and r < self.rows
+    and c >= 0
+    and c < self.cols
+    and (not only_blank or not self.cells[r][c])
+  then
+    self.cells[r][c], self.colors[r][c] = ch, group
   end
-  local function put(r, c, ch, g, only_blank)
-    if c >= 0 and c < cols and (not only_blank or not grid[r][c]) then
-      grid[r][c], colors[r][c] = ch, g
-    end
+end
+
+---Text from (r, c) on, a character per cell.
+function Grid:text(r, c, text, group, only_blank)
+  for k = 1, #text do
+    self:put(r, c + k - 1, text:sub(k, k), group, only_blank)
   end
-  spec.yticks = {}
-  for i, s in ipairs(stats) do
-    local g = C.color(ctx, show, i, nil, order[i])
-    local show_means, g_mean = C.item_part(ctx, "series", i, "mean", g)
-    local show_outliers, g_out = C.item_part(ctx, "series", i, "outlier", g)
-    local box_values, g_value = C.item_part(ctx, "series", i, "value", ctx.css:hl("value"))
-    local top = (i - 1) * 4
-    local mid, bot = top + 1, top + 2
-    local a, q1, m, q3, b = col(s.wlo), col(s.q1), col(s.median), col(s.q3), col(s.whi)
-    for c = a + 1, q1 - 1 do
-      put(mid, c, "─", g)
-    end
-    for c = q3 + 1, b - 1 do
-      put(mid, c, "─", g)
-    end
-    for c = q1 + 1, q3 - 1 do
-      put(top, c, "─", g)
-      put(bot, c, "─", g)
-    end
-    put(top, a, "╷", g)
-    put(mid, a, "├", g)
-    put(bot, a, "╵", g)
-    put(top, b, "╷", g)
-    put(mid, b, "┤", g)
-    put(bot, b, "╵", g)
-    put(top, q1, "┌", g)
-    put(mid, q1, "┤", g)
-    put(bot, q1, "└", g)
-    put(top, q3, "┐", g)
-    put(mid, q3, "├", g)
-    put(bot, q3, "┘", g)
-    put(top, m, "┬", g)
-    put(mid, m, "│", g)
-    put(bot, m, "┴", g)
-    if show_means then
-      put(mid, col(s.mean), "+", g_mean, true)
-    end
-    if show_outliers then
-      for _, v in ipairs(s.outliers) do
-        put(mid, col(v), "•", g_out, true)
-      end
-    end
-    if box_values then -- q1, median, q3 under the box, where they fit
-      local used = -1
-      for _, v in ipairs({ s.q1, s.median, s.q3 }) do
-        local text = require("dbdash.render.format").number(v)
-        local start = math.max(col(v) - math.floor(#text / 2), used + 1)
-        if start + #text <= cols then
-          for k = 1, #text do
-            put(bot + 1, start + k - 1, text:sub(k, k), g_value)
-          end
-          used = start + #text
-        end
-      end
-    end
-    spec.yticks[#spec.yticks + 1] = { row = mid, label = order[i] }
-  end
+end
+
+---The grid as lines with highlights.
+function Grid:output()
   local lines, hl = {}, {}
-  for r = 0, rows - 1 do
+  for r = 0, self.rows - 1 do
     local parts, pos = {}, 0
-    for c = 0, cols - 1 do
-      local ch = grid[r][c] or " "
-      if colors[r][c] then
-        hl[#hl + 1] = { row = r, col_s = pos, col_e = pos + #ch, group = colors[r][c] }
+    for c = 0, self.cols - 1 do
+      local ch = self.cells[r][c] or " "
+      if self.colors[r][c] then
+        hl[#hl + 1] = { row = r, col_s = pos, col_e = pos + #ch, group = self.colors[r][c] }
       end
       parts[#parts + 1] = ch
       pos = pos + #ch
     end
     lines[#lines + 1] = table.concat(parts)
   end
+  return { lines = lines, hl = hl }
+end
+
+---Box i on rows top..top+2 (`col` maps a value to its column): whiskers, box, median,
+---mean and outliers, and q1, median, q3 under it when its values show.
+local function draw_box(ctx, show, g, i, s, label, top, col)
+  local group = C.color(ctx, show, i, nil, label)
+  local show_means, g_mean = C.item_part(ctx, "series", i, "mean", group)
+  local show_outliers, g_out = C.item_part(ctx, "series", i, "outlier", group)
+  local box_values, g_value = C.item_part(ctx, "series", i, "value", ctx.css:hl("value"))
+  local mid, bot = top + 1, top + 2
+  local a, q1, m, q3, b = col(s.wlo), col(s.q1), col(s.median), col(s.q3), col(s.whi)
+  for c = a + 1, q1 - 1 do
+    g:put(mid, c, "─", group)
+  end
+  for c = q3 + 1, b - 1 do
+    g:put(mid, c, "─", group)
+  end
+  for c = q1 + 1, q3 - 1 do
+    g:put(top, c, "─", group)
+    g:put(bot, c, "─", group)
+  end
+  -- (top, mid, bottom) of the whiskers' ends, the box's sides and the median
+  for _, x in ipairs({
+    { a, "╷", "├", "╵" },
+    { b, "╷", "┤", "╵" },
+    { q1, "┌", "┤", "└" },
+    { q3, "┐", "├", "┘" },
+    { m, "┬", "│", "┴" },
+  }) do
+    g:put(top, x[1], x[2], group)
+    g:put(mid, x[1], x[3], group)
+    g:put(bot, x[1], x[4], group)
+  end
+  if show_means then
+    g:put(mid, col(s.mean), "+", g_mean, true)
+  end
+  if show_outliers then
+    for _, v in ipairs(s.outliers) do
+      g:put(mid, col(v), "•", g_out, true)
+    end
+  end
+  if box_values then -- q1, median, q3 under the box, where they fit
+    local used = -1
+    for _, v in ipairs({ s.q1, s.median, s.q3 }) do
+      local text = require("dbdash.render.format").number(v)
+      local start = math.max(col(v) - math.floor(#text / 2), used + 1)
+      if start + #text <= g.cols then
+        g:text(bot + 1, start, text, g_value)
+        used = start + #text
+      end
+    end
+  end
+end
+
+function M.render(rs, show, ctx)
+  local axes = C.axes(show)
+  local order, stats, lo, hi = M.groups(rs, show)
+  if not order then
+    return { lines = { "(no data to plot)" }, hl = {} }
+  end
+  lo, hi = C.limits(ctx, lo, hi, axes.xmin or axes.ymin, axes.xmax or axes.ymax)
+  -- each box's value, outlier and mean elements (render/content/chart.lua); the values take
+  -- a line under the boxes when any box shows them (hidden by the UA sheet)
+  local show_values = false
+  for i = 1, #order do
+    show_values = show_values or (C.item_part(ctx, "series", i, "value"))
+  end
+  local rows = #order * 4 - (show_values and 0 or 1)
+  local spec = {
+    title = nn(show.title),
+    xlabel = axes.xlabel or axes.ylabel,
+    ylabels = order,
+    height = rows,
+    min_rows = rows,
+  }
+  local cols = ctx.frame.plot_size(ctx, spec)
+  local g = M.grid(rows, cols)
+  local function col(v)
+    return math.floor((v - lo) / (hi - lo) * (cols - 1) + 0.5)
+  end
+  spec.yticks = {}
+  for i, s in ipairs(stats) do
+    draw_box(ctx, show, g, i, s, order[i], (i - 1) * 4, col)
+    spec.yticks[#spec.yticks + 1] = { row = (i - 1) * 4 + 1, label = order[i] }
+  end
   local values, labels = ctx.ticks(lo, hi, math.max(2, math.min(8, math.floor(cols / 10))))
   spec.xticks = {}
   for i, v in ipairs(values) do
     spec.xticks[i] = { col = col(v), label = labels[i] }
   end
-  return ctx.frame.render(ctx, spec, { lines = lines, hl = hl })
+  return ctx.frame.render(ctx, spec, g:output())
 end
 
 return M
