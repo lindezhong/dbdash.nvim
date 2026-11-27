@@ -125,7 +125,8 @@ end
 ---@field line integer? line of the query in the config file (lua:// error locations)
 ---@field raw boolean? return a raw driver result (lua://, http) as is, for query.transform;
 ---   otherwise it is checked and turned into a result set
----@field cookie_jar dbdash.http.Jar? cookies kept between http(s):// queries (one per dashboard)
+---@field allow_writes boolean? the query may write files (http(s):// curl -c cookie files);
+---   set for configs that were trusted with it
 ---@field cancel dbdash.db.CancelToken? cancelling it stops the query (see M.query)
 ---@field on_status fun(text: string)? push sources: their status changed (M.stream)
 
@@ -265,7 +266,7 @@ function M.query(raw_url, query, opts, callback)
     lua = opts.lua,
     source = opts.source,
     line = opts.line,
-    cookie_jar = opts.cookie_jar,
+    allow_writes = opts.allow_writes,
     cancel = token,
   }
 

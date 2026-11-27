@@ -115,6 +115,15 @@ T["exec:// and luastream:// configs need trust like lua://"] = function()
   end
 end
 
+T["http(s):// configs that write a cookie file (curl -c) need trust"] = function()
+  local writes = write("writes.yaml", { "database: { url: 'http://127.0.0.1:1' }", "query: { sql: curl -b jar.txt -c jar.txt }" })
+  local _, needs = trust.collect(writes, require("dbdash.config").load(writes))
+  eq(needs, true)
+  local reads = write("reads.yaml", { "database: { url: 'http://127.0.0.1:1' }", "query: { sql: curl -b jar.txt }" })
+  _, needs = trust.collect(reads, require("dbdash.config").load(reads))
+  eq(needs, false)
+end
+
 T["collect: files reached through include and extends count too"] = function()
   write("base.sql", { "{% block q %}{% endblock %}{% lua %}return ''{% endlua %}" })
   write("part.sql", { "{% lua %}return 'x'{% endlua %}" })

@@ -1,18 +1,25 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
 # HTTP APIs (:help dbdash-http). Runs against the nginx of `make it-up` (port 18080; 18443
-# is HTTPS, see ../connections/tls.yaml). query.sql describes the request as JSON; its
-# "path" is appended to the URL's path as written. JSON responses are decoded: a list of
-# objects shows as it is, anything else needs query.transform (it gets rs and response).
-# Cookies the server sets are kept for the dashboard and sent on later requests.
+# is HTTPS, see ../connections/tls.yaml). query.sql is a curl command: its path is joined
+# to database.url's path as written, and the options are curl's (-X, -H, -d, -G, --json,
+# -b, -c, -L, ...). JSON responses are decoded: a list of objects shows as it is, anything
+# else needs query.transform (it gets rs and response). Cookies work as with curl: -b
+# sends, -c writes the cookie file a later refresh reads with -b.
 
 title: "HTTP"
 description: |
-  HTTP APIs: a local nginx answers with lists, wrapped lists, redirects and cookies.
-  Needs `make it-up` (port 18080). See `:help dbdash-http`.
+  HTTP APIs written as curl commands: lists, wrapped lists, a redirect, a JSON POST, a
+  quoted argument and a login kept in a cookie file. Needs `make it-up` (port 18080).
+  See `:help dbdash-http`.
 
 database:
   url: "http://127.0.0.1:18080"
+
+args:
+  - name: q
+    default: "it's a test"
+    description: "Sent URL-encoded by the quoting panel"
 
 style:
   dashboard: { grid-template-columns: 2 }
@@ -21,17 +28,17 @@ style:
 
 panels:
   - query:
-      sql: '{"path": "/items"}'
+      sql: curl /items
     show:
       type: table
       title: "A JSON list of objects: rows as they are"
       description: |
-        `{"path": "/items"}` GETs `http://127.0.0.1:18080/items`; a JSON list of objects is
-        shown as rows without a transform.
+        `curl /items` GETs `http://127.0.0.1:18080/items`; a JSON list of objects is shown as
+        rows without a transform.
       interval: 1m
 
   - query:
-      sql: '{"path": "/wrapped", "query": {"page": 1}}'
+      sql: curl /wrapped -G -d page=1
       transform: |
         -- rs is the decoded body; response has status, headers, body and url.
         local out = {}
@@ -43,30 +50,61 @@ panels:
       type: table
       title: "A wrapped list: query.transform takes it out"
       description: |
-        The rows are inside `data.items`: `query.transform` takes them out, and reads
-        `response.status` too.
+        `-G -d page=1` sends the data as URL parameters (`/wrapped?page=1`). The rows are
+        inside `data.items`: `query.transform` takes them out, and reads `response.status`.
       interval: 1m
 
   - query:
-      sql: '{"path": "/old"}'
+      sql: curl -L /old
     show:
       type: table
-      title: "A redirect (301) followed"
+      title: "A redirect (301) followed with -L"
       description: |
-        `/old` answers 301; the redirect is followed (up to `redirects`, default 5).
+        `/old` answers 301 to `/items`; as with curl, `-L` follows it (`--max-redirs N`
+        limits how many). Without `-L` the 301 itself is the answer, shown as an error.
       interval: 1m
 
   - query:
       sql: |
-        {% if meta.refresh_count == 1 %}{"path": "/login"}{% else %}{"path": "/whoami", "cookies": "lang=zh"}{% endif %}
+        curl -X POST /items \
+          -H 'X-Request: dbdash' \
+          --json '{"limit": 5}'
+    show:
+      type: table
+      title: "A POST with --json and a header"
+      description: |
+        `--json` sends a JSON body with its Content-Type and Accept (`-d` would send a form,
+        as curl does); `-H` adds a header.
+      interval: 1m
+
+  - query:
+      autoescape: true
+      sql: curl /items -G --data-urlencode q={{ args.q }}
+    show:
+      type: table
+      title: "An argument as one quoted word"
+      args_show: true
+      description: |
+        With `query.autoescape`, `{{ args.q }}` is written as a shell-quoted word, so a value
+        such as `it's a test` cannot break the command (`| shell_quote` does the same
+        without autoescape). `-G` moves the data, URL-encoded, to the URL: `?q=it%27s...`.
+      interval: 1m
+
+  - query:
+      sql: |
+        {% if meta.refresh_count == 1 %}curl /login -c cookies.txt
+        {%- else %}curl /whoami -b cookies.txt -c cookies.txt -b 'lang=zh'{% endif %}
       transform: |
-        -- The first refresh logs in (the server sets a cookie), later ones show what is sent.
+        -- The first refresh logs in (the server sets a cookie, written to cookies.txt);
+        -- later ones read it back and show what was sent.
         if response.url:find("/login") then return { { cookie = "(logged in; refresh with r)" } } end
         return rs
     show:
       type: table
-      title: "Cookies kept between refreshes"
+      title: "A login kept in a cookie file (-b / -c)"
       description: |
-        The first refresh logs in and the server sets a cookie; later refreshes send it (and
-        the configured `cookies`) to `/whoami`, which echoes them. Press `r`.
+        As with curl: the first refresh logs in and `-c cookies.txt` writes the cookie the
+        server set (next to this file); later refreshes read it with `-b cookies.txt` (and
+        send `-b 'lang=zh'` too) to `/whoami`, which echoes them. Press `r`. A config that
+        writes a cookie file asks whether you trust it first.
       interval: 5s

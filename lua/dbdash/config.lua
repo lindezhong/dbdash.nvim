@@ -254,10 +254,11 @@ function Ctx:args_list(list, base)
   return out
 end
 
----@param db table the panel's database (http(s):// may leave out the request: a GET of the URL)
+---@param db table the panel's database (webhook:// has no request; http(s):// needs its
+---curl command, `curl` alone being a GET of the URL)
 function Ctx:query(q, prefix, db)
   prefix = prefix or ""
-  local optional = db and (db.type == "http" or db.type == "webhook")
+  local optional = db and db.type == "webhook"
   if optional and nn(q) == nil then
     q = map.new()
   end

@@ -1242,6 +1242,11 @@ SQL filters, quoted for the panel's database (|dbdash-template-dialects|):
   sql_limit              a positive integer, or "" for none; anything else
                          is an error
 
+For curl commands (|dbdash-http|), whatever the database:
+
+  shell_quote            one shell word: 'it'\''s', none as ''; a list
+                         gives one word per item
+
 Functions:
 
   range(stop) range(start, stop[, step])   integers, like Python
@@ -1298,8 +1303,10 @@ Autoescape                                        *dbdash-template-autoescape*
 With `query.autoescape: true`, every `{{ value }}` is written as a literal of
 the database's dialect, as if `| sql_quote` were applied: strings are quoted
 and escaped, lists become (a, b), none becomes NULL, numbers and booleans
-stay literals. Output of the SQL filters and functions and of `| safe` is
-inserted as is, so use `| safe` for SQL fragments such as column names: >jinja
+stay literals. In the curl command of an `http(s)://` query a value becomes
+a shell word instead, as if `| shell_quote` were applied (|dbdash-http|).
+Output of the SQL filters and functions and of `| safe` is inserted as is,
+so use `| safe` for SQL fragments such as column names: >jinja
   SELECT {{ args.column | safe }} FROM t WHERE name = {{ args.name }}
 <A mapping cannot be autoescaped (use `| tojson` or pick a key). Values
 inside `{% %}` statements are never escaped.
@@ -1313,6 +1320,8 @@ The SQL filters and autoescape follow the database type:
   mssql                         N'...' for non-ASCII text, [ident], 1/0
   mongodb                       JSON: "text", [1, 2], {"k": 1}, true, null
   redis                         "double quoted" with backslash escapes, 1/0
+  http                          shell words for curl: 'it'\''s', a list
+                                as one word per item, none as ''
 
 Imports                                              *dbdash-template-imports*
 
@@ -1622,7 +1631,7 @@ SQL Server  `mssql://user:pass@host:1433/db`  SQL authentication. With
 
 Lua         `lua://`  the query is Lua code, see |dbdash-lua|.
 HTTP        `https://api.example.com/v1` (or `http://`)  the query is a
-            JSON request description, see |dbdash-http|.
+            curl command whose URL is a path under it, see |dbdash-http|.
 
 Each refresh opens a connection, runs the query and closes it.
 
@@ -1815,22 +1824,19 @@ config file and line.
 
 HTTP                                                             *dbdash-http*
 
-`http://` and `https://` URLs call an HTTP API. The URL is the base
-address; `user:password@` sends Basic authentication (|dbdash-passwords|
-works too). `query.sql` (after the template) is a JSON object describing the
-request; an empty or missing `query.sql` GETs the URL: >yaml
+`http://` and `https://` URLs call an HTTP API. The URL is the base address;
+`user:password@` sends Basic authentication (|dbdash-passwords| works too).
+`query.sql` (after the template) is a curl command describing the request;
+its URL is a path, joined to the URL's: >yaml
   database:
     url: https://api.example.com/v1?api_key=${API_KEY}
   query:
+    autoescape: true          # {{ }} values are shell-quoted words
     sql: |
-      {
-        "method": "POST",
-        "path": "/search",
-        "query": {"limit": {{ args.limit }}},
-        "headers": {"Authorization": "Bearer {{ args.token }}"},
-        "cookies": "session=abc; lang=en",
-        "body": {"q": "{{ args.keyword }}"}
-      }
+      curl -X POST /search \
+        -H 'Authorization: Bearer {{ args.token }}' \
+        -G --data-urlencode q={{ args.keyword }} \
+        --json '{"limit": 20}' -L
     transform: |
       local out = {}
       for _, it in ipairs(rs.data.items) do
@@ -1838,44 +1844,93 @@ request; an empty or missing `query.sql` GETs the URL: >yaml
       end
       return out
 <
-Fields (all optional):
+The command is read the way a shell reads it: '...' is literal, "..." takes
+\" \\ \$ \`, $'...' takes C escapes (\n \t \' \xHH \uHHHH), a backslash
+outside quotes escapes the next character and a backslash at the end of a
+line continues it; # starts a comment at the start of a word. There are no
+variables, globs or command substitution. The leading `curl` is optional;
+`curl` alone GETs the URL. A request is required: an empty `query.sql` is
+an error, and so is the JSON request description of earlier versions.
 
-  method     default POST when there is a body or form, else GET
-  path       joined to the URL's path as written (plain concatenation:
-             `/v1` + `/search` is `/v1/search`); may carry `?a=1`
-  query      parameters added to the URL (encoded; lists repeat the name)
-  headers    request headers
-  cookies    like curl's `-b`: "a=1; b=2", a file name without "=" (a
-             Netscape cookie file as written by `curl -c` or browser
-             add-ons, relative to the config file), or an object
-  body       an object or list is sent as JSON (Content-Type
-             application/json unless given), a string as is
-  form       an object sent as application/x-www-form-urlencoded
-  redirects  how many redirects to follow (default 5, 0: none)
+The URL argument is a path only: the scheme, host and port (and TLS,
+passwords and timeouts) are the database URL's. The path is joined to the
+URL's path as written (plain concatenation: `/v1` + `/search` is
+`/v1/search`, `/v1` + `search` is `/v1search`) and may carry `?a=1`
+(quote it: `curl '/items?a=1&b=2'`). Parameters in the URL other than
+dbdash's own (`tls`, `fingerprint`, `ca`, `tls_host`, `connect_timeout`,
+`timeout`) are sent too, then the path's, then those -G moves there.
 
-Parameters in the URL other than dbdash's own (`tls`, `fingerprint`, `ca`,
-`tls_host`, `connect_timeout`, `timeout`) are sent to the server. `https`
-verifies the certificate and host name by default (`tls=verify-full`, see
-|dbdash-tls|); `tls=require` or `pin` relax that.
+Options, as curl's:
 
-The response body is the query's result: JSON (by Content-Type, or text that
-starts with `[` or `{` when there is none) is decoded, anything else stays
-text. It is then checked as rows (|dbdash-result|): a JSON list of objects or
-`{"columns": [...], "rows": [...]}` shows directly; other JSON and text need
-`query.transform`, which also gets `response` (|dbdash-transform|).
+  -X, --request METHOD      the method (default: POST with data, else GET)
+  -H, --header 'Name: v'    a header; may be repeated
+  -d, --data, --data-ascii  data, joined with "&" when repeated; sent as
+  --data-binary, --data-raw   application/x-www-form-urlencoded unless a
+                            Content-Type header says otherwise; @file reads
+                            a file next to the config (-d drops its
+                            newlines; --data-raw takes @ literally)
+  --data-urlencode X        X as content, =content, name=content, @file or
+                            name@file, URL-encoded
+  --json DATA               a JSON body: Content-Type and Accept are
+                            application/json unless given
+  -G, --get                 the data goes to the URL's parameters (a GET)
+  -b, --cookie X            "a=1; b=2" cookies, or a Netscape cookie file
+                            (no "="); '' only turns cookies on; see below
+  -c, --cookie-jar FILE     write the cookies to FILE afterwards (below)
+  -j                        drop session cookies when reading -b files
+  -u, --user user:pass      Basic authentication (over the URL's account)
+  -A, --user-agent, -e, --referer   the User-Agent and Referer headers
+  -L, --location            follow redirects (not followed without it)
+  --max-redirs N            at most N redirects with -L (default 50)
+  -k, --insecure            https without verifying the certificate (as
+                            `tls=require`)
+  -m, --max-time S          seconds for the request (default:
+                            query.timeout); --connect-timeout S too
+  -I, --head                a HEAD request
+  --url PATH                the path, as an option
 
-A failed request names the URL it went to (the URL and the path joined); an
-error status (not 2xx) also gives the start of the body.
+Options about curl's output (-s, -S, -v, -i, -f, --fail-with-body, -g,
+--compressed, --http1.1, --no-progress-meter, -#) are accepted and mean
+nothing here, so a command copied from a terminal or "Copy as cURL" runs as
+it is. Multipart forms (-F), -o/-O, -T, proxies (-x) and unknown options
+are errors that say so.
 
-Cookies the server sets (Set-Cookie) are kept in memory for the running
-dashboard and sent on later refreshes and redirects, following their Domain,
-Path, Secure and expiry. They override configured cookies of the same name;
-the config and cookie files are never written. Stopping the dashboard forgets
-them.
+Values from templates: write them with `| shell_quote`
+(|dbdash-template-filters|), or set `query.autoescape: true` and every
+`{{ value }}` becomes one shell word (|dbdash-template-autoescape|), so
+`it's a test` cannot break the command or add options to it.
 
-A response other than 2xx is an error showing the status and the start of the
-body (401 and 403 count as authentication errors). Compressed responses are
-not requested and not supported; bodies are limited to 64 MB.
+Cookies work as curl's cookie engine. Without -b or -c it is off: cookies
+the server sets (Set-Cookie) are dropped, also across redirects. -b turns
+it on: its "a=1; b=2" cookies are sent, its cookie files read (one that
+does not exist has none), and what the server sets is used by the
+redirects of the request (by Domain, Path, Secure and expiry; the server's
+value wins over -b's of the same name). -c FILE writes all the cookies
+(read and set, session cookies too) to FILE in curl's Netscape format after
+the request, so a later refresh, or Neovim after a restart, reads them back
+with -b: >yaml
+  sql: curl /whoami -b cookies.txt -c cookies.txt
+<-c writes only inside the config's directory (a relative path without
+`..`), with permissions 600 (cookies are credentials), and a config whose
+query writes a cookie file asks whether you trust it first, as Lua does
+(|dbdash-lua|); -c must be in `query.sql` itself. Configs, -b files and
+data files are only read.
+
+`https` verifies the certificate and host name by default
+(`tls=verify-full`, see |dbdash-tls|); `tls=require`, `pin` or -k relax
+that.
+
+The response body is the query's result: JSON (by Content-Type, or text
+that starts with `[` or `{` when there is none) is decoded, anything else
+stays text. It is then checked as rows (|dbdash-result|): a JSON list of
+objects or `{"columns": [...], "rows": [...]}` shows directly; other JSON
+and text need `query.transform`, which also gets `response`
+(|dbdash-transform|).
+
+A response other than 2xx is an error showing the status, the URL and the
+start of the body (401 and 403 count as authentication errors); a redirect
+without -L is one too. Compressed responses are not requested and not
+supported; bodies are limited to 64 MB.
 
 Push sources                                                     *dbdash-push*
 

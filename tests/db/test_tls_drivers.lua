@@ -74,20 +74,23 @@ T["it: https with verify-full (the default), pin, redirects and cookies"] = func
   h.require_it()
   local ca = "&ca=tests/fixtures/pki/root.pem"
   local base = "https://localhost:18443"
-  eq(h.ok(base .. "/items?tls=verify-full" .. ca, "").rows, { { 1, "a" }, { 2, "b" } }) -- columns by name: n, name
-  eq(h.ok("https://127.0.0.1:18443/items?x=1" .. ca, "").rows[1][2], "a") -- verify-full by default
-  -- not trusted by the system store: verify-full fails without ca=
-  local r = h.query(base .. "/items", "")
+  eq(h.ok(base .. "/items?tls=verify-full" .. ca, "curl").rows, { { 1, "a" }, { 2, "b" } }) -- columns by name: n, name
+  eq(h.ok("https://127.0.0.1:18443/items?x=1" .. ca, "curl").rows[1][2], "a") -- verify-full by default
+  -- not trusted by the system store: verify-full fails without ca=; curl -k does not verify
+  local r = h.query(base .. "/items", "curl")
   eq(r.err.phase, "tls")
-  eq(h.ok(base .. "/items?tls=pin&fingerprint=" .. fingerprint("pki/leaf.pem"), "").rows[1][1], 1)
-  eq(h.ok(base .. "/old?tls=require", "").rows[1][1], 1) -- 301 followed
-  -- a dashboard's jar: the cookie from /login is sent to /whoami
-  local jar = require("dbdash.net.http_cookie").new()
-  h.ok(base .. "/login?tls=require", "", { cookie_jar = jar })
-  local who = h.ok(base .. "/whoami?tls=require", '{"cookies": "lang=zh"}', { cookie_jar = jar })
+  eq(h.ok(base .. "/items", "curl -k").rows[1][1], 1)
+  eq(h.ok(base .. "/items?tls=pin&fingerprint=" .. fingerprint("pki/leaf.pem"), "curl").rows[1][1], 1)
+  eq(h.ok(base .. "/old?tls=require", "curl -L").rows[1][1], 1) -- 301 followed with -L
+  -- the session cookie from /login, kept in a cookie file (-c) and sent back by -b
+  local dir = vim.fn.tempname()
+  vim.fn.mkdir(dir, "p")
+  local opts = { base_dir = dir, allow_writes = true }
+  h.ok(base .. "/login?tls=require", "curl -b jar.txt -c jar.txt", opts)
+  local who = h.ok(base .. "/whoami?tls=require", "curl -b jar.txt -c jar.txt -b lang=zh", opts)
   eq(who.rows[1][1], "session=s3cret; lang=zh")
   -- plain http on the same routes; a raw (wrapped) result for the transform
-  local raw = h.ok("http://127.0.0.1:18080/wrapped", "", { raw = true })
+  local raw = h.ok("http://127.0.0.1:18080/wrapped", "curl", { raw = true })
   eq({ raw.value.total, raw.value.data.items[1].name, raw.vars.response.status }, { 1, "a", 200 })
 end
 

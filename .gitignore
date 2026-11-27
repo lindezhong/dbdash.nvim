@@ -2,3 +2,4 @@
 /tests/**/*.actual
 .luarc.local.json
 /example/**/*.db
+/example/**/cookies.txt

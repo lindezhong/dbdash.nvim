@@ -164,6 +164,27 @@ M.dialects = {
   }),
 }
 
+-- http(s):// queries are curl commands: values are shell words (single quotes).
+M.dialects.http = make("http", {
+  null = "''",
+  quote_string = function(s)
+    return require("dbdash.net.curl").quote(s)
+  end,
+  quote_ident = function(s)
+    return require("dbdash.net.curl").quote(s)
+  end,
+  boolean_literal = function(b)
+    return b and "true" or "false"
+  end,
+  list_literal = function(v, d)
+    local out = {}
+    for i, x in ipairs(v) do
+      out[i] = d.literal(x)
+    end
+    return table.concat(out, " ")
+  end,
+})
+
 ---@param name string database type
 ---@return dbdash.db.Dialect
 function M.get(name)

@@ -1,12 +1,9 @@
--- Cookies for http(s):// queries.
+-- Cookies for http(s):// queries, as curl's cookie engine (net/curl.lua: -b, -c).
 --
--- A jar keeps the cookies servers set (Set-Cookie) in memory, for one dashboard: later
--- requests (refreshes, redirects) send them back. Configured cookies are given in curl's
--- -b forms and are only read, never written back:
---   "a=1; b=2"      a Cookie header value
---   "cookies.txt"   (no "=") a Netscape cookie file, as written by curl -c or browser add-ons
---   { a = "1" }     a table
--- When the jar holds a cookie with the same name, the server's value wins.
+-- A jar lives for one request (and its redirects): it is filled from the -b cookie files,
+-- takes the cookies the server sets (Set-Cookie) and, with -c, is written to a Netscape
+-- cookie file afterwards, which a later refresh reads again with -b. The -b "a=1; b=2"
+-- strings are only sent; when the jar has a cookie of the same name, the jar's wins.
 local M = {}
 
 local MONTHS = { jan = 1, feb = 2, mar = 3, apr = 4, may = 5, jun = 6, jul = 7, aug = 8, sep = 9, oct = 10, nov = 11, dec = 12 }
@@ -70,7 +67,8 @@ end
 ---@field host_only boolean
 ---@field path string
 ---@field secure boolean
----@field expires number? epoch seconds; nil: until the jar is dropped
+---@field expires number? epoch seconds; nil: a session cookie
+---@field http_only boolean?
 
 ---@class dbdash.http.Jar
 ---@field cookies table<string, dbdash.http.Cookie>
@@ -108,6 +106,8 @@ function M.parse_set_cookie(header, host, path, now)
       c.path = v
     elseif k == "secure" then
       c.secure = true
+    elseif k == "httponly" then
+      c.http_only = true
     elseif k == "max-age" and v then
       max_age = tonumber(v)
     elseif k == "expires" and v and not c.expires then
@@ -191,6 +191,7 @@ function M.parse_netscape(text)
           path = f[3] ~= "" and f[3] or "/",
           secure = f[4]:upper() == "TRUE",
           expires = (expires and expires > 0) and expires or nil,
+          http_only = http_only ~= nil or nil,
         }
       end
     end
@@ -198,49 +199,116 @@ function M.parse_netscape(text)
   return out
 end
 
----Configured cookies (curl -b forms) as cookies for the request's host.
----@param spec string|table|nil
----@param host string the host of the base URL (string and table cookies go only there)
----@param base_dir string? where relative cookie file paths start
----@return dbdash.http.Cookie[]? cookies, string? error
-function M.configured(spec, host, base_dir)
-  if spec == nil or spec == vim.NIL then
-    return {}
-  end
+---curl -b "a=1; b=2": cookies sent to the request's host (not kept in the jar).
+---@return dbdash.http.Cookie[]
+function M.from_string(spec, host)
   local out = {}
-  local function add(name, value)
-    out[#out + 1] = { name = name, value = value, domain = host:lower(), host_only = true, path = "/", secure = false }
-  end
-  if type(spec) == "table" then
-    local names = vim.tbl_keys(spec)
-    table.sort(names)
-    for _, n in ipairs(names) do
-      add(tostring(n), tostring(spec[n]))
+  for pair in spec:gmatch("[^;]+") do
+    local n, v = pair:match("^%s*([^=]-)%s*=%s*(.-)%s*$")
+    if n and n ~= "" then
+      out[#out + 1] = { name = n, value = v, domain = host:lower(), host_only = true, path = "/", secure = false }
     end
-    return out
-  elseif type(spec) ~= "string" then
-    return nil, "cookies must be a string or an object"
   end
-  if spec:find("=", 1, true) then
-    for pair in spec:gmatch("[^;]+") do
-      local n, v = pair:match("^%s*([^=]-)%s*=%s*(.-)%s*$")
-      if n and n ~= "" then
-        add(n, v)
-      end
-    end
-    return out
-  end
-  local path = vim.fn.expand(spec)
+  return out
+end
+
+---A path given in a curl command: relative ones start at `base_dir` (the config's).
+function M.resolve_path(name, base_dir)
+  local path = vim.fn.expand(name)
   if base_dir and not (path:match("^/") or path:match("^%a:[/\\]") or path:match("^\\\\")) then
     path = vim.fs.joinpath(base_dir, path)
   end
-  local f = io.open(path, "rb")
+  return path
+end
+
+---curl -b FILE: the cookies of a Netscape cookie file; a file that does not exist has
+---none (as curl). `junk`: drop session cookies (curl -j).
+---@return dbdash.http.Cookie[]
+function M.read_file(name, base_dir, junk)
+  local f = io.open(M.resolve_path(name, base_dir), "rb")
   if not f then
-    return nil, ("cannot read the cookie file %s"):format(path)
+    return {}
   end
   local text = f:read("*a")
   f:close()
-  return M.parse_netscape(text)
+  local out = {}
+  for _, c in ipairs(M.parse_netscape(text)) do
+    if not (junk and c.expires == nil) then
+      out[#out + 1] = c
+    end
+  end
+  return out
+end
+
+---Put cookies into the jar (from -b files); later ones replace earlier ones of the same
+---domain, path and name.
+function Jar:load(list)
+  for _, c in ipairs(list) do
+    local k = key(c)
+    local old = self.cookies[k]
+    if old then
+      c.seq = old.seq
+    else
+      self.seq = self.seq + 1
+      c.seq = self.seq
+    end
+    self.cookies[k] = c
+  end
+end
+
+---The jar as a Netscape cookie file, as curl -c writes it: domain (with a leading dot
+---for domain cookies), include-subdomains, path, secure, expiry (0: a session cookie),
+---name, value; HttpOnly cookies get the #HttpOnly_ prefix. Expired cookies are left out.
+function Jar:netscape(now)
+  now = now or os.time()
+  local list = {}
+  for _, c in pairs(self.cookies) do
+    if not c.expires or c.expires > now then
+      list[#list + 1] = c
+    end
+  end
+  table.sort(list, function(a, b)
+    return a.seq < b.seq
+  end)
+  local lines = {
+    "# Netscape HTTP Cookie File",
+    "# https://curl.se/docs/http-cookies.html",
+    "# This file was generated by dbdash.nvim! Edit at your own risk.",
+    "",
+  }
+  for _, c in ipairs(list) do
+    local domain = c.host_only and c.domain or ("." .. c.domain)
+    lines[#lines + 1] = table.concat({
+      (c.http_only and "#HttpOnly_" or "") .. domain,
+      c.host_only and "FALSE" or "TRUE",
+      c.path,
+      c.secure and "TRUE" or "FALSE",
+      tostring(c.expires and math.floor(c.expires) or 0),
+      c.name,
+      c.value,
+    }, "\t")
+  end
+  return table.concat(lines, "\n") .. "\n"
+end
+
+---Write the jar to a file (curl -c): a temporary file renamed over it, readable by you
+---only (cookies are credentials).
+---@return boolean ok, string? err
+function Jar:write(path, now)
+  local tmp = path .. ".dbdash-tmp"
+  local f, err = io.open(tmp, "wb")
+  if not f then
+    return false, ("cannot write the cookie file %s: %s"):format(path, tostring(err))
+  end
+  f:write(self:netscape(now))
+  f:close()
+  pcall(vim.uv.fs_chmod, tmp, 384) -- 0600
+  local ok, rerr = vim.uv.fs_rename(tmp, path)
+  if not ok then
+    os.remove(tmp)
+    return false, ("cannot write the cookie file %s: %s"):format(path, tostring(rerr))
+  end
+  return true
 end
 
 ---The Cookie header for a request to `url`: configured cookies, overridden by name with the

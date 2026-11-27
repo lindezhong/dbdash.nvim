@@ -73,7 +73,7 @@ panels:
   - database:
       url: "https://localhost:18443?ca=../../tests/fixtures/pki/root.pem"
     query:
-      sql: '{"path": "/items"}'
+      sql: curl /items
     show:
       type: table
       title: "HTTPS (verify-full by default) with ca="

@@ -66,6 +66,25 @@ F.sql_quote = function(env, v, args, kw)
   return R.str(v)
 end
 
+-- A value as one word of a shell-quoted command (the curl command of an http(s)://
+-- query): single quotes, ' written as '\''. Lists give one word per item.
+F.shell_quote = function(_, v, args, kw)
+  filters.bind("shell_quote", args, kw, {})
+  v = plain(v)
+  local q = require("dbdash.net.curl").quote
+  if v == NONE then
+    return "''"
+  elseif R.is_list(v) then
+    local out = {}
+    for i, x in ipairs(v) do
+      x = plain(x)
+      out[i] = q(x == NONE and "" or R.str(x))
+    end
+    return table.concat(out, " ")
+  end
+  return q(R.str(v))
+end
+
 F.sql_in = function(env, v, args, kw)
   filters.bind("sql_in", args, kw, {})
   v = plain(v)

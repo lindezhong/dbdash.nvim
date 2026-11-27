@@ -23,7 +23,7 @@ T["a JSON list of records is rows without a transform"] = function()
   local base, seen = server(function()
     return json('[{"name":"a","n":1},{"name":"b","n":null}]')
   end)
-  local rs = h.ok(base .. "/v1/items", "")
+  local rs = h.ok(base .. "/v1/items", "curl")
   eq({ rs.columns[1].name, rs.columns[2].name }, { "n", "name" })
   eq(rs.rows, { { 1, "a" }, { vim.NIL, "b" } })
   eq({ seen[1].method, seen[1].target, seen[1].headers.host }, { "GET", "/v1/items", base:match("//(.*)") })
@@ -33,10 +33,10 @@ T["other shapes need query.transform; the raw value keeps the response"] = funct
   local base = server(function()
     return json('{"data":{"items":[{"k":"x","v":2}]}}', { "X-Total: 1" })
   end)
-  local r = h.query(base, "")
+  local r = h.query(base, "curl")
   eq(r.err.phase, "query")
   eq(r.err.message, "the result is an object (data), not rows; add query.transform to reshape it (:help dbdash-transform)")
-  local raw = h.ok(base, "", { raw = true })
+  local raw = h.ok(base, "curl", { raw = true })
   eq(require("dbdash.db.lua_result").is_raw(raw), true)
   eq(raw.value.data.items[1].k, "x")
   eq({ raw.vars.response.status, raw.vars.response.headers["x-total"] }, { 200, "1" })
@@ -44,38 +44,50 @@ T["other shapes need query.transform; the raw value keeps the response"] = funct
   base = server(function()
     return response("200 OK", { "Content-Type: text/plain", "Content-Length: 5" }, "hello")
   end)
-  eq(h.ok(base, "", { raw = true }).value, "hello")
-  eq(h.query(base, "").err.message:find("the result is not rows (got string); add query.transform", 1, true) ~= nil, true)
+  eq(h.ok(base, "curl", { raw = true }).value, "hello")
+  eq(h.query(base, "curl").err.message:find("the result is not rows (got string); add query.transform", 1, true) ~= nil, true)
 end
 
-T["request description: method, path, query, headers, JSON body, form"] = function()
+T["curl: method, path, query, headers, JSON body, form, -G, -u"] = function()
   local base, seen = server(function()
     return json("[]")
   end)
-  h.ok(base .. "/api/v1?key=k%201&tls=disable", vim.json.encode({
-    path = "/search?x=1",
-    query = { limit = 5, tag = { "a", "b c" } },
-    headers = { ["X-Token"] = "t" },
-    body = { q = "neovim" },
-  }))
+  h.ok(base .. "/api/v1?key=k%201&tls=disable", [[
+    curl '/search?x=1&limit=5&tag=a&tag=b%20c' \
+      -H 'X-Token: t' \
+      --json '{"q": "neovim"}'
+  ]])
   local r = seen[1]
   eq({ r.method, r.target }, { "POST", "/api/v1/search?key=k%201&x=1&limit=5&tag=a&tag=b%20c" })
-  eq({ r.headers["x-token"], r.headers["content-type"], vim.json.decode(r.body) }, { "t", "application/json", { q = "neovim" } })
-  h.ok(base .. "/api", vim.json.encode({ method = "put", path = "/abs", form = { a = "1&2" } }))
+  eq({ r.headers["x-token"], r.headers["content-type"], r.headers.accept, vim.json.decode(r.body) }, { "t", "application/json", "application/json", { q = "neovim" } })
+  -- -d: a form by default, as curl; -X sets the method
+  h.ok(base .. "/api", "curl -X put /abs -d 'a=1%262'")
   eq({ seen[2].method, seen[2].target, seen[2].body }, { "PUT", "/api/abs", "a=1%262" })
   eq(seen[2].headers["content-type"], "application/x-www-form-urlencoded")
-  h.ok(base, '{"body": "raw text", "headers": {"Content-Type": "text/csv"}}')
+  -- a body of its own type
+  h.ok(base, "curl -H 'Content-Type: text/csv' --data-binary 'raw text'")
   eq({ seen[3].method, seen[3].body, seen[3].headers["content-type"] }, { "POST", "raw text", "text/csv" })
+  -- -G: the data goes to the query string
+  h.ok(base, "curl /s -G --data-urlencode 'q=a b' -d n=1")
+  eq({ seen[4].method, seen[4].target, seen[4].body }, { "GET", "/s?q=a%20b&n=1", "" })
+  -- -u: Basic auth over the URL's account
+  h.ok(base:gsub("^http://", "http://x:y@"), "curl -u 'me:p w'")
+  eq(seen[5].headers.authorization, "Basic " .. vim.base64.encode("me:p w"))
 end
 
-T["bad request descriptions are query errors"] = function()
+T["bad curl commands and JSON requests are query errors"] = function()
   local base = server(function()
     return json("[]")
   end)
-  eq(h.query(base, "{oops").err.message:find("the request is not valid JSON", 1, true) ~= nil, true)
-  eq(h.query(base, '{"pth": "x"}').err.message:find('unknown request field "pth"', 1, true) ~= nil, true)
-  eq(h.query(base, '{"headers": "x"}').err.message, 'request field "headers" must be a object')
-  eq(h.query(base, "[1]").err.message, "the request must be a JSON object")
+  local function err(cmd)
+    return h.query(base, cmd).err.message
+  end
+  eq(err('{"path": "/x"}'):find("the request is a curl command, not JSON", 1, true) ~= nil, true)
+  eq(err("curl --hedaer 'X: 1'"):find("curl option --hedaer is not supported", 1, true) ~= nil, true)
+  eq(err("curl -F a=@x.csv /up"):find("multipart", 1, true) ~= nil, true)
+  eq(err("curl /a /b"), "curl: one URL per request (/a and /b)")
+  eq(err("   "), "the request is empty: write a curl command (curl alone GETs database.url)")
+  eq(err("curl 'unterminated"), "the curl command has an unterminated ' quote")
 end
 
 T["bodies: chunked, close-delimited, slow chunks, 1xx first"] = function()
@@ -86,11 +98,11 @@ T["bodies: chunked, close-delimited, slow chunks, 1xx first"] = function()
       "6;ext=1\r\n: 1},{\r\n7\r\n\"a\": 2}\r\n1\r\n]\r\n0\r\nX-Trailer: y\r\n\r\n",
     }
   end)
-  eq(h.ok(base, "").rows, { { 1 }, { 2 } })
+  eq(h.ok(base, "curl").rows, { { 1 }, { 2 } })
   base = server(function()
     return { "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n[{\"a\":", "3}]" }
   end)
-  eq(h.ok(base, "").rows, { { 3 } })
+  eq(h.ok(base, "curl").rows, { { 3 } })
 end
 
 T["errors: HTTP status, auth status, invalid JSON, compressed"] = function()
@@ -104,12 +116,12 @@ T["errors: HTTP status, auth status, invalid JSON, compressed"] = function()
     end
     return json("[{")
   end)
-  local e = h.query(base .. "/missing", "").err
+  local e = h.query(base .. "/missing", "curl").err
   eq({ e.phase, e.message }, { "query", "HTTP 404 Not Found from " .. base .. "/missing: no such x" })
-  eq(h.query(base .. "/secret", "").err.phase, "auth")
-  eq(h.query(base .. "/bad", "").err.message:find("the response is not valid JSON", 1, true) ~= nil, true)
+  eq(h.query(base .. "/secret", "curl").err.phase, "auth")
+  eq(h.query(base .. "/bad", "curl").err.message:find("the response is not valid JSON", 1, true) ~= nil, true)
   -- Errors name the URL (the URL's path and the request's joined).
-  eq(h.query(base .. "/gz", "").err.message, "compressed responses (gzip) are not supported (" .. base .. "/gz)")
+  eq(h.query(base .. "/gz", "curl").err.message, "compressed responses (gzip) are not supported (" .. base .. "/gz)")
 end
 
 T["Basic auth from the URL; redirects keep it on the same host only"] = function()
@@ -125,7 +137,7 @@ T["Basic auth from the URL; redirects keep it on the same host only"] = function
     return json("[]")
   end)
   local authed = base:gsub("^http://", "http://us%%40er:p%%3Aw@")
-  local rs = h.ok(authed .. "/start", "")
+  local rs = h.ok(authed .. "/start", "curl -L")
   eq(rs.rows, { { "other" } })
   eq(seen[1].headers.authorization, "Basic " .. vim.base64.encode("us@er:p:w"))
   eq(seen[2].headers.authorization ~= nil, true)
@@ -138,52 +150,86 @@ T["Basic auth from the URL; redirects keep it on the same host only"] = function
     end
     return json("[]")
   end)
-  h.ok(b2, '{"body": {"x": 1}}')
+  h.ok(b2, [[curl --json '{"x": 1}' -L]])
   eq({ seen2[2].method, seen2[2].body, seen2[2].headers["content-type"] }, { "GET", "", nil })
 end
 
-T["too many redirects; redirects = 0 returns the 3xx as an error"] = function()
+T["redirects: followed with -L only; --max-redirs"] = function()
   local base = server(function()
     return response("302 Found", { "Location: /again", "Content-Length: 0" })
   end)
-  eq(h.query(base, "").err.message, "too many redirects (more than 5) (" .. base .. "/)")
-  eq(h.query(base, '{"redirects": 0}').err.message:find("^HTTP 302 Found") ~= nil, true)
+  eq(h.query(base, "curl").err.message:find("^HTTP 302 Found") ~= nil, true) -- as curl: not followed
+  eq(h.query(base, "curl -L --max-redirs 3").err.message, "too many redirects (more than 3) (" .. base .. "/)")
 end
 
-T["cookies: configured (curl -b forms), overridden by Set-Cookie, never written back"] = function()
+T["cookies: curl's engine (-b strings and files, -b '', -c files, -j)"] = function()
   local dir = vim.fn.tempname()
   vim.fn.mkdir(dir, "p")
-  local file = dir .. "/cookies.txt"
-  local base, seen = server(function(_, n)
-    if n == 1 then
-      return json("[]", { "Set-Cookie: session=new; Path=/; HttpOnly", "Set-Cookie: gone=; Max-Age=0" })
+  local base, seen = server(function(req)
+    if req.target == "/login" then
+      return response("302 Found", { "Location: /me", "Set-Cookie: session=new; Path=/; HttpOnly", "Content-Length: 0" })
     end
-    return json("[]")
+    return json("[]", { "Set-Cookie: seen=1; Path=/" })
   end)
   local host = base:match("//([^:]+)")
+  local opts = { base_dir = dir, allow_writes = true }
+  -- no -b / -c: the engine is off, nothing is kept, not even across the redirect
+  h.ok(base .. "/login", "curl -L", opts)
+  eq({ seen[1].headers.cookie, seen[2].headers.cookie }, { nil, nil })
+  -- -b '': the engine is on for this request: the redirect carries the new cookie
+  h.ok(base .. "/login", "curl -L -b ''", opts)
+  eq(seen[4].headers.cookie, "session=new")
+  -- -b "a=1; b=2" is sent; the next request knows nothing of what the server set
+  h.ok(base, "curl -b 'session=old; lang=zh'", opts)
+  eq(seen[5].headers.cookie, "session=old; lang=zh")
+  h.ok(base, "curl -b 'lang=zh'", opts)
+  eq(seen[6].headers.cookie, "lang=zh")
+  -- a Netscape file (relative to the config's directory); a missing one has no cookies
   local lines = {
     "# Netscape HTTP Cookie File",
     "#HttpOnly_" .. host .. "\tFALSE\t/\tFALSE\t0\tfromfile\tf1",
     host .. "\tFALSE\t/other\tFALSE\t0\telsewhere\tz",
     host .. "\tFALSE\t/\tTRUE\t0\tsecureonly\ts",
     host .. "\tFALSE\t/\tFALSE\t1\texpired\te",
+    host .. "\tFALSE\t/\tFALSE\t4102444800\tlasting\tl",
   }
-  vim.fn.writefile(lines, file)
-  local jar = cookie.new()
-  local opts = { cookie_jar = jar, base_dir = dir }
-  h.ok(base, '{"cookies": "session=old; lang=zh"}', opts)
-  eq(seen[1].headers.cookie, "session=old; lang=zh")
-  h.ok(base, '{"cookies": "session=old; lang=zh"}', opts)
-  eq(seen[2].headers.cookie, "session=new; lang=zh") -- the server's value wins
-  h.ok(base, '{"cookies": "cookies.txt"}', opts)
-  eq(seen[3].headers.cookie, "session=new; fromfile=f1")
-  h.ok(base, '{"cookies": {"b": 2, "a": "1"}}', opts)
-  eq(seen[4].headers.cookie, "session=new; a=1; b=2")
-  eq(vim.fn.readfile(file), lines) -- the cookie file is only read
-  eq(h.query(base, '{"cookies": "missing.txt"}', opts).err.message:find("cannot read the cookie file", 1, true) ~= nil, true)
-  -- without a jar (e.g. dbdash.query) cookies are not kept
-  h.ok(base, "")
-  eq(seen[#seen].headers.cookie, nil)
+  vim.fn.writefile(lines, dir .. "/in.txt")
+  h.ok(base, "curl -b in.txt", opts)
+  eq(seen[7].headers.cookie, "fromfile=f1; lasting=l")
+  h.ok(base, "curl -b in.txt -j", opts) -- -j: no session cookies
+  eq(seen[8].headers.cookie, "lasting=l")
+  h.ok(base, "curl -b missing.txt", opts)
+  eq(seen[9].headers.cookie, nil)
+  eq(vim.fn.readfile(dir .. "/in.txt"), lines) -- -b files are only read
+  -- -b jar -c jar: what the server sets is written, and sent by the next refresh
+  h.ok(base .. "/login", "curl -L -b jar.txt -c jar.txt", opts)
+  local jar = table.concat(vim.fn.readfile(dir .. "/jar.txt"), "\n")
+  eq(jar:find("# Netscape HTTP Cookie File", 1, true) == 1, true)
+  eq(jar:find("#HttpOnly_" .. host .. "\tFALSE\t/\tFALSE\t0\tsession\tnew", 1, true) ~= nil, true)
+  eq(jar:find(host .. "\tFALSE\t/\tFALSE\t0\tseen\t1", 1, true) ~= nil, true)
+  if vim.fn.has("win32") == 0 then
+    eq(vim.fn.getfperm(dir .. "/jar.txt"), "rw-------")
+  end
+  h.ok(base, "curl -b jar.txt -c jar.txt -b 'session=old'", opts)
+  eq(seen[#seen].headers.cookie, "session=new; seen=1") -- the jar's value wins
+end
+
+T["cookies: curl -c is written only in the config's directory, for trusted configs"] = function()
+  local base = server(function()
+    return json("[]")
+  end)
+  local dir = vim.fn.tempname()
+  vim.fn.mkdir(dir, "p")
+  local function err(cmd, allow)
+    return h.query(base, cmd, { base_dir = dir, allow_writes = allow ~= false }).err.message
+  end
+  eq(err("curl -c /tmp/x.txt"):find("must be a relative path", 1, true) ~= nil, true)
+  eq(err("curl -c ../x.txt"):find("no ..", 1, true) ~= nil, true)
+  eq(err("curl -c -"):find("standard output", 1, true) ~= nil, true)
+  eq(err("curl -c jar.txt", false):find("so the config is trusted for it", 1, true) ~= nil, true)
+  eq(require("dbdash.trust").curl_writes("curl -Lc jar.txt /x"), true)
+  eq(require("dbdash.trust").curl_writes("curl --cookie-jar=j /x"), true)
+  eq(require("dbdash.trust").curl_writes("curl -b j /x -d 'a=-c'"), false)
 end
 
 T["cookie jar: domain, path, secure, expiry, deletion"] = function()
@@ -222,7 +268,7 @@ T["URLs: resolve redirects, encode"] = function()
 end
 
 T["http:// cannot use tls; https:// defaults to verify-full"] = function()
-  eq(h.query("http://127.0.0.1:1/?tls=require", "").err.message, "http:// URLs cannot use tls (use https://)")
+  eq(h.query("http://127.0.0.1:1/?tls=require", "curl").err.message, "http:// URLs cannot use tls (use https://)")
   local info = require("dbdash.db.url").parse("https://api.example.com/v1?tls=require&key=1")
   info = require("dbdash.db.drivers.http").parse_url(info)
   eq({ info.tls, info.base_path, info.base_query }, { "require", "/v1", "key=1" })
@@ -232,7 +278,7 @@ T["http:// cannot use tls; https:// defaults to verify-full"] = function()
   eq(require("dbdash.db.credentials").keys(info)[1], "https://api.example.com:443")
 end
 
-T["path: the URL's path and the request's path are joined as they are"] = function()
+T["path: the URL's path and the command's path are joined as they are"] = function()
   local base, seen = server(function()
     return json("[]")
   end)
@@ -244,12 +290,12 @@ T["path: the URL's path and the request's path are joined as they are"] = functi
     { "/v1", "", "/v1" },
     { "", "", "/" },
   }) do
-    h.ok(base .. c[1], vim.json.encode({ path = c[2] }))
+    h.ok(base .. c[1], "curl " .. require("dbdash.net.curl").quote(c[2]))
     eq({ c[1], c[2], seen[#seen].target }, { c[1], c[2], c[3] })
   end
-  -- A full URL is joined like any path (no request to another host).
-  h.ok(base .. "/v1", '{"path": "http://other.example/x"}')
-  eq(seen[#seen].target, "/v1http://other.example/x")
+  -- A full URL is refused: the host is database.url's.
+  local e = h.query(base .. "/v1", "curl http://other.example/x").err
+  eq(e.message:find("write the path only", 1, true) ~= nil, true)
 end
 
 return T

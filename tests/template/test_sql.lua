@@ -110,4 +110,17 @@ T["escape in SQL is the dialect's literal; HTML filters stay under SQL autoescap
   eq(template.render("{{ '<a>' | e }}", {}), "&lt;a&gt;")
 end
 
+T["shell_quote and the http dialect: values as shell words of a curl command"] = function()
+  local curl = require("dbdash.net.curl")
+  local vars = { q = "it's a test", n = 5, ids = { 1, "a b" } }
+  eq(render("curl /s -G --data-urlencode q={{ q | shell_quote }}", vars, "sqlite"), [[curl /s -G --data-urlencode q='it'\''s a test']])
+  eq(render("{{ ids | shell_quote }}", vars, "postgres"), [['1' 'a b']])
+  eq(render("{{ none | shell_quote }}", { none = vim.NIL }, "sqlite"), "''")
+  -- autoescape of an http(s):// query: every {{ }} is one word; numbers stay numbers
+  local out = render("curl /s -d n={{ n }} --data-urlencode q={{ q }} {{ ids }}", vars, "http", true)
+  eq(out, [[curl /s -d n=5 --data-urlencode q='it'\''s a test' 1 'a b']])
+  out = render("curl /s -d n={{ n }} --data-urlencode q={{ q }}", vars, "http", true)
+  eq(curl.parse(out).body, "n=5&q=it%27s%20a%20test")
+end
+
 return T

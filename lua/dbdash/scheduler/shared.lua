@@ -36,7 +36,7 @@ Panel.__index = Panel
 ---@field ctimer uv.uv_timer_t? countdown display timer
 ---@field regions table[]? buffer regions of the panels (multi-panel)
 ---@field last_size integer[]?
----@field cookie_jar dbdash.http.Jar cookies servers set for http(s):// panels (in memory)
+---@field writes_trusted boolean? the config was trusted with what it writes (curl -c files)
 local Dashboard = {}
 Dashboard.__index = Dashboard
 

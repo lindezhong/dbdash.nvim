@@ -246,7 +246,7 @@ Common parameters: `tls=disable|require|pin|verify-ca|verify-full`,
 query that runs out of time is stopped on the server too (`:help dbdash-cancel`).
 Passwords are percent-decoded. Also accepted: `sqlite3://`, `postgresql://`, `mariadb://`,
 `cql://`, `sqlserver://`. The query language follows the database: SQL, CQL, one Redis
-command, a JSON document for MongoDB, Lua for `lua://`, a JSON request for HTTP.
+command, a JSON document for MongoDB, Lua for `lua://`, a curl command for HTTP.
 Details: `:help dbdash-databases` and `:help dbdash-tls`.
 
 ### Templates
@@ -317,30 +317,37 @@ usually needs the transform (`:help dbdash-transform`).
 
 ### HTTP
 
-`http://` and `https://` URLs call an API; `query.sql` is a JSON request description:
+`http://` and `https://` URLs call an API; `query.sql` is a curl command whose URL is a
+path under the database URL:
 
 ```yaml
 database:
   url: https://api.example.com/v1
 query:
+  autoescape: true      # {{ }} values become shell-quoted words
   sql: |
-    {"method": "POST", "path": "/search", "query": {"limit": {{ args.limit }}},
-     "headers": {"Authorization": "Bearer {{ args.token }}"},
-     "cookies": "session=abc", "body": {"q": "{{ args.keyword }}"}}
+    curl -X POST /search \
+      -H 'Authorization: Bearer {{ args.token }}' \
+      -G --data-urlencode q={{ args.keyword }} \
+      -b cookies.txt -c cookies.txt \
+      --json '{"limit": 20}' -L
   transform: |
     local out = {}
     for _, it in ipairs(rs.data.items) do out[#out + 1] = { name = it.name, n = it.count } end
     return out
 ```
 
-`path` is appended to the URL's path as written: `/v1` + `/search` requests `/v1/search`
-(a failed request names the full URL). The transform gets the decoded JSON as `rs` and
-`response` (status, reason, headers, body, url). A JSON list of objects or
-`{"columns": [...], "rows": [...]}` shows without a transform; every result must end up
-in one of these row shapes (`:help dbdash-result`).
-`cookies` takes curl's `-b` forms (`"a=1; b=2"` or a Netscape cookie file); cookies the
-server sets are kept in memory for the dashboard and sent on the next refresh, without
-touching the config. `https` verifies certificates by default. See `:help dbdash-http`.
+The options are curl's (`-X`, `-H`, `-d`, `--data-urlencode`, `--json`, `-G`, `-b`, `-c`,
+`-u`, `-L`, `-k`, `-m`, ...), with curl's defaults: `-d` sends a form, redirects need
+`-L`; output options such as `-s` are accepted, so a command copied with "Copy as cURL"
+runs once its URL is cut down to the path. The path is appended to the URL's path as
+written: `/v1` + `/search` requests `/v1/search` (a failed request names the full URL).
+Cookies work as curl's: `-b` sends them, `-c` writes the cookie file (next to the config;
+the config is trusted first) that a later refresh reads with `-b`. The transform gets the
+decoded JSON as `rs` and `response` (status, reason, headers, body, url). A JSON list of
+objects or `{"columns": [...], "rows": [...]}` shows without a transform; every result
+must end up in one of these row shapes (`:help dbdash-result`). `https` verifies
+certificates by default. See `:help dbdash-http`.
 
 ### Push sources
 

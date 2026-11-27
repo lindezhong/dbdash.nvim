@@ -125,7 +125,7 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
   p = run("http", {
     ("database: { url: %q }"):format(base .. "/v1"),
     "query:",
-    "  sql: '{\"path\": \"items\"}'",
+    "  sql: curl items",
     "  transform: |",
     "    local out = {}",
     "    for _, it in ipairs(rs.items) do",
@@ -139,13 +139,14 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
   p = run("http_bad", {
     ("database: { url: %q }"):format(base),
     "query:",
+    "  sql: curl",
     "  transform: 'return rs.items[1].name'",
   })
   eq(p.error.phase, "transform")
   eq(p.error.message, "the result is not rows (got string)")
   eq(notes[#notes], { msg = "dbdash: transform error: the result is not rows (got string)", level = vim.log.levels.ERROR })
   -- without a transform the response itself is checked, with a hint
-  p = run("http_plain", { ("database: { url: %q }"):format(base) })
+  p = run("http_plain", { ("database: { url: %q }"):format(base), "query: { sql: curl }" })
   eq(p.error.phase, "query")
   eq(p.error.message:find("the result is an object (items), not rows; add query.transform", 1, true) ~= nil, true)
   eq(notes[#notes], {
@@ -155,7 +156,7 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
   eq(#notes, 2) -- one per failing dashboard; the successful ones did not notify
 end
 
-T["http: cookies set by the server are sent on the next refresh, the config is unchanged"] = function()
+T["http: cookies the server sets reach the next refresh through the -c / -b file"] = function()
   local base, seen = h.http_server(function(_, n)
     local set = n == 1 and "Set-Cookie: token=fresh; Path=/\r\n" or ""
     return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" .. set .. "Content-Length: 2\r\n\r\n[]"
@@ -163,7 +164,7 @@ T["http: cookies set by the server are sent on the next refresh, the config is u
   local lines = {
     ("database: { url: %q }"):format(base),
     "query:",
-    "  sql: '{\"cookies\": \"token=initial; user=me\"}'",
+    "  sql: curl -b jar.txt -c jar.txt -b 'token=initial; user=me'",
   }
   local p = run("cookies", lines)
   eq(p.error, nil)
@@ -173,12 +174,17 @@ T["http: cookies set by the server are sent on the next refresh, the config is u
     return #seen >= 2 and not p.running
   end, 10)
   eq(seen[1].headers.cookie, "token=initial; user=me")
-  eq(seen[2].headers.cookie, "token=fresh; user=me")
-  eq(vim.fn.readfile(dir .. "/cookies.yaml"), lines)
-  -- a new start begins with an empty jar
+  eq(seen[2].headers.cookie, "token=fresh; user=me") -- the file's cookie wins over -b's
+  eq(vim.fn.readfile(dir .. "/cookies.yaml"), lines) -- the config is never written
+  eq(vim.fn.filereadable(dir .. "/jar.txt"), 1)
+  -- the file outlives the dashboard, as with curl: a new start sends it again
   sched.stop(sched.normalize(dir .. "/cookies.yaml"))
   run("cookies", lines)
-  eq(seen[3].headers.cookie, "token=initial; user=me")
+  eq(seen[3].headers.cookie, "token=fresh; user=me")
+  -- without -b / -c nothing is kept
+  local plain = { ("database: { url: %q }"):format(base), "query: { sql: curl }" }
+  run("nocookies", plain)
+  eq(seen[4].headers.cookie, nil)
 end
 
 local DATABASES = {

@@ -117,7 +117,8 @@ function M.start(path, o)
       cfg = cfg,
       state = state,
       panels = {},
-      cookie_jar = require("dbdash.net.http_cookie").new(),
+      -- curl -c in its queries: trusted above (or trust is not required here)
+      writes_trusted = require("dbdash.trust").writes(cfg),
     }, Dashboard)
     for i, pc in ipairs(cfg.panels) do
       d.panels[i] = setmetatable({

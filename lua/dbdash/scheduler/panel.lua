@@ -124,7 +124,8 @@ function Panel:pipeline(run)
     source = source,
     line = q.sql_line,
     raw = code ~= nil, -- the transform gets the raw result; checked after it
-    cookie_jar = self.d.cookie_jar,
+    -- curl -c writes a cookie file: allowed when the config was trusted for it
+    allow_writes = self.d.writes_trusted == true,
     cancel = run.life.cancel, -- cancelling the refresh stops the query
   })
   -- The query's own result (before query.transform): rows as Lua data, or the raw value.

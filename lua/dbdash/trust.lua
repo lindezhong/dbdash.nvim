@@ -89,8 +89,27 @@ function M.reachable(base_dir, text, seen)
   return out
 end
 
+---Does a curl command (an http(s):// query, before its template) write a file: curl -c /
+-----cookie-jar (also in a cluster of short options such as -Lc)?
+function M.curl_writes(text)
+  text = text or ""
+  return text:find("%-%-cookie%-jar") ~= nil or text:find("%f[%S]%-[%a#]*c%f[^%w]") ~= nil
+end
+
+---Configs whose http(s):// queries write cookie files (curl -c): they need trust like Lua,
+---and only these may write (a -c that only a template produces is refused).
+function M.writes(cfg)
+  for _, p in ipairs(cfg.panels) do
+    if (p.database.type == "http") and M.curl_writes(p.query.sql) then
+      return true
+    end
+  end
+  return false
+end
+
 ---The files whose Lua a config runs: the config itself (always first, as the unit of
 ---trust) and the .lua files and {% lua %} templates reachable through literal imports.
+---A config that writes files (curl -c) needs trust too.
 ---@param path string config path
 ---@param cfg table loaded config
 ---@return dbdash.trust.File[] files, boolean has_lua
@@ -126,6 +145,7 @@ function M.collect(path, cfg)
     has_lua = has_lua or M.has_lua_block(cfg.description)
     visit(cfg.description)
   end
+  has_lua = has_lua or M.writes(cfg)
   table.sort(files, function(a, b)
     if (a.kind == "config") ~= (b.kind == "config") then
       return a.kind == "config"

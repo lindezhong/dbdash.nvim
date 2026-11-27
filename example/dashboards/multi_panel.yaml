@@ -106,14 +106,11 @@ panels:
   - database:                       # another data source: an HTTPS JSON API
       url: "https://api.github.com"
     query:
-      # A GET with parameters (:help dbdash-http). The response is a list of flat records,
-      # which are rows as they are: no transform needed.
+      # A curl command: a GET with parameters (:help dbdash-http). The response is a list
+      # of flat records, which are rows as they are: no transform needed.
       sql: |
-        {
-          "path": "/repos/neovim/neovim/contributors",
-          "query": {"per_page": 8},
-          "headers": {"Accept": "application/vnd.github+json"}
-        }
+        curl /repos/neovim/neovim/contributors -G -d per_page=8 \
+          -H 'Accept: application/vnd.github+json'
     show:
       type: bar
       title: "Top Neovim contributors"
