@@ -322,115 +322,153 @@ local function type_name(t)
 end
 M.type_name = type_name
 
----Decode a value of type t from bytes b (b is never nil here).
-local function decode(t, b)
-  local name = TYPE_NAMES[t.id]
-  if name == "ascii" or name == "varchar" then
-    return b
-  elseif
-    name == "bigint"
-    or name == "counter"
-    or name == "int"
-    or name == "smallint"
-    or name == "tinyint"
-  then
-    return be_int(b)
-  elseif name == "varint" then
+local decode
+
+local function same(b)
+  return b
+end
+
+---decimal: an int scale, then the unscaled value as a varint.
+local function decimal(b)
+  local scale = rd_i32(b, 1)
+  local digits = M.varint(b:sub(5))
+  local neg = digits:sub(1, 1) == "-"
+  digits = digits:gsub("^%-", "")
+  if scale > 0 then
+    digits = string.rep("0", math.max(0, scale - #digits + 1)) .. digits
+    digits = digits:sub(1, #digits - scale) .. "." .. digits:sub(#digits - scale + 1)
+  elseif scale < 0 then
+    digits = digits .. string.rep("0", -scale)
+  end
+  return (neg and "-" or "") .. digits
+end
+
+---date: days since the epoch, centered on 2^31.
+local function date(b)
+  local days = 0
+  for i = 1, 4 do
+    days = days * 256 + b:byte(i)
+  end
+  days = days - 2 ^ 31
+  return require("dbdash.db.bson").ms_to_iso(days * 86400000):sub(1, 10)
+end
+
+---time: nanoseconds since midnight.
+local function time(b)
+  local ns = tonumber(be_int(b)) or 0
+  local secs = math.floor(ns / 1e9)
+  local frac = ns - secs * 1e9
+  return ("%02d:%02d:%02d.%09d"):format(
+    math.floor(secs / 3600),
+    math.floor(secs % 3600 / 60),
+    secs % 60,
+    frac
+  )
+end
+
+---A list or set: its elements.
+local function list(t, b)
+  local n, p = rd_i32(b, 1)
+  local out = {}
+  for i = 1, n do
+    local e
+    e, p = rd_bytes(b, p)
+    out[i] = e == nil and NULL or decode(t.sub[1], e)
+  end
+  return out
+end
+
+---A map: keys as text (non-text keys written as Python would).
+local function map_of(t, b)
+  local n, p = rd_i32(b, 1)
+  local out = map.new()
+  for _ = 1, n do
+    local kb, vb
+    kb, p = rd_bytes(b, p)
+    vb, p = rd_bytes(b, p)
+    local k = kb and decode(t.sub[1], kb) or "null"
+    if type(k) ~= "string" then
+      k = require("dbdash.util.pystr").str(k)
+    end
+    map.set(out, k, vb == nil and NULL or decode(t.sub[2], vb))
+  end
+  return out
+end
+
+---A user-defined type: its fields by name (later fields may be missing).
+local function udt(t, b)
+  local out, p = map.new(), 1
+  for _, f in ipairs(t.fields) do
+    if p > #b then
+      break
+    end
+    local fb
+    fb, p = rd_bytes(b, p)
+    map.set(out, f.name, fb == nil and NULL or decode(f.type, fb))
+  end
+  return out
+end
+
+local function tuple(t, b)
+  local out, p = {}, 1
+  for i, st in ipairs(t.sub) do
+    local eb
+    eb, p = rd_bytes(b, p)
+    out[i] = eb == nil and NULL or decode(st, eb)
+  end
+  return out
+end
+
+-- Decoders by type name: fun(b) for simple types, fun(t, b) (COMPOSITE) for the others.
+local DECODE = {
+  ascii = same,
+  varchar = same,
+  blob = same,
+  bigint = be_int,
+  counter = be_int,
+  int = be_int,
+  smallint = be_int,
+  tinyint = be_int,
+  varint = function(b)
     return resultset.integer(M.varint(b))
-  elseif name == "boolean" then
+  end,
+  boolean = function(b)
     return b:byte(1) ~= 0
-  elseif name == "double" then
-    return be_double(b)
-  elseif name == "float" then
-    return be_float(b)
-  elseif name == "decimal" then
-    local scale = rd_i32(b, 1)
-    local digits = M.varint(b:sub(5))
-    local neg = digits:sub(1, 1) == "-"
-    digits = digits:gsub("^%-", "")
-    if scale > 0 then
-      digits = string.rep("0", math.max(0, scale - #digits + 1)) .. digits
-      digits = digits:sub(1, #digits - scale) .. "." .. digits:sub(#digits - scale + 1)
-    elseif scale < 0 then
-      digits = digits .. string.rep("0", -scale)
-    end
-    return (neg and "-" or "") .. digits
-  elseif name == "timestamp" then
-    local ms = be_int(b)
-    return require("dbdash.db.bson").ms_to_iso(tonumber(ms) or 0)
-  elseif name == "date" then
-    local days = 0
-    for i = 1, 4 do
-      days = days * 256 + b:byte(i)
-    end
-    days = days - 2 ^ 31
-    return require("dbdash.db.bson").ms_to_iso(days * 86400000):sub(1, 10)
-  elseif name == "time" then
-    local ns = tonumber(be_int(b)) or 0
-    local secs = math.floor(ns / 1e9)
-    local frac = ns - secs * 1e9
-    return ("%02d:%02d:%02d.%09d"):format(
-      math.floor(secs / 3600),
-      math.floor(secs % 3600 / 60),
-      secs % 60,
-      frac
-    )
-  elseif name == "uuid" or name == "timeuuid" then
-    return uuid(b)
-  elseif name == "inet" then
-    return inet(b)
-  elseif name == "blob" then
-    return b
-  elseif name == "duration" then
+  end,
+  double = be_double,
+  float = be_float,
+  decimal = decimal,
+  timestamp = function(b)
+    return require("dbdash.db.bson").ms_to_iso(tonumber(be_int(b)) or 0)
+  end,
+  date = date,
+  time = time,
+  uuid = uuid,
+  timeuuid = uuid,
+  inet = inet,
+  duration = function(b)
     local mo, d, ns, p
     mo, p = rd_vint(b, 1)
     d, p = rd_vint(b, p)
     ns = rd_vint(b, p)
     return ("%dmo%dd%dns"):format(zigzag(mo), zigzag(d), zigzag(ns))
-  elseif name == "list" or name == "set" then
-    local n, p = rd_i32(b, 1)
-    local out = {}
-    for i = 1, n do
-      local e
-      e, p = rd_bytes(b, p)
-      out[i] = e == nil and NULL or decode(t.sub[1], e)
-    end
-    return out
-  elseif name == "map" then
-    local n, p = rd_i32(b, 1)
-    local out = map.new()
-    for _ = 1, n do
-      local kb, vb
-      kb, p = rd_bytes(b, p)
-      vb, p = rd_bytes(b, p)
-      local k = kb and decode(t.sub[1], kb) or "null"
-      if type(k) ~= "string" then
-        k = require("dbdash.util.pystr").str(k)
-      end
-      map.set(out, k, vb == nil and NULL or decode(t.sub[2], vb))
-    end
-    return out
-  elseif name == "udt" then
-    local out, p = map.new(), 1
-    for _, f in ipairs(t.fields) do
-      if p > #b then
-        break
-      end
-      local fb
-      fb, p = rd_bytes(b, p)
-      map.set(out, f.name, fb == nil and NULL or decode(f.type, fb))
-    end
-    return out
-  elseif name == "tuple" then
-    local out, p = {}, 1
-    for i, st in ipairs(t.sub) do
-      local eb
-      eb, p = rd_bytes(b, p)
-      out[i] = eb == nil and NULL or decode(st, eb)
-    end
-    return out
+  end,
+}
+local COMPOSITE = { list = list, set = list, map = map_of, udt = udt, tuple = tuple }
+
+---Decode a value of type t from bytes b (b is never nil here); custom and unknown types
+---give the raw bytes as text.
+function decode(t, b)
+  local name = TYPE_NAMES[t.id]
+  local composite = COMPOSITE[name]
+  if composite then
+    return composite(t, b)
   end
-  return b -- custom / unknown: raw bytes as text
+  local f = DECODE[name]
+  if f then
+    return f(b)
+  end
+  return b
 end
 M.decode = decode
 
