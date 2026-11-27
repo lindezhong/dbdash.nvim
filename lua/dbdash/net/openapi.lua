@@ -1016,4 +1016,231 @@ function Api:multipart(text, content_type, media, doc)
   return out
 end
 
+-- Handling a request -----------------------------------------------------------------
+
+---The operation of a request, its parameters (by location) and the request as Lua code
+---sees it (`hidden` headers left out); raises { http_status, detail, headers } otherwise.
+function Api:route(req, hidden)
+  local op, path_values, allow = self:match(req.method, req.path)
+  if not op then
+    if path_values == 405 then
+      error({
+        http_status = 405,
+        detail = "method not allowed",
+        headers = { Allow = table.concat(allow, ", ") },
+      }, 0)
+    end
+    bad(404, "no such path")
+  end
+  local authorized, challenge = self:authorize(op, req.headers)
+  if not authorized then
+    error({
+      http_status = 401,
+      detail = "authentication required",
+      headers = challenge and { ["WWW-Authenticate"] = challenge } or nil,
+    }, 0)
+  end
+  local params = self:parameters(op, req, path_values)
+  local headers = {}
+  for k, v in pairs(req.headers) do
+    if not hidden[k] then
+      headers[k] = v
+    end
+  end
+  local request = {
+    method = req.method,
+    path = req.path,
+    operation_id = op.id,
+    content_type = req.headers["content-type"],
+    headers = headers,
+  }
+  return op, params, request
+end
+
+---Headers that carry credentials (not passed on): those of HTTP and the document's API keys.
+---@return table<string, boolean>
+function Api:credential_headers()
+  local hidden = { authorization = true, ["proxy-authorization"] = true, cookie = true }
+  for _, s in pairs(self.schemes) do
+    if s.type == "apiKey" and s["in"] == "header" then
+      hidden[tostring(s.name):lower()] = true
+    end
+  end
+  return hidden
+end
+
+---The parameters as one mapping (an item of a request without a body).
+local function params_item(params)
+  local m = map.new()
+  for _, where in ipairs({ "path", "query", "header", "cookie" }) do
+    for k, v in map.pairs(params[where]) do
+      map.set(m, k, v)
+    end
+  end
+  return m
+end
+
+---Raise 400 when `value` does not match the media type's schema.
+function Api:check_value(media, mdoc, value, what)
+  if media.schema == nil then
+    return
+  end
+  local e = self:validate(media.schema, value, mdoc)
+  if e then
+    bad(400, "%s%s: %s", what, e.path ~= "/" and (" " .. e.path) or "", e.message)
+  end
+end
+
+---A streaming body: cut at the delimiter (o.split), each piece an item (decoded JSON for
+---stream-json), validated.
+function Api:read_stream(kind, ct, media, mdoc, read_body, o, emit)
+  local delimiter = ct == "application/json-seq" and "\30" or o.delimiter
+  local n = 0
+  local write, flush = o.split(delimiter, function(piece)
+    n = n + 1
+    local value = piece
+    if kind == "stream-json" then
+      local v, err = M.decode_json(vim.trim(piece))
+      if v == nil and err then
+        bad(400, "item %d: invalid JSON (%s)", n, err)
+      end
+      value = v
+    end
+    self:check_value(media, mdoc, value, "item " .. n)
+    emit(value)
+  end)
+  read_body(write, o.max_body)
+  flush()
+end
+
+---A whole body: JSON decoded, a form's fields, the parts of multipart, else the text;
+---validated; one item.
+function Api:read_whole(kind, content_type, media, mdoc, read_body, o, emit)
+  local parts = {}
+  read_body(function(data)
+    parts[#parts + 1] = data
+  end, o.max_body)
+  local body = table.concat(parts)
+  local value
+  if kind == "json" then
+    local v, err = M.decode_json(body)
+    if v == nil and err then
+      bad(400, "invalid JSON (%s)", err)
+    end
+    value = v
+  elseif kind == "form" then
+    value = self:form(body, media, mdoc)
+  elseif kind == "multipart" then
+    value = self:multipart(body, content_type, media, mdoc)
+  else
+    value = body
+  end
+  self:check_value(media, mdoc, value, "request body")
+  emit(value)
+end
+
+---The items of a request (emit(value) each): its body by media type, or its parameters
+---when there is none.
+function Api:read_items(op, req, params, read_body, o, emit)
+  local has_body = (tonumber(req.headers["content-length"] or "0") or 0) > 0
+    or (req.headers["transfer-encoding"] or ""):lower():find("chunked", 1, true) ~= nil
+  if not op.body or not has_body then
+    if has_body then
+      read_body(function() end, o.max_body) -- (ignored: the operation takes no body)
+    elseif op.body and op.body.required == true then
+      bad(400, "a request body is required")
+    end
+    emit(params_item(params))
+    return
+  end
+  local content_type = req.headers["content-type"]
+  local mt, media, mdoc, ct = self:media(op, content_type)
+  if not mt then
+    bad(415, "unsupported media type %s", tostring(content_type))
+  end
+  local kind = M.kind(ct ~= "" and ct or tostring(mt), o.stream_types)
+  if kind:match("^stream") then
+    self:read_stream(kind, ct, media, mdoc, read_body, o, emit)
+  else
+    self:read_whole(kind, content_type, media, mdoc, read_body, o, emit)
+  end
+end
+
+---The response to an accepted request: the operation's example, else { queued = n }.
+local function accepted(op, count)
+  if op.example then
+    local body = type(op.example.value) == "string" and op.example.value
+      or vim.json.encode(op.example.value)
+    return {
+      status = op.status or 202,
+      headers = { ["Content-Type"] = op.example.type },
+      body = body,
+    }
+  end
+  return {
+    status = op.status or 202,
+    headers = { ["Content-Type"] = "application/json" },
+    body = vim.json.encode({ queued = count }),
+  }
+end
+
+---@class dbdash.net.openapi.HandleOpts
+---@field emit fun(value: any, vars: { params: table, request: table }) one item
+---@field split fun(delimiter: string, on_piece: fun(piece: string)): function, function
+---  a body cut into pieces: write(data), flush()
+---@field max_body integer
+---@field delimiter string
+---@field stream_types string[]
+---@field hidden table<string, boolean> headers not passed on (Api:credential_headers)
+
+---Handle a request (net/http_server's handler, after its own checks): the operation, its
+---authorization and parameters, the items of its body (o.emit each, with `params` and
+---`request`). Returns the response, or nil and the rejection { http_status, detail,
+---headers } (detail says how many items came before it).
+---@param o dbdash.net.openapi.HandleOpts
+---@return table? response, table? rejection
+function Api:handle(req, read_body, o)
+  local op, params, request
+  local ok, err = pcall(function()
+    op, params, request = self:route(req, o.hidden)
+  end)
+  if not ok then
+    if type(err) == "table" and err.http_status then
+      return nil, err
+    end
+    error(err, 0)
+  end
+  local vars = { params = params, request = request }
+  local count = 0
+  ok, err = pcall(self.read_items, self, op, req, params, read_body, o, function(value)
+    count = count + 1
+    o.emit(value, vars)
+  end)
+  if not ok then
+    if type(err) == "table" and err.http_status then
+      if count > 0 then
+        err.detail = ("%s (%d item(s) before it were accepted)"):format(err.detail, count)
+      end
+      return nil, err
+    end
+    error(err, 0)
+  end
+  return accepted(op, count)
+end
+
+---Raise unless every operation has a security requirement (an endpoint others can reach
+---must authenticate every request, after MCP); `where` names the endpoint.
+function Api:require_security(where)
+  for _, r in ipairs(self.routes) do
+    for _, op in pairs(r.ops) do
+      if #op.security == 0 then
+        require("dbdash.util.error").raise(
+          "config",
+          ("%s needs a security requirement on every operation; %s has none"):format(where, op.id)
+        )
+      end
+    end
+  end
+end
+
 return M

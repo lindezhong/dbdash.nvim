@@ -12,7 +12,6 @@
 -- localhost by default, credentials only in headers or cookies, Origin and Host checked,
 -- limits on body size, connections and slow requests.
 local dberr = require("dbdash.util.error")
-local map = require("dbdash.util.map")
 local options = require("dbdash.db.options")
 
 local M = {
@@ -60,19 +59,6 @@ function M.parse_url(info)
   return info
 end
 
-local function problem(status, detail)
-  return {
-    status = status,
-    headers = { ["Content-Type"] = "application/problem+json" },
-    body = vim.json.encode({
-      type = "about:blank",
-      title = require("dbdash.net.http_server").REASONS[status] or "Error",
-      status = status,
-      detail = detail,
-    }),
-  }
-end
-
 ---The document used when query.sql is empty: POST or PUT of anything at the URL's path.
 local function default_doc(base_path)
   local key = base_path == "" and "/" or ""
@@ -86,10 +72,8 @@ paths:
 ]]):format(key)
 end
 
----@param ctx dbdash.db.StreamCtx
-function M.produce(info, text, ctx)
-  local openapi = require("dbdash.net.openapi")
-  local server = require("dbdash.net.http_server")
+---The options with their defaults, and the tokens with ${NAME} from the environment.
+local function read_options(info)
   local o = options.check("webhook", info.options, SPEC, {
     delimiter = "\n",
     max_body = "10MB",
@@ -110,35 +94,11 @@ function M.produce(info, text, ctx)
       tokens[k] = options.expand_env(v, what) -- ${NAME}: from the environment
     end
   end
-  local ok, api =
-    pcall(openapi.load, vim.trim(text) ~= "" and text or default_doc(info.base_path), {
-      base_dir = ctx.base_dir,
-      base_path = info.base_path,
-      tokens = tokens,
-    })
-  if not ok then
-    error(api, 0)
-  end
-  local host = info.host
-  local is_local = LOCAL[host] == true
-  if not is_local then
-    -- MCP: an endpoint others can reach must authenticate every request.
-    for _, r in ipairs(api.routes) do
-      for _, op in pairs(r.ops) do
-        if #op.security == 0 then
-          dberr.raise(
-            "config",
-            ("webhook:// on %s (not this machine) needs a security requirement on every operation; %s has none"):format(
-              host,
-              op.id
-            )
-          )
-        end
-      end
-    end
-  end
-  local bind = host == "localhost" and "127.0.0.1" or host
-  local max_body = require("dbdash.util.bytes").parse(o.max_body)
+  return o, tokens
+end
+
+---The Hosts and Origins requests may come with (DNS rebinding, http_server.check_host).
+local function allowed(host, is_local, o)
   local hosts = {
     [host:lower()] = true,
     localhost = is_local or nil,
@@ -152,198 +112,59 @@ function M.produce(info, text, ctx)
   for _, h in ipairs(o.allowed_origins) do
     origins[h] = true
   end
-  -- Headers that carry credentials are not passed on.
-  local hidden = { authorization = true, ["proxy-authorization"] = true, cookie = true }
-  for _, s in pairs(api.schemes) do
-    if s.type == "apiKey" and s["in"] == "header" then
-      hidden[tostring(s.name):lower()] = true
-    end
+  return hosts, origins
+end
+
+---Serve the document's operations until the run stops: each accepted request gives items
+---(net/openapi.lua's Api:handle), every rejection is counted by status.
+---@param ctx dbdash.db.StreamCtx
+function M.produce(info, text, ctx)
+  local openapi = require("dbdash.net.openapi")
+  local server = require("dbdash.net.http_server")
+  local o, tokens = read_options(info)
+  local api = openapi.load(vim.trim(text) ~= "" and text or default_doc(info.base_path), {
+    base_dir = ctx.base_dir,
+    base_path = info.base_path,
+    tokens = tokens,
+  })
+  local host = info.host
+  local is_local = LOCAL[host] == true
+  if not is_local then
+    api:require_security(("webhook:// on %s (not this machine)"):format(host))
   end
+  local hosts, origins = allowed(host, is_local, o)
+  local max_body = require("dbdash.util.bytes").parse(o.max_body)
   local function reject(status, detail, headers)
     ctx.stats.rejected[status] = (ctx.stats.rejected[status] or 0) + 1
-    local res = problem(status, detail)
-    for k, v in pairs(headers or {}) do
-      res.headers[k] = v
-    end
-    return res
+    return server.problem(status, detail, headers)
   end
-
-  local function handle(req, read_body)
-    -- DNS rebinding: the Host must be this server, the Origin (from browsers) allowed.
-    local h = (req.headers.host or ""):lower():gsub(":%d+$", ""):gsub("^%[(.*)%]$", "%1")
-    if not hosts[h] then
-      return reject(403, "this Host is not allowed")
-    end
-    local origin = req.headers.origin
-    if origin and not origins[origin] then
-      return reject(403, "this Origin is not allowed")
-    end
-    local op, path_values, allow = api:match(req.method, req.path)
-    if not op then
-      if path_values == 405 then
-        return reject(405, "method not allowed", { Allow = table.concat(allow, ", ") })
-      end
-      return reject(404, "no such path")
-    end
-    local authorized, challenge = api:authorize(op, req.headers)
-    if not authorized then
-      return reject(
-        401,
-        "authentication required",
-        challenge and { ["WWW-Authenticate"] = challenge } or nil
-      )
-    end
-    local pok, params = pcall(api.parameters, api, op, req, path_values)
-    if not pok then
-      if type(params) == "table" and params.http_status then
-        return reject(params.http_status, params.detail)
-      end
-      error(params, 0)
-    end
-    local headers = {}
-    for k, v in pairs(req.headers) do
-      if not hidden[k] then
-        headers[k] = v
-      end
-    end
-    local content_type = req.headers["content-type"]
-    local vars = {
-      params = params,
-      request = {
-        method = req.method,
-        path = req.path,
-        operation_id = op.id,
-        content_type = content_type,
-        headers = headers,
-      },
-    }
-    local has_body = (tonumber(req.headers["content-length"] or "0") or 0) > 0
-      or (req.headers["transfer-encoding"] or ""):lower():find("chunked", 1, true) ~= nil
-    local count = 0
-    local function emit(v)
-      count = count + 1
-      ctx.emit(v, vars)
-    end
-    local function params_item()
-      local m = map.new()
-      for _, where in ipairs({ "path", "query", "header", "cookie" }) do
-        for k, v in map.pairs(params[where]) do
-          map.set(m, k, v)
-        end
-      end
-      emit(m)
-    end
-    local bok, berr = pcall(function()
-      if not op.body then
-        if has_body then
-          read_body(function() end, max_body) -- (ignored: the operation takes no body)
-        end
-        params_item()
-        return
-      end
-      if not has_body then
-        if op.body.required == true then
-          server.error(400, "a request body is required")
-        end
-        params_item()
-        return
-      end
-      local mt, media, mdoc, ct = api:media(op, content_type)
-      if not mt then
-        server.error(415, ("unsupported media type %s"):format(tostring(content_type)))
-      end
-      local kind = openapi.kind(ct ~= "" and ct or tostring(mt), o.stream_types)
-      if kind:match("^stream") then
-        local delimiter = ct == "application/json-seq" and "\30" or o.delimiter
-        local n = 0
-        local write, flush = require("dbdash.db").splitter(delimiter, max_body, function(piece)
-          n = n + 1
-          local value = piece
-          if kind == "stream-json" then
-            local v, err = openapi.decode_json(vim.trim(piece))
-            if v == nil and err then
-              server.error(400, ("item %d: invalid JSON (%s)"):format(n, err))
-            end
-            value = v
-          end
-          if media.schema ~= nil then
-            local e = api:validate(media.schema, value, mdoc)
-            if e then
-              server.error(
-                400,
-                ("item %d%s: %s"):format(n, e.path ~= "/" and (" " .. e.path) or "", e.message)
-              )
-            end
-          end
-          emit(value)
-        end, ctx.stats)
-        read_body(write, max_body)
-        flush()
-        return
-      end
-      local parts = {}
-      read_body(function(data)
-        parts[#parts + 1] = data
-      end, max_body)
-      local body = table.concat(parts)
-      local value
-      if kind == "json" then
-        local v, err = openapi.decode_json(body)
-        if v == nil and err then
-          server.error(400, ("invalid JSON (%s)"):format(err))
-        end
-        value = v
-      elseif kind == "form" then
-        value = api:form(body, media, mdoc)
-      elseif kind == "multipart" then
-        value = api:multipart(body, content_type, media, mdoc)
-      else
-        value = body
-      end
-      if media.schema ~= nil then
-        local e = api:validate(media.schema, value, mdoc)
-        if e then
-          server.error(
-            400,
-            ("request body%s: %s"):format(e.path ~= "/" and (" " .. e.path) or "", e.message)
-          )
-        end
-      end
-      emit(value)
-    end)
-    if not bok then
-      if type(berr) == "table" and berr.http_status then
-        local detail = berr.detail
-        if count > 0 then
-          detail = ("%s (%d item(s) before it were accepted)"):format(detail, count)
-        end
-        return reject(berr.http_status, detail)
-      end
-      error(berr, 0)
-    end
-    if op.example then
-      local body = type(op.example.value) == "string" and op.example.value
-        or vim.json.encode(op.example.value)
-      return {
-        status = op.status or 202,
-        headers = { ["Content-Type"] = op.example.type },
-        body = body,
-      }
-    end
-    return {
-      status = op.status or 202,
-      headers = { ["Content-Type"] = "application/json" },
-      body = vim.json.encode({ queued = count }),
-    }
-  end
-
-  local lok, srv = pcall(server.listen, bind, info.port, {
+  local handle_opts = {
+    emit = ctx.emit,
+    split = function(delimiter, on_piece)
+      return require("dbdash.db").splitter(delimiter, max_body, on_piece, ctx.stats)
+    end,
+    max_body = max_body,
+    delimiter = o.delimiter,
+    stream_types = o.stream_types,
+    hidden = api:credential_headers(),
+  }
+  local lok, srv = pcall(server.listen, host == "localhost" and "127.0.0.1" or host, info.port, {
     max_connections = o.max_connections,
     timeout = require("dbdash.util.duration").parse(o.timeout),
     on_error = function(status, detail)
       return reject(status, detail or "")
     end,
-  }, handle)
+  }, function(req, read_body)
+    local status, detail = server.check_host(req, hosts, origins)
+    if status then
+      return reject(status, detail)
+    end
+    local res, rejected = api:handle(req, read_body, handle_opts)
+    if rejected then
+      return reject(rejected.http_status, rejected.detail, rejected.headers)
+    end
+    return res
+  end)
   if not lok then
     dberr.raise("connect", tostring(srv))
   end

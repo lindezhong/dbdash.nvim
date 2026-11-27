@@ -44,6 +44,42 @@ local function http_error(status, detail)
 end
 M.error = http_error
 
+---A problem response (RFC 9457: application/problem+json) with `status`, its reason as
+---the title and `detail`; `headers` are added.
+---@return table response
+function M.problem(status, detail, headers)
+  local res = {
+    status = status,
+    headers = { ["Content-Type"] = "application/problem+json" },
+    body = vim.json.encode({
+      type = "about:blank",
+      title = REASONS[status] or "Error",
+      status = status,
+      detail = detail,
+    }),
+  }
+  for k, v in pairs(headers or {}) do
+    res.headers[k] = v
+  end
+  return res
+end
+
+---DNS rebinding: a request's Host must be one of `hosts` (lower case, without the port),
+---its Origin (sent by browsers) one of `origins`. Returns nil, or 403 and why.
+---@param hosts table<string, boolean>
+---@param origins table<string, boolean>
+---@return integer? status, string? detail
+function M.check_host(req, hosts, origins)
+  local h = (req.headers.host or ""):lower():gsub(":%d+$", ""):gsub("^%[(.*)%]$", "%1")
+  if not hosts[h] then
+    return 403, "this Host is not allowed"
+  end
+  local origin = req.headers.origin
+  if origin and not origins[origin] then
+    return 403, "this Origin is not allowed"
+  end
+end
+
 ---Read the request line and headers.
 local function read_head(sock)
   while true do
