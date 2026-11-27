@@ -65,6 +65,15 @@ end
 ---  args, started_at, finished_at, elapsed_ms, ok, error, sql, query, result
 ---@field lua { store: table, helpers: table } globals of all Lua code of the run
 ---@field meta table? the metadata of this run
+---@field life { n: integer, runs: table[], version: integer, cancel: dbdash.db.CancelToken }
+---  the same as counter
+---@field code string? the rendered query.transform
+---@field item { value: any, vars: table }? the item of a source that sends data
+---@field maps table[] the template `args` mappings of this run
+---@field meta_maps table[] the template `meta` mappings of this run
+---@field meta_version integer?
+---@field seen table the values when the run started
+---@field read_only boolean?
 
 ---A run of the panel's pipeline with `values` (default: the current arguments).
 ---@param parent dbdash.Run? the run this one is a callback of
