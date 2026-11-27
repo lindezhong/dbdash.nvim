@@ -10,6 +10,105 @@ local M = {}
 ---Server-side cancels still being sent: Neovim waits for them briefly when it exits.
 M.pending = 0
 
+---@class dbdash.db.Query one query on a driver with connect (M.execute)
+---@field driver dbdash.db.Driver
+---@field info dbdash.db.ConnInfo
+---@field callback fun(err: dbdash.Error?, rs: dbdash.db.ResultSet?)
+---@field token dbdash.db.CancelToken stops Lua code of the query (lua://)
+---@field conn dbdash.db.Connection?
+---@field timer uv.uv_timer_t?
+---@field unlink fun()? leaves the caller's cancel token
+---@field done boolean the callback was called
+---@field closed boolean
+---@field server_stopped boolean
+local Query = {}
+Query.__index = Query
+
+---Call back once (on the main loop), the time limit and the caller's token released.
+function Query:finish(err, rs)
+  if self.done then
+    return
+  end
+  self.done = true
+  if self.timer then
+    self.timer:stop()
+    self.timer:close()
+    self.timer = nil
+  end
+  if self.unlink then
+    self.unlink()
+  end
+  vim.schedule(function()
+    self.callback(err and dberr.wrap(err, self.driver.name) or nil, rs)
+  end)
+end
+
+function Query:close_conn()
+  if self.conn and not self.closed then
+    self.closed = true
+    pcall(self.conn.close, self.conn) -- (closing: an error leaves nothing to do)
+  end
+end
+
+---Steps 2 and 3: stop the query on the server, then close the connection (in a task:
+---drivers talk to the server).
+function Query:stop_server()
+  if self.server_stopped or not self.conn or self.closed then
+    return
+  end
+  self.server_stopped = true
+  M.pending = M.pending + 1
+  async.run(function()
+    if self.driver.cancel then
+      pcall(self.driver.cancel, self.conn, self.info) -- (best effort: closing follows)
+    end
+    self:close_conn()
+  end, function()
+    M.pending = M.pending - 1
+  end)
+end
+
+---Stop the query: the caller gets the error now (step 1), then the server stops.
+function Query:abort(phase, message)
+  if self.done then
+    return
+  end
+  self:finish(dberr.new({ driver = self.driver.name, phase = phase, message = message }))
+  self.token:cancel(message)
+  self:stop_server()
+end
+
+---Inside a task: credentials, connect, execute, close (or stop the server when a read or
+---write timed out: the query may still run there); the result as rows unless opts.raw.
+function Query:run(query, exec_opts, opts)
+  local started = vim.uv.hrtime()
+  require("dbdash.db.credentials").fill(self.info, opts.password_cmd)
+  if self.done then
+    return
+  end
+  local c = self.driver.connect(self.info)
+  if self.done then -- stopped while connecting: nothing runs on the server yet
+    pcall(c.close, c) -- (closing: an error leaves nothing to do)
+    return
+  end
+  self.conn = c
+  local ok, rs = pcall(c.execute, c, query, exec_opts)
+  if not ok and type(rs) == "table" and rs.phase == "timeout" then
+    self:stop_server()
+  elseif not self.server_stopped then
+    self:close_conn()
+  end
+  if not ok then
+    error(rs, 0)
+  end
+  local lua_result = require("dbdash.db.lua_result")
+  if lua_result.is_raw(rs) and not opts.raw then
+    rs = lua_result.normalize(rs, { max_rows = exec_opts.max_rows, phase = "query", hint = true })
+  end
+  rs.elapsed_ms = (vim.uv.hrtime() - started) / 1e6
+  return rs
+end
+
 ---Run one query on a driver with connect (`info`: its parsed URL). `callback(err, rs)` is
 ---invoked exactly once, on the main loop. Returns a handle: handle:cancel(reason) stops it.
 ---
@@ -28,71 +127,18 @@ M.pending = 0
 ---@return { cancel: fun(self, reason: string?) }
 function M.execute(driver, info, query, opts, callback)
   opts = opts or {}
-  local driver_name = driver.name
-  local done = false
-  local timer
-  local conn
-  local closed, server_stopped = false, false
-  -- This query's token: Lua code of the query (lua://) stops when it is cancelled.
-  local token = require("dbdash.db.cancel").new()
-  local unlink
-
-  local function finish(err, rs)
-    if done then
-      return
-    end
-    done = true
-    if timer then
-      timer:stop()
-      timer:close()
-      timer = nil
-    end
-    if unlink then
-      unlink()
-    end
-    vim.schedule(function()
-      callback(err and dberr.wrap(err, driver_name) or nil, rs)
-    end)
-  end
-
-  local function close_conn()
-    if conn and not closed then
-      closed = true
-      pcall(conn.close, conn)
-    end
-  end
-
-  ---Steps 2 and 3: stop the query on the server, then close the connection (in a task:
-  ---drivers talk to the server).
-  local function stop_server()
-    if server_stopped or not conn or closed then
-      return
-    end
-    server_stopped = true
-    M.pending = M.pending + 1
-    async.run(function()
-      if driver.cancel then
-        pcall(driver.cancel, conn, info)
-      end
-      close_conn()
-    end, function()
-      M.pending = M.pending - 1
-    end)
-  end
-
-  ---Stop the query: the caller gets the error now (step 1), then the server stops.
-  local function abort(phase, message)
-    if done then
-      return
-    end
-    finish(dberr.new({ driver = driver_name, phase = phase, message = message }))
-    token:cancel(message)
-    stop_server()
-  end
-
+  local q = setmetatable({
+    driver = driver,
+    info = info,
+    callback = callback,
+    token = require("dbdash.db.cancel").new(),
+    done = false,
+    closed = false,
+    server_stopped = false,
+  }, Query)
   local handle = {
     cancel = function(_, reason)
-      abort("cancelled", "query cancelled: " .. (reason or "cancelled"))
+      q:abort("cancelled", "query cancelled: " .. (reason or "cancelled"))
     end,
   }
   if opts.cancel then
@@ -100,11 +146,10 @@ function M.execute(driver, info, query, opts, callback)
       handle:cancel(opts.cancel.reason)
       return handle
     end
-    unlink = opts.cancel:on_cancel(function(reason)
+    q.unlink = opts.cancel:on_cancel(function(reason)
       handle:cancel(reason)
     end)
   end
-
   local q_timeout = opts.timeout or info.timeout
   local exec_opts = {
     max_rows = opts.max_rows or defaults.current.max_rows,
@@ -115,52 +160,23 @@ function M.execute(driver, info, query, opts, callback)
     source = opts.source,
     line = opts.line,
     allow_writes = opts.allow_writes,
-    cancel = token,
+    cancel = q.token,
   }
-
-  timer = vim.uv.new_timer()
-  timer:start(info.connect_timeout + q_timeout, 0, function()
+  local limit = info.connect_timeout + q_timeout
+  q.timer = vim.uv.new_timer()
+  q.timer:start(limit, 0, function()
     vim.schedule(function()
-      abort(
-        "timeout",
-        ("query did not finish within %.1fs"):format((info.connect_timeout + q_timeout) / 1000)
-      )
+      q:abort("timeout", ("query did not finish within %.1fs"):format(limit / 1000))
     end)
   end)
-
-  local started = vim.uv.hrtime()
-  local credentials = require("dbdash.db.credentials")
   async.run(function()
-    credentials.fill(info, opts.password_cmd)
-    if done then
-      return
-    end
-    local c = driver.connect(info)
-    if done then -- stopped while connecting: nothing runs on the server yet
-      pcall(c.close, c)
-      return
-    end
-    conn = c
-    local ok2, rs = pcall(conn.execute, conn, query, exec_opts)
-    if not ok2 and type(rs) == "table" and rs.phase == "timeout" then
-      stop_server() -- a read or write timed out: the query may still run on the server
-    elseif not server_stopped then
-      close_conn()
-    end
-    if not ok2 then
-      error(rs, 0)
-    end
-    local lua_result = require("dbdash.db.lua_result")
-    if lua_result.is_raw(rs) and not opts.raw then
-      rs = lua_result.normalize(rs, { max_rows = exec_opts.max_rows, phase = "query", hint = true })
-    end
-    rs.elapsed_ms = (vim.uv.hrtime() - started) / 1e6
-    return rs
+    return q:run(query, exec_opts, opts)
   end, function(err, rs)
     if err and opts.password_cmd and type(err) == "table" and err.phase == "auth" then
-      credentials.forget(opts.password_cmd, info) -- the password may have changed
+      -- the password may have changed
+      require("dbdash.db.credentials").forget(opts.password_cmd, info)
     end
-    finish(err, rs)
+    q:finish(err, rs)
   end)
   return handle
 end
