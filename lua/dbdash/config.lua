@@ -434,6 +434,103 @@ end
 ---@param file string used in error messages
 ---@param positions table<string, {line: integer, col: integer}>?
 ---@return dbdash.Config
+---With panels, the top-level query and show are defaults: fields of one chart are not.
+function Ctx:check_defaults(top_query, top_show)
+  for section, m in pairs({ query = top_query, show = top_show }) do
+    for k in map.pairs(m or map.new()) do
+      if panel_only(section, k) then
+        local hint = (section == "query" and k == "args")
+            and "; shared arguments go in the top-level args"
+          or ""
+        self:fail(
+          ("%s.%s"):format(section, k),
+          "'%s.%s' belongs to one panel; with panels, set it in each panel%s",
+          section,
+          k,
+          hint
+        )
+      end
+    end
+  end
+end
+
+---Panel i's id (`id:`, else its index), unique.
+function Ctx:panel_id(cfg, raw, i, prefix, ids)
+  local id = tostring(i)
+  if cfg.grid and nn(raw.id) ~= nil then
+    id = self:expect(prefix .. "id", raw.id, "string")
+    if not id:match("^[%a_][%w_]*$") then
+      self:fail(prefix .. "id", "panel id '%s' must be an identifier", id)
+    end
+  end
+  if ids[id] then
+    self:fail(prefix .. "id", "duplicate panel id '%s' (panels[%d])", id, ids[id])
+  end
+  ids[id] = i
+  return id
+end
+
+---The panels: each one's raw fields over the top-level defaults.
+function Ctx:panels(cfg, panels_raw, top_query, top_show, top_interval)
+  local ids = {}
+  for i, raw in ipairs(panels_raw) do
+    local prefix = cfg.grid and ("panels[%d]."):format(i) or ""
+    if cfg.grid then
+      self:expect(("panels[%d]"):format(i), raw, "map")
+      -- Inherited fields report the line of the top-level default.
+      for path, p in pairs(self.pos) do
+        if
+          (path:match("^query%.") or path:match("^show%.")) and self.pos[prefix .. path] == nil
+        then
+          self.pos[prefix .. path] = p
+        end
+      end
+    end
+    local id = self:panel_id(cfg, raw, i, prefix, ids)
+    local panel = self:panel({
+      database = nn(raw.database),
+      query = merge(top_query, nn(raw.query)),
+      show = merge(top_show, nn(raw.show)),
+    }, prefix, cfg, i, id, top_interval)
+    panel.style_rules = cfg.grid and self:style(raw.style, prefix .. "style") or nil
+    cfg.panels[i] = panel
+  end
+end
+
+---Every argument (shared, then each panel's) with the key of its value: the name, or
+---<panel id>.<name> for a local argument whose name another argument has too.
+local function argument_keys(cfg)
+  cfg.args = vim.list_extend({}, cfg.shared_args)
+  for _, p in ipairs(cfg.panels) do
+    vim.list_extend(cfg.args, p.args)
+  end
+  local count = {}
+  for _, spec in ipairs(cfg.args) do
+    count[spec.name] = (count[spec.name] or 0) + 1
+  end
+  for _, spec in ipairs(cfg.args) do
+    spec.path = nil
+    spec.key = (spec.panel and count[spec.name] > 1) and (spec.panel_id .. "." .. spec.name)
+      or spec.name
+  end
+end
+
+---The dashboard-wide fields: interval, title, description, the style sheet.
+function Ctx:dashboard_fields(cfg, data)
+  cfg.refresh_all = self:duration("interval", nn(data.interval))
+  cfg.title = self:expect("title", data.title, "string", true)
+  -- The dashboard's description: a template rendered as Markdown (:DbDashDescribe).
+  cfg.description = self:expect("description", data.description, "string", true)
+  cfg.description_line = (self.pos["description"] or {}).line or 1
+  for _, k in ipairs({ "layout", "show_countdown", "countdown_format" }) do
+    if nn(data[k]) ~= nil then
+      self:moved(k)
+    end
+  end
+  -- the dashboard's style sheet (author origin); panels have their own (inline, scoped)
+  cfg.style_rules = self:style(data.style, "style")
+end
+
 function M.validate(data, file, positions)
   local ctx = setmetatable({ file = file, pos = positions or {} }, Ctx)
   if not map.is_map(data) then
@@ -442,24 +539,8 @@ function M.validate(data, file, positions)
   if nn(data.args_show) ~= nil then
     ctx:fail("args_show", "'args_show' moved to show.args_show")
   end
-  local cfg = {
-    path = file,
-    dir = vim.fs.dirname(file),
-    positions = ctx.pos,
-    refresh_all = ctx:duration("interval", nn(data.interval)),
-  }
-  -- Dashboard-wide: the title and the countdown to the global refresh.
-  cfg.title = ctx:expect("title", data.title, "string", true)
-  -- The dashboard's description: a template rendered as Markdown (:DbDashDescribe).
-  cfg.description = ctx:expect("description", data.description, "string", true)
-  cfg.description_line = (ctx.pos["description"] or {}).line or 1
-  for _, k in ipairs({ "layout", "show_countdown", "countdown_format" }) do
-    if nn(data[k]) ~= nil then
-      ctx:moved(k)
-    end
-  end
-  -- the dashboard's style sheet (author origin); panels have their own (inline, scoped)
-  cfg.style_rules = ctx:style(data.style, "style")
+  local cfg = { path = file, dir = vim.fs.dirname(file), positions = ctx.pos, panels = {} }
+  ctx:dashboard_fields(cfg, data)
   local panels_raw = nn(data.panels)
   cfg.grid = panels_raw ~= nil
   local top_query = ctx:expect("query", data.query, "map", true)
@@ -469,22 +550,7 @@ function M.validate(data, file, positions)
     if #panels_raw == 0 then
       ctx:fail("panels", "panels must not be empty")
     end
-    for section, m in pairs({ query = top_query, show = top_show }) do
-      for k in map.pairs(m or map.new()) do
-        if panel_only(section, k) then
-          local hint = (section == "query" and k == "args")
-              and "; shared arguments go in the top-level args"
-            or ""
-          ctx:fail(
-            ("%s.%s"):format(section, k),
-            "'%s.%s' belongs to one panel; with panels, set it in each panel%s",
-            section,
-            k,
-            hint
-          )
-        end
-      end
-    end
+    ctx:check_defaults(top_query, top_show)
   else
     -- The top level is the only panel.
     panels_raw = { { query = top_query, show = top_show } }
@@ -495,53 +561,8 @@ function M.validate(data, file, positions)
   for _, spec in ipairs(cfg.shared_args) do
     spec.key = spec.name
   end
-  cfg.panels = {}
-  local ids = {}
-  for i, raw in ipairs(panels_raw) do
-    local prefix = cfg.grid and ("panels[%d]."):format(i) or ""
-    if cfg.grid then
-      ctx:expect(("panels[%d]"):format(i), raw, "map")
-      -- Inherited fields report the line of the top-level default.
-      for path, p in pairs(ctx.pos) do
-        if (path:match("^query%.") or path:match("^show%.")) and ctx.pos[prefix .. path] == nil then
-          ctx.pos[prefix .. path] = p
-        end
-      end
-    end
-    local id = tostring(i)
-    if cfg.grid and nn(raw.id) ~= nil then
-      id = ctx:expect(prefix .. "id", raw.id, "string")
-      if not id:match("^[%a_][%w_]*$") then
-        ctx:fail(prefix .. "id", "panel id '%s' must be an identifier", id)
-      end
-    end
-    if ids[id] then
-      ctx:fail(prefix .. "id", "duplicate panel id '%s' (panels[%d])", id, ids[id])
-    end
-    ids[id] = i
-    local panel = ctx:panel({
-      database = nn(raw.database),
-      query = merge(top_query, nn(raw.query)),
-      show = merge(top_show, nn(raw.show)),
-    }, prefix, cfg, i, id, nn(data.interval))
-    panel.style_rules = cfg.grid and ctx:style(raw.style, prefix .. "style") or nil
-    cfg.panels[i] = panel
-  end
-  cfg.args = vim.list_extend({}, cfg.shared_args)
-  for _, p in ipairs(cfg.panels) do
-    vim.list_extend(cfg.args, p.args)
-  end
-  -- Keys of the argument values: the name, or <panel id>.<name> for a local argument
-  -- whose name another argument has too.
-  local count = {}
-  for _, spec in ipairs(cfg.args) do
-    count[spec.name] = (count[spec.name] or 0) + 1
-  end
-  for _, spec in ipairs(cfg.args) do
-    spec.path = nil
-    spec.key = (spec.panel and count[spec.name] > 1) and (spec.panel_id .. "." .. spec.name)
-      or spec.name
-  end
+  ctx:panels(cfg, panels_raw, top_query, top_show, nn(data.interval))
+  argument_keys(cfg)
   if not cfg.grid then
     local p = cfg.panels[1]
     cfg.query, cfg.show = p.query, p.show
