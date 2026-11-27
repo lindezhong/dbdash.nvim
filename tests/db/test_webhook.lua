@@ -55,13 +55,13 @@ components:
 ---Start a webhook stream; returns its state with the port once it listens.
 local function start(url, doc, options)
   local st = { items = {} }
-  st.handle = db.stream(url, doc or DOC, {
+  st.handle = db.run(url, doc or DOC, {
     options = options or { tokens = { bearer = "s3cret" } },
     base_dir = vim.fn.getcwd(),
     on_status = function(s)
       st.status = s
     end,
-  }, function(v, vars)
+  }, function(_, v, vars)
     st.items[#st.items + 1] = { value = v, vars = vars }
   end, function(err)
     st.ended, st.err = true, err

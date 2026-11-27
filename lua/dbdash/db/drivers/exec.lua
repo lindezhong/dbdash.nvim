@@ -8,7 +8,7 @@ local options = require("dbdash.db.push.options")
 local M = {
   name = "exec",
   schemes = { "exec" },
-  capabilities = { tls = false, sql = false, query_language = "script", push = true },
+  capabilities = { tls = false, sql = false, query_language = "script" },
 }
 
 local function strings(v)
@@ -51,10 +51,6 @@ function M.default_interpreter()
     return { "cmd.exe", "/d", "/s", "/c" }
   end
   return { "sh", "-c" }
-end
-
-function M.connect()
-  dberr.raise("config", "exec:// is a push source: it runs as a stream (:help dbdash-push)")
 end
 
 ---@param ctx dbdash.db.StreamCtx

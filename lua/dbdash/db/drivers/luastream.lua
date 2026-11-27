@@ -6,20 +6,15 @@
 -- database.options.cwd is the code's directory: Lua runs inside Neovim, so instead of
 -- changing the process's directory, io.open / io.lines / dofile / loadfile resolve relative
 -- paths there and io.popen / os.execute / dbdash.system() run commands there.
-local dberr = require("dbdash.util.error")
 local options = require("dbdash.db.push.options")
 
 local M = {
   name = "luastream",
   schemes = { "luastream" },
-  capabilities = { tls = false, sql = false, query_language = "lua", push = true },
+  capabilities = { tls = false, sql = false, query_language = "lua" },
 }
 
 local SPEC = { cwd = "string", delimiter = options.delimiter }
-
-function M.connect()
-  dberr.raise("config", "luastream:// is a push source: it runs as a stream (:help dbdash-push)")
-end
 
 local function absolute(p)
   return p:sub(1, 1) == "/" or p:match("^%a:[/\\]") ~= nil

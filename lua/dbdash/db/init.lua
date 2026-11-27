@@ -34,8 +34,8 @@ M.Error = dberr
 ---  a dialect name of dbdash.template.dialect (default: the driver's name) or a dialect
 ---@field capabilities { tls: boolean, sql: boolean, query_language: string }
 ---@field parse_url (fun(u: dbdash.db.ConnInfo): dbdash.db.ConnInfo)?
----@field produce (fun(info: dbdash.db.ConnInfo, query: string, ctx: dbdash.db.StreamCtx))? a push
----   source (capabilities.push): produces data until it returns (:help dbdash-push)
+---@field produce (fun(info: dbdash.db.ConnInfo, query: string, ctx: dbdash.db.StreamCtx))? a source
+---   that sends data (a push source): it produces until it returns (:help dbdash-push)
 ---@field cancel (fun(conn: dbdash.db.Connection, info: dbdash.db.ConnInfo))? stop the query
 ---   running on `conn` on the server (inside a task, while the query's own task waits)
 ---@field connect fun(info: dbdash.db.ConnInfo): dbdash.db.Connection
@@ -69,7 +69,10 @@ local BUILTIN = {
 ---@param driver dbdash.db.Driver
 function M.register(driver)
   assert(type(driver.name) == "string", "driver.name is required")
-  assert(type(driver.connect) == "function", "driver.connect is required")
+  assert(
+    type(driver.connect) == "function" or type(driver.produce) == "function",
+    "a driver has connect (a database queried on every tick) or produce (a source that sends data)"
+  )
   driver.schemes = driver.schemes or { driver.name }
   driver.dialect = driver.dialect or driver.name
   driver.capabilities = driver.capabilities or { tls = false, sql = true, query_language = "sql" }
@@ -133,7 +136,9 @@ end
 ---@field allow_writes boolean? the query may write files (http(s):// curl -c cookie files);
 ---   set for configs that were trusted with it
 ---@field cancel dbdash.db.CancelToken? cancelling it stops the query (see M.query)
----@field on_status fun(text: string)? push sources: their status changed (M.stream)
+---@field on_status fun(text: string)? push sources: their status changed (M.run)
+---@field wait_tick (fun(): boolean)? a run of a driver with connect: waits for its next tick, false
+---  when the run stops (default: one tick)
 
 -- Server-side cancels still being sent (see M.pending_cancels).
 local pending = 0
@@ -392,14 +397,47 @@ function M.splitter(delimiter, max, emit, stats)
   return write, flush
 end
 
----Run a push source: its producer runs until it returns (on_end(nil)), fails (on_end(err))
----or is stopped (handle:stop(reason), or opts.cancel; on_end gets a "cancelled" error).
----Every item goes to on_item(value, vars) on the main loop, in order, before on_end.
+---The producer of a driver with connect: on every tick (ctx.wait_tick), the query (a
+---function renders it anew: sql and a tag passed along with its result) runs once through
+---M.query (timeouts, cancelling on the server); its result or error is passed on. It does
+---not end by itself: when wait_tick says the run stops.
+local function pull(raw_url, query, ctx, opts)
+  while ctx.wait_tick() do
+    local ok, sql, tag = pcall(function()
+      if type(query) == "function" then
+        return query()
+      end
+      return query
+    end)
+    if not ok then
+      ctx.fail(sql) -- the query could not be rendered
+    else
+      local qopts = vim.tbl_extend("force", {}, opts, { cancel = ctx.cancel })
+      local err, rs = async.await(M.query, raw_url, sql, qopts)
+      if ctx.cancel.cancelled then
+        return
+      end
+      if err then
+        ctx.fail(err, tag)
+      else
+        ctx.emit(rs, nil, tag)
+      end
+    end
+  end
+end
+
+---Run a data source. A driver with produce sends results until it returns (on_end(nil)),
+---fails (on_end(err)) or is stopped; a driver with connect is queried on every tick of
+---opts.wait_tick (once without it) and never ends by itself. handle:stop(reason) or
+---opts.cancel stops the run: on_end gets a "cancelled" error.
+---Every result goes to on_result(err, value, vars, tag) on the main loop, in order, before
+---on_end: a query's error, or a value (a result set, a raw driver result, an item).
+---@param query string|fun(): string, any the query, or a function rendering it on each tick
 ---@param opts dbdash.db.QueryOpts
----@param on_item fun(value: any, vars: table)
+---@param on_result fun(err: table?, value: any, vars: table?, tag: any)
 ---@param on_end fun(err: dbdash.db.DbError?)
 ---@return { stop: fun(self, reason: string?), stats: { items: integer, truncated: integer } }
-function M.stream(raw_url, query, opts, on_item, on_end)
+function M.run(raw_url, query, opts, on_result, on_end)
   opts = opts or {}
   local token = require("dbdash.db.cancel").new(opts.cancel)
   local stats = { items = 0, truncated = 0, rejected = {} } -- rejected: count by HTTP status
@@ -439,9 +477,6 @@ function M.stream(raw_url, query, opts, on_item, on_end)
     end
     local d = M.driver_for(expanded)
     driver_name = d.name
-    if not d.produce then
-      dberr.raise("config", ("%s is not a push source"):format(d.name))
-    end
     local i = url.parse(expanded)
     i.options = opts.options or {}
     i.base_dir = opts.base_dir
@@ -455,20 +490,38 @@ function M.stream(raw_url, query, opts, on_item, on_end)
     return handle
   end
   local max = require("dbdash.util.bytes").parse(defaults.current.max_record) or 1048576
-  local function emit(value, vars)
+  local function emit(value, vars, tag)
     if done then
       return
     end
     stats.items = stats.items + 1
     vim.schedule(function()
       if not token.cancelled then
-        on_item(value, vars or {})
+        on_result(nil, value, vars or {}, tag)
       end
     end)
+  end
+  local function fail(err, tag)
+    if done then
+      return
+    end
+    vim.schedule(function()
+      if not token.cancelled then
+        on_result(err, nil, nil, tag)
+      end
+    end)
+  end
+  local once = true
+  local function one_tick()
+    local first = once
+    once = false
+    return first
   end
   ---@type dbdash.db.StreamCtx
   local ctx = {
     emit = emit,
+    fail = fail,
+    wait_tick = opts.wait_tick or one_tick,
     writer = function(delimiter, vars)
       local write, flush = M.splitter(delimiter, max, function(piece)
         emit(piece, vars)
@@ -502,7 +555,11 @@ function M.stream(raw_url, query, opts, on_item, on_end)
     timeout = opts.timeout or prep.info.timeout, -- (luastream: the longest stretch without waiting)
   }
   async.run(function()
-    prep.driver.produce(prep.info, query, ctx)
+    if prep.driver.produce then
+      prep.driver.produce(prep.info, type(query) == "function" and query() or query, ctx)
+    else
+      pull(raw_url, query, ctx, opts)
+    end
   end, function(err)
     if not err then
       for _, flush in ipairs(flushes) do

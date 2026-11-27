@@ -1,4 +1,4 @@
--- Push sources in a dashboard (:help dbdash-push): a producer (db.stream) and a consumer.
+-- Push sources in a dashboard (:help dbdash-push): a producer (db.run) and a consumer.
 -- Items go into the panel's queue as they arrive; one consumer task takes them in order,
 -- one at a time, through the panel's pipeline (a run of kind "push": query.transform or
 -- the JSON rows check, callbacks, store, meta.prev ...). The panel is drawn on its
@@ -14,7 +14,7 @@ local db = require("dbdash.db")
 ---@class dbdash.PushStream
 ---@field queue table[] { value, vars } waiting
 ---@field token dbdash.db.CancelToken stops the producer
----@field handle table? db.stream's handle
+---@field handle table? db.run's handle
 ---@field state string "starting" | "running" | "listening ..." | "ended" | "failed" | "stopped"
 ---@field received integer
 ---@field processed integer
@@ -62,7 +62,7 @@ function Panel:stream_start()
       st.sql = sql
       st.state = "running"
       local source = vim.fn.fnamemodify(self.d.path, ":~:.")
-      st.handle = db.stream(self.cfg.database.url, sql, {
+      st.handle = db.run(self.cfg.database.url, sql, {
         options = self.cfg.database.options,
         base_dir = self.d.cfg.dir,
         password_cmd = self.cfg.database.password_cmd,
@@ -80,7 +80,7 @@ function Panel:stream_start()
             self.d:update_status()
           end
         end,
-      }, function(value, vars)
+      }, function(_, value, vars)
         self:stream_item(st, value, vars)
       end, function(e)
         self:stream_end(st, e)

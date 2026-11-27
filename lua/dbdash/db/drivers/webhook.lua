@@ -18,7 +18,7 @@ local options = require("dbdash.db.push.options")
 local M = {
   name = "webhook",
   schemes = { "webhook" },
-  capabilities = { tls = false, sql = false, query_language = "openapi", push = true },
+  capabilities = { tls = false, sql = false, query_language = "openapi" },
 }
 
 local function strings(v)
@@ -48,10 +48,6 @@ local SPEC = {
 }
 
 local LOCAL = { ["127.0.0.1"] = true, ["::1"] = true, localhost = true }
-
-function M.connect()
-  dberr.raise("config", "webhook:// is a push source: it runs as a stream (:help dbdash-push)")
-end
 
 function M.parse_url(info)
   info.host = (info.host and info.host ~= "") and info.host or "127.0.0.1"

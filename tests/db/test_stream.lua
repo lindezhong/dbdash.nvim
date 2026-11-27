@@ -1,4 +1,4 @@
--- Push sources at the driver level (db.stream): cutting output into items, exec:// and
+-- Push sources at the driver level (db.run): cutting output into items, exec:// and
 -- luastream://. The scheduler's side is in tests/test_push.lua.
 local db = require("dbdash.db")
 local eq = MiniTest.expect.equality
@@ -10,7 +10,7 @@ local LUA = { vim.v.progpath, "--clean", "-l", RUN_LUA } -- exec:// interpreter 
 ---Run a stream to its end (or `stop_after` ms); returns { items = { {value, vars} }, err }.
 local function run(url, query, opts, stop_after)
   local res = { items = {} }
-  local h = db.stream(url, query, opts or {}, function(value, vars)
+  local h = db.run(url, query, opts or {}, function(_, value, vars)
     res.items[#res.items + 1] = { value, vars }
   end, function(err)
     res.ended, res.err = true, err
