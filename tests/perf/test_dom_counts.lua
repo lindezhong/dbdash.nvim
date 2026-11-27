@@ -1,8 +1,8 @@
--- Counts of the charts' DOM (dom/content): elements and restyles grow linearly with the
+-- Counts of the charts' DOM (render/content): elements and restyles grow linearly with the
 -- data, a new result of the same shape reuses every element (and restyles only those
 -- whose classes changed), and styles are shared, not computed per element.
 local H = require("tests.perf.helpers")
-local content = require("dbdash.dom.content")
+local content = require("dbdash.render.content")
 local style = require("dbdash.css.style")
 local eq = MiniTest.expect.equality
 

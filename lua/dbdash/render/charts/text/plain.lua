@@ -44,9 +44,9 @@ function M.render(rs, show, ctx)
   local css = ctx.css
   local style = require("dbdash.css.style")
   local hl = require("dbdash.css.hl")
-  -- the lines' DOM (dom/content/text.lua), one line element per row
-  local root = require("dbdash.dom.content").build(css.node, rs, show)
-  local line_nodes = require("dbdash.dom.content").list(root, "line")
+  -- the lines' DOM (render/content/text.lua), one line element per row
+  local root = require("dbdash.render.content").build(css.node, rs, show)
+  local line_nodes = require("dbdash.render.content").list(root, "line")
   local null_text = css:get("cell", { classes = { "null" } }).content or ""
   local lines, hls = {}, {}
   local title = nn(show.title)
@@ -68,7 +68,7 @@ function M.render(rs, show, ctx)
   local body = {} -- { text, group, n, align }
   local nw = numbers and (#tostring(#line_nodes) + 1) or 0
   local width = math.max(ctx.width - nw, 10)
-  local NULL = require("dbdash.dom.content.text").NULL
+  local NULL = require("dbdash.render.content.text").NULL
   for n, ln in ipairs(line_nodes) do
     local ls = style.get(ln)
     local text = ln.text or ""

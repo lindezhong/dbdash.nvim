@@ -162,23 +162,23 @@ function M.series_spec(i, name, classes)
 end
 
 ---Highlight group for the i-th series / named category: the color of its series element
----(dom/content/chart.lua) in the style sheets, else the palette's i-th color. Without a
+---(render/content/chart.lua) in the style sheets, else the palette's i-th color. Without a
 ---context (building the DOM) there is none.
 function M.color(ctx, _, i, _, name)
   if not ctx then
     return nil
   end
-  local node = require("dbdash.dom.content.chart").item(ctx.css.node, "series", i)
+  local node = require("dbdash.render.content.chart").item(ctx.css.node, "series", i)
   if node then
     return require("dbdash.css").hl_of(node) or ctx.palette(i)
   end
   return ctx.css:hl("series", M.series_spec(i, name)) or ctx.palette(i)
 end
 
----Highlight group of an item's element (dom/content/chart.lua: "legend", "marks", ...),
+---Highlight group of an item's element (render/content/chart.lua: "legend", "marks", ...),
 ---else of the chart's part `tag` (charts drawn without their content).
 function M.item_hl(ctx, kind, i, tag, child)
-  local chart = require("dbdash.dom.content.chart")
+  local chart = require("dbdash.render.content.chart")
   local node = chart.item(ctx.css.node, kind, i)
   if child then
     node = chart.child(node, child)
@@ -202,7 +202,7 @@ end
 
 ---Computed style of an item's element (or of the chart's part `tag`).
 function M.item_style(ctx, kind, i, tag, child)
-  local chart = require("dbdash.dom.content.chart")
+  local chart = require("dbdash.render.content.chart")
   local node = chart.item(ctx.css.node, kind, i)
   if child then
     node = chart.child(node, child)

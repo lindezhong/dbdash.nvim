@@ -6,7 +6,7 @@
 --   │  1 │ Alice │
 --   └────┴───────┘
 --
--- The table is laid out from its DOM (dom/content/table.lua: table > header, row > cell,
+-- The table is laid out from its DOM (render/content/table.lua: table > header, row > cell,
 -- built from the result with show.column_list, show.sort and the thresholds' classes);
 -- appearance is each element's computed style:
 --   table   border (rich: heavy header, light body), border-color, line-clamp (rows shown)
@@ -102,10 +102,10 @@ function M.render(rs, show, ctx)
   local css = ctx.css
   local style = require("dbdash.css.style")
   local hl = require("dbdash.css.hl")
-  -- the table's DOM (dom/content/table.lua): built from the result before styles, here
+  -- the table's DOM (render/content/table.lua): built from the result before styles, here
   -- only brought up to date when rendering outside a dashboard
-  local tnode = require("dbdash.dom.content").build(css.node, rs, show)
-  local content = require("dbdash.dom.content")
+  local tnode = require("dbdash.render.content").build(css.node, rs, show)
+  local content = require("dbdash.render.content")
   local tbl = style.get(tnode)
   local show_lines = css:get("rule").display ~= "none"
   local g_border = css:border_hl("table")

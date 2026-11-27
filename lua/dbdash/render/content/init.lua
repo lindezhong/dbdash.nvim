@@ -12,10 +12,10 @@ local M = {}
 ---Counters for tests: elements created and reused, builds skipped (nothing changed).
 M.stats = { created = 0, reused = 0, skipped = 0 }
 
-local CHART = "dbdash.dom.content.chart"
+local CHART = "dbdash.render.content.chart"
 local BUILDERS = {
-  table = "dbdash.dom.content.table",
-  text = "dbdash.dom.content.text",
+  table = "dbdash.render.content.table",
+  text = "dbdash.render.content.text",
   line = CHART,
   area = CHART,
   scatter = CHART,

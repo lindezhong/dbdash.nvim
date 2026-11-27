@@ -11,7 +11,7 @@
 --   stat                          stat (one per value) > value, unit, label, delta, sparkline
 -- A series or item named like an identifier also has its name as a class (series.EU).
 -- The elements are kept in chart.content.items for the renderers.
-local content = require("dbdash.dom.content")
+local content = require("dbdash.render.content")
 local C = require("dbdash.render.charts.common")
 
 local M = {}

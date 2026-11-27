@@ -133,7 +133,7 @@ local function keys(rs, i)
   return labels
 end
 
--- grids by result: the DOM build (dom/content/chart.lua) and the renderer share one
+-- grids by result: the DOM build (render/content/chart.lua) and the renderer share one
 local grids = setmetatable({}, { __mode = "k" })
 
 ---@return { xs: string[], ys: string[], values: table<string, number>, lo: number, hi: number }

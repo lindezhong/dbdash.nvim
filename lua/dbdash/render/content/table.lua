@@ -5,7 +5,7 @@
 -- The table element keeps the columns' layout data (label, alignment, column_list width /
 -- height, type); a cell's text is its formatted value (newlines kept: layout wraps or
 -- marks them), a NULL cell has no text (cell.null { content } gives it one).
-local content = require("dbdash.dom.content")
+local content = require("dbdash.render.content")
 local T = require("dbdash.render.thresholds")
 
 local M = {}

@@ -3,7 +3,7 @@
 -- boxes, not elements), in show.reverse order, with the class of the first show.highlight
 -- rule whose pattern matches. A line's text is its cells joined by show.separator; a NULL
 -- cell is the character "\1" there, which layout replaces with cell.null { content }.
-local content = require("dbdash.dom.content")
+local content = require("dbdash.render.content")
 local tbl = require("dbdash.render.table")
 
 local M = {}

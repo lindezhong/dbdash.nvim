@@ -85,7 +85,7 @@ function M.render(rs, show, ctx)
   end
   lo, hi = C.limits(ctx, lo, hi, axes.xmin or axes.ymin, axes.xmax or axes.ymax)
 
-  -- each box's value, outlier and mean elements (dom/content/chart.lua); the values take
+  -- each box's value, outlier and mean elements (render/content/chart.lua); the values take
   -- a line under the boxes when any box shows them (hidden by the UA sheet)
   local show_values = false
   for i = 1, #order do

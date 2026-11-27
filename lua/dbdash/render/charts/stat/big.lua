@@ -99,9 +99,9 @@ function M.classes(v, show)
 end
 
 ---One value: the number (big or normal), its label, the change and the sparkline. Its
----parts are the elements of the i-th stat (dom/content/chart.lua).
+---parts are the elements of the i-th stat (render/content/chart.lua).
 local function one(rs, show, ctx, history, i)
-  local chart = require("dbdash.dom.content.chart")
+  local chart = require("dbdash.render.content.chart")
   local style = require("dbdash.css.style")
   local hl_of = require("dbdash.css").hl_of
   local stat = chart.item(ctx.css.node, "stats", i or 1)

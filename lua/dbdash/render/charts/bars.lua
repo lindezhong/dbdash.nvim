@@ -45,9 +45,9 @@ local function segments(b)
   return b.segments or { { value = b.value, group = b.group, item = b.item } }
 end
 
----A bar's element (dom/content/chart.lua: bar[category][series], in result order).
+---A bar's element (render/content/chart.lua: bar[category][series], in result order).
 local function bar_node(ctx, k)
-  return k and require("dbdash.dom.content.chart").item(ctx.css.node, "bars", k) or nil
+  return k and require("dbdash.render.content.chart").item(ctx.css.node, "bars", k) or nil
 end
 
 ---The color of a bar: its own element's (bar.<category>, bar[category=...]), else its
@@ -63,7 +63,7 @@ end
 
 ---The group of a segment's value label, or false when its value element is hidden.
 local function value_group(ctx, seg)
-  local node = require("dbdash.dom.content.chart").child(bar_node(ctx, seg and seg.item), "value")
+  local node = require("dbdash.render.content.chart").child(bar_node(ctx, seg and seg.item), "value")
   if not node then
     return ctx.css:hl("value")
   end
@@ -587,7 +587,7 @@ end
 ---Histogram bins from value_column. bins defaults to Sturges' rule; bin_width and
 ---bin_range fix the bins (Vega-Lite bin.step / extent); cumulative adds up; normalize:
 ---percent (of all values) or density (per unit of the value).
--- bins by result: the DOM build (dom/content/chart.lua) and the renderer share them
+-- bins by result: the DOM build (render/content/chart.lua) and the renderer share them
 local bin_cache = setmetatable({}, { __mode = "k" })
 
 ---The bins of a result (without colors), computed once per result and settings.
