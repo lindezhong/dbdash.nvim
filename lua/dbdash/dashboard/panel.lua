@@ -88,14 +88,6 @@ function Panel:show_config()
   return show
 end
 
----Delay before the next try after `failures` consecutive failures: the interval doubled
----per failure after the first, at most interval x factor (errors.backoff).
----@return integer ms
-function M.backoff_delay(interval, failures, factor)
-  local mult = math.min(2 ^ math.max(failures - 1, 0), math.max(factor or 1, 1))
-  return math.floor(interval * mult)
-end
-
 -- The run --------------------------------------------------------------------------------
 
 ---The options of the panel's queries: the same for every query of a run, and those of one
@@ -114,6 +106,13 @@ function Panel:query_opts(run)
     raw = q.transform ~= nil, -- the transform gets the raw result; checked after it
     -- curl -c writes a cookie file: allowed when the config was trusted for it
     allow_writes = self.d.writes_trusted == true,
+    -- failures in a row back off (db/driver.lua)
+    interval = self.cfg.show.interval,
+    backoff = opts().errors.backoff,
+    failures = self.failures,
+    on_backoff = function(retry_at, mult, failures)
+      self:on_backoff(retry_at, mult, failures)
+    end,
   }
   if run then
     o.args, o.meta, o.lua = run.args, run.meta, run.lua
@@ -394,25 +393,29 @@ function Panel:apply_transform(run, rs)
   return rs
 end
 
----An error of a result: notified (errors.notify). A source queried on ticks backs off:
----after failures in a row its next query waits longer (errors.backoff).
+---An error of a result: told (the error event; view/notifier applies errors.notify).
 function Panel:fail(err)
   local changed = not self.error or format_error(self.error) ~= format_error(err)
   self.error = err
   events:emit("error", self.d, self, err, { changed = changed })
-  if not self.waits_ticks then
-    return
+end
+
+---The source backs off after failures in a row (db/driver.lua): its next query not before
+---retry_at (nil: no longer); kept for the clock, the countdown and :DbDashStatus.
+function Panel:on_backoff(retry_at, mult, failures)
+  local was = self.retry_at ~= nil
+  self.failures = failures
+  if retry_at and (self.d.paused and not self.cfg.show.refresh_hidden) then
+    return -- hidden: no ticks to wait for
   end
-  self.failures = (self.failures or 0) + 1
-  local interval = self.cfg.show.interval
-  local delay = M.backoff_delay(interval, self.failures, opts().errors.backoff)
-  if delay > interval and (not self.d.paused or self.cfg.show.refresh_hidden) then
-    self.retry_at = now() + delay
-    self.backoff_mult = math.floor(delay / interval + 0.5)
-    self.next_at = self.retry_at
-    if self.d.clock then
-      self.d.clock:arm()
-    end
+  self.retry_at, self.backoff_mult = retry_at, mult
+  if retry_at then
+    self.next_at = retry_at
+  elseif was and self.d.clock then
+    self.d.clock:reset(self) -- back to the interval
+  end
+  if self.d.clock then
+    self.d.clock:arm()
   end
 end
 
@@ -431,6 +434,9 @@ function Panel:settle(run, err, rs)
   self:finish_record(run, err)
   self.prev, self.prev_runs = run.record, run.life.runs
   run.life.cancel:release()
+  if feed and feed.handle and run.depth == 0 then
+    feed.handle:report(err == nil) -- the source counts failures in a row
+  end
   if err then
     self:push_history({ error = format_error(err) })
     self:fail(err)
@@ -439,14 +445,6 @@ function Panel:settle(run, err, rs)
     local elapsed = ticked and rs.elapsed_ms or run.record.elapsed_ms
     self:push_history({ elapsed_ms = elapsed, rows = rs.row_count })
     self.rs = rs
-    if (self.failures or 0) > 0 then
-      local was_backing_off = self.retry_at ~= nil
-      self.failures, self.retry_at, self.backoff_mult = 0, nil, nil
-      if was_backing_off and self.d.clock then
-        self.d.clock:reset(self)
-        self.d.clock:arm()
-      end
-    end
     self:track(rs)
     self:check_thresholds(rs)
     self.error = nil
@@ -540,7 +538,9 @@ function Panel:push_pipeline(run)
   local item = run.item
   local o = self:template_opts(run)
   run.record.sql = self.stream and self.stream.sql
-  run.record.query = item.value
+  -- the item as it came (rows made from it keep it as .item)
+  local raw = type(item.value) == "table" and item.value.item
+  run.record.query = raw ~= nil and raw or item.value
   local code = q.transform
       and require("dbdash.dashboard.run").render_text(self.d, q.transform, q.transform_line, o)
     or nil
@@ -558,26 +558,7 @@ function Panel:push_pipeline(run)
       cancel = run.life.cancel,
     })
   else
-    local value = item.value
-    if type(value) == "string" then
-      local ok = pcall(vim.json.decode, value)
-      if not ok then
-        require("dbdash.util.error").raise(
-          "query",
-          ("the item is not JSON rows (%s); add query.transform to read it (:help dbdash-push)"):format(
-            vim.trim(value):sub(1, 60)
-          )
-        )
-      end
-      value = require("dbdash.util.json").decode(value)
-    end
-    if require("dbdash.util.map").is_map(value) and value.rows == nil then
-      value = { value } -- one record (a form, the parameters of a request)
-    end
-    rs = lua_result.normalize(
-      value,
-      { max_rows = q.max_rows or opts().defaults.max_rows, phase = "query", hint = true }
-    )
+    rs = item.value -- rows already (db.run: an item without query.transform)
   end
   rs.elapsed_ms = (vim.uv.hrtime() - started) / 1e6
   run.record.result = lua_result.to_lua(rs)

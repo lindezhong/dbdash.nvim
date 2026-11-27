@@ -56,6 +56,7 @@ components:
 local function start(url, doc, options)
   local st = { items = {} }
   st.handle = db.run(url, doc or DOC, {
+    raw = true, -- the items as they come
     options = options or { tokens = { bearer = "s3cret" } },
     base_dir = vim.fn.getcwd(),
     on_status = function(s)

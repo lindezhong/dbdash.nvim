@@ -141,25 +141,15 @@ end
 ---@field wait_tick (fun(): boolean)? a run of a driver with connect: waits for its next tick, false
 ---  when the run stops (default: one tick)
 
--- Server-side cancels still being sent (see M.pending_cancels).
-local pending = 0
-
 ---Server-side cancels still being sent: Neovim waits for them briefly when it exits.
 ---@return integer
 function M.pending_cancels()
-  return pending
+  return require("dbdash.db.driver").pending
 end
 
----Run a query. `callback(err, rs)` is invoked exactly once, on the main loop. Returns a
----handle: handle:cancel(reason) stops the query.
----
----Stopping a query (cancelled, or its time is up) always goes the same way:
----  1. the client stops waiting: the callback gets the error at once (phase "cancelled" or
----     "timeout") and a result that comes later is dropped;
----  2. the server stops: driver.cancel(conn, info) when the connection is open (Postgres
----     CancelRequest, MySQL KILL QUERY, SQL Server attention, MongoDB killOp, SQLite
----     interrupt, Lua scripts stop); drivers without it (redis, cassandra, http) skip this;
----  3. the connection is closed.
+---Run one query (the Lua API, dbdash.query in Lua code): a run of one tick, its first
+---result. `callback(err, rs)` is invoked exactly once, on the main loop; handle:cancel(reason)
+---stops the query (the callback gets the error at once, then the server stops it).
 ---@param raw_url string
 ---@param query string
 ---@param opts dbdash.db.QueryOpts?
@@ -167,168 +157,51 @@ end
 ---@return { cancel: fun(self, reason: string?) }
 function M.query(raw_url, query, opts, callback)
   opts = opts or {}
-  local driver_name
-  local done = false
-  local timer
-  local conn, driver, info
-  local closed, server_stopped = false, false
-  -- This query's token: Lua code of the query (lua://) stops when it is cancelled.
-  local token = require("dbdash.db.cancel").new()
-  local unlink
-
+  local done, run, unlink = false, nil, nil
   local function finish(err, rs)
     if done then
       return
     end
     done = true
-    if timer then
-      timer:stop()
-      timer:close()
-      timer = nil
-    end
     if unlink then
       unlink()
     end
-    vim.schedule(function()
-      callback(err and dberr.wrap(err, driver_name) or nil, rs)
-    end)
+    callback(err, rs)
   end
-
-  local function close_conn()
-    if conn and not closed then
-      closed = true
-      pcall(conn.close, conn)
-    end
-  end
-
-  ---Steps 2 and 3: stop the query on the server, then close the connection (in a task:
-  ---drivers talk to the server).
-  local function stop_server()
-    if server_stopped or not conn or closed then
-      return
-    end
-    server_stopped = true
-    pending = pending + 1
-    async.run(function()
-      if driver.cancel then
-        pcall(driver.cancel, conn, info)
-      end
-      close_conn()
-    end, function()
-      pending = pending - 1
-    end)
-  end
-
-  ---Stop the query: the caller gets the error now (step 1), then the server stops.
-  local function abort(phase, message)
-    if done then
-      return
-    end
-    finish(dberr.new({ driver = driver_name, phase = phase, message = message }))
-    token:cancel(message)
-    stop_server()
-  end
-
   local handle = {
     cancel = function(_, reason)
-      abort("cancelled", "query cancelled: " .. (reason or "cancelled"))
+      reason = reason or "cancelled"
+      if not done then
+        done = true -- (a result that comes now is dropped)
+        if unlink then
+          unlink()
+        end
+        vim.schedule(function()
+          callback(dberr.new({ phase = "cancelled", message = "query cancelled: " .. reason }))
+        end)
+      end
+      if run then
+        run:stop(reason)
+      end
     end,
   }
-  if opts.cancel then
-    if opts.cancel.cancelled then
-      handle:cancel(opts.cancel.reason)
-      return handle
-    end
-    unlink = opts.cancel:on_cancel(function(reason)
+  local parent = opts.cancel
+  if parent and parent.cancelled then
+    handle:cancel(parent.reason)
+    return handle
+  end
+  local ropts = vim.tbl_extend("force", {}, opts, { query_only = true })
+  ropts.cancel = nil
+  run = M.run(raw_url, query, ropts, function(err, rs)
+    finish(err, rs)
+  end, function(err)
+    finish(err or dberr.new({ phase = "internal", message = "the query gave no result" }))
+  end)
+  if parent then
+    unlink = parent:on_cancel(function(reason)
       handle:cancel(reason)
     end)
   end
-
-  local ok, prep = pcall(function()
-    local expanded, env_err = require("dbdash.db.credentials").expand_env(raw_url)
-    if not expanded then
-      dberr.raise("config", env_err)
-    end
-    local d = M.validate(expanded, opts.options)
-    driver_name = d.name
-    local i = url.parse(expanded)
-    i.options = opts.options or {}
-    i.base_dir = opts.base_dir
-    if d.parse_url then
-      i = d.parse_url(i)
-    end
-    return { driver = d, info = i }
-  end)
-  if not ok then
-    finish(prep)
-    return handle
-  end
-  driver, info = prep.driver, prep.info
-  if driver.produce then
-    finish(dberr.new({
-      driver = driver_name,
-      phase = "config",
-      message = driver.name .. ":// is a push source: it runs as a stream (:help dbdash-push)",
-    }))
-    return handle
-  end
-  local q_timeout = opts.timeout or info.timeout
-  local exec_opts = {
-    max_rows = opts.max_rows or defaults.current.max_rows,
-    timeout = q_timeout,
-    args = opts.args,
-    meta = opts.meta,
-    lua = opts.lua,
-    source = opts.source,
-    line = opts.line,
-    allow_writes = opts.allow_writes,
-    cancel = token,
-  }
-
-  timer = vim.uv.new_timer()
-  timer:start(info.connect_timeout + q_timeout, 0, function()
-    vim.schedule(function()
-      abort(
-        "timeout",
-        ("query did not finish within %.1fs"):format((info.connect_timeout + q_timeout) / 1000)
-      )
-    end)
-  end)
-
-  local started = vim.uv.hrtime()
-  local credentials = require("dbdash.db.credentials")
-  async.run(function()
-    credentials.fill(info, opts.password_cmd)
-    if done then
-      return
-    end
-    local c = driver.connect(info)
-    if done then -- stopped while connecting: nothing runs on the server yet
-      pcall(c.close, c)
-      return
-    end
-    conn = c
-    local ok2, rs = pcall(conn.execute, conn, query, exec_opts)
-    if not ok2 and type(rs) == "table" and rs.phase == "timeout" then
-      stop_server() -- a read or write timed out: the query may still run on the server
-    elseif not server_stopped then
-      close_conn()
-    end
-    if not ok2 then
-      error(rs, 0)
-    end
-    local lua_result = require("dbdash.db.lua_result")
-    if lua_result.is_raw(rs) and not opts.raw then
-      rs = lua_result.normalize(rs, { max_rows = exec_opts.max_rows, phase = "query", hint = true })
-    end
-    rs.elapsed_ms = (vim.uv.hrtime() - started) / 1e6
-    return rs
-  end, function(err, rs)
-    if err and opts.password_cmd and type(err) == "table" and err.phase == "auth" then
-      credentials.forget(opts.password_cmd, info) -- the password may have changed
-    end
-    finish(err, rs)
-  end)
   return handle
 end
 
@@ -398,35 +271,6 @@ function M.splitter(delimiter, max, emit, stats)
   return write, flush
 end
 
----The producer of a driver with connect: on every tick (ctx.wait_tick), the query (a
----function renders it anew: sql, a tag passed along with its result, and options of this
----query over opts) runs once through M.query (timeouts, cancelling on the server); its
----result or error is passed on. It does not end by itself: when wait_tick says the run stops.
-local function pull(raw_url, query, ctx, opts)
-  while ctx.wait_tick() do
-    local ok, sql, tag, extra = pcall(function()
-      if type(query) == "function" then
-        return query()
-      end
-      return query
-    end)
-    if not ok then
-      ctx.fail(sql) -- the query could not be rendered
-    else
-      local qopts = vim.tbl_extend("force", {}, opts, extra or {}, { cancel = ctx.cancel })
-      local err, rs = async.await(M.query, raw_url, sql, qopts)
-      if ctx.cancel.cancelled then
-        return
-      end
-      if err then
-        ctx.fail(err, tag)
-      else
-        ctx.emit(rs, nil, tag)
-      end
-    end
-  end
-end
-
 ---Run a data source. A driver with produce sends results until it returns (on_end(nil)),
 ---fails (on_end(err)) or is stopped; a driver with connect is queried on every tick of
 ---opts.wait_tick (once without it) and never ends by itself. handle:stop(reason) or
@@ -442,8 +286,15 @@ function M.run(raw_url, query, opts, on_result, on_end)
   opts = opts or {}
   local token = require("dbdash.db.cancel").new(opts.cancel)
   local stats = { items = 0, truncated = 0, rejected = {} } -- rejected: count by HTTP status
+  local ctx_report
   local handle = {
     stats = stats,
+    ---The consumer took a result: ok, or it failed (a database backs off after failures).
+    report = function(_, ok)
+      if ctx_report then
+        ctx_report(ok)
+      end
+    end,
     stop = function(_, reason)
       token:cancel(reason or "stopped")
     end,
@@ -491,17 +342,56 @@ function M.run(raw_url, query, opts, on_result, on_end)
     return handle
   elseif not ok then
     -- A ticked run reports what is wrong on every tick, as each query does.
-    prep = { info = { options = opts.options or {} } }
+    prep = { error = prep, info = { options = opts.options or {} } }
+  elseif opts.query_only and prep.driver.produce then
+    finish(dberr.new({
+      driver = driver_name,
+      phase = "config",
+      message = driver_name .. ":// is a push source: it runs as a stream (:help dbdash-push)",
+    }))
+    return handle
   end
   local max = require("dbdash.util.bytes").parse(defaults.current.max_record) or 1048576
+  local lua_result = require("dbdash.db.lua_result")
   local function emit(value, vars, tag)
     if done then
       return
     end
     stats.items = stats.items + 1
+    local err
+    if not opts.raw and prep.driver and prep.driver.produce then
+      -- an item without query.transform: JSON rows (or one record)
+      local ok_rows, rows = pcall(function()
+        local v = value
+        if type(v) == "string" then
+          local okj = pcall(vim.json.decode, v)
+          if not okj then
+            dberr.raise(
+              "query",
+              ("the item is not JSON rows (%s); add query.transform to read it (:help dbdash-push)"):format(
+                vim.trim(v):sub(1, 60)
+              )
+            )
+          end
+          v = require("dbdash.util.json").decode(v)
+        end
+        if require("dbdash.util.map").is_map(v) and v.rows == nil then
+          v = { v } -- one record (a form, the parameters of a request)
+        end
+        local max_rows = opts.max_rows or defaults.current.max_rows
+        local rs = lua_result.normalize(v, { max_rows = max_rows, phase = "query", hint = true })
+        rs.item = value -- the item as it came (meta.prev.query)
+        return rs
+      end)
+      if ok_rows then
+        value = rows
+      else
+        err, value = rows, nil
+      end
+    end
     vim.schedule(function()
       if not token.cancelled then
-        on_result(nil, value, vars or {}, tag)
+        on_result(err and dberr.wrap(err, driver_name) or nil, value, vars or {}, tag)
       end
     end)
   end
@@ -511,7 +401,7 @@ function M.run(raw_url, query, opts, on_result, on_end)
     end
     vim.schedule(function()
       if not token.cancelled then
-        on_result(err, nil, nil, tag)
+        on_result(dberr.wrap(err, driver_name), nil, nil, tag)
       end
     end)
   end
@@ -523,6 +413,8 @@ function M.run(raw_url, query, opts, on_result, on_end)
   end
   ---@type dbdash.db.StreamCtx
   local ctx = {
+    opts = opts,
+    prep_error = prep.error,
     emit = emit,
     fail = fail,
     wait_tick = opts.wait_tick or one_tick,
@@ -562,7 +454,13 @@ function M.run(raw_url, query, opts, on_result, on_end)
     if prep.driver and prep.driver.produce then
       prep.driver.produce(prep.info, type(query) == "function" and query() or query, ctx)
     else
-      pull(raw_url, query, ctx, opts)
+      local producer = require("dbdash.db.driver").producer(prep.driver)
+      ctx_report = function(ok_result)
+        if ctx.report then
+          ctx.report(ok_result)
+        end
+      end
+      producer(prep.driver and prep.info or nil, query, ctx)
     end
   end, function(err)
     if not err then

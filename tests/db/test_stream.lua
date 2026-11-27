@@ -10,11 +10,17 @@ local LUA = { vim.v.progpath, "--clean", "-l", RUN_LUA } -- exec:// interpreter 
 ---Run a stream to its end (or `stop_after` ms); returns { items = { {value, vars} }, err }.
 local function run(url, query, opts, stop_after)
   local res = { items = {} }
-  local h = db.run(url, query, opts or {}, function(_, value, vars)
-    res.items[#res.items + 1] = { value, vars }
-  end, function(err)
-    res.ended, res.err = true, err
-  end)
+  local h = db.run(
+    url,
+    query,
+    vim.tbl_extend("force", { raw = true }, opts or {}),
+    function(_, value, vars)
+      res.items[#res.items + 1] = { value, vars }
+    end,
+    function(err)
+      res.ended, res.err = true, err
+    end
+  )
   res.handle = h
   if stop_after then
     vim.wait(stop_after, function()
