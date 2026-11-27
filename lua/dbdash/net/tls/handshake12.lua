@@ -247,89 +247,98 @@ end
 ---@field x25519 { priv: string }
 ---@field p256 { priv: string }
 
----Continue the handshake after a TLS 1.2 ServerHello.
----@param io table socket-like object (raw_read_exact / raw_write)
----@param ctx dbdash.net.tls.handshake12.Ctx
----@return dbdash.tls.Session
-function M.finish(io, ctx)
-  local s = M.SUITES[ctx.suite]
-  if not s then
-    fail("server chose an unsupported cipher suite 0x%04x", ctx.suite)
-  end
-  local opts = ctx.opts
-  local strict = require("dbdash.net.tls.auth").STRICT[opts.mode]
-  local transcript = { ctx.transcript }
-  local hbuf = ctx.leftover or ""
-  local read_cipher
+---@class dbdash.net.tls.handshake12.State
+---@field io table
+---@field s table the cipher suite (M.SUITES)
+---@field ctx dbdash.net.tls.handshake12.Ctx
+---@field transcript string[] the handshake messages so far
+---@field hbuf string handshake bytes read but not taken yet
+---@field read_cipher table? the server's protection, after its ChangeCipherSpec
 
-  local function next_handshake()
-    while true do
-      if #hbuf >= 4 then
-        local len = rd24(hbuf, 2)
-        if #hbuf >= 4 + len then
-          local msg = hbuf:sub(1, 4 + len)
-          hbuf = hbuf:sub(5 + len)
-          return msg:byte(1), msg:sub(5), msg
-        end
-      end
-      local typ, hdr, body = record.read(io)
-      if read_cipher then
-        typ, body = read_cipher:open(hdr, body)
-      end
-      if typ == TYPE.handshake then
-        hbuf = hbuf .. body
-      elseif typ == TYPE.alert then
-        record.alert(body)
-      elseif typ == TYPE.change_cipher_spec then
-        return "ccs"
-      else
-        fail("unexpected record type %d during the TLS 1.2 handshake", typ)
+---The next handshake message (type, body, the whole message), or "ccs" for a
+---ChangeCipherSpec.
+local function next_handshake(h)
+  while true do
+    if #h.hbuf >= 4 then
+      local len = rd24(h.hbuf, 2)
+      if #h.hbuf >= 4 + len then
+        local msg = h.hbuf:sub(1, 4 + len)
+        h.hbuf = h.hbuf:sub(5 + len)
+        return msg:byte(1), msg:sub(5), msg
       end
     end
+    local typ, hdr, body = record.read(h.io)
+    if h.read_cipher then
+      typ, body = h.read_cipher:open(hdr, body)
+    end
+    if typ == TYPE.handshake then
+      h.hbuf = h.hbuf .. body
+    elseif typ == TYPE.alert then
+      record.alert(body)
+    elseif typ == TYPE.change_cipher_spec then
+      return "ccs"
+    else
+      fail("unexpected record type %d during the TLS 1.2 handshake", typ)
+    end
   end
+end
 
-  -- Server flight: Certificate, [ServerKeyExchange], [CertificateRequest], ServerHelloDone.
+---Certificate: the chain, authenticated (net/tls/auth.lua).
+local function read_certificate(body, opts)
+  local list_len, p = rd24(body, 1)
+  local stop = p + list_len
+  local ders = {}
+  while p < stop do
+    local clen
+    clen, p = rd24(body, p)
+    ders[#ders + 1] = body:sub(p, p + clen - 1)
+    p = p + clen
+  end
+  return require("dbdash.net.tls.auth").authenticate(ders, opts)
+end
+
+---ServerKeyExchange (ECDHE, a named curve): the curve and the server's point, its
+---signature checked with the certificate (an error in strict modes).
+local function read_key_exchange(h, cert, body)
+  if h.s.kx ~= "ecdhe" then
+    fail("unexpected ServerKeyExchange for RSA key exchange")
+  end
+  if body:byte(1) ~= 3 then
+    fail("only named curves are supported in ServerKeyExchange")
+  end
+  local ctx = h.ctx
+  local group = rd16(body, 2)
+  local plen = body:byte(4)
+  local params = body:sub(1, 4 + plen)
+  local point = body:sub(5, 4 + plen)
+  local alg = rd16(body, 5 + plen)
+  local slen = rd16(body, 7 + plen)
+  local sig = body:sub(9 + plen, 8 + plen + slen)
+  local ok, err = false, "no certificate"
+  if cert then
+    ok, err = M.check_signature(cert, alg, sig, ctx.client_random .. ctx.server_random .. params)
+  end
+  if not ok and require("dbdash.net.tls.auth").STRICT[ctx.opts.mode] then
+    fail("ServerKeyExchange signature check failed%s", err and (": " .. err) or "")
+  end
+  return { group = group, point = point }
+end
+
+---The server flight: Certificate, [ServerKeyExchange], [CertificateRequest],
+---ServerHelloDone. Returns the certificate, the key exchange's parameters and whether a
+---client certificate was asked for.
+local function server_flight(h)
   local cert, server_params, cert_requested
   while true do
-    local t, body, raw = next_handshake()
+    local t, body, raw = next_handshake(h)
     if t == "ccs" then
       fail("unexpected ChangeCipherSpec")
     end
-    transcript[#transcript + 1] = raw
+    h.transcript[#h.transcript + 1] = raw
     if t == HS.certificate then
-      local list_len, p = rd24(body, 1)
-      local stop = p + list_len
-      local ders = {}
-      while p < stop do
-        local clen
-        clen, p = rd24(body, p)
-        ders[#ders + 1] = body:sub(p, p + clen - 1)
-        p = p + clen
-      end
-      cert = require("dbdash.net.tls.auth").authenticate(ders, opts)
+      cert = read_certificate(body, h.ctx.opts)
     elseif t == HS.server_key_exchange then
-      if s.kx ~= "ecdhe" then
-        fail("unexpected ServerKeyExchange for RSA key exchange")
-      end
-      if body:byte(1) ~= 3 then
-        fail("only named curves are supported in ServerKeyExchange")
-      end
-      local group = rd16(body, 2)
-      local plen = body:byte(4)
-      local params = body:sub(1, 4 + plen)
-      local point = body:sub(5, 4 + plen)
-      local alg = rd16(body, 5 + plen)
-      local slen = rd16(body, 7 + plen)
-      local sig = body:sub(9 + plen, 8 + plen + slen)
-      local ok, err = false, "no certificate"
-      if cert then
-        ok, err =
-          M.check_signature(cert, alg, sig, ctx.client_random .. ctx.server_random .. params)
-      end
-      if not ok and strict then
-        fail("ServerKeyExchange signature check failed%s", err and (": " .. err) or "")
-      end
-      server_params = { group = group, point = point }
+      server_params = read_key_exchange(h, cert, body)
     elseif t == HS.certificate_request then
       cert_requested = true
     elseif t == HS.server_hello_done then
@@ -341,55 +350,49 @@ function M.finish(io, ctx)
   if not cert or not cert.der then
     fail("the server sent no certificate")
   end
+  return cert, server_params, cert_requested
+end
 
-  -- Client flight.
-  local out_msgs = {}
-  if cert_requested then
-    out_msgs[#out_msgs + 1] = message(HS.certificate, u24(0)) -- no client certificate
-  end
-  local premaster, cke_body
-  if s.kx == "ecdhe" then
-    if not server_params then
-      fail("missing ServerKeyExchange")
-    end
-    if server_params.group == 0x001d then
-      local x25519 = require("dbdash.crypto.x25519")
-      premaster = x25519.scalarmult(ctx.x25519.priv, server_params.point)
-      if premaster == string.rep("\0", 32) then
-        fail("invalid x25519 shared secret")
-      end
-      cke_body = u8(32) .. x25519.public(ctx.x25519.priv)
-    elseif server_params.group == 0x0017 then
-      local curve = require("dbdash.crypto.ecdsa").curves.p256
-      premaster = curve:ecdh(ctx.p256.priv, server_params.point)
-      cke_body = u8(#ctx.p256.pub) .. ctx.p256.pub
-    else
-      fail("server chose an unsupported curve 0x%04x", server_params.group)
-    end
-  else
+---The premaster secret and the ClientKeyExchange body: ECDHE (x25519 or P-256) or RSA.
+local function key_exchange(h, cert, server_params)
+  local ctx = h.ctx
+  if h.s.kx ~= "ecdhe" then
     if cert.key_type ~= "rsa" then
       fail("RSA key exchange needs an RSA certificate")
     end
-    premaster = "\3\3" .. require("dbdash.crypto.random").bytes(46)
+    local premaster = "\3\3" .. require("dbdash.crypto.random").bytes(46)
     local enc = require("dbdash.crypto.rsa").pkcs1_encrypt(cert.rsa, premaster)
-    cke_body = u16(#enc) .. enc
+    return premaster, u16(#enc) .. enc
   end
-  out_msgs[#out_msgs + 1] = message(HS.client_key_exchange, cke_body)
-  vim.list_extend(transcript, out_msgs)
+  if not server_params then
+    fail("missing ServerKeyExchange")
+  end
+  if server_params.group == 0x001d then
+    local x25519 = require("dbdash.crypto.x25519")
+    local premaster = x25519.scalarmult(ctx.x25519.priv, server_params.point)
+    if premaster == string.rep("\0", 32) then
+      fail("invalid x25519 shared secret")
+    end
+    return premaster, u8(32) .. x25519.public(ctx.x25519.priv)
+  elseif server_params.group == 0x0017 then
+    local curve = require("dbdash.crypto.ecdsa").curves.p256
+    return curve:ecdh(ctx.p256.priv, server_params.point), u8(#ctx.p256.pub) .. ctx.p256.pub
+  end
+  fail("server chose an unsupported curve 0x%04x", server_params.group)
+end
 
+---The master secret (extended master secret when agreed) and both directions' keys.
+---@return string master, table write_cipher, table keys of the server's direction
+local function key_schedule(h, premaster)
+  local s, ctx = h.s, h.ctx
   local prf_hash = s.prf()
   local master
   if ctx.ems then
-    master = prf12.prf(
-      prf_hash,
-      premaster,
-      "extended master secret",
-      prf_hash.digest(table.concat(transcript)),
-      48
-    )
+    local hash = prf_hash.digest(table.concat(h.transcript))
+    master = prf12.prf(prf_hash, premaster, "extended master secret", hash, 48)
   else
-    master =
-      prf12.prf(prf_hash, premaster, "master secret", ctx.client_random .. ctx.server_random, 48)
+    local seed = ctx.client_random .. ctx.server_random
+    master = prf12.prf(prf_hash, premaster, "master secret", seed, 48)
   end
   local mac_len = s.cipher == "cbc" and s.mac().size or 0
   local iv_len = s.cipher == "gcm" and 4 or (s.cipher == "chacha" and 12 or 0)
@@ -410,12 +413,38 @@ function M.finish(io, ctx)
   local c_key, s_key = take(s.key_len), take(s.key_len)
   local c_iv, s_iv = take(iv_len), take(iv_len)
   local etm = s.cipher == "cbc" and ctx.etm
-  local write_cipher = protection(s, c_key, c_iv, c_mac, etm)
+  return master, protection(s, c_key, c_iv, c_mac, etm), { s_key, s_iv, s_mac, etm }
+end
 
-  local verify =
-    prf12.prf(prf_hash, master, "client finished", prf_hash.digest(table.concat(transcript)), 12)
-  local fin = message(HS.finished, verify)
-  transcript[#transcript + 1] = fin
+---The Finished verify data of `label` over the transcript so far.
+local function verify_data(h, master, label)
+  local prf_hash = h.s.prf()
+  return prf12.prf(prf_hash, master, label, prf_hash.digest(table.concat(h.transcript)), 12)
+end
+
+---Continue the handshake after a TLS 1.2 ServerHello.
+---@param io table socket-like object (raw_read_exact / raw_write)
+---@param ctx dbdash.net.tls.handshake12.Ctx
+---@return dbdash.tls.Session
+function M.finish(io, ctx)
+  local s = M.SUITES[ctx.suite]
+  if not s then
+    fail("server chose an unsupported cipher suite 0x%04x", ctx.suite)
+  end
+  local h =
+    { io = io, s = s, ctx = ctx, transcript = { ctx.transcript }, hbuf = ctx.leftover or "" }
+  local cert, server_params, cert_requested = server_flight(h)
+  -- Client flight: [Certificate (none)], ClientKeyExchange, ChangeCipherSpec, Finished.
+  local out_msgs = {}
+  if cert_requested then
+    out_msgs[#out_msgs + 1] = message(HS.certificate, u24(0)) -- no client certificate
+  end
+  local premaster, cke_body = key_exchange(h, cert, server_params)
+  out_msgs[#out_msgs + 1] = message(HS.client_key_exchange, cke_body)
+  vim.list_extend(h.transcript, out_msgs)
+  local master, write_cipher, server_keys = key_schedule(h, premaster)
+  local fin = message(HS.finished, verify_data(h, master, "client finished"))
+  h.transcript[#h.transcript + 1] = fin
   local wire = {}
   for _, m in ipairs(out_msgs) do
     wire[#wire + 1] = record.header(TYPE.handshake, #m) .. m
@@ -423,30 +452,27 @@ function M.finish(io, ctx)
   wire[#wire + 1] = record.header(TYPE.change_cipher_spec, 1) .. "\1"
   wire[#wire + 1] = write_cipher:seal(TYPE.handshake, fin)
   io:raw_write(table.concat(wire))
-
   -- Server ChangeCipherSpec and Finished.
-  if next_handshake() ~= "ccs" then
+  if next_handshake(h) ~= "ccs" then
     fail("expected ChangeCipherSpec from the server")
   end
-  read_cipher = protection(s, s_key, s_iv, s_mac, etm)
-  local t, body = next_handshake()
+  h.read_cipher = protection(s, unpack(server_keys))
+  local t, body = next_handshake(h)
   if t ~= HS.finished then
     fail("expected server Finished, got handshake message %s", tostring(t))
   end
-  local expected =
-    prf12.prf(prf_hash, master, "server finished", prf_hash.digest(table.concat(transcript)), 12)
-  if not util.equal(body, expected) then
+  if not util.equal(body, verify_data(h, master, "server finished")) then
     fail("server Finished verification failed")
   end
   return {
     version = 0x0303,
     suite = ctx.suite,
     suite_name = s.name,
-    read = read_cipher,
+    read = h.read_cipher,
     write = write_cipher,
     cert = cert,
-    leftover = hbuf,
-    etm = etm,
+    leftover = h.hbuf,
+    etm = server_keys[4],
     ems = ctx.ems,
   }
 end
