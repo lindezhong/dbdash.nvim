@@ -82,9 +82,19 @@ local function luals()
 end
 
 if arg[1] == "fmt" then
-  local code, out = stylua(false)
-  io.write(out)
-  os.exit(code)
+  -- StyLua may need more than one pass to settle (a call it rewraps can then fit).
+  for _ = 1, 5 do
+    local code, out = stylua(false)
+    if code ~= 0 then
+      io.write(out)
+      os.exit(code)
+    end
+    if stylua(true) == 0 then
+      os.exit(0)
+    end
+  end
+  io.stderr:write("lint: StyLua did not settle after 5 passes\n")
+  os.exit(1)
 end
 
 local failed = false
