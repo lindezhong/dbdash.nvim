@@ -1,4 +1,4 @@
--- Running dashboards and their refresh cycle (design §12).
+-- Running dashboards and their refresh cycle (ARCHITECTURE.md#scheduling).
 --
 -- A dashboard has one or more panels. Each panel refreshes on its own interval: render
 -- template -> db.query -> render chart -> redraw. A refresh that comes due while the

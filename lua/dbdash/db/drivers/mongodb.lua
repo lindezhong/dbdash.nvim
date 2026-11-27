@@ -1,4 +1,4 @@
--- MongoDB driver (design §8.5): OP_MSG over TCP (or TLS), SCRAM-SHA-256 / SCRAM-SHA-1
+-- MongoDB driver (:help dbdash-databases): OP_MSG over TCP (or TLS), SCRAM-SHA-256 / SCRAM-SHA-1
 -- authentication, and a JSON query document:
 --   { "collection": "orders", "operation": "find" | "aggregate" | "count" | "distinct",
 --     "filter": {...}, "projection": {...}, "sort": {...}, "limit": 100,

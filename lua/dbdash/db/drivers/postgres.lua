@@ -1,4 +1,4 @@
--- PostgreSQL driver (design §8.4): frontend/backend protocol 3.0, Simple Query, text
+-- PostgreSQL driver (:help dbdash-databases): frontend/backend protocol 3.0, Simple Query, text
 -- format results mapped by type OID. Authentication: cleartext, md5, SCRAM-SHA-256.
 local bit = require("bit")
 local dberr = require("dbdash.util.error")

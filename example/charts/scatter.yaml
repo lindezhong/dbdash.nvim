@@ -8,7 +8,7 @@ title: "Scatter plot"
 description: |
   A scatter plot puts one point per row at (`x_column`, `y_column`); `color_column`
   splits the points into groups, colored by `series.<group>` rules. See
-  `:help dbdash-chart-types`.
+  `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"

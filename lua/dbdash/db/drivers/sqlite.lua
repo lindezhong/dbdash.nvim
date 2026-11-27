@@ -1,4 +1,4 @@
--- SQLite driver (design §8.4): LuaJIT FFI over the system libsqlite3.
+-- SQLite driver (:help dbdash-databases): LuaJIT FFI over the system libsqlite3.
 --
 -- FFI calls block, so open/prepare/step/close run in a vim.uv.new_work thread. The thread
 -- returns JSON with tagged cells, decoded and type-mapped on the main loop:

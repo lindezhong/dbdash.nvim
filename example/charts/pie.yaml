@@ -8,7 +8,7 @@ title: "Pie chart"
 description: |
   A pie chart shows each row's share: `label_column` names the slices, `value_column`
   sizes them (positive values only). The default renderer is one proportional bar with a
-  legend; `chart { renderer: circle }` draws a round pie. See `:help dbdash-chart-types`.
+  legend; `chart { renderer: circle }` draws a round pie. See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"

@@ -1,4 +1,5 @@
--- DriverManager (design §8.2): driver registry, URL dispatch and the query entry points.
+-- DriverManager (ARCHITECTURE.md#data-sources): driver registry, URL dispatch and the query entry
+-- points.
 --
 -- Every query is: parse url -> connect -> execute -> close (no pooling). close() is always
 -- called, the whole operation is bounded by connect_timeout + timeout, and callbacks always

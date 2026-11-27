@@ -12,7 +12,7 @@ description: |
   `y_columns`, or `series_column` for long data). The default is a braille canvas; the
   style rule `chart { canvas }` picks another pixel grid and `chart { renderer: asciichart }`
   draws box lines.
-  See `:help dbdash-chart-types`.
+  See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"

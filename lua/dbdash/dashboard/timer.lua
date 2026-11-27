@@ -1,4 +1,4 @@
--- The clock of a dashboard (ARCHITECTURE.md#ticks): every panel's next tick (show.interval)
+-- The clock of a dashboard (ARCHITECTURE.md#scheduling): every panel's next tick (show.interval)
 -- and the top-level interval's (cfg.refresh_all, a tick for every panel) on one uv timer.
 -- A wake sends each due panel one tick (Panel:on_tick), however many deadlines it met: a
 -- panel's own deadline and the top-level one at the same moment are one tick. A tick

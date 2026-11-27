@@ -1,4 +1,4 @@
--- Uniform ResultSet (design §8.3) and logical type helpers shared by drivers.
+-- Uniform ResultSet (:help dbdash-result) and logical type helpers shared by drivers.
 local map = require("dbdash.util.map")
 
 local M = {}

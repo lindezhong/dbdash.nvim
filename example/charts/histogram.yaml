@@ -8,7 +8,7 @@ title: "Histogram"
 description: |
   A histogram counts the values of `value_column` in bins. `bins` sets how many
   (default: Sturges' rule), `bin_width` and `bin_range` fix them. Horizontal by default;
-  `chart { renderer: vertical }` draws columns. See `:help dbdash-chart-types`.
+  `chart { renderer: vertical }` draws columns. See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"

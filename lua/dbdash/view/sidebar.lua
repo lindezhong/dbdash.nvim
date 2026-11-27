@@ -1,4 +1,4 @@
--- Sidebar listing config files (design §3.4). Configured by setup({ sidebar = ... }).
+-- Sidebar listing config files (:help dbdash-commands). Configured by setup({ sidebar = ... }).
 local M = {}
 
 local function opts()

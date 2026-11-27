@@ -10,7 +10,7 @@ title: "Stat"
 description: |
   A stat shows one value in large digits, its change since the previous refresh and a
   sparkline of the last refreshes. The value is the first row of `value_column` (default:
-  the first numeric column), or `reduce` of all rows. See `:help dbdash-chart-types`.
+  the first numeric column), or `reduce` of all rows. See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"

@@ -1,4 +1,4 @@
--- Redis driver (design §8.6): one command per query, tokenized shell-style; replies are
+-- Redis driver (:help dbdash-databases): one command per query, tokenized shell-style; replies are
 -- mapped to tables by command, with generic fallbacks.
 --
 -- Connects with HELLO 3 (RESP3: maps, doubles, booleans) and falls back to RESP2 + AUTH

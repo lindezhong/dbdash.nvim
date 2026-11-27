@@ -1,4 +1,4 @@
--- Table renderer, "box" style (design §11.1), modeled after rich's default table:
+-- Table renderer, "box" style (:help dbdash-charts), modeled after rich's default table:
 --
 --   ┏━━━━┳━━━━━━━┓
 --   ┃ id ┃ name  ┃

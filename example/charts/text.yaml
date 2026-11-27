@@ -8,7 +8,7 @@ title: "Text"
 description: |
   A text chart shows the result without a table: each row is its cells joined by
   `separator`; newlines in a cell start new lines and long lines wrap. Good for
-  logs, messages and `lua://` output. See `:help dbdash-chart-types`.
+  logs, messages and `lua://` output. See `:help dbdash-charts`.
 
 database:
   url: "sqlite3:///:memory:"        # sqlite3:// is the same as sqlite://

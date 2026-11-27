@@ -1,7 +1,7 @@
 -- TLS 1.3 client handshake (RFC 8446): X25519 or secp256r1 key exchange, AES-128-GCM-SHA256 or
 -- ChaCha20-Poly1305-SHA256, server authentication by CertificateVerify, Finished.
 --
--- Modes (design §9.2):
+-- Modes (:help dbdash-tls):
 --   require  encryption only; the certificate is not checked
 --   pin      the leaf certificate's SHA-256 must equal the configured fingerprint and its
 --            CertificateVerify signature must verify (otherwise a server could replay the

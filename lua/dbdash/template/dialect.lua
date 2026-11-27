@@ -1,5 +1,5 @@
--- Per-database literal and identifier quoting (design §8.7). Template SQL filters and
--- autoescape only use these functions.
+-- Per-database literal and identifier quoting (:help dbdash-template-dialects). Template SQL
+-- filters and autoescape only use these functions.
 local map = require("dbdash.util.map")
 
 local M = {}

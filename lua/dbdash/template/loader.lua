@@ -1,7 +1,7 @@
--- Files for {% import %}, {% from %}, {% include %} and {% extends %} (design §6.2): paths
--- are relative to the config file's directory. Templates are compiled and cached by path
--- and modification time; *.lua files are Lua modules, returned as { lua = true } and run
--- by the runtime.
+-- Files for {% import %}, {% from %}, {% include %} and {% extends %} (:help
+-- dbdash-template-imports): paths are relative to the config file's directory. Templates are
+-- compiled and cached by path and modification time; *.lua files are Lua modules, returned as { lua
+-- = true } and run by the runtime.
 local M = {}
 
 local cache = {} ---@type table<string, { mtime: integer, tpl: table }>

@@ -8,7 +8,7 @@ title: "Bubble chart"
 description: |
   A bubble chart is a scatter plot with sizes: (`x_column`, `y_column`) per row, the
   circle's area by `size_column`, groups by `color_column`, a text by `label_column`.
-  See `:help dbdash-chart-types`.
+  See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"

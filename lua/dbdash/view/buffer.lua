@@ -1,5 +1,5 @@
--- Dashboard buffer (design §3.3): scratch buffer named dbdash://<abs path>, content written
--- with extmark highlights; countdown and errors are extmarks, never buffer text.
+-- Dashboard buffer (ARCHITECTURE.md#drawing): scratch buffer named dbdash://<abs path>, content
+-- written with extmark highlights; countdown and errors are extmarks, never buffer text.
 local M = {}
 
 M.ns = vim.api.nvim_create_namespace("dbdash")

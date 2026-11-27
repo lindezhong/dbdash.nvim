@@ -1,4 +1,4 @@
--- YAML subset parser (design §5).
+-- YAML subset parser (:help dbdash-config).
 --
 -- Supported: block mappings and sequences (including "- key: v" items), plain / single- /
 -- double-quoted scalars, block scalars (| > with chomping and indentation indicators),

@@ -9,7 +9,7 @@ description: |
   An area chart fills under each series: `x_column` and `y_columns` (or `y_column`,
   `series_column`). `stacked: true` piles the series up, `stacked: percent` scales every
   x to 100%. Colors are style rules: `series.<label> { color }` here, for every panel.
-  See `:help dbdash-chart-types` and `:help dbdash-css`.
+  See `:help dbdash-charts` and `:help dbdash-css`.
 
 database:
   url: "sqlite:///:memory:"

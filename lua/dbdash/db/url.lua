@@ -1,4 +1,4 @@
--- Connection URL parsing (design §8.8):
+-- Connection URL parsing (:help dbdash-databases):
 --   <scheme>://[user[:password]@]host[:port][/database][?param=value&...]
 --   sqlite:///absolute/path.db   sqlite:///:memory:   sqlite://relative/path.db
 local dberr = require("dbdash.util.error")

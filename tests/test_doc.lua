@@ -173,4 +173,44 @@ T["every schema field has a help tag that jumps to it"] = function()
   eq(#top > 10, true)
 end
 
+T["references lead somewhere: :help tags, |links| and ARCHITECTURE.md sections"] = function()
+  local tags = {}
+  for _, f in ipairs({ "doc/dbdash.txt", "doc/dbdash-schema.txt" }) do
+    for tag in table.concat(vim.fn.readfile(f), "\n"):gmatch("%*(dbdash[%w_.:-]*)%*") do
+      tags[tag] = true
+    end
+  end
+  local anchors = {}
+  for _, l in ipairs(vim.fn.readfile("ARCHITECTURE.md")) do
+    local h = l:match("^## (.+)$")
+    if h then
+      anchors[h:lower():gsub("[^%w%- ]", ""):gsub(" ", "-")] = true
+    end
+  end
+  local files = vim.fn.globpath("lua", "**/*.lua", false, true)
+  vim.list_extend(files, vim.fn.globpath("example", "**/*.yaml", false, true))
+  vim.list_extend(files, { "README.md", "doc/dbdash.txt", "ARCHITECTURE.md" })
+  local nowhere = {}
+  for _, f in ipairs(files) do
+    local text = table.concat(vim.fn.readfile(f), "\n")
+    for tag in text:gmatch(":help (dbdash[%w_.:-]*[%w_])") do
+      if not tags[tag] then
+        nowhere[#nowhere + 1] = f .. ": " .. tag
+      end
+    end
+    for tag in text:gmatch("|(dbdash[%w_.:-]*)|") do
+      if not tags[tag] then
+        nowhere[#nowhere + 1] = f .. ": " .. tag
+      end
+    end
+    for anchor in text:gmatch("ARCHITECTURE%.md#([%w%-]+)") do
+      if not anchors[anchor] then
+        nowhere[#nowhere + 1] = f .. ": #" .. anchor
+      end
+    end
+  end
+  table.sort(nowhere)
+  eq(nowhere, {})
+end
+
 return T

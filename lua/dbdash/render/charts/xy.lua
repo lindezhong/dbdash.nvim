@@ -1,4 +1,4 @@
--- XY plots on a pixel canvas: line, area, scatter and bubble (design §11.1).
+-- XY plots on a pixel canvas: line, area, scatter and bubble (:help dbdash-charts).
 --
 -- Options after Chart.js / ECharts: show.span_gaps (false: NULLs break the line),
 -- axes.*.scale (log), axes.*.ticks (how many), mark_lines (reference lines: value, mean,

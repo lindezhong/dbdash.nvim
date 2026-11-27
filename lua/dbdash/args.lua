@@ -1,4 +1,5 @@
--- Query arguments (design §7): typed parsing of "key=value" input and precedence merging.
+-- Query arguments (:help dbdash-arguments): typed parsing of "key=value" input and precedence
+-- merging.
 --
 -- Precedence (high to low): command line > edited in the dashboard > interactive input >
 -- YAML default. Values only live for the session. Declared arguments without a value are

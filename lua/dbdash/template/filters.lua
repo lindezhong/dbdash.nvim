@@ -1,4 +1,4 @@
--- Built-in filters, tests and globals (design §6.3), with Jinja/Python semantics.
+-- Built-in filters, tests and globals (:help dbdash-template-filters), with Jinja/Python semantics.
 -- SQL filters are registered separately (dbdash.template.sql).
 local map = require("dbdash.util.map")
 local R = require("dbdash.template.runtime")

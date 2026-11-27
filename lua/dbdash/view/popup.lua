@@ -1,4 +1,4 @@
--- Floating windows for SQL, arguments and status (design §3.5).
+-- Floating windows for SQL, arguments and status (ARCHITECTURE.md#drawing).
 local M = {}
 
 ---Set the filetype of a float's buffer. The built-in lua and markdown filetype plugins start

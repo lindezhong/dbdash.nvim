@@ -1,4 +1,4 @@
--- Uniform database error object (design §8.9).
+-- Uniform database error object (:help dbdash-errors).
 local M = {}
 
 ---@alias dbdash.db.Phase

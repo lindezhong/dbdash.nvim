@@ -9,7 +9,7 @@
 title: "Table"
 description: |
   A table shows the rows as they are: every column (or `column_list`), one row per result
-  row, long cells wrapping inside their column. See `:help dbdash-chart-types` and
+  row, long cells wrapping inside their column. See `:help dbdash-charts` and
   `:help dbdash-css`.
 
 database:

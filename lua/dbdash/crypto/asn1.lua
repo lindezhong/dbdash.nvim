@@ -1,4 +1,4 @@
--- Minimal DER reader: enough to walk certificates and public keys (design §9.2).
+-- Minimal DER reader: enough to walk certificates and public keys (:help dbdash-tls).
 local bit = require("bit")
 
 local M = {}

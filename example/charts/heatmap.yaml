@@ -8,7 +8,7 @@ title: "Heat map"
 description: |
   A heat map colors a grid: `x_column` across, `y_column` down, `value_column` the color.
   The default renderer packs two rows into one line (half blocks); `chart { renderer:
-  block }` gives every row a line and can write the values. See `:help dbdash-chart-types`.
+  block }` gives every row a line and can write the values. See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"

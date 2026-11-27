@@ -1,4 +1,4 @@
--- MySQL / MariaDB driver (design §8.4): handshake v10, mysql_native_password and
+-- MySQL / MariaDB driver (:help dbdash-databases): handshake v10, mysql_native_password and
 -- caching_sha2_password (fast path, and full authentication with the server's RSA key on
 -- plain-text connections), COM_QUERY text protocol with multiple result sets.
 local bit = require("bit")

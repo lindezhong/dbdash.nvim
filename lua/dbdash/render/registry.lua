@@ -1,4 +1,4 @@
--- Registry of render implementations by "category/name" (design §11.2, §11.3):
+-- Registry of render implementations by "category/name" (:help dbdash-styles):
 --   chart/<type>/<renderer>, canvas/<name>, ticks/<name>, frame/<name>, palette/<name>
 -- Built-ins load on demand; setup({ register = {...} }) adds or replaces entries.
 local M = {}

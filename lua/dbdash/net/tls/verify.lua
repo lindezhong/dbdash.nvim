@@ -1,4 +1,4 @@
--- Certificate chain and host name verification for tls=verify-full (design §9.2).
+-- Certificate chain and host name verification for tls=verify-full (:help dbdash-tls).
 --
 -- The chain is built from the leaf through the certificates the server sent and the
 -- trust store, checking signatures, validity periods, CA constraints and unknown critical

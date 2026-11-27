@@ -8,7 +8,7 @@ title: "Box plot"
 description: |
   A box plot summarizes `value_column` per `category_column`: the box spans the first to
   the third quartile with the median inside, whiskers reach the furthest values within
-  1.5 IQR, and points beyond are outliers. See `:help dbdash-chart-types`.
+  1.5 IQR, and points beyond are outliers. See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"

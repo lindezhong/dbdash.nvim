@@ -1,4 +1,4 @@
--- Interactive argument input (design §7) on top of vim.ui.input / vim.ui.select.
+-- Interactive argument input (:help dbdash-arguments) on top of vim.ui.input / vim.ui.select.
 local args = require("dbdash.args")
 
 local M = {}

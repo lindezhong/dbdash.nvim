@@ -1,4 +1,4 @@
--- TLS 1.3 for driver sockets (design §9). After starttls() the socket's read/write go
+-- TLS 1.3 for driver sockets (:help dbdash-tls). After starttls() the socket's read/write go
 -- through the record layer transparently.
 --
 -- Known risk (documented in :h dbdash-tls): the pure Lua primitives are not constant-time,

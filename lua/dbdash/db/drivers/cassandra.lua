@@ -1,4 +1,4 @@
--- Cassandra driver (design §8.4): CQL native protocol v4 over TCP or TLS,
+-- Cassandra driver (:help dbdash-databases): CQL native protocol v4 over TCP or TLS,
 -- PasswordAuthenticator (SASL PLAIN), QUERY with paging, RESULT Rows mapped by column type.
 local bit = require("bit")
 local ffi = require("ffi")

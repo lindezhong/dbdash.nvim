@@ -1,4 +1,4 @@
--- Jinja2 template engine (design §6): lexer -> parser -> Lua codegen -> load().
+-- Jinja2 template engine (:help dbdash-templates): lexer -> parser -> Lua codegen -> load().
 local errors = require("dbdash.template.errors")
 local R = require("dbdash.template.runtime")
 

@@ -1,4 +1,4 @@
--- TCP sockets for drivers, in coroutine style (design §9.1). Every call must run inside a
+-- TCP sockets for drivers, in coroutine style (:help dbdash-tls). Every call must run inside a
 -- dbdash.util.async task; operations suspend the task instead of blocking.
 --
 -- A transport filter (TLS, M4) can be installed with set_filter(): outgoing bytes pass

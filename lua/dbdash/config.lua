@@ -1,4 +1,5 @@
--- Load and validate a dashboard config file (design §4), applying defaults.
+-- Load and validate a dashboard config file (ARCHITECTURE.md#startup-and-configuration), applying
+-- defaults.
 local yaml = require("dbdash.yaml")
 local map = require("dbdash.util.map")
 

@@ -1,4 +1,4 @@
--- X.509 certificate parsing (design §9.2): public key, names, validity, signature and the
+-- X.509 certificate parsing (:help dbdash-tls): public key, names, validity, signature and the
 -- extensions needed for chain validation (basicConstraints, keyUsage, extKeyUsage,
 -- subjectAltName, key identifiers). Unknown critical extensions are recorded so the
 -- verifier can reject them.

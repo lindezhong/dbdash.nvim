@@ -1,4 +1,5 @@
--- SQL filters and globals (design §6.3), implemented through the current driver's dialect:
+-- SQL filters and globals (:help dbdash-template-filters), implemented through the current driver's
+-- dialect:
 --   * sql_id quotes with the dialect's identifier quotes
 --   * sql_in of an empty list gives "(NULL)"
 --   * booleans become dialect literals

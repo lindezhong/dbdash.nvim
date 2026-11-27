@@ -9,7 +9,7 @@ title: "Bar chart"
 description: |
   A bar chart shows one value per category: `x_column` names the bars, `y_column` (or
   `y_columns`, or `series_column` for long data) gives their lengths. Horizontal by
-  default; `chart { renderer: vertical }` draws columns. See `:help dbdash-chart-types`.
+  default; `chart { renderer: vertical }` draws columns. See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"

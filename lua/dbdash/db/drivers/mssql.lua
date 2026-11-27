@@ -1,4 +1,4 @@
--- SQL Server driver (design §8.4): TDS 7.4, optionally encrypted (TLS negotiated in
+-- SQL Server driver (:help dbdash-databases): TDS 7.4, optionally encrypted (TLS negotiated in
 -- PRELOGIN, or TDS 8 strict mode), SQL authentication via LOGIN7, SQL_BATCH, and
 -- COLMETADATA / ROW / NBCROW decoding.
 local bit = require("bit")
