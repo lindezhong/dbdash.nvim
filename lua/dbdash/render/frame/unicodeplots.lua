@@ -95,6 +95,114 @@ function M.plot_size(ctx, spec)
   return math.max(cols, 10), math.max(rows, spec.min_rows or ctx.min_plot_height or 3)
 end
 
+---Lines with highlight spans ({ col_s, col_e, group }).
+local function add(f, text, spans)
+  f.lines[#f.lines + 1] = text
+  for _, s in ipairs(spans or {}) do
+    f.hl[#f.hl + 1] = { row = #f.lines - 1, col_s = s[1], col_e = s[2], group = s[3] }
+  end
+end
+
+---A line of `text` centered over the plot (the title, the x axis title).
+local function centered(f, text, group)
+  local t = W.truncate(text, f.plot_w)
+  local pad = f.left + math.max(0, math.floor((f.plot_w - W.width(t)) / 2))
+  add(f, string.rep(" ", pad) .. t, { { pad, pad + #t, group } })
+end
+
+---Plot row r: its y tick label in the margin, the border, the body's line padded to the
+---plot's width, and a legend entry on the right.
+local function plot_row(f, body, r, ylab)
+  local spec, ch = f.spec, f.ch
+  local b = builder()
+  local label = ylab[r]
+  if f.m > 0 then
+    b.put(string.rep(" ", f.m - (label and W.width(label) or 0)))
+    if label then
+      b.put(label, f.g_axis)
+    end
+    b.put(" ")
+  end
+  if f.border then
+    b.put(ch.v, f.g_border)
+  end
+  local line = body.lines[r + 1] or ""
+  local base = b.pos
+  b.put(line)
+  for _, h in ipairs(body.hl) do
+    if h.row == r then
+      b.spans[#b.spans + 1] = { base + h.col_s, base + h.col_e, h.group }
+    end
+  end
+  local pad = f.cols - W.width(line)
+  if pad > 0 then
+    b.put(string.rep(" ", pad))
+  end
+  if f.border then
+    b.put(ch.v, f.g_border)
+  end
+  local e = spec.legend_position == "right" and (spec.legend or {})[r + 1]
+  if e then
+    b.put(" ")
+    b.put(e.symbol or "■", e.group)
+    b.put(" " .. W.truncate(e.label, 24), e.label_group or f.g_legend)
+  end
+  add(f, b.done())
+end
+
+---A border line (top or bottom) of the plot.
+local function border_line(f, left_ch, right_ch)
+  local b = builder()
+  b.put(string.rep(" ", f.left))
+  b.put(left_ch .. string.rep(f.ch.h, f.cols) .. right_ch, f.g_border)
+  add(f, b.done())
+end
+
+---The x axis's tick labels, centered on their columns, none overlapping the previous one.
+local function x_axis(f)
+  local offset = f.left + (f.border and 1 or 0)
+  local width = offset + f.cols + (f.border and 1 or 0)
+  local cells = {}
+  for i = 1, width do
+    cells[i] = " "
+  end
+  local last_end = 0
+  for _, t in ipairs(f.spec.xticks or {}) do
+    local w = W.width(t.label)
+    local start = offset + t.col - math.floor(w / 2)
+    start = math.max(start, offset)
+    start = math.min(start, width - w)
+    if start > last_end or last_end == 0 then
+      local i = start + 1
+      for c in W.chars(t.label) do
+        cells[i] = c
+        local cw = W.width(c)
+        for k = 1, cw - 1 do
+          cells[i + k] = ""
+        end
+        i = i + cw
+      end
+      last_end = start + w
+    end
+  end
+  local s = table.concat(cells):gsub("%s+$", "")
+  add(f, s, #s > 0 and { { 0, #s, f.g_axis } } or nil)
+end
+
+---The legend on one line below the plot.
+local function bottom_legend(f, legend)
+  local b = builder()
+  b.put(string.rep(" ", f.left))
+  for i, e in ipairs(legend) do
+    if i > 1 then
+      b.put("  ")
+    end
+    b.put(e.symbol or "■", e.group)
+    b.put(" " .. e.label, e.label_group or f.g_legend)
+  end
+  add(f, b.done())
+end
+
 ---Compose the frame around a plot body of exactly cols x rows characters.
 ---@param ctx dbdash.render.Ctx
 ---@param spec dbdash.render.FrameSpec
@@ -102,142 +210,57 @@ end
 ---@return dbdash.render.Output
 function M.render(ctx, spec, body)
   M.apply_style(ctx, spec)
-  local ch = spec.chars or borders.STYLES.single
-  local g_border, g_axis, g_legend =
-    ctx.css:border_hl("plot"), ctx.css:hl("axis"), ctx.css:hl("legend")
-  local cols, rows = 0, #body.lines
+  local cols = 0
   for _, l in ipairs(body.lines) do
     cols = math.max(cols, W.width(l))
   end
   local m = margin(spec)
-  local left = m + (m > 0 and 1 or 0)
   local border = spec.border ~= false
-  local lines, hl = {}, {}
-  local function add(text, spans)
-    lines[#lines + 1] = text
-    for _, s in ipairs(spans or {}) do
-      hl[#hl + 1] = { row = #lines - 1, col_s = s[1], col_e = s[2], group = s[3] }
-    end
-  end
-  local plot_w = cols + (border and 2 or 0)
-
+  local f = {
+    spec = spec,
+    ch = spec.chars or borders.STYLES.single,
+    g_border = ctx.css:border_hl("plot"),
+    g_axis = ctx.css:hl("axis"),
+    g_legend = ctx.css:hl("legend"),
+    cols = cols,
+    m = m,
+    left = m + (m > 0 and 1 or 0),
+    border = border,
+    plot_w = cols + (border and 2 or 0),
+    lines = {},
+    hl = {},
+  }
   if spec.title and spec.title ~= "" then
-    local t = W.truncate(spec.title, plot_w)
-    local pad = left + math.max(0, math.floor((plot_w - W.width(t)) / 2))
-    add(string.rep(" ", pad) .. t, { { pad, pad + #t, ctx.css:hl("title") } })
+    centered(f, spec.title, ctx.css:hl("title"))
   end
   if spec.ylabel then
     local t = W.truncate(spec.ylabel, ctx.width)
-    add(t, { { 0, #t, ctx.css:hl("axis-title") } })
+    add(f, t, { { 0, #t, ctx.css:hl("axis-title") } })
   end
-
   local ylab = {}
   for _, t in ipairs(spec.yticks or {}) do
     ylab[t.row] = t.label
   end
-  local legend = spec.legend or {}
-  local legend_right = spec.legend_position == "right" and #legend > 0
-
-  local function legend_cell(b, i)
-    local e = legend[i]
-    if legend_right and e then
-      b.put(" ")
-      b.put(e.symbol or "■", e.group)
-      b.put(" " .. W.truncate(e.label, 24), e.label_group or g_legend)
-    end
-  end
-
   if border then
-    local b = builder()
-    b.put(string.rep(" ", left))
-    b.put(ch.tl .. string.rep(ch.h, cols) .. ch.tr, g_border)
-    add(b.done())
+    border_line(f, f.ch.tl, f.ch.tr)
   end
-  for r = 0, rows - 1 do
-    local b = builder()
-    local label = ylab[r]
-    if m > 0 then
-      b.put(string.rep(" ", m - (label and W.width(label) or 0)))
-      if label then
-        b.put(label, g_axis)
-      end
-      b.put(" ")
-    end
-    if border then
-      b.put(ch.v, g_border)
-    end
-    local line = body.lines[r + 1] or ""
-    local base = b.pos
-    b.put(line)
-    for _, h in ipairs(body.hl) do
-      if h.row == r then
-        b.spans[#b.spans + 1] = { base + h.col_s, base + h.col_e, h.group }
-      end
-    end
-    local pad = cols - W.width(line)
-    if pad > 0 then
-      b.put(string.rep(" ", pad))
-    end
-    if border then
-      b.put(ch.v, g_border)
-    end
-    legend_cell(b, r + 1)
-    add(b.done())
+  for r = 0, #body.lines - 1 do
+    plot_row(f, body, r, ylab)
   end
   if border then
-    local b = builder()
-    b.put(string.rep(" ", left))
-    b.put(ch.bl .. string.rep(ch.h, cols) .. ch.br, g_border)
-    add(b.done())
+    border_line(f, f.ch.bl, f.ch.br)
   end
-
   if spec.x_axis ~= false then
-    local offset = left + (border and 1 or 0)
-    local width = offset + cols + (border and 1 or 0)
-    local cells = {}
-    for i = 1, width do
-      cells[i] = " "
-    end
-    local last_end = 0
-    for _, t in ipairs(spec.xticks or {}) do
-      local w = W.width(t.label)
-      local start = offset + t.col - math.floor(w / 2)
-      start = math.max(start, offset)
-      start = math.min(start, width - w)
-      if start > last_end or last_end == 0 then
-        local i = start + 1
-        for c in W.chars(t.label) do
-          cells[i] = c
-          local cw = W.width(c)
-          for k = 1, cw - 1 do
-            cells[i + k] = ""
-          end
-          i = i + cw
-        end
-        last_end = start + w
-      end
-    end
-    local s = table.concat(cells):gsub("%s+$", "")
-    add(s, #s > 0 and { { 0, #s, g_axis } } or nil)
+    x_axis(f)
   end
   if spec.xlabel then
-    local t = W.truncate(spec.xlabel, plot_w)
-    local pad = left + math.max(0, math.floor((plot_w - W.width(t)) / 2))
-    add(string.rep(" ", pad) .. t, { { pad, pad + #t, ctx.css:hl("axis-title") } })
+    centered(f, spec.xlabel, ctx.css:hl("axis-title"))
   end
+  local legend = spec.legend or {}
   if spec.legend_position == "bottom" and #legend > 0 then
-    local b = builder()
-    b.put(string.rep(" ", left))
-    for i, e in ipairs(legend) do
-      if i > 1 then
-        b.put("  ")
-      end
-      b.put(e.symbol or "■", e.group)
-      b.put(" " .. e.label, e.label_group or g_legend)
-    end
-    add(b.done())
+    bottom_legend(f, legend)
   end
-  return { lines = lines, hl = hl }
+  return { lines = f.lines, hl = f.hl }
 end
 
 M.builder = builder
