@@ -1,6 +1,6 @@
 -- The rendering pipeline (after Servo): coalesced updates, layout reuse by subtree
 -- version, a compositor that writes only changed rows, hit testing and event dispatch.
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local parser = require("dbdash.css.parser")
 local layout = require("dbdash.layout.view")
 local buffer = require("dbdash.view.buffer")

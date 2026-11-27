@@ -1,6 +1,6 @@
 -- Configs that run Lua are trusted per config: one question covers the config and every
 -- .lua file / {% lua %} template it imports; a change to any of them asks again.
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local trust = require("dbdash.trust")
 local dbdash = require("dbdash")
 local eq = MiniTest.expect.equality

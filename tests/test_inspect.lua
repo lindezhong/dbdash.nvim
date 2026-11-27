@@ -1,6 +1,6 @@
 -- :DbDashInspect (DevTools: matched rules, computed style, box) and :DbDashStyle set
 -- (runtime rules, the top of the cascade).
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local eq = MiniTest.expect.equality
 
 local T = MiniTest.new_set({

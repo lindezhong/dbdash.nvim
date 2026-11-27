@@ -54,7 +54,7 @@ function M.apply_keys(buf)
         -- an event at the cursor: hit test, then capture and bubble (events/); the
         -- default action listens on the document root
         local register = vim.v.register
-        for _, d in ipairs(require("dbdash.scheduler").list()) do
+        for _, d in ipairs(require("dbdash.dashboard").list()) do
           if d.buf == buf and d.doc then
             require("dbdash.events").at_cursor(d, action, { register = register })
             return

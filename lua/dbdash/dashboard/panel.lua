@@ -1,6 +1,6 @@
 -- Panels: the refresh pipeline (template -> query -> transform), its result or error,
-local M = require("dbdash.scheduler")
-local S = require("dbdash.scheduler.shared")
+local M = require("dbdash.dashboard")
+local S = require("dbdash.dashboard.shared")
 local Panel = S.Panel
 local opts, notify, now, close_timer, as_error = S.opts, S.notify, S.now, S.close_timer, S.as_error
 local db = require("dbdash.db")

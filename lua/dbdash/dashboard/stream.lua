@@ -5,8 +5,8 @@
 -- interval when there is something new. When the producer ends (exec://, luastream://)
 -- the queue is drained, the last result drawn and the panel stops; r or changed arguments
 -- start it again.
-local M = require("dbdash.scheduler")
-local S = require("dbdash.scheduler.shared")
+local M = require("dbdash.dashboard")
+local S = require("dbdash.dashboard.shared")
 local Panel = S.Panel
 local opts, notify, now, close_timer, as_error = S.opts, S.notify, S.now, S.close_timer, S.as_error
 local db = require("dbdash.db")

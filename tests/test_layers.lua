@@ -20,7 +20,7 @@ local LAYERS = {
   { "paint" },
   { "layout" },
   -- the application: dashboards and what they are made from
-  { "options", "config", "trust", "metadata", "session", "export", "scheduler", "health_util" },
+  { "options", "config", "trust", "metadata", "session", "export", "dashboard", "health_util" },
   -- UI and entry points (:checkhealth dbdash.<database> is lua/dbdash/<database>/health.lua)
   {
     "init",
@@ -39,19 +39,19 @@ local LAYERS = {
   },
 }
 
--- Requires that still go up, until the scheduler becomes dashboard/ and view/dashboard
+-- Requires that still go up, until dashboard/ and view/dashboard are separated
 -- (they build the dashboard's DOM and draw it from the application layer, and the
--- scheduler's files add methods to one package that requires them).
+-- dashboard package's files add methods to one package that requires them).
 local PENDING = {
   ["dbdash.dom.build"] = true,
-  ["dbdash.scheduler"] = true,
-  ["dbdash.scheduler.dashboard"] = true,
-  ["dbdash.scheduler.lifecycle"] = true,
-  ["dbdash.scheduler.panel"] = true,
-  ["dbdash.scheduler.run"] = true,
-  ["dbdash.scheduler.shared"] = true,
-  ["dbdash.scheduler.stream"] = true,
-  ["dbdash.scheduler.view"] = true,
+  ["dbdash.dashboard"] = true,
+  ["dbdash.dashboard.dashboard"] = true,
+  ["dbdash.dashboard.lifecycle"] = true,
+  ["dbdash.dashboard.panel"] = true,
+  ["dbdash.dashboard.run"] = true,
+  ["dbdash.dashboard.shared"] = true,
+  ["dbdash.dashboard.stream"] = true,
+  ["dbdash.dashboard.view"] = true,
 }
 
 local level = {}

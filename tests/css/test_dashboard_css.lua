@@ -1,6 +1,6 @@
 -- Dashboards have a document (dom/build.lua) and their view and charts take their colors
 -- from it: a rule added to the document reaches the buffer on the next redraw.
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local parser = require("dbdash.css.parser")
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set({

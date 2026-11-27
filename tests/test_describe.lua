@@ -1,6 +1,6 @@
 -- Descriptions: the dashboard's `description` and a chart's `show.description` are templates
 -- (args, meta, imports) shown as Markdown in a float by K / :DbDashDescribe; ⓘ marks them.
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local eq = MiniTest.expect.equality
 
 local dir

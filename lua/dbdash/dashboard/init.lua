@@ -8,13 +8,13 @@
 -- Multi-panel configs with a top-level `interval` also have a global timer that refreshes
 -- every panel and restarts the panels' own timers.
 --
--- This module is the scheduler's interface; the work is split over lua/dbdash/scheduler/:
+-- This module is the scheduler's interface; the work is split over lua/dbdash/dashboard/:
 -- shared (classes, helpers), run (runs, records, templates), panel (refresh pipeline,
 -- timers), stream (push sources), view (drawing), dashboard (global timer, pause/resume),
 -- lifecycle (start/stop).
 local M = {}
 -- The modules below add their functions to this table (and require it while it loads).
-package.loaded["dbdash.scheduler"] = M
+package.loaded["dbdash.dashboard"] = M
 
 ---@type table<string, dbdash.Dashboard>
 M.dashboards = {}
@@ -66,13 +66,13 @@ function M.normalize(path)
   return vim.fs.normalize(vim.fn.fnamemodify(vim.fn.expand(path), ":p"))
 end
 
-local S = require("dbdash.scheduler.shared")
-require("dbdash.scheduler.run")
-require("dbdash.scheduler.panel")
-require("dbdash.scheduler.stream")
-require("dbdash.scheduler.view")
-require("dbdash.scheduler.dashboard")
-require("dbdash.scheduler.lifecycle")
+local S = require("dbdash.dashboard.shared")
+require("dbdash.dashboard.run")
+require("dbdash.dashboard.panel")
+require("dbdash.dashboard.stream")
+require("dbdash.dashboard.view")
+require("dbdash.dashboard.dashboard")
+require("dbdash.dashboard.lifecycle")
 
 M.Dashboard = S.Dashboard
 M.Panel = S.Panel

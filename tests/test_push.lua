@@ -1,6 +1,6 @@
 -- Push sources in dashboards: the queue and its single consumer, drawing on the interval,
 -- the end of a source, restarting, callbacks on the same item, hidden dashboards, stopping.
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local eq = MiniTest.expect.equality
 
 local RUN_LUA = vim.fs.normalize(vim.fn.fnamemodify("tests/fixtures/run_lua.lua", ":p"))

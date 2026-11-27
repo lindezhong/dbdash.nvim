@@ -1,6 +1,6 @@
 -- Lua state of a panel across refreshes: `store`, meta.prev_*, dbdash.run() callbacks and
 -- assigning arguments (from Lua and {% set args.x %}).
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local eq = MiniTest.expect.equality
 
 local dir, notes

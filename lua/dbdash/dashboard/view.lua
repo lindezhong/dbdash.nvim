@@ -1,6 +1,6 @@
 -- Drawing a dashboard: header, countdowns, argument lines and the panel grid.
-local M = require("dbdash.scheduler")
-local S = require("dbdash.scheduler.shared")
+local M = require("dbdash.dashboard")
+local S = require("dbdash.dashboard.shared")
 local Dashboard = S.Dashboard
 local opts, now = S.opts, S.now
 local buffer = require("dbdash.view.buffer")
@@ -94,7 +94,7 @@ function Dashboard:request_render()
   local since = vim.uv.now() - (self.last_render_at or 0)
   vim.defer_fn(function()
     self.render_pending = false
-    if require("dbdash.scheduler").get(self.path) ~= self then
+    if require("dbdash.dashboard").get(self.path) ~= self then
       return
     end
     if self.paused then

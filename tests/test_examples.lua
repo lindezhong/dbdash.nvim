@@ -3,7 +3,7 @@
 -- example/dbdash.schema.yaml.
 local config = require("dbdash.config")
 local render = require("dbdash.render")
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local h = require("tests.helpers")
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set({

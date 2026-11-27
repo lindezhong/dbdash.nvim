@@ -1,6 +1,6 @@
 -- query.transform: Lua that reshapes the result of any database. Every source goes
 -- query -> transform -> rows check.
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local h = require("tests.helpers")
 local eq = MiniTest.expect.equality
 

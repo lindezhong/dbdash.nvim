@@ -1,6 +1,6 @@
 -- Command implementations (design §3.1) and completion.
 local args = require("dbdash.args")
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 
 local M = {}
 

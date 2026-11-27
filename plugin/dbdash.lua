@@ -139,7 +139,7 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
     if not path then
       return
     end
-    local sched = require("dbdash.scheduler")
+    local sched = require("dbdash.dashboard")
     local d = sched.get(path)
     if d and d.buf == ev.buf then
       d:redraw() -- :edit cleared the buffer of a running dashboard
@@ -158,14 +158,14 @@ vim.api.nvim_create_autocmd("BufWriteCmd", {
 vim.api.nvim_create_autocmd("SessionLoadPost", {
   group = group,
   callback = function()
-    require("dbdash.scheduler").adopt_session_buffers()
+    require("dbdash.dashboard").adopt_session_buffers()
   end,
 })
 vim.api.nvim_create_autocmd("VimLeavePre", {
   group = group,
   callback = function()
-    if package.loaded["dbdash.scheduler"] then
-      require("dbdash.scheduler").freeze_all()
+    if package.loaded["dbdash.dashboard"] then
+      require("dbdash.dashboard").freeze_all()
     end
   end,
 })
@@ -173,9 +173,9 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
 vim.api.nvim_create_autocmd({ "BufWinEnter", "BufWinLeave", "WinClosed", "TabEnter" }, {
   group = group,
   callback = function()
-    if package.loaded["dbdash.scheduler"] then
+    if package.loaded["dbdash.dashboard"] then
       vim.schedule(function()
-        require("dbdash.scheduler").update_visibility()
+        require("dbdash.dashboard").update_visibility()
       end)
     end
   end,
@@ -184,16 +184,16 @@ vim.api.nvim_create_autocmd({ "BufWinEnter", "BufWinLeave", "WinClosed", "TabEnt
 vim.api.nvim_create_autocmd("WinClosed", {
   group = group,
   callback = function(ev)
-    if package.loaded["dbdash.scheduler"] then
-      require("dbdash.scheduler").on_win_closed(tonumber(ev.match))
+    if package.loaded["dbdash.dashboard"] then
+      require("dbdash.dashboard").on_win_closed(tonumber(ev.match))
     end
   end,
 })
 vim.api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
   group = group,
   callback = function()
-    if package.loaded["dbdash.scheduler"] then
-      require("dbdash.scheduler").on_resize()
+    if package.loaded["dbdash.dashboard"] then
+      require("dbdash.dashboard").on_resize()
     end
   end,
 })

@@ -54,7 +54,7 @@ function M.check()
   end
 
   health.start("Dashboards")
-  local running = require("dbdash.scheduler").list()
+  local running = require("dbdash.dashboard").list()
   health.info(("%d running"):format(#running))
   health.info("Database requirements: :checkhealth " .. table.concat(
     vim.tbl_map(function(d)

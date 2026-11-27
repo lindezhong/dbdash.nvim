@@ -1,6 +1,6 @@
 -- Cancelling refreshes: a refresh the user asks for replaces the one running (its queries
 -- stop), stopping a dashboard and exiting cancel what runs; timer ticks still skip.
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local db = require("dbdash.db")
 local async = require("dbdash.util.async")
 local resultset = require("dbdash.db.resultset")

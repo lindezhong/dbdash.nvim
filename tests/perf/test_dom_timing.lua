@@ -140,7 +140,7 @@ T["a redraw of a dashboard where nothing changed"] = function()
   if not H.timing_enabled() then
     MiniTest.skip("DBDASH_PERF=0")
   end
-  local sched = require("dbdash.scheduler")
+  local sched = require("dbdash.dashboard")
   require("dbdash").setup({ dashboard = { pause_hidden = false } })
   local f = vim.fn.tempname() .. ".yaml"
   vim.fn.writefile({

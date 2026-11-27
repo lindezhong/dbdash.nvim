@@ -86,11 +86,11 @@ end
 
 ---Start a dashboard. `tokens` are "name=value" arguments.
 function M.start(path, tokens)
-  return require("dbdash.scheduler").start(path, { tokens = tokens })
+  return require("dbdash.dashboard").start(path, { tokens = tokens })
 end
 
 function M.stop(path)
-  return require("dbdash.scheduler").stop(require("dbdash.scheduler").normalize(path))
+  return require("dbdash.dashboard").stop(require("dbdash.dashboard").normalize(path))
 end
 
 ---Run a query through the data layer: callback(err, resultset).

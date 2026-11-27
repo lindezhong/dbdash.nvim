@@ -1,6 +1,6 @@
 -- Dashboards give templates and Lua code two names: args.<name> (the arguments) and
 -- meta.<name> (metadata such as meta.config_dir and meta.os).
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local metadata = require("dbdash.metadata")
 local template = require("dbdash.template")
 local eq = MiniTest.expect.equality

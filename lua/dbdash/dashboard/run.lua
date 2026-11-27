@@ -1,6 +1,6 @@
 -- Runs of a panel's pipeline (refreshes and dbdash.run() callbacks) with their records,
-local M = require("dbdash.scheduler")
-local S = require("dbdash.scheduler.shared")
+local M = require("dbdash.dashboard")
+local S = require("dbdash.dashboard.shared")
 local Panel, Dashboard = S.Panel, S.Dashboard
 local opts = S.opts
 local args = require("dbdash.args")

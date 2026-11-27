@@ -8,7 +8,7 @@ local M = {}
 function M.state()
   local args = require("dbdash.args")
   local out = {}
-  for _, d in ipairs(require("dbdash.scheduler").list()) do
+  for _, d in ipairs(require("dbdash.dashboard").list()) do
     local values = {}
     for _, spec in ipairs(d.cfg.args) do
       local v = args.value(spec, d.state)
@@ -29,7 +29,7 @@ local pending = {}
 ---Apply values from state(): running dashboards refresh with them, the others
 ---get them when they start. Unknown arguments and values that no longer parse are skipped.
 function M.restore(state)
-  local sched = require("dbdash.scheduler")
+  local sched = require("dbdash.dashboard")
   for path, values in pairs(state or {}) do
     if type(path) == "string" and type(values) == "table" then
       path = sched.normalize(path)

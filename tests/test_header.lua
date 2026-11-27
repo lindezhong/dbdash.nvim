@@ -1,6 +1,6 @@
 -- The dashboard header: the title and the countdown to the global refresh, and the uses of
 -- the title elsewhere (notifications, meta.dashboard_title).
-local sched = require("dbdash.scheduler")
+local sched = require("dbdash.dashboard")
 local buffer = require("dbdash.view.buffer")
 local eq = MiniTest.expect.equality
 

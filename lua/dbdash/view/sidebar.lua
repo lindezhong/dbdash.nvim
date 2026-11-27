@@ -119,7 +119,7 @@ end
 ---{ path, dir } nodes.
 function M.render(buf)
   require("dbdash.css.hl").setup()
-  local sched = require("dbdash.scheduler")
+  local sched = require("dbdash.dashboard")
   local root = M.dir()
   local lines = vim.deepcopy(M.HEADER)
   lines[2] = "Directory: " .. vim.fn.fnamemodify(root, ":~")
@@ -270,7 +270,7 @@ local function on_enter(buf)
   if not path then
     return
   end
-  local sched = require("dbdash.scheduler")
+  local sched = require("dbdash.dashboard")
   local side_win = vim.api.nvim_get_current_win()
   local win = target_win(side_win)
   sched.start(path, { win = win })
@@ -280,7 +280,7 @@ end
 local function on_stop(buf)
   local path = selected(buf)
   if path then
-    require("dbdash.scheduler").stop(path)
+    require("dbdash.dashboard").stop(path)
     M.refresh()
   end
 end
@@ -290,7 +290,7 @@ local function on_refresh(buf)
   if not path then
     return
   end
-  local d = require("dbdash.scheduler").get(path)
+  local d = require("dbdash.dashboard").get(path)
   if not d then
     vim.notify("DbDash not running for this config", vim.log.levels.WARN)
     return
