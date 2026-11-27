@@ -6,13 +6,12 @@ local nn = require("dbdash.util.null").nn
 
 local M = { name = "asciichart" }
 
-function M.render(rs, show, ctx)
-  local axes = C.axes(show)
-  local xaxis = C.x_axis(rs, nn(show.x_column))
-  local series = C.series(rs, show)
+---The values of each series by row (nil: no number), with their range (nil: no data).
+---@return table[] data, number? ylo, number? yhi
+local function series_values(rs, show, ctx)
   local ylo, yhi
   local data = {}
-  for i, s in ipairs(series) do
+  for i, s in ipairs(C.series(rs, show)) do
     local vals = {}
     for r, row in ipairs(rs.rows) do
       local v = C.num(row[s.index])
@@ -24,6 +23,51 @@ function M.render(rs, show, ctx)
     end
     data[i] = { values = vals, group = C.color(ctx, show, i, nil, s.label), label = s.label }
   end
+  return data, ylo, yhi
+end
+
+---The step from (c0, r0) to (c1, r1): flat, or a corner up or down halfway.
+local function step(g, c0, r0, c1, r1, group)
+  if r0 == r1 then
+    for c = c0, c1 do
+      g:put(r0, c, "─", group)
+    end
+    return
+  end
+  local mid = math.floor((c0 + c1) / 2)
+  for c = c0, mid - 1 do
+    g:put(r0, c, "─", group)
+  end
+  local up = r1 < r0
+  g:put(r0, mid, up and "╯" or "╮", group)
+  for r = math.min(r0, r1) + 1, math.max(r0, r1) - 1 do
+    g:put(r, mid, "│", group)
+  end
+  g:put(r1, mid, up and "╭" or "╰", group)
+  for c = mid + 1, c1 do
+    g:put(r1, c, "─", group)
+  end
+end
+
+---x labels, as many as fit at their widest.
+local function x_ticks(labels, n, cols, col_of)
+  local W = require("dbdash.util.width")
+  local maxw = 1
+  for _, l in ipairs(labels) do
+    maxw = math.max(maxw, W.width(l))
+  end
+  local every = math.max(1, math.ceil(n / math.max(1, math.floor(cols / (maxw + 2)))))
+  local out = {}
+  for i = 1, n, every do
+    out[#out + 1] = { col = col_of(i), label = labels[i] }
+  end
+  return out
+end
+
+function M.render(rs, show, ctx)
+  local axes = C.axes(show)
+  local xaxis = C.x_axis(rs, nn(show.x_column))
+  local data, ylo, yhi = series_values(rs, show, ctx)
   if not ylo then
     return { lines = { "(no data to plot)" }, hl = {} }
   end
@@ -46,16 +90,7 @@ function M.render(rs, show, ctx)
   spec.yticks, spec.ylabels = C.y_ticks(ctx, ylo, yhi, rows, axes.yformat)
   local cols
   cols, rows = ctx.frame.plot_size(ctx, spec)
-
-  local grid, colors = {}, {}
-  for r = 0, rows - 1 do
-    grid[r], colors[r] = {}, {}
-  end
-  local function put(r, c, ch, g)
-    if r >= 0 and r < rows and c >= 0 and c < cols then
-      grid[r][c], colors[r][c] = ch, g
-    end
-  end
+  local g = require("dbdash.render.charts.grid").new(rows, cols)
   local n = #rs.rows
   local function col_of(i)
     return n == 1 and 0 or math.floor((i - 1) * (cols - 1) / (n - 1) + 0.5)
@@ -64,61 +99,17 @@ function M.render(rs, show, ctx)
     return rows - 1 - math.floor((v - ylo) / (yhi - ylo) * (rows - 1) + 0.5)
   end
   for _, d in ipairs(data) do
-    local g = d.group
     for i = 1, n - 1 do
       local a, b = d.values[i], d.values[i + 1]
       if a and b then
-        local c0, c1 = col_of(i), col_of(i + 1)
-        local r0, r1 = row_of(a), row_of(b)
-        local mid = math.floor((c0 + c1) / 2)
-        if r0 == r1 then
-          for c = c0, c1 do
-            put(r0, c, "─", g)
-          end
-        else
-          for c = c0, mid - 1 do
-            put(r0, c, "─", g)
-          end
-          local up = r1 < r0
-          put(r0, mid, up and "╯" or "╮", g)
-          for r = math.min(r0, r1) + 1, math.max(r0, r1) - 1 do
-            put(r, mid, "│", g)
-          end
-          put(r1, mid, up and "╭" or "╰", g)
-          for c = mid + 1, c1 do
-            put(r1, c, "─", g)
-          end
-        end
+        step(g, col_of(i), row_of(a), col_of(i + 1), row_of(b), d.group)
       elseif a and n == 1 then
-        put(row_of(a), 0, "─", g)
+        g:put(row_of(a), 0, "─", d.group)
       end
     end
   end
-  local lines, hl = {}, {}
-  for r = 0, rows - 1 do
-    local parts, pos = {}, 0
-    for c = 0, cols - 1 do
-      local ch = grid[r][c] or " "
-      if colors[r][c] then
-        hl[#hl + 1] = { row = r, col_s = pos, col_e = pos + #ch, group = colors[r][c] }
-      end
-      parts[#parts + 1] = ch
-      pos = pos + #ch
-    end
-    lines[#lines + 1] = table.concat(parts)
-  end
-  local labels_x = {}
-  local W = require("dbdash.util.width")
-  local maxw = 1
-  for _, l in ipairs(xaxis.labels) do
-    maxw = math.max(maxw, W.width(l))
-  end
-  local step = math.max(1, math.ceil(n / math.max(1, math.floor(cols / (maxw + 2)))))
-  for i = 1, n, step do
-    labels_x[#labels_x + 1] = { col = col_of(i), label = xaxis.labels[i] }
-  end
-  spec.xticks = labels_x
-  return ctx.frame.render(ctx, spec, { lines = lines, hl = hl })
+  spec.xticks = x_ticks(xaxis.labels, n, cols, col_of)
+  return ctx.frame.render(ctx, spec, g:output())
 end
 
 return M

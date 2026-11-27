@@ -356,44 +356,24 @@ function M.horizontal(ctx, bars, o)
   return ctx.frame.render(ctx, spec, { lines = lines, hl = hl })
 end
 
----@class dbdash.render.charts.bars.Grid cells of vertical bars, row 0 at the top
----@field rows integer
----@field cols integer
----@field cells table<integer, table<integer, string>>
----@field groups table<integer, string> highlight of cell r * cols + c
-
-local function new_grid(rows, cols)
-  local g = { rows = rows, cols = cols, cells = {}, groups = {} }
-  for r = 0, rows - 1 do
-    g.cells[r] = {}
-  end
-  return g
-end
-
 ---Fill column c from `from` (rows of height, float) to `to`: full blocks, an eighth on top.
 local function fill(g, c, from, to, group)
   local rows = g.rows
   local full_from, full_to = math.floor(from + 0.5), math.floor(to)
   for k = full_from, full_to - 1 do
-    if k >= 0 and k < rows then
-      g.cells[rows - 1 - k][c] = "█"
-      g.groups[(rows - 1 - k) * g.cols + c] = group
-    end
+    g:put(rows - 1 - k, c, "█", group)
   end
   local rest = math.floor((to - full_to) * 8 + 0.5)
   if rest > 0 and full_to < rows and full_to >= full_from then
-    g.cells[rows - 1 - full_to][c] = EIGHTHS_V[rest]
-    g.groups[(rows - 1 - full_to) * g.cols + c] = group
+    g:put(rows - 1 - full_to, c, EIGHTHS_V[rest], group)
   end
 end
 
+---Text from (r, start) on, a character (of any width) per cell.
 local function put_text(g, r, start, text, group)
   local k = 0
   for ch in W.chars(text) do
-    if start + k < g.cols and start + k >= 0 then
-      g.cells[r][start + k] = ch
-      g.groups[r * g.cols + start + k] = group
-    end
+    g:put(r, start + k, ch, group)
     k = k + 1
   end
 end
@@ -442,25 +422,6 @@ local function vertical_bar(ctx, g, v, i, b, o)
   return c0 + math.floor(width_all / 2)
 end
 
----The grid as lines with highlights.
-local function grid_lines(g)
-  local lines, hl = {}, {}
-  for r = 0, g.rows - 1 do
-    local parts, pos = {}, 0
-    for c = 0, g.cols - 1 do
-      local ch = g.cells[r][c] or " "
-      local group = g.groups[r * g.cols + c]
-      if group then
-        hl[#hl + 1] = { row = r, col_s = pos, col_e = pos + #ch, group = group }
-      end
-      parts[#parts + 1] = ch
-      pos = pos + #ch
-    end
-    lines[#lines + 1] = table.concat(parts)
-  end
-  return lines, hl
-end
-
 ---Vertical bars: columns with eighth-block tops, category labels below.
 function M.vertical(ctx, bars, o)
   local stacked = o.stacked
@@ -493,7 +454,7 @@ function M.vertical(ctx, bars, o)
       return hi > lo and math.max(0, x - lo) / (hi - lo) * rows or 0
     end,
   }
-  local g = new_grid(rows, cols)
+  local g = require("dbdash.render.charts.grid").new(rows, cols)
   local centers = {}
   for i, b in ipairs(bars) do
     centers[i] = vertical_bar(ctx, g, v, i, b, o)
@@ -504,17 +465,14 @@ function M.vertical(ctx, bars, o)
     if r >= 0 and r < rows then
       local group = mark_group(ctx, m)
       for c = 0, cols - 1 do
-        if not g.cells[r][c] then
-          g.cells[r][c] = "┄"
-          g.groups[r * cols + c] = group
-        end
+        g:put(r, c, "┄", group, true)
       end
       if m.label then
         put_text(g, r, cols - W.width(m.label), m.label, group)
       end
     end
   end
-  local lines, hl = grid_lines(g)
+  local out = g:output()
   -- Label every bar, truncated to its slot; with very narrow slots, label every k-th bar.
   spec.xticks = {}
   local every = slot >= 4 and 1 or math.ceil(4 / slot)
@@ -522,7 +480,7 @@ function M.vertical(ctx, bars, o)
     local label = slot >= 4 and W.truncate(bars[i].label, slot - 1) or bars[i].label
     spec.xticks[#spec.xticks + 1] = { col = centers[i], label = label }
   end
-  return ctx.frame.render(ctx, spec, { lines = lines, hl = hl })
+  return ctx.frame.render(ctx, spec, out)
 end
 
 ---Bars from x_column and y_column / y_columns / series_column (bar charts), sorted and

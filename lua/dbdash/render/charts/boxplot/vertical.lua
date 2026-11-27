@@ -77,7 +77,7 @@ function M.render(rs, show, ctx)
   spec.yticks, spec.ylabels = C.y_ticks(ctx, lo, hi, rows, axes.yformat)
   local cols
   cols, rows = ctx.frame.plot_size(ctx, spec)
-  local g = boxdraw.grid(rows, cols)
+  local g = require("dbdash.render.charts.grid").new(rows, cols)
   local function row(v)
     return rows - 1 - math.floor((v - lo) / (hi - lo) * (rows - 1) + 0.5)
   end

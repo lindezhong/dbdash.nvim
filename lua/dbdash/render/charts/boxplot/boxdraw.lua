@@ -89,61 +89,6 @@ function M.groups(rs, show)
   return order, stats, lo, hi
 end
 
----@class dbdash.render.charts.boxplot.Grid cells of a box plot, row 0 at the top
----@field rows integer
----@field cols integer
----@field cells table<integer, table<integer, string>>
----@field colors table<integer, table<integer, string>>
-local Grid = {}
-Grid.__index = Grid
-
----@return dbdash.render.charts.boxplot.Grid
-function M.grid(rows, cols)
-  local g = setmetatable({ rows = rows, cols = cols, cells = {}, colors = {} }, Grid)
-  for r = 0, rows - 1 do
-    g.cells[r], g.colors[r] = {}, {}
-  end
-  return g
-end
-
----Put `ch` (highlight `group`) at (r, c) inside the grid; only_blank: not over another.
-function Grid:put(r, c, ch, group, only_blank)
-  if
-    r >= 0
-    and r < self.rows
-    and c >= 0
-    and c < self.cols
-    and (not only_blank or not self.cells[r][c])
-  then
-    self.cells[r][c], self.colors[r][c] = ch, group
-  end
-end
-
----Text from (r, c) on, a character per cell.
-function Grid:text(r, c, text, group, only_blank)
-  for k = 1, #text do
-    self:put(r, c + k - 1, text:sub(k, k), group, only_blank)
-  end
-end
-
----The grid as lines with highlights.
-function Grid:output()
-  local lines, hl = {}, {}
-  for r = 0, self.rows - 1 do
-    local parts, pos = {}, 0
-    for c = 0, self.cols - 1 do
-      local ch = self.cells[r][c] or " "
-      if self.colors[r][c] then
-        hl[#hl + 1] = { row = r, col_s = pos, col_e = pos + #ch, group = self.colors[r][c] }
-      end
-      parts[#parts + 1] = ch
-      pos = pos + #ch
-    end
-    lines[#lines + 1] = table.concat(parts)
-  end
-  return { lines = lines, hl = hl }
-end
-
 ---Box i on rows top..top+2 (`col` maps a value to its column): whiskers, box, median,
 ---mean and outliers, and q1, median, q3 under it when its values show.
 local function draw_box(ctx, show, g, i, s, label, top, col)
@@ -218,7 +163,7 @@ function M.render(rs, show, ctx)
     min_rows = rows,
   }
   local cols = ctx.frame.plot_size(ctx, spec)
-  local g = M.grid(rows, cols)
+  local g = require("dbdash.render.charts.grid").new(rows, cols)
   local function col(v)
     return math.floor((v - lo) / (hi - lo) * (cols - 1) + 0.5)
   end
