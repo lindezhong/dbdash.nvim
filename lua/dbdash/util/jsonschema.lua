@@ -324,19 +324,8 @@ function V:valid(schema, v, path, base)
   return self:check(schema, v, path, base) == nil
 end
 
-function V:check_keywords(s, v, path, base)
-  local t = json_type(v)
-  local e
-
-  if s["$ref"] ~= nil then
-    local target, doc = self:resolve(s["$ref"], base)
-    e = self:check(target, v, path, doc)
-    if e then
-      return e
-    end
-  end
-
-  -- Type and values.
+---type, enum and const (nullable: null is allowed besides the type, OpenAPI 3.0).
+function V:check_type(s, v, t, path)
   local nullable = self.opts.nullable and s.nullable == true and t == "null"
   if s.type ~= nil and not nullable then
     local types = type(s.type) == "string" and { s.type } or s.type
@@ -360,187 +349,203 @@ function V:check_keywords(s, v, path, base)
   if s.const ~= nil and not equal(s.const, v) then
     return err(path, "must be %s", show(s.const))
   end
+  return nil
+end
 
-  -- Numbers.
-  if t == "integer" or t == "number" then
-    if s.multipleOf ~= nil then
-      local q = v / s.multipleOf
-      if
-        q ~= q
-        or q == math.huge
-        or q == -math.huge
-        or math.abs(q - math.floor(q + 0.5)) > 1e-9 * math.max(1, math.abs(q))
-      then
-        return err(path, "must be a multiple of %s", show(s.multipleOf))
-      end
-    end
-    if s.minimum ~= nil and v < s.minimum then
-      return err(path, "must be >= %s", show(s.minimum))
-    end
-    if s.maximum ~= nil and v > s.maximum then
-      return err(path, "must be <= %s", show(s.maximum))
-    end
-    if type(s.exclusiveMinimum) == "number" and v <= s.exclusiveMinimum then
-      return err(path, "must be > %s", show(s.exclusiveMinimum))
-    end
-    if type(s.exclusiveMaximum) == "number" and v >= s.exclusiveMaximum then
-      return err(path, "must be < %s", show(s.exclusiveMaximum))
+---Numbers: multipleOf, minimum, maximum and the exclusive ones.
+function V:check_number(s, v, path)
+  if s.multipleOf ~= nil then
+    local q = v / s.multipleOf
+    if
+      q ~= q
+      or q == math.huge
+      or q == -math.huge
+      or math.abs(q - math.floor(q + 0.5)) > 1e-9 * math.max(1, math.abs(q))
+    then
+      return err(path, "must be a multiple of %s", show(s.multipleOf))
     end
   end
+  if s.minimum ~= nil and v < s.minimum then
+    return err(path, "must be >= %s", show(s.minimum))
+  end
+  if s.maximum ~= nil and v > s.maximum then
+    return err(path, "must be <= %s", show(s.maximum))
+  end
+  if type(s.exclusiveMinimum) == "number" and v <= s.exclusiveMinimum then
+    return err(path, "must be > %s", show(s.exclusiveMinimum))
+  end
+  if type(s.exclusiveMaximum) == "number" and v >= s.exclusiveMaximum then
+    return err(path, "must be < %s", show(s.exclusiveMaximum))
+  end
+  return nil
+end
 
-  -- Strings.
-  if t == "string" then
-    if s.minLength ~= nil and ulen(v) < s.minLength then
-      return err(path, "must be at least %d characters long", s.minLength)
+---Strings: lengths in characters, pattern, format.
+function V:check_string(s, v, path)
+  if s.minLength ~= nil and ulen(v) < s.minLength then
+    return err(path, "must be at least %d characters long", s.minLength)
+  end
+  if s.maxLength ~= nil and ulen(v) > s.maxLength then
+    return err(path, "must be at most %d characters long", s.maxLength)
+  end
+  if s.pattern ~= nil then
+    local r, rerr = regex.get(s.pattern)
+    if not r then
+      error({
+        schema_error = true,
+        message = ("invalid pattern %s: %s"):format(show(s.pattern), rerr),
+      }, 0)
     end
-    if s.maxLength ~= nil and ulen(v) > s.maxLength then
-      return err(path, "must be at most %d characters long", s.maxLength)
-    end
-    if s.pattern ~= nil then
-      local r, rerr = regex.get(s.pattern)
-      if not r then
-        error({
-          schema_error = true,
-          message = ("invalid pattern %s: %s"):format(show(s.pattern), rerr),
-        }, 0)
-      end
-      if not r:test(v) then
-        return err(path, "must match the pattern %s", show(s.pattern))
-      end
-    end
-    if s.format ~= nil and self.opts.formats then
-      local f = M.FORMATS[s.format]
-      if f and not f(v) then
-        return err(path, "must be a valid %s", s.format)
-      end
+    if not r:test(v) then
+      return err(path, "must match the pattern %s", show(s.pattern))
     end
   end
+  if s.format ~= nil and self.opts.formats then
+    local f = M.FORMATS[s.format]
+    if f and not f(v) then
+      return err(path, "must be a valid %s", s.format)
+    end
+  end
+  return nil
+end
 
-  -- Arrays.
-  if t == "array" then
-    local n = #v
-    if s.minItems ~= nil and n < s.minItems then
-      return err(path, "must have at least %d items", s.minItems)
-    end
-    if s.maxItems ~= nil and n > s.maxItems then
-      return err(path, "must have at most %d items", s.maxItems)
-    end
-    if s.uniqueItems == true then
-      for i = 1, n do
-        for j = i + 1, n do
-          if equal(v[i], v[j]) then
-            return err(path, "items %d and %d are equal", i - 1, j - 1)
-          end
+---Arrays: the number of items, uniqueItems, prefixItems and items, contains.
+function V:check_array(s, v, path, base)
+  local e
+  local n = #v
+  if s.minItems ~= nil and n < s.minItems then
+    return err(path, "must have at least %d items", s.minItems)
+  end
+  if s.maxItems ~= nil and n > s.maxItems then
+    return err(path, "must have at most %d items", s.maxItems)
+  end
+  if s.uniqueItems == true then
+    for i = 1, n do
+      for j = i + 1, n do
+        if equal(v[i], v[j]) then
+          return err(path, "items %d and %d are equal", i - 1, j - 1)
         end
       end
     end
-    local prefix = s.prefixItems or {}
-    for i = 1, math.min(#prefix, n) do
-      e = self:check(prefix[i], v[i], child(path, i - 1), base)
+  end
+  local prefix = s.prefixItems or {}
+  for i = 1, math.min(#prefix, n) do
+    e = self:check(prefix[i], v[i], child(path, i - 1), base)
+    if e then
+      return e
+    end
+  end
+  if s.items ~= nil then
+    for i = #prefix + 1, n do
+      e = self:check(s.items, v[i], child(path, i - 1), base)
       if e then
         return e
       end
     end
-    if s.items ~= nil then
-      for i = #prefix + 1, n do
-        e = self:check(s.items, v[i], child(path, i - 1), base)
-        if e then
-          return e
-        end
+  end
+  if s.contains ~= nil then
+    local count = 0
+    for i = 1, n do
+      if self:valid(s.contains, v[i], child(path, i - 1), base) then
+        count = count + 1
       end
     end
-    if s.contains ~= nil then
-      local count = 0
-      for i = 1, n do
-        if self:valid(s.contains, v[i], child(path, i - 1), base) then
-          count = count + 1
-        end
-      end
-      local min = s.minContains or 1
-      if count < min then
-        return err(path, "must contain at least %d matching item(s)", min)
-      end
-      if s.maxContains ~= nil and count > s.maxContains then
-        return err(path, "must contain at most %d matching item(s)", s.maxContains)
-      end
+    local min = s.minContains or 1
+    if count < min then
+      return err(path, "must contain at least %d matching item(s)", min)
+    end
+    if s.maxContains ~= nil and count > s.maxContains then
+      return err(path, "must contain at most %d matching item(s)", s.maxContains)
     end
   end
+  return nil
+end
 
-  -- Objects.
-  if t == "object" then
-    local keys = map.keys(v)
-    if s.minProperties ~= nil and #keys < s.minProperties then
-      return err(path, "must have at least %d properties", s.minProperties)
-    end
-    if s.maxProperties ~= nil and #keys > s.maxProperties then
-      return err(path, "must have at most %d properties", s.maxProperties)
-    end
-    for _, name in ipairs(s.required or {}) do
-      if v[name] == nil then
-        return err(path, "missing required property %s", show(name))
+---properties, patternProperties, additionalProperties and propertyNames of each key.
+function V:check_properties(s, v, keys, path, base)
+  local e
+  local props, patterns = s.properties or {}, s.patternProperties or {}
+  for _, k in ipairs(keys) do
+    local x = v[k]
+    local p = child(path, k)
+    local covered = false
+    if props[k] ~= nil then
+      covered = true
+      e = self:check(props[k], x, p, base)
+      if e then
+        return e
       end
     end
-    for name, needs in pairs(s.dependentRequired or {}) do
-      if v[name] ~= nil then
-        for _, other in ipairs(needs) do
-          if v[other] == nil then
-            return err(path, "property %s requires %s", show(name), show(other))
-          end
-        end
+    for pat, sub in pairs(patterns) do
+      local r = regex.get(pat)
+      if not r then
+        error({ schema_error = true, message = ("invalid pattern %s"):format(show(pat)) }, 0)
       end
-    end
-    for name, sub in pairs(s.dependentSchemas or {}) do
-      if v[name] ~= nil then
-        e = self:check(sub, v, path, base)
-        if e then
-          return e
-        end
-      end
-    end
-    local props, patterns = s.properties or {}, s.patternProperties or {}
-    for _, k in ipairs(keys) do
-      local x = v[k]
-      local p = child(path, k)
-      local covered = false
-      if props[k] ~= nil then
+      if type(k) == "string" and r:test(k) then
         covered = true
-        e = self:check(props[k], x, p, base)
+        e = self:check(sub, x, p, base)
         if e then
           return e
         end
       end
-      for pat, sub in pairs(patterns) do
-        local r = regex.get(pat)
-        if not r then
-          error({ schema_error = true, message = ("invalid pattern %s"):format(show(pat)) }, 0)
-        end
-        if type(k) == "string" and r:test(k) then
-          covered = true
-          e = self:check(sub, x, p, base)
-          if e then
-            return e
-          end
-        end
+    end
+    if not covered and s.additionalProperties ~= nil then
+      if s.additionalProperties == false then
+        return err(p, "property %s is not allowed", show(k))
       end
-      if not covered and s.additionalProperties ~= nil then
-        if s.additionalProperties == false then
-          return err(p, "property %s is not allowed", show(k))
-        end
-        e = self:check(s.additionalProperties, x, p, base)
-        if e then
-          return e
-        end
+      e = self:check(s.additionalProperties, x, p, base)
+      if e then
+        return e
       end
-      if s.propertyNames ~= nil then
-        e = self:check(s.propertyNames, k, p, base)
-        if e then
-          return err(p, "invalid property name %s: %s", show(k), e.message)
+    end
+    if s.propertyNames ~= nil then
+      e = self:check(s.propertyNames, k, p, base)
+      if e then
+        return err(p, "invalid property name %s: %s", show(k), e.message)
+      end
+    end
+  end
+  return nil
+end
+
+---Objects: the number of properties, required ones, dependencies, each property.
+function V:check_object(s, v, path, base)
+  local keys = map.keys(v)
+  local e
+  if s.minProperties ~= nil and #keys < s.minProperties then
+    return err(path, "must have at least %d properties", s.minProperties)
+  end
+  if s.maxProperties ~= nil and #keys > s.maxProperties then
+    return err(path, "must have at most %d properties", s.maxProperties)
+  end
+  for _, name in ipairs(s.required or {}) do
+    if v[name] == nil then
+      return err(path, "missing required property %s", show(name))
+    end
+  end
+  for name, needs in pairs(s.dependentRequired or {}) do
+    if v[name] ~= nil then
+      for _, other in ipairs(needs) do
+        if v[other] == nil then
+          return err(path, "property %s requires %s", show(name), show(other))
         end
       end
     end
   end
+  for name, sub in pairs(s.dependentSchemas or {}) do
+    if v[name] ~= nil then
+      e = self:check(sub, v, path, base)
+      if e then
+        return e
+      end
+    end
+  end
+  return self:check_properties(s, v, keys, path, base)
+end
 
-  -- Combinations.
+---allOf, anyOf, oneOf, not and if / then / else.
+function V:check_combinations(s, v, path, base)
+  local e
   for _, sub in ipairs(s.allOf or {}) do
     e = self:check(sub, v, path, base)
     if e then
@@ -597,6 +602,41 @@ function V:check_keywords(s, v, path, base)
     end
   end
   return nil
+end
+
+local BY_TYPE = {
+  integer = V.check_number,
+  number = V.check_number,
+  string = V.check_string,
+  array = V.check_array,
+  object = V.check_object,
+}
+
+---The keywords of schema `s` for `v`: $ref, type and values, those of v's type, the
+---combinations; the first error.
+function V:check_keywords(s, v, path, base)
+  local t = json_type(v)
+  local e
+  if s["$ref"] ~= nil then
+    local target, doc = self:resolve(s["$ref"], base)
+    e = self:check(target, v, path, doc)
+    if e then
+      return e
+    end
+  end
+
+  e = self:check_type(s, v, t, path)
+  if e then
+    return e
+  end
+  local by_type = BY_TYPE[t]
+  if by_type then
+    e = by_type(self, s, v, path, base)
+    if e then
+      return e
+    end
+  end
+  return self:check_combinations(s, v, path, base)
 end
 
 ---@class dbdash.jsonschema.Opts
