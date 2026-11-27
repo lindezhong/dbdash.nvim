@@ -4,7 +4,7 @@
 -- :help dbdash-http.
 --
 --   curl -X POST /search -H 'X-Token: t' -b .cookies.txt -c .cookies.txt --json '{...}' -L
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local http = require("dbdash.net.http")
 local cookie = require("dbdash.net.http_cookie")
 

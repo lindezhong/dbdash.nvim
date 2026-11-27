@@ -20,7 +20,7 @@ local function text(v, col)
     end
     return v
   elseif t == "number" then
-    return require("dbdash.template.runtime").numstr(v)
+    return require("dbdash.util.number").numstr(v)
   elseif t == "boolean" then
     return v and "true" or "false"
   elseif t == "cdata" then

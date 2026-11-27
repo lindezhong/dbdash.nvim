@@ -2,7 +2,7 @@
 -- sh -c, cmd /c on Windows); what it writes (stdout, stderr or both) is cut into items at
 -- the delimiter (:help dbdash-exec). It ends when the script exits.
 local async = require("dbdash.util.async")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local options = require("dbdash.db.push.options")
 
 local M = {

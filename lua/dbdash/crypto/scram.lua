@@ -2,7 +2,7 @@
 local hmac = require("dbdash.crypto.hmac")
 local pbkdf2 = require("dbdash.crypto.pbkdf2")
 local util = require("dbdash.crypto.util")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 
 local M = {}
 

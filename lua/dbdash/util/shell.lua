@@ -13,4 +13,12 @@ function M.argv(cmd)
   return { "sh", "-c", cmd }
 end
 
+---One shell word in single quotes: any text comes back as it is (the template filter
+---shell_quote, and the autoescape of curl commands for http:// databases).
+---@param s any
+---@return string
+function M.quote(s)
+  return "'" .. tostring(s):gsub("'", "'\\''") .. "'"
+end
+
 return M

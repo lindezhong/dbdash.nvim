@@ -1,5 +1,5 @@
 -- database.options of push sources: checked by type, unknown names are errors.
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local map = require("dbdash.util.map")
 
 local M = {}

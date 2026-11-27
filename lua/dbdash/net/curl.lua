@@ -451,11 +451,4 @@ function M.parse(text, base_dir)
   return r
 end
 
----Quote a value for a curl command (shell single quotes): the template filter
----shell_quote and the autoescape of http:// databases.
----@param s string
-function M.quote(s)
-  return "'" .. tostring(s):gsub("'", "'\\''") .. "'"
-end
-
 return M

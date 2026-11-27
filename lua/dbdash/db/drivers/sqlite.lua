@@ -10,7 +10,7 @@
 -- database.options: lib_path (library to load), readonly (open read-only),
 -- create (create the file when missing; off by default so a typo does not create a db).
 local async = require("dbdash.util.async")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 
@@ -326,9 +326,9 @@ local function cell(tag, raw, ltype)
   if ltype == "boolean" and (tag == "I" or tag == "R") then
     return v ~= 0 and v ~= "0"
   elseif ltype == "json" and tag == "T" then
-    return require("dbdash.db.json").decode(v)
+    return require("dbdash.util.json").decode(v)
   elseif ltype == "decimal" and (tag == "I" or tag == "R") then
-    return type(v) == "number" and require("dbdash.template.runtime").numstr(v) or v
+    return type(v) == "number" and require("dbdash.util.number").numstr(v) or v
   end
   return v
 end

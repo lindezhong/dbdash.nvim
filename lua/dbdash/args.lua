@@ -178,7 +178,7 @@ function M.format_value(v)
   elseif type(v) == "boolean" then
     return v and "true" or "false"
   elseif type(v) == "number" then
-    return require("dbdash.template.runtime").numstr(v)
+    return require("dbdash.util.number").numstr(v)
   elseif map.is_map(v) then
     local parts = {}
     for k, x in map.pairs(v) do

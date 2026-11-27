@@ -345,7 +345,7 @@ T["path: the URL's path and the command's path are joined as they are"] = functi
     { "/v1", "", "/v1" },
     { "", "", "/" },
   }) do
-    h.ok(base .. c[1], "curl " .. require("dbdash.net.curl").quote(c[2]))
+    h.ok(base .. c[1], "curl " .. require("dbdash.util.shell").quote(c[2]))
     eq({ c[1], c[2], seen[#seen].target }, { c[1], c[2], c[3] })
   end
   -- A full URL is refused: the host is database.url's.

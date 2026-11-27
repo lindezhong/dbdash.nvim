@@ -11,7 +11,7 @@
 -- Security follows MCP's rules for HTTP endpoints (:help dbdash-webhook-security):
 -- localhost by default, credentials only in headers or cookies, Origin and Host checked,
 -- limits on body size, connections and slow requests.
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local map = require("dbdash.util.map")
 local options = require("dbdash.db.push.options")
 

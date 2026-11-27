@@ -4,7 +4,7 @@
 -- called, the whole operation is bounded by connect_timeout + timeout, and callbacks always
 -- run on the main loop. A query can be cancelled (M.query's handle, opts.cancel).
 local async = require("dbdash.util.async")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 local url = require("dbdash.db.url")

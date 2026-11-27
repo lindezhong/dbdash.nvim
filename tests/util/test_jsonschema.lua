@@ -2,7 +2,7 @@
 -- keywords (tests/fixtures/jsonschema_suite.json, made by tests/util/jsonschema_gen.py), and
 -- formats, OpenAPI's nullable, error paths.
 local js = require("dbdash.util.jsonschema")
-local json = require("dbdash.db.json")
+local json = require("dbdash.util.json")
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()
 

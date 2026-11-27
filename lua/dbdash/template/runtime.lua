@@ -5,6 +5,9 @@
 -- (StrictUndefined: any use other than `is defined` and `default` raises). Numbers: a Lua
 -- number is an int when it is integral and a float otherwise; a float with an integral
 -- value (2.0) is boxed (Float), so it prints as Python does.
+local markup = require("dbdash.util.markup")
+local number = require("dbdash.util.number")
+local pystr = require("dbdash.util.pystr")
 local map = require("dbdash.util.map")
 local errors = require("dbdash.template.errors")
 
@@ -44,14 +47,9 @@ local check = R.check
 
 -- Safe strings (output verbatim even with autoescape) -------------------------------------
 
-local Safe = {}
-Safe.__index = Safe
-function R.safe(s)
-  return setmetatable({ s = s }, Safe)
-end
-function R.is_safe(v)
-  return getmetatable(v) == Safe
-end
+local Safe = markup.Safe
+R.safe = markup.safe
+R.is_safe = markup.is_safe
 
 ---The text of a string or safe string; nil for other values.
 local function as_str(v)
@@ -129,22 +127,9 @@ end
 
 -- Floats with an integral value ------------------------------------------------------------
 
-local Float = {}
-Float.__index = Float
-
----A float: boxed when its value is integral (2.0), else the plain number.
----@param x number
-function R.float(x)
-  if x == x and x ~= math.huge and x ~= -math.huge and x == math.floor(x) then
-    return setmetatable({ v = x }, Float)
-  end
-  return x
-end
-
----True for a boxed integral float.
-function R.is_float_box(v)
-  return getmetatable(v) == Float
-end
+local Float = number.Float
+R.float = number.float
+R.is_float_box = number.is_float_box
 
 ---True for any float (boxed, non-integral, inf or nan).
 function R.is_float(v)
@@ -310,106 +295,28 @@ function R.truthy(v)
   return true
 end
 
----Python repr() of a float (boxed or plain).
-function R.floatstr(v)
-  if getmetatable(v) == Float then
-    v = v.v
-  end
-  if v == math.floor(v) and math.abs(v) < 1e16 then
-    return ("%.0f"):format(v) .. ".0"
-  end
-  return R.numstr(v)
-end
+R.floatstr = number.floatstr
+R.numstr = number.numstr
 
----Python repr() of a float/int.
-function R.numstr(v)
-  if getmetatable(v) == Float then
-    return R.floatstr(v)
-  end
-  if v ~= v then
-    return "nan"
-  elseif v == math.huge then
-    return "inf"
-  elseif v == -math.huge then
-    return "-inf"
-  elseif v == math.floor(v) and math.abs(v) < 1e16 then
-    return ("%.0f"):format(v)
-  end
-  local s
-  for p = 1, 17 do
-    s = ("%." .. p .. "e"):format(v)
-    if tonumber(s) == v then
-      break
-    end
-  end
-  -- s looks like "-1.2345e-05": rebuild in Python's repr style.
-  local sign, int, frac, exp = s:match("^(-?)(%d)%.?(%d*)e([-+]%d+)$")
-  local digits = (int .. frac):gsub("0+$", "")
-  if digits == "" then
-    digits = "0"
-  end
-  exp = tonumber(exp)
-  if exp >= -4 and exp < 16 then
-    if exp < 0 then
-      return sign .. "0." .. string.rep("0", -exp - 1) .. digits
-    end
-    local ip = digits:sub(1, exp + 1)
-    ip = ip .. string.rep("0", exp + 1 - #ip)
-    local fp = digits:sub(exp + 2)
-    return sign .. ip .. "." .. (fp == "" and "0" or fp)
-  end
-  local m = digits:sub(1, 1) .. (#digits > 1 and ("." .. digits:sub(2)) or "")
-  return ("%s%se%s%02d"):format(sign, m, exp < 0 and "-" or "+", math.abs(exp))
-end
+R.strrepr = pystr.strrepr
 
----Python repr() of a string.
-function R.strrepr(s)
-  local q = "'"
-  if s:find("'", 1, true) and not s:find('"', 1, true) then
-    q = '"'
-  end
-  local out = s:gsub("[\\\n\r\t%c" .. q .. "]", function(c)
-    if c == "\\" then
-      return "\\\\"
-    elseif c == "\n" then
-      return "\\n"
-    elseif c == "\r" then
-      return "\\r"
-    elseif c == "\t" then
-      return "\\t"
-    elseif c == q then
-      return "\\" .. q
-    end
-    return ("\\x%02x"):format(c:byte())
-  end)
-  return q .. out .. q
-end
-
----Python repr().
+---Python repr(): template values here (tuples, dict views, namespaces, ...), plain data
+---in util.pystr.
 function R.repr(v)
-  if type(v) == "string" then
-    return R.strrepr(v)
-  elseif getmetatable(v) == Safe then
-    return "Markup(" .. R.strrepr(v.s) .. ")"
-  elseif map.is_map(v) then
-    local parts = {}
-    for k, x in map.pairs(v) do
-      parts[#parts + 1] = R.repr(k) .. ": " .. R.repr(x)
-    end
-    return "{" .. table.concat(parts, ", ") .. "}"
-  elseif is_list(v) then
+  local mt = getmetatable(v)
+  if mt == Tuple or mt == View then
     local parts = {}
     for i = 1, #v do
       parts[i] = R.repr(v[i])
     end
-    if getmetatable(v) == Tuple then
+    if mt == Tuple then
       return "(" .. table.concat(parts, ", ") .. (#v == 1 and ",)" or ")")
-    elseif getmetatable(v) == View then
-      return (view_names[v] or "dict_keys") .. "([" .. table.concat(parts, ", ") .. "])"
     end
-    return "[" .. table.concat(parts, ", ") .. "]"
-  elseif R.repr_hook[getmetatable(v) or false] then
-    return R.repr_hook[getmetatable(v)](v)
+    return (view_names[v] or "dict_keys") .. "([" .. table.concat(parts, ", ") .. "])"
+  elseif R.repr_hook[mt or false] then
+    return R.repr_hook[mt](v)
+  elseif type(v) == "string" or mt == Safe or map.is_map(v) or is_list(v) then
+    return pystr.repr(v, R.repr)
   end
   return R.str(v)
 end
@@ -417,32 +324,18 @@ end
 ---repr() of other value types by metatable (namespace, cycler, ...).
 R.repr_hook = {}
 
----Python str().
+---Python str(): template values here (loops, macros), the rest in util.pystr.
 function R.str(v)
   check(v)
-  local t = type(v)
-  if t == "string" then
-    return v
-  elseif t == "number" then
-    return R.numstr(v)
-  elseif getmetatable(v) == Float then
-    return R.floatstr(v)
-  elseif v == true then
-    return "True"
-  elseif v == false then
-    return "False"
-  elseif v == R.NONE or v == nil then
-    return "None"
-  elseif getmetatable(v) == Safe then
-    return v.s
-  elseif getmetatable(v) == Loop then
+  local mt = getmetatable(v)
+  if mt == Loop then
     return "<LoopContext>"
-  elseif getmetatable(v) == Macro then
+  elseif mt == Macro then
     return ("<Macro '%s'>"):format(v.name)
-  elseif t == "table" then
+  elseif type(v) == "table" and v ~= R.NONE and mt ~= Safe and mt ~= Float then
     return R.repr(v)
   end
-  return tostring(v)
+  return pystr.str(v)
 end
 
 ---HTML escaping (Jinja's escape / autoescape outside SQL).

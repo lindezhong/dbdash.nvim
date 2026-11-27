@@ -3,7 +3,7 @@
 -- u1*G + u2*Q with Shamir's trick. Not constant-time (accepted risk, see :h dbdash-tls).
 local checkpoint = require("dbdash.util.async").checkpoint -- yields inside tasks only
 local bn = require("dbdash.crypto.bignum")
-local asn1 = require("dbdash.net.tls.asn1")
+local asn1 = require("dbdash.crypto.asn1")
 
 local M = {}
 

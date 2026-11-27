@@ -113,7 +113,7 @@ local function format_number(v, o)
   end
   if typ == "c" then
     return pad(
-      require("dbdash.template.lexer").utf8_char(math.floor(x)),
+      require("dbdash.util.utf8").char(math.floor(x)),
       o.width,
       o.align or (o.percent and ">" or "<"),
       o.fill or " ",

@@ -1,6 +1,6 @@
 -- Trusted root certificates for tls=verify-full: the system store, or a CA file given
 -- with ?ca=. Bundles are parsed once and cached by path and modification time.
-local asn1 = require("dbdash.net.tls.asn1")
+local asn1 = require("dbdash.crypto.asn1")
 local x509 = require("dbdash.net.tls.x509")
 
 local M = {}

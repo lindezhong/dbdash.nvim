@@ -2,7 +2,7 @@
 -- caching_sha2_password (fast path, and full authentication with the server's RSA key on
 -- plain-text connections), COM_QUERY text protocol with multiple result sets.
 local bit = require("bit")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 local socket = require("dbdash.net.socket")
@@ -202,7 +202,7 @@ local function decode_value(raw, col)
   elseif t == "number" then
     return tonumber(raw) or raw
   elseif t == "json" then
-    return require("dbdash.db.json").decode(raw)
+    return require("dbdash.util.json").decode(raw)
   end
   return raw
 end

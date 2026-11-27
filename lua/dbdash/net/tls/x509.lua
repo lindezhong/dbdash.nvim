@@ -2,7 +2,7 @@
 -- extensions needed for chain validation (basicConstraints, keyUsage, extKeyUsage,
 -- subjectAltName, key identifiers). Unknown critical extensions are recorded so the
 -- verifier can reject them.
-local asn1 = require("dbdash.net.tls.asn1")
+local asn1 = require("dbdash.crypto.asn1")
 local bit = require("bit")
 
 local M = {}
@@ -75,7 +75,7 @@ function M.parse_time(node)
     fail("unsupported time format " .. v)
   end
   local iso = ("%04d-%s-%sT%s:%s:%sZ"):format(y, mo, d, h, mi, s)
-  return math.floor(require("dbdash.db.bson").iso_to_ms(iso) / 1000)
+  return math.floor(assert(require("dbdash.util.time").iso_to_ms(iso)) / 1000)
 end
 
 ---Common name from a Name, or nil.

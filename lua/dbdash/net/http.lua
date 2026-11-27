@@ -1,7 +1,7 @@
 -- A small HTTP/1.1 client for http(s):// queries, on dbdash's sockets and TLS. One request
 -- per connection (Connection: close); bodies by Content-Length, chunked or until close;
 -- redirects followed with the cookie jar. Must run inside a util.async task.
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local socket = require("dbdash.net.socket")
 
 local M = {}

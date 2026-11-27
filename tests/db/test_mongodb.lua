@@ -1,5 +1,5 @@
 local bson = require("dbdash.db.bson")
-local json = require("dbdash.db.json")
+local json = require("dbdash.util.json")
 local mongo = require("dbdash.db.drivers.mongodb")
 local map = require("dbdash.util.map")
 local u = require("dbdash.crypto.util")
@@ -44,7 +44,7 @@ end
 T["dates"] = function()
   eq(bson.ms_to_iso(0), "1970-01-01T00:00:00.000Z")
   eq(bson.ms_to_iso(951782400000), "2000-02-29T00:00:00.000Z")
-  eq(bson.iso_to_ms("2000-02-29T08:00:00+08:00"), 951782400000)
+  eq(require("dbdash.util.time").iso_to_ms("2000-02-29T08:00:00+08:00"), 951782400000)
   eq(bson.ms_to_iso(-86400000), "1969-12-31T00:00:00.000Z")
 end
 

@@ -48,26 +48,7 @@ local SIMPLE_ESC = {
   ["\n"] = "",
 }
 
-local function utf8_char(cp)
-  if cp < 0x80 then
-    return string.char(cp)
-  elseif cp < 0x800 then
-    return string.char(0xC0 + math.floor(cp / 0x40), 0x80 + cp % 0x40)
-  elseif cp < 0x10000 then
-    return string.char(
-      0xE0 + math.floor(cp / 0x1000),
-      0x80 + math.floor(cp / 0x40) % 0x40,
-      0x80 + cp % 0x40
-    )
-  end
-  return string.char(
-    0xF0 + math.floor(cp / 0x40000),
-    0x80 + math.floor(cp / 0x1000) % 0x40,
-    0x80 + math.floor(cp / 0x40) % 0x40,
-    0x80 + cp % 0x40
-  )
-end
-M.utf8_char = utf8_char
+local utf8_char = require("dbdash.util.utf8").char
 
 ---Tokenize template source.
 ---@param src string

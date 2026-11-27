@@ -4,7 +4,7 @@
 --   * stdpath("data")/dbdash/passwords.json maps URLs without passwords to passwords.
 -- A password in the URL wins over password_cmd, which wins over passwords.json.
 local async = require("dbdash.util.async")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 
 local M = {}
 

@@ -4,7 +4,7 @@
 -- A transport filter (TLS, M4) can be installed with set_filter(): outgoing bytes pass
 -- through filter:wrap() and incoming bytes through filter:unwrap().
 local async = require("dbdash.util.async")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 
 local M = {}
 

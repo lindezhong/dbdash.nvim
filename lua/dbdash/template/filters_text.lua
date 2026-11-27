@@ -236,7 +236,7 @@ local function unescape(s)
       end
       local n = kind:lower() == "#x" and tonumber(body, 16) or tonumber(body)
       if n then
-        return require("dbdash.template.lexer").utf8_char(n)
+        return require("dbdash.util.utf8").char(n)
       end
     end)
   )

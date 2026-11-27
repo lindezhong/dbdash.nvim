@@ -13,7 +13,7 @@ local M = {}
 ---@field null string
 
 local function numstr(v)
-  return require("dbdash.template.runtime").numstr(v)
+  return require("dbdash.util.number").numstr(v)
 end
 
 local function fail(msg, ...)
@@ -77,10 +77,10 @@ local function make(name, spec)
       return numstr(v)
     elseif type(v) == "string" then
       return d.quote_string(v)
-    elseif require("dbdash.template.runtime").is_safe(v) then
+    elseif require("dbdash.util.markup").is_safe(v) then
       return v.s
-    elseif require("dbdash.template.runtime").is_float_box(v) then
-      return require("dbdash.template.runtime").floatstr(v) -- 2.0 (a template float)
+    elseif require("dbdash.util.number").is_float_box(v) then
+      return require("dbdash.util.number").floatstr(v) -- 2.0 (a template float)
     elseif map.is_map(v) then
       if spec.map_literal then
         return spec.map_literal(v)
@@ -168,10 +168,10 @@ M.dialects = {
 M.dialects.http = make("http", {
   null = "''",
   quote_string = function(s)
-    return require("dbdash.net.curl").quote(s)
+    return require("dbdash.util.shell").quote(s)
   end,
   quote_ident = function(s)
-    return require("dbdash.net.curl").quote(s)
+    return require("dbdash.util.shell").quote(s)
   end,
   boolean_literal = function(b)
     return b and "true" or "false"

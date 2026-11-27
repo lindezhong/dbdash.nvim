@@ -8,7 +8,7 @@
 --   dbdash.safe(s)    (templates) output s as is, even with autoescape
 --   store             the panel's table kept for as long as the dashboard runs
 local async = require("dbdash.util.async")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 
 local M = {}
 
@@ -16,7 +16,7 @@ local M = {}
 M.helpers = {
   null = vim.NIL,
   safe = function(s)
-    return require("dbdash.template.runtime").safe(tostring(s))
+    return require("dbdash.util.markup").safe(tostring(s))
   end,
   checkpoint = async.checkpoint,
   sleep = async.sleep,

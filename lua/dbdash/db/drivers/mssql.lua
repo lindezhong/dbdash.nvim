@@ -3,7 +3,7 @@
 -- COLMETADATA / ROW / NBCROW decoding.
 local bit = require("bit")
 local ffi = require("ffi")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 local socket = require("dbdash.net.socket")
@@ -97,7 +97,7 @@ end
 ---UTF-16LE -> UTF-8.
 function M.utf8(s)
   local out = {}
-  local lexer = require("dbdash.template.lexer")
+  local utf8 = require("dbdash.util.utf8")
   local i = 1
   while i + 1 <= #s do
     local u = s:byte(i) + s:byte(i + 1) * 256
@@ -109,7 +109,7 @@ function M.utf8(s)
         i = i + 2
       end
     end
-    out[#out + 1] = lexer.utf8_char(u)
+    out[#out + 1] = utf8.char(u)
   end
   return table.concat(out)
 end
@@ -119,9 +119,9 @@ local function latin1(s)
   if not s:find("[\128-\255]") then
     return s
   end
-  local lexer = require("dbdash.template.lexer")
+  local utf8 = require("dbdash.util.utf8")
   return (s:gsub("[\128-\255]", function(c)
-    return lexer.utf8_char(c:byte())
+    return utf8.char(c:byte())
   end))
 end
 

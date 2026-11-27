@@ -1,7 +1,7 @@
 -- Signature verification against signatures made by Python's cryptography package
 -- (tests/fixtures: ec.key / ec_cert.pem, rsa2048.pem / rsa_cert.pem).
 local u = require("dbdash.crypto.util")
-local asn1 = require("dbdash.net.tls.asn1")
+local asn1 = require("dbdash.crypto.asn1")
 local x509 = require("dbdash.net.tls.x509")
 local ecdsa = require("dbdash.crypto.ecdsa_p256")
 local rsa = require("dbdash.crypto.rsa")

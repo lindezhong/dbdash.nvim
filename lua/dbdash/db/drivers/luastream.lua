@@ -6,7 +6,7 @@
 -- database.options.cwd is the code's directory: Lua runs inside Neovim, so instead of
 -- changing the process's directory, io.open / io.lines / dofile / loadfile resolve relative
 -- paths there and io.popen / os.execute / dbdash.system() run commands there.
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local options = require("dbdash.db.push.options")
 
 local M = {

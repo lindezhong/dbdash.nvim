@@ -1,7 +1,7 @@
 -- Connection URL parsing (design §8.8):
 --   <scheme>://[user[:password]@]host[:port][/database][?param=value&...]
 --   sqlite:///absolute/path.db   sqlite:///:memory:   sqlite://relative/path.db
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local duration = require("dbdash.util.duration")
 
 local M = {}

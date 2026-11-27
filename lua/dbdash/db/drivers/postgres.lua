@@ -1,7 +1,7 @@
 -- PostgreSQL driver (design §8.4): frontend/backend protocol 3.0, Simple Query, text
 -- format results mapped by type OID. Authentication: cleartext, md5, SCRAM-SHA-256.
 local bit = require("bit")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 local socket = require("dbdash.net.socket")
@@ -271,7 +271,7 @@ function decode_value(s, oid)
   elseif t == "bytes" then
     return decode_bytea(s)
   elseif t == "json" then
-    return require("dbdash.db.json").decode(s)
+    return require("dbdash.util.json").decode(s)
   end
   return s
 end

@@ -77,7 +77,7 @@ end
 F.shell_quote = function(_, v, args, kw)
   filters.bind("shell_quote", args, kw, {})
   v = plain(v)
-  local q = require("dbdash.net.curl").quote
+  local q = require("dbdash.util.shell").quote
   if v == NONE then
     return "''"
   elseif R.is_list(v) then

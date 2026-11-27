@@ -7,9 +7,9 @@
 -- Each document is a row; columns are the union of top-level keys in first-seen order;
 -- nested documents are expanded to "a.b" columns up to `flatten` levels.
 local bson = require("dbdash.db.bson")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local dialect = require("dbdash.db.dialect")
-local json = require("dbdash.db.json")
+local json = require("dbdash.util.json")
 local map = require("dbdash.util.map")
 local resultset = require("dbdash.db.resultset")
 local socket = require("dbdash.net.socket")

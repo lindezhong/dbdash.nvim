@@ -9,7 +9,7 @@
 --   a result set (e.g. from dbdash.query)                       used as is
 -- nil values are NULL; column types follow the first non-NULL value.
 local resultset = require("dbdash.db.resultset")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 
 local M = {}
 

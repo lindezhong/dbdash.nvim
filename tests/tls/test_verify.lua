@@ -1,5 +1,5 @@
 -- verify-full building blocks against the test PKI (tests/fixtures/pki/gen.py).
-local asn1 = require("dbdash.net.tls.asn1")
+local asn1 = require("dbdash.crypto.asn1")
 local x509 = require("dbdash.net.tls.x509")
 local verify = require("dbdash.net.tls.verify")
 local truststore = require("dbdash.net.tls.truststore")

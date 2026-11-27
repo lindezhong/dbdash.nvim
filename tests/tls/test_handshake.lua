@@ -338,7 +338,7 @@ end
 T["tampered CertificateVerify is rejected"] = function()
   local hs = require("dbdash.net.tls.handshake")
   local x509 = require("dbdash.net.tls.x509")
-  local asn1 = require("dbdash.net.tls.asn1")
+  local asn1 = require("dbdash.crypto.asn1")
   local f = assert(io.open(FIX .. "ec_cert.pem", "rb"))
   local cert = x509.parse(asn1.pem(f:read("*a"), "CERTIFICATE"))
   f:close()

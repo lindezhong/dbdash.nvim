@@ -118,13 +118,13 @@ db.register({
   connect = function(info)
     log[#log + 1] = "connect " .. (info.host or "")
     if info.host == "down" then
-      require("dbdash.db.error").raise("connect", "connection refused")
+      require("dbdash.util.error").raise("connect", "connection refused")
     end
     return {
       execute = function(_, q, opts)
         log[#log + 1] = "execute " .. q
         if q == "boom" then
-          require("dbdash.db.error").raise("query", "syntax error", { code = "42601" })
+          require("dbdash.util.error").raise("query", "syntax error", { code = "42601" })
         elseif q == "slow" then
           async.sleep(500)
         elseif q == "crash" then

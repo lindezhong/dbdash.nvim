@@ -34,7 +34,7 @@ function M.decode_json(s)
   if not ok then
     return nil, tostring(v):gsub("^.-:%d+: ", "")
   end
-  return require("dbdash.db.json").decode(s), nil
+  return require("dbdash.util.json").decode(s), nil
 end
 
 -- Documents and $ref ----------------------------------------------------------------------

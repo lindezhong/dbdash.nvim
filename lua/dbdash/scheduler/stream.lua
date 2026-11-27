@@ -261,14 +261,14 @@ function Panel:push_pipeline(run)
     if type(value) == "string" then
       local ok = pcall(vim.json.decode, value)
       if not ok then
-        require("dbdash.db.error").raise(
+        require("dbdash.util.error").raise(
           "query",
           ("the item is not JSON rows (%s); add query.transform to read it (:help dbdash-push)"):format(
             vim.trim(value):sub(1, 60)
           )
         )
       end
-      value = require("dbdash.db.json").decode(value)
+      value = require("dbdash.util.json").decode(value)
     end
     if require("dbdash.util.map").is_map(value) and value.rows == nil then
       value = { value } -- one record (a form, the parameters of a request)

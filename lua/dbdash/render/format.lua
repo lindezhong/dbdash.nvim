@@ -40,7 +40,7 @@ function M.python(v, spec)
   elseif kind == "e" or kind == "g" then
     s = ("%" .. (prec ~= "" and ("." .. prec) or "") .. kind):format(v)
   else
-    s = require("dbdash.template.runtime").numstr(v)
+    s = require("dbdash.util.number").numstr(v)
   end
   return comma ~= "" and group_thousands(s) or s
 end

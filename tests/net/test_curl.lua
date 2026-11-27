@@ -117,7 +117,7 @@ end
 
 T["quote: any text back as one word"] = function()
   for _, s in ipairs({ "plain", "it's", "a b", "'", "", '$HOME `x` \\ "q"', "line\nbreak" }) do
-    eq(curl.words("curl " .. curl.quote(s)), { "curl", s })
+    eq(curl.words("curl " .. require("dbdash.util.shell").quote(s)), { "curl", s })
   end
 end
 

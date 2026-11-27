@@ -78,7 +78,7 @@ function M.parse(s)
             i = i + 6
           end
         end
-        out[#out + 1] = require("dbdash.template.lexer").utf8_char(cp)
+        out[#out + 1] = require("dbdash.util.utf8").char(cp)
       elseif ESC[e] then
         out[#out + 1] = ESC[e]
         i = j + 2

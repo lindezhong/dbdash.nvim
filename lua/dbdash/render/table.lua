@@ -39,7 +39,7 @@ function M.format_value(v, ltype, null_text, keep_lines)
       s = v
     end
   elseif t == "number" then
-    s = require("dbdash.template.runtime").numstr(v)
+    s = require("dbdash.util.number").numstr(v)
   elseif t == "boolean" then
     s = v and "true" or "false"
   elseif t == "table" then

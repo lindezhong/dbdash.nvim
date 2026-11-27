@@ -5,7 +5,7 @@
 -- DLL) is used instead unless a server is given.
 local async = require("dbdash.util.async")
 local bit = require("bit")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 
 local M = {}
 

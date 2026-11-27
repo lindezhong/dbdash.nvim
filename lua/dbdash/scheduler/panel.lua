@@ -60,7 +60,7 @@ function Panel:check_thresholds(rs)
           what,
           value,
           cur.below and "≤" or "≥",
-          require("dbdash.template.runtime").numstr(cur.step.value)
+          require("dbdash.util.number").numstr(cur.step.value)
         ),
         vim.log.levels.WARN
       )
@@ -238,7 +238,10 @@ function Panel:cancel(reason)
   run.life.cancel:cancel(reason)
   self:finish_record(
     run,
-    require("dbdash.db.error").new({ phase = "cancelled", message = "query cancelled: " .. reason })
+    require("dbdash.util.error").new({
+      phase = "cancelled",
+      message = "query cancelled: " .. reason,
+    })
   )
   self.prev, self.prev_runs = run.record, run.life.runs
   self:push_history({ cancelled = reason })

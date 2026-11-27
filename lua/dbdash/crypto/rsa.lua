@@ -1,6 +1,6 @@
 -- RSA public-key operations: OAEP encryption (MySQL caching_sha2 full authentication)
 -- and signature verification helpers used by TLS (M4).
-local asn1 = require("dbdash.net.tls.asn1")
+local asn1 = require("dbdash.crypto.asn1")
 local bit = require("bit")
 local bn = require("dbdash.crypto.bignum")
 local util = require("dbdash.crypto.util")

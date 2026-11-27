@@ -70,7 +70,7 @@ function M.as_error(err)
   if type(err) == "table" and err.phase == "template" then
     return err
   end
-  return require("dbdash.db.error").wrap(err)
+  return require("dbdash.util.error").wrap(err)
 end
 
 return M

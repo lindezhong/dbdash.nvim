@@ -2,7 +2,7 @@
 -- PasswordAuthenticator (SASL PLAIN), QUERY with paging, RESULT Rows mapped by column type.
 local bit = require("bit")
 local ffi = require("ffi")
-local dberr = require("dbdash.db.error")
+local dberr = require("dbdash.util.error")
 local dialect = require("dbdash.db.dialect")
 local map = require("dbdash.util.map")
 local resultset = require("dbdash.db.resultset")
@@ -406,7 +406,7 @@ local function decode(t, b)
       vb, p = rd_bytes(b, p)
       local k = kb and decode(t.sub[1], kb) or "null"
       if type(k) ~= "string" then
-        k = require("dbdash.template.runtime").str(k)
+        k = require("dbdash.util.pystr").str(k)
       end
       map.set(out, k, vb == nil and NULL or decode(t.sub[2], vb))
     end
