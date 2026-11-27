@@ -170,112 +170,151 @@ function C:call_args(n)
 end
 
 ---Compile an expression to a Lua expression string.
-function C:expr(n)
-  local k = n.k
-  if k == "Const" then
-    if n.float then
-      return ("rt.float(%s)"):format(const(n.v))
-    end
-    return const(n.v)
-  elseif k == "Raw" then
-    return n.lua
-  elseif k == "Name" then
-    local b = self:lookup(n.name)
-    if b then
-      return b.sure and b.lua or ("rt.v(%s, ctx, %q)"):format(b.lua, n.name)
-    elseif n.name == "self" then
-      return "rt.self_ref(env, reg, ctx)" -- {{ self.block() }}
-    end
-    return ("rt.lookup(ctx, %q)"):format(n.name)
-  elseif k == "List" then
-    if n.tuple then
-      return ("rt.tuple(%s)"):format(self:list(n.items))
-    end
-    return self:list(n.items)
-  elseif k == "Dict" then
-    local flat = {}
-    for _, kv in ipairs(n.pairs) do
-      flat[#flat + 1] = self:expr(kv[1])
-      flat[#flat + 1] = self:expr(kv[2])
-    end
-    return "rt.dict({" .. table.concat(flat, ", ") .. "})"
-  elseif k == "Getattr" then
-    return ("rt.getattr(%s, %q)"):format(self:expr(n.obj), n.name)
-  elseif k == "Getitem" then
-    return ("rt.getitem(%s, %s)"):format(self:expr(n.obj), self:expr(n.key))
-  elseif k == "Slice" then
-    return ("rt.slice(%s, %s, %s, %s)"):format(
-      self:expr(n.obj),
-      n.start and self:expr(n.start) or "nil",
-      n.stop and self:expr(n.stop) or "nil",
-      n.step and self:expr(n.step) or "nil"
-    )
-  elseif k == "Call" then
-    local fn = n.fn
-    local args, kwargs = self:call_args(n)
-    if fn.k == "Getattr" then
-      -- obj.name(...): a macro of an imported module, or a method.
-      return ("rt.call_attr(env, %s, %q, %s, %s)"):format(self:expr(fn.obj), fn.name, args, kwargs)
-    end
-    return ("rt.call(env, %s, %s, %s)"):format(self:expr(fn), args, kwargs)
-  elseif k == "Filter" then
-    if not R.filters[n.name] then
-      self:fail(n, "No filter named '%s'.", n.name)
-    end
-    local args, kwargs = self:call_args(n)
-    return ("rt.filter(env, %q, %s, %s, %s)"):format(n.name, self:expr(n.node), args, kwargs)
-  elseif k == "Test" then
-    if not R.tests[n.name] then
-      self:fail(n, "No test named '%s'.", n.name)
-    end
-    local e = ("rt.test(env, %q, %s, %s)"):format(n.name, self:expr(n.node), self:list(n.args))
-    return n.neg and ("(not " .. e .. ")") or e
-  elseif k == "Neg" then
-    return ("rt.neg(%s)"):format(self:expr(n.node))
-  elseif k == "Pos" then
-    return ("rt.pos(%s)"):format(self:expr(n.node))
-  elseif k == "Bin" then
-    return ("rt.%s(%s, %s)"):format(BINOPS[n.op], self:expr(n.l), self:expr(n.r))
-  elseif k == "Compare" then
-    if #n.ops == 1 then
-      return ("rt.cmp(%q, %s, %s)"):format(
-        n.ops[1].op,
-        self:expr(n.first),
-        self:expr(n.ops[1].expr)
-      )
-    end
-    local parts = { "(function() local a = " .. self:expr(n.first) }
-    for i, o in ipairs(n.ops) do
-      parts[#parts + 1] = ("local b = %s"):format(self:expr(o.expr))
-      if i < #n.ops then
-        parts[#parts + 1] = ("if not rt.cmp(%q, a, b) then return false end a = b"):format(o.op)
-      else
-        parts[#parts + 1] = ("return rt.cmp(%q, a, b)"):format(o.op)
-      end
-    end
-    return table.concat(parts, " ") .. " end)()"
-  elseif k == "And" then
-    return ("(function() local a = %s if not rt.truthy(a) then return a end return %s end)()"):format(
-      self:expr(n.l),
-      self:expr(n.r)
-    )
-  elseif k == "Or" then
-    return ("(function() local a = %s if rt.truthy(a) then return a end return %s end)()"):format(
-      self:expr(n.l),
-      self:expr(n.r)
-    )
-  elseif k == "Not" then
-    return ("(not rt.truthy(%s))"):format(self:expr(n.node))
-  elseif k == "Cond" then
-    -- Without else, Jinja yields a lenient Undefined (renders as "") even in strict mode.
-    local b = n.b and self:expr(n.b) or '""'
-    return ("(function() if rt.truthy(%s) then return %s end return %s end)()"):format(
-      self:expr(n.test),
-      self:expr(n.a),
-      b
-    )
+-- The code of each expression node, by kind (k).
+local EXPR = {}
+
+EXPR.Const = function(_, n)
+  if n.float then
+    return ("rt.float(%s)"):format(const(n.v))
   end
-  error("unknown expression node " .. tostring(k))
+  return const(n.v)
+end
+
+EXPR.Raw = function(_, n)
+  return n.lua
+end
+
+EXPR.Name = function(self, n)
+  local b = self:lookup(n.name)
+  if b then
+    return b.sure and b.lua or ("rt.v(%s, ctx, %q)"):format(b.lua, n.name)
+  elseif n.name == "self" then
+    return "rt.self_ref(env, reg, ctx)" -- {{ self.block() }}
+  end
+  return ("rt.lookup(ctx, %q)"):format(n.name)
+end
+
+EXPR.List = function(self, n)
+  if n.tuple then
+    return ("rt.tuple(%s)"):format(self:list(n.items))
+  end
+  return self:list(n.items)
+end
+
+EXPR.Dict = function(self, n)
+  local flat = {}
+  for _, kv in ipairs(n.pairs) do
+    flat[#flat + 1] = self:expr(kv[1])
+    flat[#flat + 1] = self:expr(kv[2])
+  end
+  return "rt.dict({" .. table.concat(flat, ", ") .. "})"
+end
+
+EXPR.Getattr = function(self, n)
+  return ("rt.getattr(%s, %q)"):format(self:expr(n.obj), n.name)
+end
+
+EXPR.Getitem = function(self, n)
+  return ("rt.getitem(%s, %s)"):format(self:expr(n.obj), self:expr(n.key))
+end
+
+EXPR.Slice = function(self, n)
+  return ("rt.slice(%s, %s, %s, %s)"):format(
+    self:expr(n.obj),
+    n.start and self:expr(n.start) or "nil",
+    n.stop and self:expr(n.stop) or "nil",
+    n.step and self:expr(n.step) or "nil"
+  )
+end
+
+EXPR.Call = function(self, n)
+  local fn = n.fn
+  local args, kwargs = self:call_args(n)
+  if fn.k == "Getattr" then
+    -- obj.name(...): a macro of an imported module, or a method.
+    return ("rt.call_attr(env, %s, %q, %s, %s)"):format(self:expr(fn.obj), fn.name, args, kwargs)
+  end
+  return ("rt.call(env, %s, %s, %s)"):format(self:expr(fn), args, kwargs)
+end
+
+EXPR.Filter = function(self, n)
+  if not R.filters[n.name] then
+    self:fail(n, "No filter named '%s'.", n.name)
+  end
+  local args, kwargs = self:call_args(n)
+  return ("rt.filter(env, %q, %s, %s, %s)"):format(n.name, self:expr(n.node), args, kwargs)
+end
+
+EXPR.Test = function(self, n)
+  if not R.tests[n.name] then
+    self:fail(n, "No test named '%s'.", n.name)
+  end
+  local e = ("rt.test(env, %q, %s, %s)"):format(n.name, self:expr(n.node), self:list(n.args))
+  return n.neg and ("(not " .. e .. ")") or e
+end
+
+EXPR.Neg = function(self, n)
+  return ("rt.neg(%s)"):format(self:expr(n.node))
+end
+
+EXPR.Pos = function(self, n)
+  return ("rt.pos(%s)"):format(self:expr(n.node))
+end
+
+EXPR.Bin = function(self, n)
+  return ("rt.%s(%s, %s)"):format(BINOPS[n.op], self:expr(n.l), self:expr(n.r))
+end
+
+EXPR.Compare = function(self, n)
+  if #n.ops == 1 then
+    return ("rt.cmp(%q, %s, %s)"):format(n.ops[1].op, self:expr(n.first), self:expr(n.ops[1].expr))
+  end
+  local parts = { "(function() local a = " .. self:expr(n.first) }
+  for i, o in ipairs(n.ops) do
+    parts[#parts + 1] = ("local b = %s"):format(self:expr(o.expr))
+    if i < #n.ops then
+      parts[#parts + 1] = ("if not rt.cmp(%q, a, b) then return false end a = b"):format(o.op)
+    else
+      parts[#parts + 1] = ("return rt.cmp(%q, a, b)"):format(o.op)
+    end
+  end
+  return table.concat(parts, " ") .. " end)()"
+end
+
+EXPR.And = function(self, n)
+  return ("(function() local a = %s if not rt.truthy(a) then return a end return %s end)()"):format(
+    self:expr(n.l),
+    self:expr(n.r)
+  )
+end
+
+EXPR.Or = function(self, n)
+  return ("(function() local a = %s if rt.truthy(a) then return a end return %s end)()"):format(
+    self:expr(n.l),
+    self:expr(n.r)
+  )
+end
+
+EXPR.Not = function(self, n)
+  return ("(not rt.truthy(%s))"):format(self:expr(n.node))
+end
+
+EXPR.Cond = function(self, n)
+  -- Without else, Jinja yields a lenient Undefined (renders as "") even in strict mode.
+  local b = n.b and self:expr(n.b) or '""'
+  return ("(function() if rt.truthy(%s) then return %s end return %s end)()"):format(
+    self:expr(n.test),
+    self:expr(n.a),
+    b
+  )
+end
+
+function C:expr(n)
+  local f = EXPR[n.k]
+  if not f then
+    error("unknown expression node " .. tostring(n.k))
+  end
+  return f(self, n)
 end
 
 ---`value` passed through filters [{ name, args, kwargs }] (filter blocks, block set).
@@ -621,170 +660,208 @@ function C:loop_body(st, seq, depth, rec)
   self:emit("end")
 end
 
-function C:stmt(st)
-  local k = st.k
-  if k == "Data" then
-    self:emit(("o[#o + 1] = %s"):format(const(st.v)))
-  elseif k == "Lua" then
-    self:line(st)
-    -- The template variables visible here (set, for, macro arguments), for `vars`.
-    self:emit(
-      ("o[#o + 1] = rt.lua_block(env, %q, %d, function() return %s end)"):format(
-        st.code,
-        st.line,
-        self:visible_locals()
-      )
+-- The code of each statement node, by kind (k).
+local STMT = {}
+
+STMT.Data = function(self, st)
+  self:emit(("o[#o + 1] = %s"):format(const(st.v)))
+end
+
+STMT.Lua = function(self, st)
+  self:line(st)
+  -- The template variables visible here (set, for, macro arguments), for `vars`.
+  self:emit(
+    ("o[#o + 1] = rt.lua_block(env, %q, %d, function() return %s end)"):format(
+      st.code,
+      st.line,
+      self:visible_locals()
     )
-  elseif k == "Output" then
-    self:line(st)
-    self:emit(("o[#o + 1] = rt.out(env, %s)"):format(self:expr(st.expr)))
-  elseif k == "If" then
-    self:if_chain(st, 1)
-  elseif k == "For" then
-    self:line(st)
-    if st.recursive then
-      -- A function, so that loop(items) renders the body again one level deeper.
-      local rec = self:tmp()
-      self:emit(("local %s"):format(rec))
-      self:emit(("%s = function(seq, depth)"):format(rec))
-      self:indent(1)
-      self:emit("local o = {}")
-      self:loop_body(st, "seq", "depth", rec)
-      self:emit("return table.concat(o)")
-      self:indent(-1)
-      self:emit("end")
-      self:emit(("o[#o + 1] = %s(%s, 1)"):format(rec, self:expr(st.iter)))
-    else
-      local seq = self:tmp()
-      self:emit("do")
-      self:indent(1)
-      self:emit(("local %s = %s"):format(seq, self:expr(st.iter)))
-      self:loop_body(st, seq, "1", "nil")
-      self:indent(-1)
-      self:emit("end")
-    end
-  elseif k == "Break" or k == "Continue" then
-    local loop = self.loops[#self.loops]
-    if not loop then
-      self:fail(st, "'%s' outside of a loop", k:lower())
-    end
-    if k == "Break" then
-      self:emit(("%s = true"):format(loop.brk))
-    end
-    self:emit("do break end")
-  elseif k == "SetArg" then
-    self:line(st)
-    self:emit(("rt.set_arg(env, %q, %s)"):format(st.name, self:expr(st.expr)))
-  elseif k == "SetAttr" then
-    self:line(st)
-    self:emit(("rt.set_attr(%s, %q, %s)"):format(self:expr(st.obj), st.attr, self:expr(st.expr)))
-  elseif k == "Set" then
-    self:line(st)
-    self:assign(st.targets, self:expr(st.expr))
-  elseif k == "SetBlock" then
-    self:line(st)
-    local v = self:capture(st.body)
-    self:assign(st.targets, self:apply_filters(("rt.markup(env, %s)"):format(v), st.filters))
-  elseif k == "FilterBlock" then
-    self:line(st)
-    local v = self:capture(st.body)
-    self:emit(
-      ("o[#o + 1] = rt.out(env, rt.markup(env, %s))"):format(
-        self:apply_filters(("rt.markup(env, %s)"):format(v), st.filters)
-      )
-    )
-  elseif k == "With" then
-    self:line(st)
-    self:emit("do")
+  )
+end
+
+STMT.Output = function(self, st)
+  self:line(st)
+  self:emit(("o[#o + 1] = rt.out(env, %s)"):format(self:expr(st.expr)))
+end
+
+STMT.If = function(self, st)
+  self:if_chain(st, 1)
+end
+
+STMT.For = function(self, st)
+  self:line(st)
+  if st.recursive then
+    -- A function, so that loop(items) renders the body again one level deeper.
+    local rec = self:tmp()
+    self:emit(("local %s"):format(rec))
+    self:emit(("%s = function(seq, depth)"):format(rec))
     self:indent(1)
-    -- The values are computed before any of the names is set (Jinja).
-    local bindings = {}
-    for _, a in ipairs(st.assigns) do
-      local vars = {}
-      for j, name in ipairs(a.targets) do
-        vars[j] = self:tmp()
-        bindings[name] = { lua = vars[j], sure = true }
-      end
-      if #vars == 1 then
-        self:emit(("local %s = %s"):format(vars[1], self:expr(a.expr)))
-      else
-        self:emit(
-          ("local %s = rt.unpack(%s, %d)"):format(
-            table.concat(vars, ", "),
-            self:expr(a.expr),
-            #vars
-          )
-        )
-      end
-    end
-    self:scoped_body(st.body, bindings)
+    self:emit("local o = {}")
+    self:loop_body(st, "seq", "depth", rec)
+    self:emit("return table.concat(o)")
     self:indent(-1)
     self:emit("end")
-  elseif k == "Do" then
-    self:line(st)
-    self:emit(("local _ = %s"):format(self:expr(st.expr)))
-  elseif k == "Autoescape" then
-    self:line(st)
-    local saved = self:tmp()
-    self:emit(("local %s = env.autoescape"):format(saved))
-    self:emit(("env.autoescape = rt.truthy(%s)"):format(self:expr(st.expr)))
-    self:body(st.body)
-    self:emit(("env.autoescape = %s"):format(saved))
-  elseif k == "Macro" then
-    self:line(st)
-    local b = self.scopes[#self.scopes][st.name]
-    self:macro(b.lua, st.name, st.params, st.body)
-    self:export(st.name, b.lua)
-  elseif k == "CallBlock" then
-    self:line(st)
-    local caller = self:tmp()
-    self:emit(("local %s"):format(caller))
-    self:macro(caller, "caller", st.params, st.body)
-    local call = vim.deepcopy(st.call)
-    call.kwargs = vim.list_extend(
-      vim.deepcopy(call.kwargs or {}),
-      { { "caller", { k = "Raw", lua = caller } } }
-    )
-    self:emit(("o[#o + 1] = rt.out(env, %s)"):format(self:expr(call)))
-  elseif k == "Import" then
-    self:line(st)
-    local b = self.scopes[#self.scopes][st.alias]
-    self:emit(
-      ("%s = rt.import(env, %s, %s)"):format(b.lua, self:expr(st.target), self:import_context(st))
-    )
-  elseif k == "FromImport" then
-    self:line(st)
-    local mod = self:tmp()
-    self:emit(
-      ("local %s = rt.import(env, %s, %s)"):format(
-        mod,
-        self:expr(st.target),
-        self:import_context(st)
-      )
-    )
-    for _, n in ipairs(st.names) do
-      local b = self.scopes[#self.scopes][n.alias]
-      self:emit(("%s = rt.import_name(%s, %q)"):format(b.lua, mod, n.name))
-    end
-  elseif k == "Include" then
-    self:line(st)
-    self:emit(
-      ("o[#o + 1] = rt.include(env, %s, %s, %s)"):format(
-        self:expr(st.target),
-        tostring(st.ignore_missing),
-        self:import_context(st)
-      )
-    )
-  elseif k == "Extends" then
-    self:line(st)
-    self:emit(("rt.extends(env, reg, %s, #o)"):format(self:expr(st.target)))
-  elseif k == "Block" then
-    self:line(st)
-    local bctx = st.scoped and ("rt.layer(ctx, %s)"):format(self:visible_locals()) or "ctx"
-    self:emit(("o[#o + 1] = rt.render_block(env, reg, %q, %s)"):format(st.name, bctx))
+    self:emit(("o[#o + 1] = %s(%s, 1)"):format(rec, self:expr(st.iter)))
   else
-    error("unknown statement node " .. tostring(k))
+    local seq = self:tmp()
+    self:emit("do")
+    self:indent(1)
+    self:emit(("local %s = %s"):format(seq, self:expr(st.iter)))
+    self:loop_body(st, seq, "1", "nil")
+    self:indent(-1)
+    self:emit("end")
   end
+end
+
+STMT.Break = function(self, st)
+  local k = st.k
+  local loop = self.loops[#self.loops]
+  if not loop then
+    self:fail(st, "'%s' outside of a loop", k:lower())
+  end
+  if k == "Break" then
+    self:emit(("%s = true"):format(loop.brk))
+  end
+  self:emit("do break end")
+end
+STMT.Continue = STMT.Break
+
+STMT.SetArg = function(self, st)
+  self:line(st)
+  self:emit(("rt.set_arg(env, %q, %s)"):format(st.name, self:expr(st.expr)))
+end
+
+STMT.SetAttr = function(self, st)
+  self:line(st)
+  self:emit(("rt.set_attr(%s, %q, %s)"):format(self:expr(st.obj), st.attr, self:expr(st.expr)))
+end
+
+STMT.Set = function(self, st)
+  self:line(st)
+  self:assign(st.targets, self:expr(st.expr))
+end
+
+STMT.SetBlock = function(self, st)
+  self:line(st)
+  local v = self:capture(st.body)
+  self:assign(st.targets, self:apply_filters(("rt.markup(env, %s)"):format(v), st.filters))
+end
+
+STMT.FilterBlock = function(self, st)
+  self:line(st)
+  local v = self:capture(st.body)
+  self:emit(
+    ("o[#o + 1] = rt.out(env, rt.markup(env, %s))"):format(
+      self:apply_filters(("rt.markup(env, %s)"):format(v), st.filters)
+    )
+  )
+end
+
+STMT.With = function(self, st)
+  self:line(st)
+  self:emit("do")
+  self:indent(1)
+  -- The values are computed before any of the names is set (Jinja).
+  local bindings = {}
+  for _, a in ipairs(st.assigns) do
+    local vars = {}
+    for j, name in ipairs(a.targets) do
+      vars[j] = self:tmp()
+      bindings[name] = { lua = vars[j], sure = true }
+    end
+    if #vars == 1 then
+      self:emit(("local %s = %s"):format(vars[1], self:expr(a.expr)))
+    else
+      self:emit(
+        ("local %s = rt.unpack(%s, %d)"):format(table.concat(vars, ", "), self:expr(a.expr), #vars)
+      )
+    end
+  end
+  self:scoped_body(st.body, bindings)
+  self:indent(-1)
+  self:emit("end")
+end
+
+STMT.Do = function(self, st)
+  self:line(st)
+  self:emit(("local _ = %s"):format(self:expr(st.expr)))
+end
+
+STMT.Autoescape = function(self, st)
+  self:line(st)
+  local saved = self:tmp()
+  self:emit(("local %s = env.autoescape"):format(saved))
+  self:emit(("env.autoescape = rt.truthy(%s)"):format(self:expr(st.expr)))
+  self:body(st.body)
+  self:emit(("env.autoescape = %s"):format(saved))
+end
+
+STMT.Macro = function(self, st)
+  self:line(st)
+  local b = self.scopes[#self.scopes][st.name]
+  self:macro(b.lua, st.name, st.params, st.body)
+  self:export(st.name, b.lua)
+end
+
+STMT.CallBlock = function(self, st)
+  self:line(st)
+  local caller = self:tmp()
+  self:emit(("local %s"):format(caller))
+  self:macro(caller, "caller", st.params, st.body)
+  local call = vim.deepcopy(st.call)
+  call.kwargs =
+    vim.list_extend(vim.deepcopy(call.kwargs or {}), { { "caller", { k = "Raw", lua = caller } } })
+  self:emit(("o[#o + 1] = rt.out(env, %s)"):format(self:expr(call)))
+end
+
+STMT.Import = function(self, st)
+  self:line(st)
+  local b = self.scopes[#self.scopes][st.alias]
+  self:emit(
+    ("%s = rt.import(env, %s, %s)"):format(b.lua, self:expr(st.target), self:import_context(st))
+  )
+end
+
+STMT.FromImport = function(self, st)
+  self:line(st)
+  local mod = self:tmp()
+  self:emit(
+    ("local %s = rt.import(env, %s, %s)"):format(mod, self:expr(st.target), self:import_context(st))
+  )
+  for _, n in ipairs(st.names) do
+    local b = self.scopes[#self.scopes][n.alias]
+    self:emit(("%s = rt.import_name(%s, %q)"):format(b.lua, mod, n.name))
+  end
+end
+
+STMT.Include = function(self, st)
+  self:line(st)
+  self:emit(
+    ("o[#o + 1] = rt.include(env, %s, %s, %s)"):format(
+      self:expr(st.target),
+      tostring(st.ignore_missing),
+      self:import_context(st)
+    )
+  )
+end
+
+STMT.Extends = function(self, st)
+  self:line(st)
+  self:emit(("rt.extends(env, reg, %s, #o)"):format(self:expr(st.target)))
+end
+
+STMT.Block = function(self, st)
+  self:line(st)
+  local bctx = st.scoped and ("rt.layer(ctx, %s)"):format(self:visible_locals()) or "ctx"
+  self:emit(("o[#o + 1] = rt.render_block(env, reg, %q, %s)"):format(st.name, bctx))
+end
+
+function C:stmt(st)
+  local f = STMT[st.k]
+  if not f then
+    error("unknown statement node " .. tostring(st.k))
+  end
+  f(self, st)
 end
 
 function C:if_chain(st, idx)
