@@ -117,8 +117,9 @@ configs (|dbdash-examples|). Every field has a tag:
     interval:
       $ref: "#/definitions/duration"
       description: >-
-        Global refresh: when it elapses every panel refreshes and the panels'
-        own timers restart. Also the last default of show.interval (after the
+        A refresh of every panel at once: when it elapses every panel gets a
+        new period and its own count starts again from there (:help
+        dbdash-interval). Also the last default of show.interval (after the
         top-level show.interval). At least 1s.
 <
                                                    *dbdash-schema-title* >yaml
@@ -842,9 +843,11 @@ configs (|dbdash-examples|). Every field has a tag:
         interval:
           $ref: "#/definitions/duration"
           description: >-
-            Refresh interval of this chart (default the top-level
-            show.interval, then the top-level interval, else 30s from setup
-            defaults.interval). At least 1s.
+            The chart's period: a database is queried once per period, a
+            source that sends data is shown at most once per period (:help
+            dbdash-interval). Default the top-level show.interval, then the
+            top-level interval, else 30s from setup defaults.interval. At
+            least 1s.
 <
                                      *dbdash-schema-show.refresh_hidden* >yaml
         refresh_hidden:
