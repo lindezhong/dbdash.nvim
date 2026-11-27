@@ -156,7 +156,7 @@ panels:
   local count = other.refresh_count or 0
   vim.wait(1300)
   eq((other.refresh_count or 0) > count, true) -- the other panel keeps refreshing
-  eq(p.timer, nil)
+  eq(p.next_at, nil) -- no next tick
   d:restart() -- r
   eq(p:push_state() ~= "ended", true)
   wait(function()

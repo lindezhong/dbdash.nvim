@@ -398,12 +398,12 @@ function M.splitter(delimiter, max, emit, stats)
 end
 
 ---The producer of a driver with connect: on every tick (ctx.wait_tick), the query (a
----function renders it anew: sql and a tag passed along with its result) runs once through
----M.query (timeouts, cancelling on the server); its result or error is passed on. It does
----not end by itself: when wait_tick says the run stops.
+---function renders it anew: sql, a tag passed along with its result, and options of this
+---query over opts) runs once through M.query (timeouts, cancelling on the server); its
+---result or error is passed on. It does not end by itself: when wait_tick says the run stops.
 local function pull(raw_url, query, ctx, opts)
   while ctx.wait_tick() do
-    local ok, sql, tag = pcall(function()
+    local ok, sql, tag, extra = pcall(function()
       if type(query) == "function" then
         return query()
       end
@@ -412,7 +412,7 @@ local function pull(raw_url, query, ctx, opts)
     if not ok then
       ctx.fail(sql) -- the query could not be rendered
     else
-      local qopts = vim.tbl_extend("force", {}, opts, { cancel = ctx.cancel })
+      local qopts = vim.tbl_extend("force", {}, opts, extra or {}, { cancel = ctx.cancel })
       local err, rs = async.await(M.query, raw_url, sql, qopts)
       if ctx.cancel.cancelled then
         return
@@ -485,9 +485,12 @@ function M.run(raw_url, query, opts, on_result, on_end)
     end
     return { driver = d, info = i }
   end)
-  if not ok then
+  if not ok and not opts.wait_tick then
     finish(prep)
     return handle
+  elseif not ok then
+    -- A ticked run reports what is wrong on every tick, as each query does.
+    prep = { info = { options = opts.options or {} } }
   end
   local max = require("dbdash.util.bytes").parse(defaults.current.max_record) or 1048576
   local function emit(value, vars, tag)
@@ -555,7 +558,7 @@ function M.run(raw_url, query, opts, on_result, on_end)
     timeout = opts.timeout or prep.info.timeout, -- (luastream: the longest stretch without waiting)
   }
   async.run(function()
-    if prep.driver.produce then
+    if prep.driver and prep.driver.produce then
       prep.driver.produce(prep.info, type(query) == "function" and query() or query, ctx)
     else
       pull(raw_url, query, ctx, opts)

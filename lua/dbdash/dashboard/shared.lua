@@ -32,7 +32,7 @@ Panel.__index = Panel
 ---@field state dbdash.ArgState
 ---@field buf integer
 ---@field panels dbdash.Panel[]
----@field gtimer uv.uv_timer_t? global refresh timer (top-level interval: cfg.refresh_all)
+---@field clock dbdash.Clock? the panels' ticks and the top-level interval's (dashboard/timer.lua)
 ---@field ctimer uv.uv_timer_t? countdown display timer
 ---@field regions table[]? buffer regions of the panels (multi-panel)
 ---@field last_size integer[]?

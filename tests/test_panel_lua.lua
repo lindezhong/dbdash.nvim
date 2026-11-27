@@ -206,7 +206,7 @@ panels:
   local p1, p2 = d.panels[1], d.panels[2]
   eq(p1.cfg.follows_global, true)
   d:pause()
-  eq(d.gtimer ~= nil, true) -- kept for panel 1
+  eq(d.clock:running(), true) -- kept for panel 1
   local h1, h2 = #p1.history, #p2.history
   vim.wait(2600, function()
     return false

@@ -683,7 +683,7 @@ T["the global interval and a panel's own both refresh, without double queries"] 
   vim.fn.writefile(vim.split(both, "\n"), dir .. "/both.yaml")
   child.cmd("DbDashStart both.yaml")
   wait_loaded()
-  eq(child.lua_get("require('dbdash.dashboard').list()[1].gtimer ~= nil"), true)
+  eq(child.lua_get("require('dbdash.dashboard').list()[1].cfg.refresh_all"), 3000)
   settle(3500)
   local h = runs()
   -- 1s timer for ~3.5s plus one global refresh: about 4-5, never doubled ticks.
@@ -698,7 +698,6 @@ T["the global interval and a panel's own both refresh, without double queries"] 
   settle(2500)
   h = runs()
   eq(h >= 2 and h <= 4, true)
-  eq(child.lua_get("require('dbdash.dashboard').list()[1].panels[1].timer"), vim.NIL)
 end
 
 T["changing an argument while a query runs re-runs it with the new value"] = function()

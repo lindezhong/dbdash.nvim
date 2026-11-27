@@ -69,7 +69,6 @@ end
 local S = require("dbdash.dashboard.shared")
 require("dbdash.dashboard.run")
 require("dbdash.dashboard.panel")
-require("dbdash.dashboard.stream")
 require("dbdash.dashboard.view")
 require("dbdash.dashboard.dashboard")
 require("dbdash.dashboard.lifecycle")
