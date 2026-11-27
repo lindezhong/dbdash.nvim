@@ -38,7 +38,8 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
 - **Push sources**: data that arrives instead of being queried: `luastream://` (Lua that
   prints), `exec://` (a script's output, like `tail -f`) and `webhook://` (an HTTP endpoint
   described by an OpenAPI 3.1 document, validated with JSON Schema, secured after MCP's
-  rules). Items are processed one at a time; the panel is drawn on its interval.
+  rules). Items are processed one at a time; the panel shows new data at most once per
+  interval.
 - **Thresholds**: classes on values (stat cards, table cells and rows), colored by style
   sheets, and notify when a value crosses a level.
 - **Arguments**: typed variables set from the command line, prompts or in the dashboard;
@@ -168,7 +169,9 @@ dashboard-wide: `interval` (a refresh of every panel), `args` (shared arguments)
 the header's `title` and `description`. The top-level `database`, `query` and `show` are
 defaults each panel can override (a panel's own `database`, `show.interval`, ...); fields
 of one chart (`query.sql`, `show.type`, ...) belong in each panel. A panel's `query.args`
-are its own. See `:help dbdash-config`.
+are its own. A config is checked when it loads (fields, arguments, the database URL and
+the driver's options, chart types, style sheets, the grid), each problem with its line and
+column. See `:help dbdash-config`.
 
 Style sheets map selectors to CSS properties, at the top level (the dashboard's), in a
 panel (only its own elements) and in `setup()` (every dashboard):
@@ -212,10 +215,10 @@ Examples are in [`example/`](example), one directory per topic (`:help dbdash-ex
 | Directory | Shows |
 | --- | --- |
 | [`charts/`](example/charts) | style sheets: selectors, the cascade and the common properties ([`css.yaml`](example/charts/css.yaml)); one file per chart type with every renderer and option, one panel each ([`line.yaml`](example/charts/line.yaml), [`bar.yaml`](example/charts/bar.yaml), [`pie.yaml`](example/charts/pie.yaml), [`table.yaml`](example/charts/table.yaml), [`stat.yaml`](example/charts/stat.yaml), ...) |
-| [`dashboards/`](example/dashboards) | several panels in a grid ([`multi_panel.yaml`](example/dashboards/multi_panel.yaml): defaults, intervals, a database per panel, title, countdown, descriptions, argument lines); a grid laid out with CSS Grid properties ([`grid.yaml`](example/dashboards/grid.yaml): column and row tracks, areas, placement) |
+| [`dashboards/`](example/dashboards) | several panels in a grid ([`multi_panel.yaml`](example/dashboards/multi_panel.yaml): defaults, intervals, a database per panel, title, countdown, descriptions, argument lines); a grid laid out with CSS Grid properties ([`grid.yaml`](example/dashboards/grid.yaml): column and row tracks, areas, placement); a database next to a source that sends data, with the top-level interval ([`pull_push.yaml`](example/dashboards/pull_push.yaml)); errors and backing off ([`errors.yaml`](example/dashboards/errors.yaml)) |
 | [`templates/`](example/templates) | arguments ([`arguments.yaml`](example/templates/arguments.yaml)); every statement ([`statements.yaml`](example/templates/statements.yaml)), filter ([`filters.yaml`](example/templates/filters.yaml)), test, function and expression ([`tests_functions.yaml`](example/templates/tests_functions.yaml)) and method ([`methods.yaml`](example/templates/methods.yaml)); SQL filters and autoescape ([`sql.yaml`](example/templates/sql.yaml)); macros ([`macros.yaml`](example/templates/macros.yaml)); extends / include / import ([`inheritance.yaml`](example/templates/inheritance.yaml)); Lua in templates ([`template_lua.yaml`](example/templates/template_lua.yaml)); every `meta` field ([`meta.yaml`](example/templates/meta.yaml)) |
 | [`lua/`](example/lua) | a `lua://` source ([`lua.yaml`](example/lua/lua.yaml)), `query.transform` ([`transform.yaml`](example/lua/transform.yaml)), panel state, callbacks and run records ([`callback.yaml`](example/lua/callback.yaml)) |
-| [`push/`](example/push) | push sources: [`luastream.yaml`](example/push/luastream.yaml), [`exec.yaml`](example/push/exec.yaml), [`webhook.yaml`](example/push/webhook.yaml) (OpenAPI: a GET without a token, a POST with one) |
+| [`push/`](example/push) | push sources: [`luastream.yaml`](example/push/luastream.yaml) (with `dbdash.run()` on an item), [`exec.yaml`](example/push/exec.yaml), [`webhook.yaml`](example/push/webhook.yaml) (OpenAPI: a GET without a token, a POST with one) |
 | [`databases/`](example/databases) | a SQLite file ([`sqlite_file.yaml`](example/databases/sqlite_file.yaml)); after `make it-up` (the test services in docker): [`postgres.yaml`](example/databases/postgres.yaml), [`mysql.yaml`](example/databases/mysql.yaml), [`redis.yaml`](example/databases/redis.yaml), [`mongodb.yaml`](example/databases/mongodb.yaml), [`cassandra.yaml`](example/databases/cassandra.yaml), [`mssql.yaml`](example/databases/mssql.yaml), [`http.yaml`](example/databases/http.yaml) |
 | [`connections/`](example/connections) | after `make it-up`: TLS modes ([`tls.yaml`](example/connections/tls.yaml)), passwords outside the config ([`passwords.yaml`](example/connections/passwords.yaml)), cancelling a slow query ([`cancel.yaml`](example/connections/cancel.yaml)); an HTTPS API ([`github.yaml`](example/connections/github.yaml), needs network) |
 
@@ -354,8 +357,9 @@ certificates by default. See `:help dbdash-http`.
 `luastream://`, `exec://` and `webhook://` receive data instead of querying it on an
 interval: Lua code that prints, a script's output, or HTTP requests to a local endpoint.
 Their output is cut into items (by default one per line); each item goes through
-`query.transform` (or must be JSON rows) and the panel is redrawn on its `show.interval`
-when something is new, so a fast source does not redraw for every item.
+`query.transform` (or must be JSON rows), one at a time, and the panel shows new data at
+most once per `show.interval`, so a fast source does not redraw for every item. A bad item
+fails on its own; the source goes on.
 
 ```yaml
 database:
@@ -387,18 +391,28 @@ Origin checks, limits on bodies and connections. Examples are in
 
 ## Development
 
+How the code is put together (layers, data sources, scheduling, drawing, events) is in
+[ARCHITECTURE.md](ARCHITECTURE.md).
+
 ```sh
-make test                  # unit, golden and UI tests (clones mini.nvim into deps/)
-make test FILE=tests/yaml/test_parse.lua
+make test                  # lint, then unit, golden and UI tests
+make test FILE=tests/yaml/test_parse.lua   # one file (no lint)
+make lint                  # stylua --check, luacheck, lua-language-server (Warning up)
+make fmt                   # format with stylua
 UPDATE_GOLDEN=1 make test  # regenerate render reference outputs
 make it-up                 # start the integration services (docker compose, waits until ready)
 make it                    # make it-up, then all tests including the integration tests
 make it-down               # stop and remove the integration services
 DBDASH_NET=1 make test     # include a TLS handshake with a public server (system CAs)
-make fmt                   # format with stylua
 make doc                   # regenerate doc/dbdash-schema.txt and doc/tags after changing
                            # the schema or the help
 ```
+
+Everything these need is downloaded into `deps/` on first use (mini.nvim, StyLua,
+luacheck and lua-language-server, pinned and checked by SHA-256): nothing is installed on
+the system; the bootstrap needs only `git`, `curl` and `tar`. The recipes run Neovim
+(`nvim -l scripts/*.lua`), so they work from PowerShell and cmd too; there, set variables
+first, e.g. `$env:DBDASH_IT = 1; make test`.
 
 ### Integration tests
 

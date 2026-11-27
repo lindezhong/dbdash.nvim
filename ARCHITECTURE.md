@@ -46,6 +46,11 @@ Rules that keep it so:
   change asks its view for a frame).
 - Hooks the entry module wires for lower layers: the trust prompt's View float
   (`trust.viewer`) and the dashboard keys' actions (the `action` event → `commands`).
+- `plugin/dbdash.lua` forwards Neovim's events to the view: reading a dbdash:// buffer
+  (`on_read`), visibility (`update_visibility`), closed windows, resizes and exiting
+  (`on_exit`); a new colorscheme only makes the highlight groups again (`css/hl.lua`).
+  The view calls the model when it is concerned (`d:pause()`, `d:resume()`,
+  `dashboard.stop`).
 
 ## Startup and configuration
 
@@ -67,6 +72,7 @@ Rules that keep it so:
       │   │       dashboard.timer    show, panel, dashboard: intervals, refresh_hidden
       │   │       → ctx:fail(path, msg) reports the line
       │   ├ trust.check                          Lua code and curl -c: ask first
+      │   │                                      (unless trust.required says no)
       │   └ the command line's arguments
       ├ view/args_ui.ask_all                     missing required arguments
       ├ dashboard.create(path, cfg, state, restored)
@@ -99,7 +105,8 @@ db.run(url, query, opts, on_result, on_end) → handle { stop, report, stats, st
     ctx.wait_tick(not_before, failures)   the next tick (opts.wait_tick: the panel's);
                                           earlier than not_before: it passes
     query()                               renders the query anew: sql, tag, options
-    driver.execute: connect → execute → close (timeouts; cancelling stops it on the server)
+    driver.execute: a Query, connect → execute → close (timeouts; cancelling stops it on
+                    the server: stop waiting, cancel on the server, close)
     ctx.emit(rs, tag) / ctx.fail(err, tag), then wait for handle:report(ok) (the consumer)
     failures in a row: not_before = now + interval × min(2^(n-1), errors.backoff)
   on_result(err, value, vars, tag)  a result (one may hold many rows), or a query's error
@@ -107,6 +114,11 @@ db.run(url, query, opts, on_result, on_end) → handle { stop, report, stats, st
 
 `db.query` (the Lua API, `dbdash.query` in Lua code) is a run of one tick: its first
 result.
+
+`webhook://` is a producer like the others; the HTTP side is the network layer's:
+`net/http_server` (connections, limits, Host and Origin checks, problem responses) and
+`net/openapi` (`Api:handle`: the operation, its security and parameters, the body's
+items by media type, validation, the response).
 
 ## Scheduling
 
@@ -153,6 +165,19 @@ on_result → Panel:on_result: queued (setup push.max_queue, unlimited by defaul
 
 `dbdash.run(args)` in Lua code runs the panel's pipeline again with other arguments: a
 query panel queries once, a push panel takes the current item again; nothing is settled.
+
+A source that sends data does not back off: a failed item is that item only (its report
+is ignored), and the next one replaces the error.
+
+## Errors
+
+Every error is a `dbdash.Error` (`util/error.lua`): a phase (config, template, connect,
+tls, auth, query, transform, timeout, cancelled, ...), a message and, where they apply,
+the driver, a code, more lines, the file and line. Raised with `errors.raise(phase,
+message, extra)`; what is raised elsewhere (a string from Lua) becomes one with
+`errors.wrap`. All read the same way: `[<driver> ]<phase> error: [<file>:<line>:
+]<message>[ [code]]`. Internal signals (an HTTP rejection inside the server, a stopped
+Lua guard) are tables of their own and never reach the user as such.
 
 ## Drawing
 
@@ -212,7 +237,7 @@ The view listens to no data event: what it shows comes from the document.
 | WebSocket `onmessage` | a push source's producer |
 | JS event handler | the consumer (transform, settle) |
 | JS variables | the model (history, prev, store, values) |
-| `requestAnimationFrame` writing the DOM | commit (a push panel's items at its next tick) |
+| `requestAnimationFrame` writing the DOM | commit (at most once per panel period) |
 | update the rendering (only what is dirty) | the view's frame |
 | hidden tab: no rendering, slower timers | hidden dashboard: no frames, only refresh_hidden ticks |
 
@@ -224,6 +249,8 @@ The view listens to no data event: what it shows comes from the document.
 | a config part's rules (`M.validators`) | `config/types.lua` (listed in `config/validators.lua`) | `css`, `args`, `db`, `render/registry`, `render/thresholds`, `layout/grid`, `dashboard/timer` |
 | chart renderers, canvases, ticks, palettes, frames | `render/types.lua` (checked by `render/registry.lua`) | `render/charts/*`, `render/{canvas,ticks,palette,frame}/*` |
 | `dbdash.render.Output` (lines and highlights) | `render/types.lua` | every renderer |
+| `dbdash.Error` | `util/error.lua` | every error shown to the user |
+| a run of `db.run` (`dbdash.db.RunHandle`) | `db/init.lua` | used by `dashboard/panel.lua` |
 
 ## Directory map
 
@@ -235,13 +262,15 @@ lua/dbdash/
   dashboard/               the model: the running dashboards (init), Dashboard, Panel, Run,
                            clock (timer), document, commit, history, track, thresholds,
                            events
-  config.lua, config/      loading configs; the validator list
+  config.lua, config/      loading configs; the validator list and its interface
   options.lua, session.lua setup's options; argument values in sessions
   trust.lua, metadata.lua  trust records; meta for templates and Lua
-  layout/, paint/          grid and panels; display lists
-  render/, compositor/     charts, their content and parts, the registry; layers into lines
+  layout/, paint/          grid and panels; display lists and boxes (borders, padding)
+  render/, compositor/     charts, their content and parts, the registry, the interfaces;
+                           layers into lines
   css/, dom/               style system; documents and nodes
-  db/                      db.run, drivers, results, the Lua of queries (db/lua_env.lua)
+  db/                      db.run, the drivers' interface and base (types, driver), drivers,
+                           results, the Lua of queries (lua_env)
   template/                the Jinja2 engine and SQL dialects
   net/, crypto/, yaml/     sockets, TLS, HTTP, OpenAPI; cryptography; YAML
   util/                    errors, JSON, UTF-8, numbers, time, shell, URLs, events, the Lua
