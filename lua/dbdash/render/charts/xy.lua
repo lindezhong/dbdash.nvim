@@ -194,16 +194,10 @@ local function label_at(canvas, row, col, text, group)
   canvas:text(row, col, text, group)
 end
 
----@param kind "line"|"area"|"scatter"|"bubble"
-function M.render(rs, show, ctx, kind)
-  local axes = C.axes(show)
-  local stacked = kind == "area" and nn(show.stacked)
-  stacked = (stacked == true or stacked == "percent") and stacked or false
-  local series, xaxis = collect(rs, show, ctx, kind)
-  local ylog = axes.yscale == "log"
-  local xlog = xaxis.numeric and axes.xscale == "log"
-
-  -- The real values, before stacking or log scales (for mark_lines / mark_points).
+---The values as plotted: the real ones kept (p.real, and every y for marks), stacked
+---(cumulative, or each x summing to 100), log10 of log scales (non-positive ones dropped).
+---@return number[] all_y the real values
+local function plotted_values(series, stacked, ylog, xlog)
   local all_y = {}
   for _, s in ipairs(series) do
     for _, p in ipairs(s.points) do
@@ -211,7 +205,6 @@ function M.render(rs, show, ctx, kind)
       p.real = p.y
     end
   end
-
   if stacked == "percent" then -- every x sums to 100 (ECharts 100% stacking)
     local total = {}
     for _, s in ipairs(series) do
@@ -248,10 +241,14 @@ function M.render(rs, show, ctx, kind)
       s.points = kept
     end
   end
+  return all_y
+end
 
-  -- Data ranges.
+---The plot's ranges (plot.xlo, xhi, ylo, yhi) from the data and the axes' limits; false
+---when there is nothing to plot.
+local function ranges(plot, axes)
   local xlo, xhi, ylo, yhi
-  for _, s in ipairs(series) do
+  for _, s in ipairs(plot.series) do
     for _, p in ipairs(s.points) do
       xlo = math.min(xlo or p.x, p.x)
       xhi = math.max(xhi or p.x, p.x)
@@ -260,25 +257,22 @@ function M.render(rs, show, ctx, kind)
     end
   end
   if not xlo then
-    return {
-      lines = { "(no data to plot)" },
-      hl = { { row = 0, col_s = 0, col_e = 17, group = ctx.css:hl("note") } },
-    }
+    return false
   end
-  if kind == "area" and not ylog then
+  if plot.kind == "area" and not plot.ylog then
     ylo, yhi = math.min(ylo, 0), math.max(yhi, 0)
   end
-  if ylog then
+  if plot.ylog then
     ylo = axes.ymin and log10(axes.ymin) or math.floor(ylo)
     yhi = axes.ymax and log10(axes.ymax) or math.ceil(yhi)
     if ylo == yhi then
       yhi = ylo + 1
     end
   else
-    ylo, yhi = C.limits(ctx, ylo, yhi, axes.ymin, axes.ymax)
+    ylo, yhi = C.limits(plot.ctx, ylo, yhi, axes.ymin, axes.ymax)
   end
-  if xaxis.numeric then
-    if xlog then
+  if plot.xaxis.numeric then
+    if plot.xlog then
       xlo = axes.xmin and log10(axes.xmin) or math.floor(xlo)
       xhi = axes.xmax and log10(axes.xmax) or math.ceil(xhi)
     else
@@ -290,10 +284,16 @@ function M.render(rs, show, ctx, kind)
   elseif xlo == xhi then
     xlo, xhi = xlo - 0.5, xhi + 0.5
   end
+  plot.xlo, plot.xhi, plot.ylo, plot.yhi = xlo, xhi, ylo, yhi
+  return true
+end
 
-  local legend_pos = C.legend_position(ctx, #series)
+---The frame's spec (labels, legend, ticks) and the plot's size in cells.
+---@return table spec, integer cols, integer rows
+local function frame_spec(plot, axes)
+  local ctx = plot.ctx
   local legend = {}
-  for i, s in ipairs(series) do
+  for i, s in ipairs(plot.series) do
     legend[i] =
       { label = s.label, group = s.group, label_group = C.item_hl(ctx, "legend", i, "legend") }
   end
@@ -301,31 +301,35 @@ function M.render(rs, show, ctx, kind)
     xlabel = axes.xlabel,
     ylabel = axes.ylabel,
     legend = legend,
-    legend_position = legend_pos,
+    legend_position = C.legend_position(ctx, #plot.series),
     height = ctx.plot_height,
   }
   -- Size the margin with a first set of tick labels, then compute the real ticks.
-  local _, labels = C.y_ticks(ctx, ylo, yhi, 15, axes.yformat, axes.yticks, ylog)
+  local ylo, yhi = plot.ylo, plot.yhi
+  local _, labels = C.y_ticks(ctx, ylo, yhi, 15, axes.yformat, axes.yticks, plot.ylog)
   spec.ylabels = labels
   local _, rows = ctx.frame.plot_size(ctx, spec)
   local yticks
-  yticks, spec.ylabels = C.y_ticks(ctx, ylo, yhi, rows, axes.yformat, axes.yticks, ylog)
+  yticks, spec.ylabels = C.y_ticks(ctx, ylo, yhi, rows, axes.yformat, axes.yticks, plot.ylog)
   spec.yticks = yticks
   local cols
   cols, rows = ctx.frame.plot_size(ctx, spec)
+  local xaxis = plot.xaxis
   if xaxis.numeric then
-    spec.xticks = numeric_ticks(ctx, xlo, xhi, cols, axes.xformat, axes.xticks, xlog)
+    spec.xticks = numeric_ticks(ctx, plot.xlo, plot.xhi, cols, axes.xformat, axes.xticks, plot.xlog)
   else
     spec.xticks = category_ticks(xaxis.labels, cols, #xaxis.labels)
   end
+  return spec, cols, rows
+end
 
-  local canvas = ctx.canvas(cols, rows, { xlo, xhi }, { ylo, yhi })
-
-  -- Grid lines first, so the data is drawn over them (Chart.js grid.display).
+---Grid lines (Chart.js grid.display), drawn first so the data is drawn over them.
+local function draw_grid(plot, spec)
+  local ctx, canvas = plot.ctx, plot.canvas
   local grid_hl = ctx.css:hl("grid")
   if ctx.css:get("grid", { classes = { "y" } }).display ~= "none" then
     for _, t in ipairs(spec.yticks or {}) do
-      local py = (rows - 1 - t.row) * canvas.px_y + math.floor(canvas.px_y / 2)
+      local py = (canvas.rows - 1 - t.row) * canvas.px_y + math.floor(canvas.px_y / 2)
       for px = 0, canvas:width_px() - 1, 4 do
         canvas:pixel(px, py, grid_hl)
       end
@@ -339,179 +343,202 @@ function M.render(rs, show, ctx, kind)
       end
     end
   end
+end
 
+---A point: its marker character (the series' point element's content), else a dot.
+local function draw_point(canvas, p, marker, group)
+  if marker then
+    local row, col = canvas:cell_of(p.x, p.y)
+    canvas:text(row, col, marker, group)
+  else
+    canvas:point(p.x, p.y, group)
+  end
+end
+
+---Bubbles: circles by size (show.size_range: radii in canvas pixels), the point, its text.
+local function draw_bubbles(plot, s, marker)
+  local canvas, size_range = plot.canvas, nn(plot.show.size_range)
+  local smax = 0
+  for _, ss in ipairs(plot.series) do
+    for _, p in ipairs(ss.points) do
+      smax = math.max(smax, math.abs(p.size or 0))
+    end
+  end
+  local rmax = math.max(1, math.min(canvas.px_x * 3, canvas.px_y * 2))
+  local function radius(f)
+    if type(size_range) == "table" then -- Chart.js radius range, in canvas pixels
+      local lo, hi = tonumber(size_range[1]) or 1, tonumber(size_range[2]) or rmax
+      return lo + (hi - lo) * f
+    end
+    return math.max(1, f * rmax)
+  end
+  for _, p in ipairs(s.points) do
+    local f = smax > 0 and p.size and math.sqrt(math.abs(p.size) / smax) or 0
+    canvas:circle(p.x, p.y, radius(f), s.group)
+    draw_point(canvas, p, marker, s.group)
+    if p.text then
+      local col = math.floor(canvas:to_px(p.x) / canvas.px_x) + 1
+      local row = canvas.rows - 1 - math.floor(canvas:to_py(p.y) / canvas.px_y)
+      if col + W.width(p.text) <= canvas.cols then
+        canvas:text(row, col, p.text, s.group)
+      end
+    end
+  end
+end
+
+---The area under series `si` down to the one below it (stacked) or zero, pixel column by
+---pixel column.
+local function fill_area(plot, si)
+  local canvas, pts = plot.canvas, plot.series[si].points
+  if #pts == 0 then
+    return
+  end
+  local group = plot.series[si].group
+  local px_lo = math.floor(canvas:to_px(pts[1].x) + 0.5)
+  local px_hi = math.floor(canvas:to_px(pts[#pts].x) + 0.5)
+  for px = px_lo, px_hi do
+    local x = plot.xlo + (plot.xhi - plot.xlo) * px / math.max(1, canvas:width_px() - 1)
+    local y = interp(pts, x)
+    if y then
+      local base = 0
+      if plot.stacked and si > 1 then
+        base = interp(plot.series[si - 1].points, x) or 0
+      end
+      local top = math.floor(canvas:to_py(y) + 0.5)
+      local bottom = math.floor(canvas:to_py(math.max(base, plot.ylo)) + 0.5)
+      for py = bottom, top do
+        canvas:pixel(px, py, group)
+      end
+    end
+  end
+end
+
+local CURVE = {
+  step = "before",
+  ["step-before"] = "before",
+  ["step-after"] = "after",
+  ["step-middle"] = "middle",
+}
+
+---Series `si`: its points (scatter), bubbles, or lines (filled for areas, stepped by the
+---series' curve) with their points; and its trend line (show.trend_line).
+local function draw_series(plot, si)
+  local ctx, canvas, kind = plot.ctx, plot.canvas, plot.kind
+  local s = plot.series[si]
+  local pts = s.points
+  local sc = C.item_style(ctx, "series", si, "series")
   -- point markers, each series' own point element: content is the marker character; on
   -- lines and areas they show with display: block (hidden by the UA sheet), scatter and
   -- bubble always draw them
-  local show_points, marker
-  local size_range = nn(show.size_range)
-  local CURVE = {
-    step = "before",
-    ["step-before"] = "before",
-    ["step-after"] = "after",
-    ["step-middle"] = "middle",
-  }
-
-  local function mark(p, group)
-    local row, col = canvas:cell_of(p.x, p.y)
-    canvas:text(row, col, marker, group)
+  local point = C.item_style(ctx, "series", si, "point", "point")
+  local show_points = point.display ~= "none"
+  local marker = point.content
+  if kind == "line" or kind == "area" then
+    marker = show_points and marker or nil
   end
-
-  for si = #series, 1, -1 do
-    local s = series[si]
-    local pts = s.points
-    local sc = C.item_style(ctx, "series", si, "series")
-    local point = C.item_style(ctx, "series", si, "point", "point")
-    show_points = point.display ~= "none"
-    marker = point.content
-    if kind == "line" or kind == "area" then
-      marker = show_points and marker or nil
+  if kind == "scatter" then
+    for _, p in ipairs(pts) do
+      draw_point(canvas, p, marker, s.group)
     end
-    local fill = kind == "area" or sc.fill == true
-    local stepped = CURVE[sc.curve]
-    if kind == "scatter" then
+  elseif kind == "bubble" then
+    draw_bubbles(plot, s, marker)
+  else
+    if kind == "area" or sc.fill == true then
+      fill_area(plot, si)
+    end
+    for i = 1, #pts - 1 do
+      if not pts[i + 1].brk then
+        segment(canvas, pts[i], pts[i + 1], CURVE[sc.curve], s.group)
+      end
+    end
+    if marker or #pts == 1 or show_points then
       for _, p in ipairs(pts) do
-        if marker then
-          mark(p, s.group)
-        else
-          canvas:point(p.x, p.y, s.group)
-        end
-      end
-    elseif kind == "bubble" then
-      local smax = 0
-      for _, ss in ipairs(series) do
-        for _, p in ipairs(ss.points) do
-          smax = math.max(smax, math.abs(p.size or 0))
-        end
-      end
-      local rmax = math.max(1, math.min(canvas.px_x * 3, canvas.px_y * 2))
-      local function radius(f)
-        if type(size_range) == "table" then -- Chart.js radius range, in canvas pixels
-          local lo, hi = tonumber(size_range[1]) or 1, tonumber(size_range[2]) or rmax
-          return lo + (hi - lo) * f
-        end
-        return math.max(1, f * rmax)
-      end
-      for _, p in ipairs(pts) do
-        local f = smax > 0 and p.size and math.sqrt(math.abs(p.size) / smax) or 0
-        canvas:circle(p.x, p.y, radius(f), s.group)
-        if marker then
-          mark(p, s.group)
-        else
-          canvas:point(p.x, p.y, s.group)
-        end
-        if p.text then
-          local col = math.floor(canvas:to_px(p.x) / canvas.px_x) + 1
-          local row = canvas.rows - 1 - math.floor(canvas:to_py(p.y) / canvas.px_y)
-          if col + W.width(p.text) <= canvas.cols then
-            canvas:text(row, col, p.text, s.group)
-          end
-        end
-      end
-    else
-      if fill and #pts > 0 then
-        local px_lo = math.floor(canvas:to_px(pts[1].x) + 0.5)
-        local px_hi = math.floor(canvas:to_px(pts[#pts].x) + 0.5)
-        for px = px_lo, px_hi do
-          local x = xlo + (xhi - xlo) * px / math.max(1, canvas:width_px() - 1)
-          local y = interp(pts, x)
-          if y then
-            local base = 0
-            if stacked and si > 1 then
-              base = interp(series[si - 1].points, x) or 0
-            end
-            local top = math.floor(canvas:to_py(y) + 0.5)
-            local bottom = math.floor(canvas:to_py(math.max(base, ylo)) + 0.5)
-            for py = bottom, top do
-              canvas:pixel(px, py, s.group)
-            end
-          end
-        end
-      end
-      for i = 1, #pts - 1 do
-        if not pts[i + 1].brk then
-          segment(canvas, pts[i], pts[i + 1], stepped, s.group)
-        end
-      end
-      if marker then
-        for _, p in ipairs(pts) do
-          mark(p, s.group)
-        end
-      elseif #pts == 1 or show_points then
-        for _, p in ipairs(pts) do
-          canvas:point(p.x, p.y, s.group)
-        end
-      end
-    end
-    if nn(show.trend_line) == "linear" then -- ECharts regression: a dashed fit per series
-      local a, b = regression(pts)
-      if a then
-        canvas:line(xlo, a + b * xlo, xhi, a + b * xhi, s.group, 2)
+        draw_point(canvas, p, marker, s.group)
       end
     end
   end
+  if nn(plot.show.trend_line) == "linear" then -- ECharts regression: a dashed fit per series
+    local a, b = regression(pts)
+    if a then
+      canvas:line(plot.xlo, a + b * plot.xlo, plot.xhi, a + b * plot.xhi, s.group, 2)
+    end
+  end
+end
 
-  -- Reference lines (ECharts markLine): a value, or the mean / min / max of the data.
-  local function stat_of(what)
-    if #all_y == 0 then
-      return nil
+---The mean, min or max of the real values (mark_lines), or nil.
+local function stat_of(all_y, what)
+  if #all_y == 0 then
+    return nil
+  end
+  if what == "mean" or what == "average" then
+    local sum = 0
+    for _, v in ipairs(all_y) do
+      sum = sum + v
     end
-    if what == "mean" or what == "average" then
-      local sum = 0
-      for _, v in ipairs(all_y) do
-        sum = sum + v
+    return sum / #all_y
+  elseif what == "min" then
+    return math.min(unpack(all_y))
+  elseif what == "max" then
+    return math.max(unpack(all_y))
+  end
+end
+
+---A vertical reference line at x (a category's label, or a number) with its label on top.
+local function mark_x(plot, m, v, group)
+  local canvas, xaxis = plot.canvas, plot.xaxis
+  local x
+  if not xaxis.numeric then -- a category: its label
+    for i, l in ipairs(xaxis.labels or {}) do
+      if l == tostring(v) then
+        x = i
       end
-      return sum / #all_y
-    elseif what == "min" then
-      return math.min(unpack(all_y))
-    elseif what == "max" then
-      return math.max(unpack(all_y))
+    end
+  else
+    x = tonumber(v)
+  end
+  if x and plot.xlog then
+    x = log10(x)
+  end
+  if x then
+    canvas:line(x, plot.ylo, x, plot.yhi, group, 2)
+    if nn(m.label) then
+      local _, col = canvas:cell_of(x, plot.yhi)
+      label_at(canvas, 0, col + 1, m.label, group)
     end
   end
-  for k, m in ipairs(nn(show.mark_lines) or {}) do
+end
+
+---Reference lines (ECharts markLine): a value, or the mean / min / max of the data.
+local function draw_mark_lines(plot)
+  local ctx, canvas = plot.ctx, plot.canvas
+  for k, m in ipairs(nn(plot.show.mark_lines) or {}) do
     local group = C.item_hl(ctx, "marks", k, "mark")
       or ctx.css:hl("mark", { classes = nn(m.class) and { m.class } or nil })
-    local axis = nn(m.axis) or "y"
     local v = nn(m.value)
-    if axis == "x" then
-      local x
-      if not xaxis.numeric then -- a category: its label
-        for i, l in ipairs(xaxis.labels or {}) do
-          if l == tostring(v) then
-            x = i
-          end
-        end
-      else
-        x = tonumber(v)
-      end
-      if x and xlog then
-        x = log10(x)
-      end
-      if x then
-        canvas:line(x, ylo, x, yhi, group, 2)
-        if nn(m.label) then
-          local _, col = canvas:cell_of(x, yhi)
-          label_at(canvas, 0, col + 1, m.label, group)
-        end
-      end
+    if (nn(m.axis) or "y") == "x" then
+      mark_x(plot, m, v, group)
     else
-      local real = tonumber(v) or stat_of(v)
-      local y = real and (ylog and log10(real) or real)
+      local real = tonumber(v) or stat_of(plot.all_y, v)
+      local y = real and (plot.ylog and log10(real) or real)
       if y then
-        canvas:line(xlo, y, xhi, y, group, 2)
+        canvas:line(plot.xlo, y, plot.xhi, y, group, 2)
         local text = nn(m.label)
           or (type(v) == "string" and ("%s %s"):format(v, fmt.number(real)))
           or nil
         if text then
-          local row = canvas:cell_of(xhi, y)
+          local row = canvas:cell_of(plot.xhi, y)
           label_at(canvas, math.max(row - 1, 0), canvas.cols, text, group)
         end
       end
     end
   end
-  -- Marked points (ECharts markPoint): each series' max / min with its value.
-  for _, what in ipairs(nn(show.mark_points) or {}) do
-    for _, s in ipairs(series) do
+end
+
+---Marked points (ECharts markPoint): each series' max / min with its value.
+local function draw_mark_points(plot)
+  local canvas = plot.canvas
+  for _, what in ipairs(nn(plot.show.mark_points) or {}) do
+    for _, s in ipairs(plot.series) do
       local best
       for _, p in ipairs(s.points) do
         if
@@ -534,8 +561,40 @@ function M.render(rs, show, ctx, kind)
       end
     end
   end
+end
 
-  local lines, hl = canvas:render()
+---@param kind "line"|"area"|"scatter"|"bubble"
+function M.render(rs, show, ctx, kind)
+  local axes = C.axes(show)
+  local stacked = kind == "area" and nn(show.stacked)
+  stacked = (stacked == true or stacked == "percent") and stacked or false
+  local series, xaxis = collect(rs, show, ctx, kind)
+  local plot = {
+    ctx = ctx,
+    show = show,
+    kind = kind,
+    series = series,
+    xaxis = xaxis,
+    stacked = stacked,
+    ylog = axes.yscale == "log",
+    xlog = xaxis.numeric and axes.xscale == "log",
+  }
+  plot.all_y = plotted_values(series, stacked, plot.ylog, plot.xlog)
+  if not ranges(plot, axes) then
+    return {
+      lines = { "(no data to plot)" },
+      hl = { { row = 0, col_s = 0, col_e = 17, group = ctx.css:hl("note") } },
+    }
+  end
+  local spec, cols, rows = frame_spec(plot, axes)
+  plot.canvas = ctx.canvas(cols, rows, { plot.xlo, plot.xhi }, { plot.ylo, plot.yhi })
+  draw_grid(plot, spec)
+  for si = #series, 1, -1 do
+    draw_series(plot, si)
+  end
+  draw_mark_lines(plot)
+  draw_mark_points(plot)
+  local lines, hl = plot.canvas:render()
   return ctx.frame.render(ctx, spec, { lines = lines, hl = hl })
 end
 
