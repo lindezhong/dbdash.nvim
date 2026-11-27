@@ -613,6 +613,7 @@ function M.style(fargs)
         ("%s%s: %s"):format(perr.key, perr.property and (" " .. perr.property) or "", perr.message)
       )
     end
+    d:commit()
     return require("dbdash.view.dashboard").redraw(d)
   end
   if a == "reset" then
@@ -624,6 +625,7 @@ function M.style(fargs)
       end
     end
     d.doc:set_sheet("runtime", {})
+    d:commit()
     return require("dbdash.view.dashboard").redraw(d)
   end
   with_panel(d, function(p)
@@ -677,6 +679,7 @@ function M.style(fargs)
       end
     end
     apply_runtime(d)
+    d:commit()
     require("dbdash.view.dashboard").redraw(d)
   end)
 end
