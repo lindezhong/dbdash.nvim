@@ -2,6 +2,7 @@
 -- results through query.transform and the rows check, one at a time, and their records.
 local M = {}
 local S = require("dbdash.dashboard.shared")
+---@class dbdash.Panel
 local Panel = S.Panel
 local opts, now, as_error = S.opts, S.now, S.as_error
 local events = require("dbdash.dashboard.events")

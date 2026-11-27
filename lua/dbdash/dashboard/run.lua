@@ -1,7 +1,10 @@
 -- Runs of a panel's pipeline (refreshes and dbdash.run() callbacks) with their records,
 local M = {}
 local S = require("dbdash.dashboard.shared")
-local Panel, Dashboard = S.Panel, S.Dashboard
+---@class dbdash.Panel
+local Panel = S.Panel
+---@class dbdash.Dashboard
+local Dashboard = S.Dashboard
 local opts = S.opts
 local args = require("dbdash.args")
 local db = require("dbdash.db")
@@ -57,11 +60,9 @@ end
 ---@field args table what Lua code sees as `args`
 ---@field depth integer 0 for a refresh, n for a callback n levels deep (meta.run.depth)
 ---@field counter { n: integer, runs: table[], cancel: dbdash.db.CancelToken } the refresh's
-
 ---  life: dbdash.run() calls so far, the run records (meta.runs) and the token that cancels
 ---  the refresh, shared by its callbacks (= run.life)
 ---@field record table this run's record (meta.run): id, kind, depth, parent_id, refresh_id,
-
 ---  args, started_at, finished_at, elapsed_ms, ok, error, sql, query, result
 ---@field lua { store: table, helpers: table } globals of all Lua code of the run
 ---@field meta table? the metadata of this run

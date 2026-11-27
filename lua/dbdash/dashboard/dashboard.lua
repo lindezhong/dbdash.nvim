@@ -1,5 +1,6 @@
 -- Dashboards: their clock (dashboard/timer.lua), refreshing every panel, pause and resume.
 local S = require("dbdash.dashboard.shared")
+---@class dbdash.Dashboard
 local Dashboard = S.Dashboard
 local events = require("dbdash.dashboard.events")
 
