@@ -376,6 +376,14 @@ end
 
 R.globals = {}
 
+-- Set by the engine (template/init.lua) from modules that require this one:
+---Call a Python method of a value ("a".upper()): found, result.
+---@type fun(obj: any, name: string, args: any[], kwargs: table): boolean, any
+R.call_method = nil
+---printf-style formatting: "x=%s" % value.
+---@type fun(s: string, values: any): string
+R.percent = nil
+
 ---A context with `vars` (template variables: name -> value, R.MISSING skipped) over `ctx`:
 ---what an include or an import "with context" sees.
 function R.layer(ctx, vars)
@@ -552,7 +560,7 @@ function R.call_attr(env, obj, name, args, kwargs)
   for i = 1, #args do
     check(args[i])
   end
-  local found, out = require("dbdash.template.methods").call(obj, name, args, kwargs)
+  local found, out = R.call_method(obj, name, args, kwargs)
   if found then
     return out
   end
@@ -1321,7 +1329,7 @@ function R.mod(a, b)
     local s = as_str(a)
     if s then
       -- printf-style formatting: 'x=%s' % value
-      local out = require("dbdash.template.pyformat").percent(s, b)
+      local out = R.percent(s, b)
       return R.is_safe(a) and R.safe(out) or out
     end
     op_error("%", a, b)

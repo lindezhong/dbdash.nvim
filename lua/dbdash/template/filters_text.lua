@@ -15,7 +15,7 @@ local raise = errors.raise
 local NONE = R.NONE
 
 local function bind(...)
-  return require("dbdash.template.filters").bind(...)
+  return require("dbdash.template.bind")(...)
 end
 
 local function str_method(name, s, args, kw)

@@ -3,7 +3,6 @@
 --   * sql_in of an empty list gives "(NULL)"
 --   * booleans become dialect literals
 local R = require("dbdash.template.runtime")
-local filters = require("dbdash.template.filters")
 local errors = require("dbdash.template.errors")
 local map = require("dbdash.util.map")
 
@@ -45,7 +44,7 @@ end
 local F = {}
 
 F.sql_escape = function(env, v, args, kw)
-  filters.bind("sql_escape", args, kw, {})
+  require("dbdash.template.bind")("sql_escape", args, kw, {})
   v = plain(v)
   local d = dialect_of(env)
   if v == NONE then
@@ -57,7 +56,7 @@ F.sql_escape = function(env, v, args, kw)
 end
 
 F.sql_quote = function(env, v, args, kw)
-  filters.bind("sql_quote", args, kw, {})
+  require("dbdash.template.bind")("sql_quote", args, kw, {})
   v = plain(v)
   local d = dialect_of(env)
   if
@@ -75,7 +74,7 @@ end
 -- A value as one word of a shell-quoted command (the curl command of an http(s)://
 -- query): single quotes, ' written as '\''. Lists give one word per item.
 F.shell_quote = function(_, v, args, kw)
-  filters.bind("shell_quote", args, kw, {})
+  require("dbdash.template.bind")("shell_quote", args, kw, {})
   v = plain(v)
   local q = require("dbdash.util.shell").quote
   if v == NONE then
@@ -92,7 +91,7 @@ F.shell_quote = function(_, v, args, kw)
 end
 
 F.sql_in = function(env, v, args, kw)
-  filters.bind("sql_in", args, kw, {})
+  require("dbdash.template.bind")("sql_in", args, kw, {})
   v = plain(v)
   local d = dialect_of(env)
   local items
@@ -113,7 +112,7 @@ F.sql_in = function(env, v, args, kw)
 end
 
 F.sql_id = function(env, v, args, kw)
-  filters.bind("sql_id", args, kw, {})
+  require("dbdash.template.bind")("sql_id", args, kw, {})
   v = plain(v)
   if type(v) ~= "string" then
     raise("value", "SQL identifier must be a string")
@@ -122,7 +121,7 @@ F.sql_id = function(env, v, args, kw)
 end
 
 F.sql_limit = function(_, v, args, kw)
-  filters.bind("sql_limit", args, kw, {})
+  require("dbdash.template.bind")("sql_limit", args, kw, {})
   v = plain(v)
   if v == NONE then
     return ""
@@ -146,7 +145,7 @@ local G = {}
 ---Conditions and values are inserted verbatim.
 G.sql_case = function(args, kw)
   local conditions, default =
-    filters.bind("sql_case", args, kw, { { "conditions" }, { "default", NONE } })
+    require("dbdash.template.bind")("sql_case", args, kw, { { "conditions" }, { "default", NONE } })
   if not map.is_map(conditions) or next(conditions) == nil then
     if conditions ~= NONE and not map.is_map(conditions) and R.truthy(conditions) then
       raise("type", "sql_case() conditions must be a mapping")

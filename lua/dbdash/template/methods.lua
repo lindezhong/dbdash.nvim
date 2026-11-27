@@ -13,7 +13,7 @@ local check = R.check
 
 ---Bind arguments to parameters { name, default } (nil default: required).
 local function bind(name, args, kwargs, params)
-  return require("dbdash.template.filters").bind(name, args, kwargs, params)
+  return require("dbdash.template.bind")(name, args, kwargs, params)
 end
 
 local function str_arg(v, what)

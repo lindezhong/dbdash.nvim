@@ -115,7 +115,7 @@ end
 -- joiner(sep): "" the first time, then sep ---------------------------------------------------
 
 G.joiner = function(args, kwargs)
-  local sep = require("dbdash.template.filters").bind("joiner", args, kwargs, { { "sep", ", " } })
+  local sep = require("dbdash.template.bind")("joiner", args, kwargs, { { "sep", ", " } })
   local used = false
   return function()
     if not used then
@@ -152,7 +152,7 @@ local WORDS = vim.split(
 )
 
 G.lipsum = function(args, kwargs)
-  local n, html, min, max = require("dbdash.template.filters").bind(
+  local n, html, min, max = require("dbdash.template.bind")(
     "lipsum",
     args,
     kwargs,

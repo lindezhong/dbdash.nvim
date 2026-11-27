@@ -11,7 +11,7 @@ local raise = errors.raise
 local NONE = R.NONE
 
 local function bind(...)
-  return require("dbdash.template.filters").bind(...)
+  return require("dbdash.template.bind")(...)
 end
 
 ---Items of an iterable (a string's characters, a mapping's keys).

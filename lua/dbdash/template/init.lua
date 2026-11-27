@@ -2,6 +2,8 @@
 local errors = require("dbdash.template.errors")
 local R = require("dbdash.template.runtime")
 
+R.call_method = require("dbdash.template.methods").call
+R.percent = require("dbdash.template.pyformat").percent
 require("dbdash.template.filters").install()
 require("dbdash.template.globals").install()
 require("dbdash.template.sql").install()
