@@ -1,0 +1,71 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Databases and sources that send data in one dashboard (:help dbdash-interval,
+# dbdash-push). show.interval is each panel's period: it shows new data at most once per
+# period.
+# - A database (here SQLite in memory) is queried once per period.
+# - A source that sends data (here luastream://, an item every 300 ms) keeps sending; the
+#   panel shows the latest at most once per period.
+# - The top-level interval is a tick for every panel at once: both kinds refresh then, and
+#   their own count starts again from it. A panel whose interval is the top-level one or
+#   longer only ever refreshes with the others.
+# The countdowns (hidden by default) show when each panel refreshes next.
+# It runs Lua, so dbdash asks whether you trust this file first.
+
+title: "Databases and sources that send data"
+description: |
+  A database queried every period next to a source that sends data all the time: both
+  show new data at most once per **interval**, and the top-level interval refreshes all
+  panels at once. See `:help dbdash-interval`.
+
+database:
+  url: "sqlite:///:memory:"
+
+interval: 20s                     # every panel, together
+
+style:
+  dashboard: { grid-template-columns: 3 }
+  panel: { border: single, padding: [0, 1] }
+  countdown: { display: block, content: "{time}s" }
+  header countdown: { display: block, content: "all in {time}s" }
+
+panels:
+  - query:
+      sql: SELECT strftime('%H:%M:%S', 'now', 'localtime') AS queried, abs(random() % 100) AS value
+    show:
+      type: table
+      title: "Queried every 5s"
+      description: |
+        A query on each tick of its 5 s interval, and on the top-level one.
+      interval: 5s
+
+  - database: { url: "luastream://" }
+    query:
+      sql: |
+        -- A reading every 300 ms for ten minutes: many items per period.
+        for i = 1, 2000 do
+          print(vim.json.encode({ n = i, at = os.date("%H:%M:%S") }))
+          dbdash.sleep(300)
+        end
+      transform: |
+        -- every item goes through here; the panel shows the latest once per period
+        store.received = (store.received or 0) + 1
+        local item = vim.json.decode(rs)
+        return { { item = item.n, at = item.at, received = store.received } }
+    show:
+      type: table
+      title: "Sent every 300 ms, shown every 3s"
+      description: |
+        `luastream://` sends an item every 300 ms; each one goes through `query.transform`,
+        the panel shows the latest at most once per 3 s period.
+      interval: 3s
+
+  - query:
+      sql: SELECT strftime('%H:%M:%S', 'now', 'localtime') AS queried
+    show:
+      type: table
+      title: "Every 1m: with the others"
+      description: |
+        Its interval (1 m) is longer than the top-level one (20 s): it refreshes only with
+        all panels.
+      interval: 1m

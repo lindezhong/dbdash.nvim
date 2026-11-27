@@ -3,9 +3,14 @@
 # luastream:// - Lua whose output is the data (:help dbdash-luastream, dbdash-push).
 # - print() / io.write() text is cut into items at database.options.delimiter (a newline by
 #   default); dbdash.emit(value) passes one item as it is (a table here).
-# - Each item goes through query.transform one at a time (rs is the item); the panel is
-#   drawn on show.interval when something is new. When the code returns, the panel ends.
+# - Each item goes through query.transform one at a time (rs is the item); the panel shows
+#   new data at most once per show.interval (the first item of a period at once, the
+#   latest of the others at the next tick). When the code returns, the panel ends.
+# - Items wait in a queue while query.transform is busy: setup push.max_queue (unlimited
+#   by default) keeps only the newest when set.
 # - database.options.cwd is the code's directory for files and commands.
+# - dbdash.run(args) in query.transform takes the same item again with other arguments
+#   (meta.run.kind is "callback" there); nothing is shown or recorded for it.
 # It runs Lua, so dbdash asks whether you trust this file first.
 
 title: "luastream://"
@@ -37,8 +42,8 @@ panels:
       type: line
       title: "print(): one reading per second"
       description: |
-        One JSON row printed per second; the panel redraws on its `interval` when something
-        is new.
+        One JSON row printed per second; the panel shows new data at most once per
+        `interval`.
       x_column: at
       y_column: load
       interval: 2s
@@ -75,3 +80,38 @@ panels:
         `io.write()` with `delimiter: ";"`, `dbdash.emit()` for a value as it is, and `cwd`
         for `dbdash.cwd()`.
       interval: 1s
+
+  - database: { url: "luastream://" }
+    query:
+      args:
+        - name: unit
+          type: string
+          default: C
+          choices: [C, F]
+          description: "Unit of the reading"
+      sql: |
+        -- A temperature every 2 seconds, in Celsius.
+        for i = 1, 600 do
+          print(vim.json.encode({ celsius = 15 + math.random(0, 100) / 10 }))
+          dbdash.sleep(2000)
+        end
+      transform: |
+        local c = vim.json.decode(rs).celsius
+        local value = args.unit == "F" and c * 9 / 5 + 32 or c
+        if meta.run.kind == "callback" then
+          return { { value = value } }                  -- for the caller below
+        end
+        -- the same item again, in the other unit
+        local other = args.unit == "F" and "C" or "F"
+        local again = dbdash.run({ unit = other }).rows[1][1]
+        return { columns = { "reading", "other unit" },
+                 rows = { { ("%.1f °%s"):format(value, args.unit),
+                            ("%.1f °%s"):format(again, other) } } }
+    show:
+      type: table
+      title: "dbdash.run(): the same item in the other unit"
+      description: |
+        `dbdash.run({ unit = ... })` in `query.transform` takes the current item again with
+        another argument. Change the unit with `:DbDashUpdateVariable unit F`.
+      args_show: true
+      interval: 2s

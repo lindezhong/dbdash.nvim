@@ -1,0 +1,60 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Errors (:help dbdash-errors), on purpose:
+# - A database whose query fails three times in every six refreshes (meta.refresh_count).
+#   The last good result stays on screen with the error above it. Failures in a row back
+#   off: the second waits 2 intervals, the third 4 (setup errors.backoff caps it); the
+#   status says "retrying" and :DbDashStatus shows the count and the next try. The first
+#   success goes back to the interval.
+# - A source that sends data where every fifth item is not JSON rows: that item fails
+#   (and is shown), the source goes on and the next item replaces the error.
+# setup({ errors = { notify = "once" } }) (the default) notifies an error when it appears
+# or changes.
+# It runs Lua, so dbdash asks whether you trust this file first.
+
+title: "Errors"
+description: |
+  A query that fails now and then, backing off, and a source that sends a bad item now and
+  then. The last good result stays on screen with the error above it. See
+  `:help dbdash-errors`.
+
+style:
+  dashboard: { grid-template-columns: 2 }
+  panel: { border: single, padding: [0, 1] }
+  countdown: { display: block, content: "{time}s" }
+
+panels:
+  - database: { url: "sqlite:///:memory:" }
+    query:
+      sql: |
+        {% if meta.refresh_count % 6 >= 3 %}
+        SELECT * FROM table_that_does_not_exist
+        {% else %}
+        SELECT {{ meta.refresh_count }} AS refresh, strftime('%H:%M:%S', 'now', 'localtime') AS at
+        {% endif %}
+    show:
+      type: table
+      title: "Fails 3 times in 6, backing off"
+      description: |
+        Refreshes 3, 4 and 5 of every six fail: the error shows above the last good result
+        and the next tries wait 2 and then 4 intervals.
+      interval: 2s
+
+  - database: { url: "luastream://" }
+    query:
+      sql: |
+        for i = 1, 600 do
+          if i % 5 == 0 then
+            print("not json " .. i)     -- this item fails; the next ones go on
+          else
+            print(vim.json.encode({ { item = i, at = os.date("%H:%M:%S") } }))
+          end
+          dbdash.sleep(1000)
+        end
+    show:
+      type: table
+      title: "Every fifth item is bad"
+      description: |
+        Without `query.transform` an item must be JSON rows: every fifth one is not, so it
+        fails on its own and the source goes on.
+      interval: 1s
