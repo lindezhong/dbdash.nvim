@@ -1,21 +1,8 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
 # webhook:// - an HTTP endpoint described by an OpenAPI 3.1 document in query.sql
-# (:help dbdash-webhook, dbdash-webhook-security, dbdash-push). Try:
-#
-#   # application/x-ndjson: one item per line, each checked against the Event schema
-#   curl -H "Authorization: Bearer demo-token" -H "Content-Type: application/x-ndjson" \
-#        -H "X-Request-Id: r1" --cookie "region=eu" \
-#        --data-binary $'{"user": "ann", "action": "login"}\n{"user": "bob", "action": "purchase", "amount": 9.5}\n' \
-#        http://127.0.0.1:8765/hooks/events/web
-#   # no body: the query parameters are the item (and the reply is the documented example)
-#   curl "http://127.0.0.1:8765/hooks/ping?n=3&tags=a,b"
-#   # a form (urlencoded or multipart) is one item
-#   curl -H "Authorization: Bearer demo-token" -d "user=cat&action=logout" http://127.0.0.1:8765/hooks/forms
-#   curl -H "Authorization: Bearer demo-token" -F user=dan -F action=login http://127.0.0.1:8765/hooks/forms
-#   # text/x-log is streamed too (options.stream_types): one item per line
-#   curl -H "Authorization: Bearer demo-token" -H "Content-Type: text/x-log" \
-#        --data-binary $'eve login\nfay logout\n' http://127.0.0.1:8765/hooks/logs
+# (:help dbdash-webhook, dbdash-webhook-security, dbdash-push). The description below
+# (K in the dashboard) has curl commands that send data to every endpoint.
 #
 # Rejected requests get application/problem+json (401 without the token, 400 for an
 # invalid event, 403 for an Origin not in allowed_origins, ...). A real token belongs in the
@@ -25,7 +12,42 @@
 title: "webhook://"
 description: |
   `webhook://`: an HTTP endpoint described by OpenAPI 3.1; every accepted request is an
-  item. See `:help dbdash-webhook` and the curl commands in the file.
+  item, shown as a row of the table. Send some from a terminal while the dashboard runs
+  (it listens on `127.0.0.1:8765`; the token is `demo-token`):
+
+  **Events**, one JSON object per line (`application/x-ndjson`), each checked against
+  the Event schema; the path picks the source (`web` or `app`):
+  ```sh
+  curl -H "Authorization: Bearer demo-token" \
+       -H "Content-Type: application/x-ndjson" \
+       -H "X-Request-Id: r1" --cookie "region=eu" \
+       --data-binary $'{"user": "ann", "action": "login"}\n{"user": "bob", "action": "purchase", "amount": 9.5}\n' \
+       http://127.0.0.1:8765/hooks/events/web
+  ```
+
+  **A form** (urlencoded or multipart) is one item:
+  ```sh
+  curl -H "Authorization: Bearer demo-token" \
+       -d "user=cat&action=logout" http://127.0.0.1:8765/hooks/forms
+  curl -H "Authorization: Bearer demo-token" \
+       -F user=dan -F action=login http://127.0.0.1:8765/hooks/forms
+  ```
+
+  **Log lines** (`text/x-log`): one item per line:
+  ```sh
+  curl -H "Authorization: Bearer demo-token" -H "Content-Type: text/x-log" \
+       --data-binary $'eve login\nfay logout\n' http://127.0.0.1:8765/hooks/logs
+  ```
+
+  **A ping** needs no token and no body: the query parameters are the item, and the
+  reply is the documented example:
+  ```sh
+  curl "http://127.0.0.1:8765/hooks/ping?n=3&tags=a,b"
+  ```
+
+  A request the document does not allow is rejected with `application/problem+json`:
+  401 without the token, 400 for an invalid event (try `"action": 1`), 403 for an
+  `Origin` other than `http://localhost:3000`. See `:help dbdash-webhook`.
 
 database:
   url: "webhook://127.0.0.1:8765/hooks"
@@ -109,6 +131,7 @@ show:
   type: table
   title: "Events pushed over HTTP"
   description: |
-    The events posted to the endpoints (see the curl commands at the top of the file):
-    parameters, bodies and the operation of each request, the newest first.
+    The events posted to the endpoints, the newest first: when, which endpoint or
+    source, the region cookie, and the event. Press `K` on the header line for curl
+    commands that send some.
   interval: 1s
