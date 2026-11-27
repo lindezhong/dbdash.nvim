@@ -2,12 +2,13 @@
 --   ╭─╮
 --  ─╯ ╰──
 local C = require("dbdash.render.charts.common")
+local nn = require("dbdash.util.null").nn
 
 local M = { name = "asciichart" }
 
 function M.render(rs, show, ctx)
   local axes = C.axes(show)
-  local xaxis = C.x_axis(rs, C.nn(show.x_column))
+  local xaxis = C.x_axis(rs, nn(show.x_column))
   local series = C.series(rs, show)
   local ylo, yhi
   local data = {}
@@ -32,7 +33,7 @@ function M.render(rs, show, ctx)
     legend[i] = { label = d.label, group = d.group, symbol = "─" }
   end
   local spec = {
-    title = C.nn(show.title),
+    title = nn(show.title),
     xlabel = axes.xlabel,
     ylabel = axes.ylabel,
     legend = legend,

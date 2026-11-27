@@ -13,7 +13,7 @@ local fmt = require("dbdash.render.format")
 
 local M = {}
 
-local nn = C.nn
+local nn = require("dbdash.util.null").nn
 
 ---Category axis labels: evenly spaced so they do not collide.
 local function category_ticks(labels, cols, n)

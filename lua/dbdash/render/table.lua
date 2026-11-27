@@ -34,7 +34,7 @@ function M.format_value(v, ltype, null_text, keep_lines)
   local s
   if t == "string" then
     if ltype == "bytes" then
-      s = "\\x" .. require("dbdash.db.resultset").hex(v)
+      s = "\\x" .. require("dbdash.crypto.util").hex(v)
     else
       s = v
     end

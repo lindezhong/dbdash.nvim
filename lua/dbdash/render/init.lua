@@ -75,12 +75,7 @@ function M.ctx(opts)
   }
 end
 
-local function nn(v)
-  if v == vim.NIL then
-    return nil
-  end
-  return v
-end
+local nn = require("dbdash.util.null").nn
 
 -- Where a title sits when its text-align is "start".
 local LEFT_TITLES = { stat = true, text = true }

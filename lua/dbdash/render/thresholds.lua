@@ -5,14 +5,7 @@
 -- and style sheets color it: the UA sheet colors success, info, warning and danger.
 local M = {}
 
-local NULL = vim.NIL
-
-local function nn(v)
-  if v == NULL then
-    return nil
-  end
-  return v
-end
+local nn = require("dbdash.util.null").nn
 
 ---Steps ordered from least to most severe.
 ---@param list table[]?

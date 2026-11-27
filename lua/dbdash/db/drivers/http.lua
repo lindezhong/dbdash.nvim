@@ -37,7 +37,7 @@ function M.parse_url(info)
   local path, query = rest:match("^([^?#]*)%??([^#]*)")
   local keep = {}
   for pair in query:gmatch("[^&]+") do
-    local k = require("dbdash.db.url").decode(pair:match("^([^=]*)"))
+    local k = require("dbdash.util.url").decode(pair:match("^([^=]*)"))
     if not OWN_PARAMS[k] then
       keep[#keep + 1] = pair
     end

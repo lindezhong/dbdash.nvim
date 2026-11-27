@@ -1,6 +1,7 @@
 -- Heat map with "▀": foreground colors the upper cell, background the lower one, so each
 -- character row shows two y values.
 local C = require("dbdash.render.charts.common")
+local nn = require("dbdash.util.null").nn
 local H = require("dbdash.render.charts.heatmap.common")
 local W = require("dbdash.util.width")
 
@@ -17,7 +18,7 @@ function M.render(rs, show, ctx)
     ylabels[r] = b and (a .. "/" .. b) or a
   end
   local spec = {
-    title = C.nn(show.title),
+    title = nn(show.title),
     xlabel = axes.xlabel,
     ylabel = axes.ylabel,
     ylabels = ylabels,

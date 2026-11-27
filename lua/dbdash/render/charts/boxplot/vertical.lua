@@ -8,6 +8,7 @@
 --      ─┴─      whisker cap (wlo)
 -- The options are those of boxdraw: show.whiskers; outlier, mean and value elements.
 local C = require("dbdash.render.charts.common")
+local nn = require("dbdash.util.null").nn
 local W = require("dbdash.util.width")
 local boxdraw = require("dbdash.render.charts.boxplot.boxdraw")
 local fmt = require("dbdash.render.format")
@@ -16,13 +17,13 @@ local M = { name = "vertical" }
 
 function M.render(rs, show, ctx)
   local axes = C.axes(show)
-  local vi = C.col(rs, C.nn(show.value_column), "value_column")
-  local ci = C.nn(show.category_column) and C.col(rs, show.category_column, "category_column")
+  local vi = C.col(rs, nn(show.value_column), "value_column")
+  local ci = nn(show.category_column) and C.col(rs, show.category_column, "category_column")
   local groups, order = {}, {}
   for _, row in ipairs(rs.rows) do
     local v = C.num(row[vi])
     if v then
-      local cat = ci and C.text(row[ci]) or C.nn(show.value_column)
+      local cat = ci and C.text(row[ci]) or nn(show.value_column)
       if not groups[cat] then
         groups[cat] = {}
         order[#order + 1] = cat
@@ -35,7 +36,7 @@ function M.render(rs, show, ctx)
   end
   local stats, lo, hi = {}, nil, nil
   for i, cat in ipairs(order) do
-    stats[i] = boxdraw.stats(groups[cat], C.nn(show.whiskers))
+    stats[i] = boxdraw.stats(groups[cat], nn(show.whiskers))
     lo = math.min(lo or stats[i].min, stats[i].min)
     hi = math.max(hi or stats[i].max, stats[i].max)
   end

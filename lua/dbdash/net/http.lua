@@ -78,12 +78,7 @@ function M.format_url(u)
   )
 end
 
----Percent-encode a query component (application/x-www-form-urlencoded style).
-function M.encode(s)
-  return (tostring(s):gsub("[^%w%-%._~]", function(c)
-    return ("%%%02X"):format(c:byte())
-  end))
-end
+local encode = require("dbdash.util.url").encode
 
 ---Encode a table as name=value pairs (sorted by name; list values repeat the name).
 function M.encode_pairs(t)
@@ -97,9 +92,9 @@ function M.encode_pairs(t)
     local values = (type(v) == "table" and vim.islist(v)) and v or { v }
     for _, x in ipairs(values) do
       if x ~= vim.NIL then
-        out[#out + 1] = M.encode(n)
+        out[#out + 1] = encode(n)
           .. "="
-          .. M.encode(type(x) == "table" and vim.json.encode(x) or tostring(x))
+          .. encode(type(x) == "table" and vim.json.encode(x) or tostring(x))
       end
     end
   end

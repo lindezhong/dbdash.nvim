@@ -8,12 +8,7 @@ local M = {}
 
 M.DAMAGE = { none = 0, repaint = 1, relayout = 2, rebuild = 3 }
 
-local function nn(v)
-  if v == vim.NIL then
-    return nil
-  end
-  return v
-end
+local nn = require("dbdash.util.null").nn
 
 local function enum(...)
   local ok = {}

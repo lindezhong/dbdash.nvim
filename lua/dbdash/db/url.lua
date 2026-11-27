@@ -4,6 +4,8 @@
 local dberr = require("dbdash.util.error")
 local duration = require("dbdash.util.duration")
 
+local pct = require("dbdash.util.url")
+
 local M = {}
 
 ---@class dbdash.db.Url
@@ -24,20 +26,6 @@ local M = {}
 
 local function fail(msg, ...)
   dberr.raise("config", msg:format(...))
-end
-
----Percent-decode a URL component ("+" is kept literally).
-function M.decode(s)
-  return (s:gsub("%%(%x%x)", function(h)
-    return string.char(tonumber(h, 16))
-  end))
-end
-
----Percent-encode for display or reconstruction.
-function M.encode(s)
-  return (s:gsub("[^%w%-%._~]", function(c)
-    return ("%%%02X"):format(c:byte())
-  end))
 end
 
 ---Parse "sha256:AB:CD:..." (or plain hex) into 32 raw bytes.
@@ -65,12 +53,12 @@ function M.parse(raw)
   rest, query = rest:match("^([^?]*)%??(.*)$")
   for pair in query:gmatch("[^&]+") do
     local k, v = pair:match("^([^=]*)=?(.*)$")
-    u.params[M.decode(k)] = M.decode(v)
+    u.params[pct.decode(k)] = pct.decode(v)
   end
 
   if u.scheme == "sqlite" then
     -- Everything after "sqlite://" is a path: "/abs.db", "/:memory:" or "rel/path.db".
-    local path = M.decode(rest)
+    local path = pct.decode(rest)
     if path == "/:memory:" or path == ":memory:" or path == "" then
       path = ":memory:"
     end
@@ -81,8 +69,8 @@ function M.parse(raw)
     hostport = hostport or authority
     if userinfo then
       local user, pass = userinfo:match("^([^:]*):(.*)$")
-      u.user = M.decode(user or userinfo)
-      u.password = pass and M.decode(pass) or nil
+      u.user = pct.decode(user or userinfo)
+      u.password = pass and pct.decode(pass) or nil
     end
     -- Seed lists ("h1:27017,h2:27018") give several hosts; u.host/u.port are the first.
     u.hosts = {}
@@ -99,7 +87,7 @@ function M.parse(raw)
           fail("invalid host:port %q", part)
         end
       end
-      local entry = { host = host ~= "" and M.decode(host) or nil }
+      local entry = { host = host ~= "" and pct.decode(host) or nil }
       if port ~= "" then
         entry.port = tonumber(port)
         -- (0 only for webhook://: listen on any free port)
@@ -111,7 +99,7 @@ function M.parse(raw)
     end
     u.host, u.port = u.hosts[1].host, u.hosts[1].port
     local db = path:gsub("^/", "")
-    u.database = db ~= "" and M.decode(db) or nil
+    u.database = db ~= "" and pct.decode(db) or nil
   end
 
   -- Common parameters.

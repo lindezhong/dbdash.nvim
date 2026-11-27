@@ -10,12 +10,7 @@ local M = {}
 
 M.NULL = "\1"
 
-local function nn(v)
-  if v == vim.NIL then
-    return nil
-  end
-  return v
-end
+local nn = require("dbdash.util.null").nn
 
 function M.key(show)
   return { show.column_list, show.separator, show.reverse, show.highlight }

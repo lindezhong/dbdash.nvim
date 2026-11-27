@@ -16,7 +16,7 @@ local function text(v, col)
   local t = type(v)
   if t == "string" then
     if col.type == "bytes" then
-      return "\\x" .. require("dbdash.db.resultset").hex(v)
+      return "\\x" .. require("dbdash.crypto.util").hex(v)
     end
     return v
   elseif t == "number" then

@@ -225,11 +225,7 @@ local function file_data(name, base_dir, strip)
   return strip and (s:gsub("[\r\n]", "")) or s
 end
 
-local function urlencode(s)
-  return (s:gsub("[^%w%-%._~]", function(c)
-    return ("%%%02X"):format(c:byte())
-  end))
-end
+local urlencode = require("dbdash.util.url").encode
 
 ---curl --data-urlencode: content, =content, name=content, @file, name@file.
 local function data_urlencode(v, base_dir)

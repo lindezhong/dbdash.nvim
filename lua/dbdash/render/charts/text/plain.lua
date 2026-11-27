@@ -10,12 +10,7 @@ local W = require("dbdash.util.width")
 
 local M = {}
 
-local function nn(v)
-  if v == vim.NIL then
-    return nil
-  end
-  return v
-end
+local nn = require("dbdash.util.null").nn
 
 ---Expand tabs to 8-column stops (by display width).
 local function expand_tabs(line)

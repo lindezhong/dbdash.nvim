@@ -12,12 +12,7 @@ local M = {}
 
 local NUMERIC = { integer = true, number = true, decimal = true }
 
-local function nn(v)
-  if v == vim.NIL then
-    return nil
-  end
-  return v
-end
+local nn = require("dbdash.util.null").nn
 
 local function fail(msg, ...)
   error({ phase = "render", message = msg:format(...) }, 0)

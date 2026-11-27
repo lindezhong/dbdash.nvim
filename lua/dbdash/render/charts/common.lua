@@ -4,13 +4,7 @@ local fmt = require("dbdash.render.format")
 
 local M = {}
 
-function M.nn(v)
-  if v == vim.NIL then
-    return nil
-  end
-  return v
-end
-local nn = M.nn
+local nn = require("dbdash.util.null").nn
 
 ---Raise a render error shown in place of the chart.
 function M.fail(msg, ...)

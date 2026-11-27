@@ -106,12 +106,7 @@ local DEFAULTS = setmetatable({}, {
 ---@field args dbdash.ArgSpec[] shared and local arguments, each with its `key`
 ---@field panels dbdash.PanelConfig[]
 
-local function nn(v)
-  if v == vim.NIL then
-    return nil
-  end
-  return v
-end
+local nn = require("dbdash.util.null").nn
 
 ---Parse a duration such as 30, "30s", "5m", "1h", "500ms" into milliseconds.
 M.parse_duration = require("dbdash.util.duration").parse

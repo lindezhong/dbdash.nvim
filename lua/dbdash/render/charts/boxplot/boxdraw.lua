@@ -6,6 +6,7 @@
 -- (minmax), or two percentiles ([5, 95]); values beyond are outliers (outlier { display:
 -- none } hides them). value { display: block } writes q1, the median and q3 under each box.
 local C = require("dbdash.render.charts.common")
+local nn = require("dbdash.util.null").nn
 
 local M = { name = "boxdraw" }
 
@@ -60,13 +61,13 @@ end
 
 function M.render(rs, show, ctx)
   local axes = C.axes(show)
-  local vi = C.col(rs, C.nn(show.value_column), "value_column")
-  local ci = C.nn(show.category_column) and C.col(rs, show.category_column, "category_column")
+  local vi = C.col(rs, nn(show.value_column), "value_column")
+  local ci = nn(show.category_column) and C.col(rs, show.category_column, "category_column")
   local groups, order = {}, {}
   for _, row in ipairs(rs.rows) do
     local v = C.num(row[vi])
     if v then
-      local cat = ci and C.text(row[ci]) or C.nn(show.value_column)
+      local cat = ci and C.text(row[ci]) or nn(show.value_column)
       if not groups[cat] then
         groups[cat] = {}
         order[#order + 1] = cat
@@ -79,7 +80,7 @@ function M.render(rs, show, ctx)
   end
   local stats, lo, hi = {}, nil, nil
   for i, cat in ipairs(order) do
-    stats[i] = M.stats(groups[cat], C.nn(show.whiskers))
+    stats[i] = M.stats(groups[cat], nn(show.whiskers))
     lo = math.min(lo or stats[i].min, stats[i].min)
     hi = math.max(hi or stats[i].max, stats[i].max)
   end
@@ -93,7 +94,7 @@ function M.render(rs, show, ctx)
   end
   local rows_needed = #order * 4 - (show_values and 0 or 1)
   local spec = {
-    title = C.nn(show.title),
+    title = nn(show.title),
     xlabel = axes.xlabel or axes.ylabel,
     ylabels = order,
     height = rows_needed,

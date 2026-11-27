@@ -16,7 +16,7 @@ local fmt = require("dbdash.render.format")
 
 local M = {}
 
-local nn = C.nn
+local nn = require("dbdash.util.null").nn
 
 local EIGHTHS_H = { "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█" }
 local EIGHTHS_V = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" }

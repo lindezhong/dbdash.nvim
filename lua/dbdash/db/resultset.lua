@@ -138,13 +138,6 @@ function M.integer(s)
   return s
 end
 
----Raw bytes -> lower-case hex (how `bytes` values are displayed).
-function M.hex(s)
-  return (s:gsub(".", function(c)
-    return ("%02x"):format(c:byte())
-  end))
-end
-
 ---Convert a logical-typed value to a number for charts; nil when not numeric.
 function M.tonumber(v)
   if type(v) == "number" then

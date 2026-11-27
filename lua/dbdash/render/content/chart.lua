@@ -16,7 +16,7 @@ local C = require("dbdash.render.charts.common")
 
 local M = {}
 
-local nn = C.nn
+local nn = require("dbdash.util.null").nn
 
 ---The show fields the content depends on: all but the titles and the refresh settings.
 function M.key(show)

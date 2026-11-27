@@ -1,5 +1,6 @@
 -- Heat map helpers: grid extraction and a sequential color scale.
 local C = require("dbdash.render.charts.common")
+local nn = require("dbdash.util.null").nn
 local fmt = require("dbdash.render.format")
 
 local M = {}
@@ -57,8 +58,8 @@ end
 ---@return { color: fun(v: number): string?, lo: number, hi: number, stops: table?, steps: table? }
 function M.colors(show, g, ctx)
   local chart = ctx.css:get()
-  local lo = tonumber(C.nn(show.scale_min)) or g.lo
-  local hi = tonumber(C.nn(show.scale_max)) or g.hi
+  local lo = tonumber(nn(show.scale_min)) or g.lo
+  local hi = tonumber(nn(show.scale_max)) or g.hi
   local stops
   local scale = chart["color-scale"]
   if type(scale) == "table" and #scale > 0 then
@@ -78,7 +79,7 @@ function M.colors(show, g, ctx)
   if type(steps) == "table" and #steps > 0 then
     local list = {}
     for _, st in ipairs(steps) do
-      list[#list + 1] = { value = tonumber(C.nn(st.value)) or 0, color = C.nn(st.color) }
+      list[#list + 1] = { value = tonumber(nn(st.value)) or 0, color = nn(st.color) }
     end
     table.sort(list, function(a, b)
       return a.value < b.value
@@ -153,9 +154,9 @@ function M.grid(rs, show)
 end
 
 function M.compute_grid(rs, show)
-  local xi = C.col(rs, C.nn(show.x_column), "x_column")
-  local yi = C.col(rs, C.nn(show.y_column), "y_column")
-  local vi = C.col(rs, C.nn(show.value_column), "value_column")
+  local xi = C.col(rs, nn(show.x_column), "x_column")
+  local yi = C.col(rs, nn(show.y_column), "y_column")
+  local vi = C.col(rs, nn(show.value_column), "value_column")
   local values, lo, hi = {}, nil, nil
   for _, row in ipairs(rs.rows) do
     local v = C.num(row[vi])
