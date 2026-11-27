@@ -3,7 +3,6 @@
 local bit = require("bit")
 local ffi = require("ffi")
 local dberr = require("dbdash.util.error")
-local dialect = require("dbdash.db.dialect")
 local map = require("dbdash.util.map")
 local resultset = require("dbdash.db.resultset")
 local socket = require("dbdash.net.socket")
@@ -11,7 +10,7 @@ local socket = require("dbdash.net.socket")
 local M = {
   name = "cassandra",
   schemes = { "cassandra", "cql" },
-  dialect = dialect.get("cassandra"),
+  dialect = "cassandra",
   capabilities = { tls = true, sql = true, query_language = "cql" },
 }
 

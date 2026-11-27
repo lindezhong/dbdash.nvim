@@ -4,14 +4,13 @@
 local bit = require("bit")
 local ffi = require("ffi")
 local dberr = require("dbdash.util.error")
-local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 local socket = require("dbdash.net.socket")
 
 local M = {
   name = "mssql",
   schemes = { "mssql", "sqlserver" },
-  dialect = dialect.get("mssql"),
+  dialect = "mssql",
   capabilities = { tls = true, sql = true, query_language = "sql" },
 }
 

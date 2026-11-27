@@ -63,7 +63,8 @@ end
 
 ---The group of a segment's value label, or false when its value element is hidden.
 local function value_group(ctx, seg)
-  local node = require("dbdash.render.content.chart").child(bar_node(ctx, seg and seg.item), "value")
+  local node =
+    require("dbdash.render.content.chart").child(bar_node(ctx, seg and seg.item), "value")
   if not node then
     return ctx.css:hl("value")
   end

@@ -1,6 +1,6 @@
 local db = require("dbdash.db")
 local url = require("dbdash.db.url")
-local dialect = require("dbdash.db.dialect")
+local dialect = require("dbdash.template.dialect")
 local resultset = require("dbdash.db.resultset")
 local async = require("dbdash.util.async")
 local map = require("dbdash.util.map")

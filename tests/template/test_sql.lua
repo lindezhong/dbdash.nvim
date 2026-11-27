@@ -1,6 +1,6 @@
 -- SQL filters/globals: their outputs, and how they differ between dialects.
 local template = require("dbdash.template")
-local dialect = require("dbdash.db.dialect")
+local dialect = require("dbdash.template.dialect")
 local yaml = require("dbdash.yaml")
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()

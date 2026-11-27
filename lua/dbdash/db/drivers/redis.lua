@@ -4,7 +4,6 @@
 -- Connects with HELLO 3 (RESP3: maps, doubles, booleans) and falls back to RESP2 + AUTH
 -- for servers that do not know HELLO.
 local dberr = require("dbdash.util.error")
-local dialect = require("dbdash.db.dialect")
 local map = require("dbdash.util.map")
 local resultset = require("dbdash.db.resultset")
 local socket = require("dbdash.net.socket")
@@ -12,7 +11,7 @@ local socket = require("dbdash.net.socket")
 local M = {
   name = "redis",
   schemes = { "redis", "rediss" },
-  dialect = dialect.get("redis"),
+  dialect = "redis",
   capabilities = { tls = true, sql = false, query_language = "redis-command" },
 }
 

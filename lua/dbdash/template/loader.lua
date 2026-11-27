@@ -32,7 +32,8 @@ function M.files(base_dir)
     local f = assert(io.open(path, "rb"))
     local src = f:read("*a")
     f:close()
-    local tpl = path:match("%.lua$") and { lua = true } or require("dbdash.template").compile(src)
+    local tpl = path:match("%.lua$") and { lua = true }
+      or require("dbdash.template.compile").compile(src)
     cache[path] = { mtime = mtime, tpl = tpl, src = src }
     return tpl, path, src
   end
@@ -49,7 +50,7 @@ function M.dict(files)
     if name:match("%.lua$") then
       return { lua = true }, name, src
     end
-    return require("dbdash.template").compile(src), name, src
+    return require("dbdash.template.compile").compile(src), name, src
   end
 end
 

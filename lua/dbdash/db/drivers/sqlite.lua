@@ -11,13 +11,12 @@
 -- create (create the file when missing; off by default so a typo does not create a db).
 local async = require("dbdash.util.async")
 local dberr = require("dbdash.util.error")
-local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 
 local M = {
   name = "sqlite",
   schemes = { "sqlite", "sqlite3" },
-  dialect = dialect.get("sqlite"),
+  dialect = "sqlite",
   capabilities = { tls = false, sql = true, query_language = "sql" },
 }
 

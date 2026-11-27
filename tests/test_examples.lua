@@ -101,7 +101,7 @@ for _, name in ipairs({ "statements", "filters", "tests_functions", "methods", "
     end, 10)
     local tpl = require("dbdash.template")
     local env =
-      tpl.env(require("dbdash.db.dialect").get("sqlite"), false, vim.fn.fnamemodify(f, ":h"))
+      tpl.env(require("dbdash.template.dialect").get("sqlite"), false, vim.fn.fnamemodify(f, ":h"))
     local checked = 0
     for _, p in ipairs(d.panels) do
       eq(p.error, nil)

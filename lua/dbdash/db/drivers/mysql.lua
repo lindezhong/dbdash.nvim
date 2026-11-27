@@ -3,7 +3,6 @@
 -- plain-text connections), COM_QUERY text protocol with multiple result sets.
 local bit = require("bit")
 local dberr = require("dbdash.util.error")
-local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 local socket = require("dbdash.net.socket")
 local util = require("dbdash.crypto.util")
@@ -11,7 +10,7 @@ local util = require("dbdash.crypto.util")
 local M = {
   name = "mysql",
   schemes = { "mysql", "mariadb" },
-  dialect = dialect.get("mysql"),
+  dialect = "mysql",
   capabilities = { tls = true, sql = true, query_language = "sql" },
 }
 

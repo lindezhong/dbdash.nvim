@@ -4,7 +4,7 @@ local map = require("dbdash.util.map")
 
 local M = {}
 
----@class dbdash.db.Dialect
+---@class dbdash.template.Dialect
 ---@field name string
 ---@field quote_string fun(s: string): string
 ---@field quote_ident fun(s: string): string
@@ -185,10 +185,14 @@ M.dialects.http = make("http", {
   end,
 })
 
----@param name string database type
----@return dbdash.db.Dialect
-function M.get(name)
-  return M.dialects[name] or M.dialects.sqlite
+---The dialect of a driver: by name (unknown names get SQLite's), or a dialect as is.
+---@param d string|dbdash.template.Dialect
+---@return dbdash.template.Dialect
+function M.get(d)
+  if type(d) == "table" then
+    return d
+  end
+  return M.dialects[d] or M.dialects.sqlite
 end
 
 return M

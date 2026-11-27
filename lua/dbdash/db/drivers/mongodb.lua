@@ -8,7 +8,6 @@
 -- nested documents are expanded to "a.b" columns up to `flatten` levels.
 local bson = require("dbdash.db.bson")
 local dberr = require("dbdash.util.error")
-local dialect = require("dbdash.db.dialect")
 local json = require("dbdash.util.json")
 local map = require("dbdash.util.map")
 local resultset = require("dbdash.db.resultset")
@@ -17,7 +16,7 @@ local socket = require("dbdash.net.socket")
 local M = {
   name = "mongodb",
   schemes = { "mongodb", "mongodb+srv" },
-  dialect = dialect.get("mongodb"),
+  dialect = "mongodb",
   capabilities = { tls = true, sql = false, query_language = "mongo-json" },
 }
 

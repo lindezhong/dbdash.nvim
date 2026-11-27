@@ -6,6 +6,7 @@ local opts = S.opts
 local args = require("dbdash.args")
 local db = require("dbdash.db")
 local template = require("dbdash.template")
+local dialect = require("dbdash.template.dialect")
 
 ---Render query.sql and query.transform for the current arguments: one template path for
 ---both (same variables, imports and helpers); the transform is Lua, so never autoescaped.
@@ -34,7 +35,7 @@ function Panel:template_opts(run)
     self.meta = run.meta
   end
   return {
-    dialect = db.driver(self.cfg.database.type).dialect,
+    dialect = dialect.get(db.driver(self.cfg.database.type).dialect),
     specs = self.cfg.visible_args,
     values = run.args,
     meta = run.meta,
@@ -314,7 +315,7 @@ function Panel:describe_async(cb)
     local run = self:new_run(nil, nil, "render")
     run.read_only = true -- showing a description does not change arguments
     return M.render_text(self.d, show.description, show.description_line, {
-      dialect = db.driver(self.cfg.database.type).dialect,
+      dialect = dialect.get(db.driver(self.cfg.database.type).dialect),
       specs = self.cfg.visible_args,
       values = run.args,
       meta = require("dbdash.metadata").values(self, run),
@@ -338,7 +339,7 @@ function Dashboard:describe_async(cb)
       error("arguments cannot be assigned in a description", 0)
     end
     return M.render_text(self, cfg.description, cfg.description_line, {
-      dialect = cfg.database and db.driver(cfg.database.type).dialect or nil,
+      dialect = cfg.database and dialect.get(db.driver(cfg.database.type).dialect) or nil,
       specs = cfg.shared_args,
       values = values,
       meta = require("dbdash.metadata").dashboard_values(self),

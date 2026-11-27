@@ -2,14 +2,13 @@
 -- format results mapped by type OID. Authentication: cleartext, md5, SCRAM-SHA-256.
 local bit = require("bit")
 local dberr = require("dbdash.util.error")
-local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 local socket = require("dbdash.net.socket")
 
 local M = {
   name = "postgres",
   schemes = { "postgres", "postgresql" },
-  dialect = dialect.get("postgres"),
+  dialect = "postgres",
   capabilities = { tls = true, sql = true, query_language = "sql" },
 }
 

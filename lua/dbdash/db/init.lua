@@ -5,7 +5,6 @@
 -- run on the main loop. A query can be cancelled (M.query's handle, opts.cancel).
 local async = require("dbdash.util.async")
 local dberr = require("dbdash.util.error")
-local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 local url = require("dbdash.db.url")
 local defaults = require("dbdash.db.defaults")
@@ -31,7 +30,8 @@ M.Error = dberr
 ---@class dbdash.db.Driver
 ---@field name string
 ---@field schemes string[]
----@field dialect dbdash.db.Dialect?
+---@field dialect string|dbdash.template.Dialect? how template values are written in its queries:
+---  a dialect name of dbdash.template.dialect (default: the driver's name) or a dialect
 ---@field capabilities { tls: boolean, sql: boolean, query_language: string }
 ---@field parse_url (fun(u: dbdash.db.ConnInfo): dbdash.db.ConnInfo)?
 ---@field produce (fun(info: dbdash.db.ConnInfo, query: string, ctx: dbdash.db.StreamCtx))? a push
@@ -71,7 +71,7 @@ function M.register(driver)
   assert(type(driver.name) == "string", "driver.name is required")
   assert(type(driver.connect) == "function", "driver.connect is required")
   driver.schemes = driver.schemes or { driver.name }
-  driver.dialect = driver.dialect or dialect.get(driver.name)
+  driver.dialect = driver.dialect or driver.name
   driver.capabilities = driver.capabilities or { tls = false, sql = true, query_language = "sql" }
   drivers[driver.name] = driver
   for _, s in ipairs(driver.schemes) do

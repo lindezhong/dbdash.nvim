@@ -12,7 +12,7 @@ local M = {
   name = "http",
   schemes = { "http", "https" },
   capabilities = { tls = true, sql = false, query_language = "curl" },
-  dialect = require("dbdash.db.dialect").get("http"),
+  dialect = "http",
 }
 
 -- URL parameters dbdash reads itself; the others are sent to the server.

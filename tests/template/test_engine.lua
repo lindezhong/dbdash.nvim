@@ -95,27 +95,27 @@ T["file imports: relative to the base dir, cached by mtime, cycles detected"] = 
     f:close()
   end
   write("lib/q.sql", "{% macro q(v) %}'{{ v }}'{% endmacro %}")
-  local env = template.env(require("dbdash.db.dialect").get("postgres"), false, dir)
+  local env = template.env(require("dbdash.template.dialect").get("postgres"), false, dir)
   local src = "{% from 'lib/q.sql' import q %}{{ q('a') }}"
   eq(template.render(src, {}, { env = env }), "'a'")
   -- A changed file is reloaded (new mtime).
   vim.wait(20)
   write("lib/q.sql", '{% macro q(v) %}"{{ v }}"{% endmacro %}')
   vim.uv.fs_utime(dir .. "/lib/q.sql", os.time() + 5, os.time() + 5)
-  env = template.env(require("dbdash.db.dialect").get("postgres"), false, dir)
+  env = template.env(require("dbdash.template.dialect").get("postgres"), false, dir)
   eq(template.render(src, {}, { env = env }), '"a"')
   write("a.sql", "{% import 'b.sql' as b %}")
   write("b.sql", "{% import 'a.sql' as a %}")
   local e = err_of(
     "{% import 'a.sql' as a %}",
     {},
-    { env = template.env(require("dbdash.db.dialect").get("postgres"), false, dir) }
+    { env = template.env(require("dbdash.template.dialect").get("postgres"), false, dir) }
   )
   eq(e.message:find("circular import of 'a.sql'") ~= nil, true)
   e = err_of(
     "{% import 'missing.sql' as m %}",
     {},
-    { env = template.env(require("dbdash.db.dialect").get("postgres"), false, dir) }
+    { env = template.env(require("dbdash.template.dialect").get("postgres"), false, dir) }
   )
   eq(e.message:find("template not found") ~= nil, true)
 end
@@ -128,7 +128,7 @@ T["errors inside imported templates name the file"] = function()
 end
 
 T["macros render safe output under autoescape"] = function()
-  local env = template.env(require("dbdash.db.dialect").get("postgres"), true)
+  local env = template.env(require("dbdash.template.dialect").get("postgres"), true)
   eq(
     template.render([[{% macro m(v) %}x = {{ v }}{% endmacro %}{{ m("it's") }}]], {}, { env = env }),
     "x = 'it''s'"

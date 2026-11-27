@@ -13,7 +13,7 @@ local NONE = R.NONE
 local raise = errors.raise
 
 local function dialect_of(env)
-  return env.dialect or require("dbdash.db.dialect").get("sqlite")
+  return env.dialect or require("dbdash.template.dialect").get("sqlite")
 end
 
 local function plain(v)
@@ -200,7 +200,7 @@ function M.install()
 end
 
 ---Build a render env for a dialect.
----@param dialect dbdash.db.Dialect
+---@param dialect dbdash.template.Dialect
 ---@param autoescape boolean?
 ---@param base_dir string? directory for {% import %} / {% include %} / {% extends %} (the
 ---  config file's directory)
