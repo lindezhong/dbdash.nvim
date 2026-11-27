@@ -4,16 +4,43 @@
 # (:help dbdash-webhook, dbdash-webhook-security, dbdash-push). The description below
 # (K in the dashboard) has curl commands that send data to every endpoint.
 #
-# Rejected requests get application/problem+json (401 without the token, 400 for an
-# invalid event, 403 for an Origin not in allowed_origins, ...). A real token belongs in the
-# environment: tokens: { bearer: "${EVENTS_TOKEN}" }. The document's paths are appended to
-# the URL's path (/hooks).
+# Tokens: the document's security schemes (components.securitySchemes) name the ways a
+# request may prove itself - here a bearer token, an API key header or Basic user:password,
+# any one of them (security lists alternatives) - and database.options.tokens gives the
+# accepted credentials of each by scheme name. A list accepts several (to rotate them). A
+# real token belongs in the environment, not in this file:
+#   tokens: { bearer: "${EVENTS_TOKEN}" }      then: EVENTS_TOKEN=... nvim
+# Rejected requests get application/problem+json (401 without a valid credential, 400 for
+# an invalid event, 403 for an Origin not in allowed_origins, ...). The document's paths
+# are appended to the URL's path (/hooks).
 
 title: "webhook://"
 description: |
   `webhook://`: an HTTP endpoint described by OpenAPI 3.1; every accepted request is an
   item, shown as a row of the table. Send some from a terminal while the dashboard runs
-  (it listens on `127.0.0.1:8765`; the token is `demo-token`):
+  (it listens on `127.0.0.1:8765`).
+
+  **Tokens.** Every endpoint but `/ping` needs a credential; any one of the three ways
+  the document's `security` lists will do (`database.options.tokens` holds the accepted
+  values):
+  ```sh
+  # a bearer token (either of the two in the list)
+  curl -H "Authorization: Bearer demo-token" -d "user=cat&action=logout" \
+       http://127.0.0.1:8765/hooks/forms
+  # an API key header
+  curl -H "X-API-Key: demo-key" -d "user=cat&action=logout" \
+       http://127.0.0.1:8765/hooks/forms
+  # Basic user:password
+  curl -u demo:secret -d "user=cat&action=logout" http://127.0.0.1:8765/hooks/forms
+  # no credential, or a wrong one: 401 with WWW-Authenticate
+  curl -i -d "user=cat&action=logout" http://127.0.0.1:8765/hooks/forms
+  ```
+  Keep a real token out of the file: `tokens: { bearer: "${EVENTS_TOKEN}" }` reads it
+  from the environment (start Neovim with `EVENTS_TOKEN=...`), and senders use
+  `-H "Authorization: Bearer $EVENTS_TOKEN"`. Tokens are compared in constant time and
+  never shown in `request`, errors or replies.
+
+  The requests below use the bearer token:
 
   **Events**, one JSON object per line (`application/x-ndjson`), each checked against
   the Event schema; the path picks the source (`web` or `app`):
@@ -46,13 +73,17 @@ description: |
   ```
 
   A request the document does not allow is rejected with `application/problem+json`:
-  401 without the token, 400 for an invalid event (try `"action": 1`), 403 for an
-  `Origin` other than `http://localhost:3000`. See `:help dbdash-webhook`.
+  401 without a valid credential, 400 for an invalid event (try `"action": 1`), 403 for
+  an `Origin` other than `http://localhost:3000`. See `:help dbdash-webhook` and
+  `:help dbdash-webhook-security`.
 
 database:
   url: "webhook://127.0.0.1:8765/hooks"
   options:
-    tokens: { bearer: "demo-token" }
+    tokens:                       # the accepted credentials, by security scheme name
+      bearer: ["demo-token", "demo-token-2"]   # a list: either is accepted (rotation)
+      apikey: "demo-key"
+      basic: "demo:secret"                       # user:password
     delimiter: "\n"
     stream_types: ["text/x-log"]
     max_body: "1MB"
@@ -65,7 +96,8 @@ query:
   sql: |
     openapi: 3.1.0
     info: { title: events, version: "1" }
-    security: [ { bearer: [] } ]
+    # any one of these: a bearer token, an API key header, Basic user:password
+    security: [ { bearer: [] }, { apikey: [] }, { basic: [] } ]
     paths:
       /events/{source}:
         post:
@@ -108,7 +140,9 @@ query:
           responses: { "202": { description: queued } }
     components:
       securitySchemes:
-        bearer: { type: http, scheme: bearer }
+        bearer: { type: http, scheme: bearer }               # Authorization: Bearer <token>
+        apikey: { type: apiKey, in: header, name: X-API-Key } # X-API-Key: <key>
+        basic: { type: http, scheme: basic }                 # Authorization: Basic (curl -u)
   transform: |
     -- rs: one item; params: { path, query, header, cookie }; request: method, path,
     -- operation_id, content_type, headers (without credentials).
