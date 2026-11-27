@@ -622,111 +622,149 @@ local function read_value(d, s, p)
   dberr.raise("decode", "unsupported column kind " .. tostring(k))
 end
 
----Parse a reply's tokens. Returns result sets, the first error, info messages.
-function M.parse_tokens(s, max_rows)
-  local p = 1
-  local results, current, err, infos = {}, nil, nil, {}
-  local env = {}
-  while p <= #s do
-    local t = s:byte(p)
-    p = p + 1
-    if t == TOKEN.COLMETADATA then
-      local n = rd_u(s, p, 2)
-      p = p + 2
-      if n ~= 0xFFFF then
-        local cols = {}
-        for i = 1, n do
-          p = p + 4 + 2 -- user type, flags
-          local d
-          d, p = type_info(s, p)
-          local name
-          name, p = b_varchar(s, p)
-          d.colname = name
-          cols[i] = d
-        end
-        current = { cols = cols, rows = {}, truncated = false }
-        results[#results + 1] = current
-      end
-    elseif t == TOKEN.ROW or t == TOKEN.NBCROW then
-      local cols = current.cols
-      local nulls
-      if t == TOKEN.NBCROW then
-        local nb = math.ceil(#cols / 8)
-        nulls = s:sub(p, p + nb - 1)
-        p = p + nb
-      end
-      local row = {}
-      for i, d in ipairs(cols) do
-        if
-          nulls
-          and bit.band(nulls:byte(math.floor((i - 1) / 8) + 1), bit.lshift(1, (i - 1) % 8)) ~= 0
-        then
-          row[i] = NULL
-        else
-          row[i], p = read_value(d, s, p)
-        end
-      end
-      if #current.rows < max_rows then
-        current.rows[#current.rows + 1] = row
-      else
-        current.truncated = true
-      end
-    elseif t == TOKEN.DONE or t == TOKEN.DONEPROC or t == TOKEN.DONEINPROC then
-      local status = rd_u(s, p, 2)
-      if bit.band(status, 0x10) ~= 0 and current and not current.affected then
-        current.count = rd_u(s, p + 4, 4)
-      elseif bit.band(status, 0x10) ~= 0 and not current then
-        results.affected = rd_u(s, p + 4, 4)
-      end
-      p = p + 12
-    elseif t == TOKEN.ERROR or t == TOKEN.INFO then
-      local len = rd_u(s, p, 2)
-      local q = p + 2
-      local number = rd_s(s, q, 4)
-      local state, class = s:byte(q + 4), s:byte(q + 5)
-      local msg = us_varchar(s, q + 6)
-      if t == TOKEN.ERROR then
-        err = err or { number = number, state = state, class = class, message = msg }
-      else
-        infos[#infos + 1] = msg
-      end
-      p = p + 2 + len
-    elseif t == TOKEN.ENVCHANGE then
-      local len = rd_u(s, p, 2)
-      local typ = s:byte(p + 2)
-      if typ == 4 then -- packet size: new value as B_VARCHAR
-        env.packet_size = tonumber((b_varchar(s, p + 3)))
-      end
-      p = p + 2 + len
-    elseif t == TOKEN.LOGINACK then
-      -- Length, interface(1), TDS version(4), program name, program version(4)
-      local len = rd_u(s, p, 2)
-      local name, q = b_varchar(s, p + 2 + 1 + 4)
-      env.server = name
-      env.version = ("%d.%d.%d"):format(
-        s:byte(q),
-        s:byte(q + 1),
-        s:byte(q + 2) * 256 + s:byte(q + 3)
-      )
-      env.logged_in = true
-      p = p + 2 + len
-    elseif t == TOKEN.ORDER or t == TOKEN.COLINFO or t == TOKEN.TABNAME or t == TOKEN.SSPI then
-      p = p + 2 + rd_u(s, p, 2)
-    elseif t == TOKEN.FEATUREEXTACK then
-      while s:byte(p) ~= 0xFF do
-        local len = rd_u(s, p + 1, 4)
-        p = p + 5 + len
-      end
-      p = p + 1
-    elseif t == TOKEN.RETURNSTATUS then
-      p = p + 4
-    elseif t == TOKEN.RETURNVALUE then
-      dberr.raise("decode", "RETURNVALUE tokens are not supported (use SELECT)")
+-- What each token does to the reply being read (`r`: { s, p, results, current, err, infos,
+-- env, max_rows }; r.p is just after the token's type).
+local ON = {}
+
+ON[TOKEN.COLMETADATA] = function(r)
+  local s = r.s
+  local n = rd_u(s, r.p, 2)
+  r.p = r.p + 2
+  if n == 0xFFFF then
+    return
+  end
+  local cols = {}
+  for i = 1, n do
+    r.p = r.p + 4 + 2 -- user type, flags
+    local d, name
+    d, r.p = type_info(s, r.p)
+    name, r.p = b_varchar(s, r.p)
+    d.colname = name
+    cols[i] = d
+  end
+  r.current = { cols = cols, rows = {}, truncated = false }
+  r.results[#r.results + 1] = r.current
+end
+
+---A row (NBCROW: with a bitmap of its NULL columns), kept up to max_rows.
+local function row(r, t)
+  local s, current = r.s, r.current
+  local cols = current.cols
+  local nulls
+  if t == TOKEN.NBCROW then
+    local nb = math.ceil(#cols / 8)
+    nulls = s:sub(r.p, r.p + nb - 1)
+    r.p = r.p + nb
+  end
+  local out = {}
+  for i, d in ipairs(cols) do
+    if
+      nulls
+      and bit.band(nulls:byte(math.floor((i - 1) / 8) + 1), bit.lshift(1, (i - 1) % 8)) ~= 0
+    then
+      out[i] = NULL
     else
-      dberr.raise("decode", ("unexpected TDS token 0x%02x"):format(t))
+      out[i], r.p = read_value(d, s, r.p)
     end
   end
-  return results, err, infos, env
+  if #current.rows < r.max_rows then
+    current.rows[#current.rows + 1] = out
+  else
+    current.truncated = true
+  end
+end
+ON[TOKEN.ROW] = row
+ON[TOKEN.NBCROW] = row
+
+---DONE, DONEPROC, DONEINPROC: the row count of a statement.
+local function done(r)
+  local s, p, current = r.s, r.p, r.current
+  local status = rd_u(s, p, 2)
+  if bit.band(status, 0x10) ~= 0 and current and not current.affected then
+    current.count = rd_u(s, p + 4, 4)
+  elseif bit.band(status, 0x10) ~= 0 and not current then
+    r.results.affected = rd_u(s, p + 4, 4)
+  end
+  r.p = p + 12
+end
+ON[TOKEN.DONE] = done
+ON[TOKEN.DONEPROC] = done
+ON[TOKEN.DONEINPROC] = done
+
+---ERROR (the first one is kept) and INFO messages.
+local function message(r, t)
+  local s, p = r.s, r.p
+  local len = rd_u(s, p, 2)
+  local q = p + 2
+  local msg = us_varchar(s, q + 6)
+  if t == TOKEN.ERROR then
+    r.err = r.err
+      or { number = rd_s(s, q, 4), state = s:byte(q + 4), class = s:byte(q + 5), message = msg }
+  else
+    r.infos[#r.infos + 1] = msg
+  end
+  r.p = p + 2 + len
+end
+ON[TOKEN.ERROR] = message
+ON[TOKEN.INFO] = message
+
+ON[TOKEN.ENVCHANGE] = function(r)
+  local s, p = r.s, r.p
+  local len = rd_u(s, p, 2)
+  if s:byte(p + 2) == 4 then -- packet size: new value as B_VARCHAR
+    r.env.packet_size = tonumber((b_varchar(s, p + 3)))
+  end
+  r.p = p + 2 + len
+end
+
+ON[TOKEN.LOGINACK] = function(r)
+  -- Length, interface(1), TDS version(4), program name, program version(4)
+  local s, p = r.s, r.p
+  local len = rd_u(s, p, 2)
+  local name, q = b_varchar(s, p + 2 + 1 + 4)
+  r.env.server = name
+  r.env.version = ("%d.%d.%d"):format(s:byte(q), s:byte(q + 1), s:byte(q + 2) * 256 + s:byte(q + 3))
+  r.env.logged_in = true
+  r.p = p + 2 + len
+end
+
+---Tokens of no interest with a 2-byte length.
+local function skip(r)
+  r.p = r.p + 2 + rd_u(r.s, r.p, 2)
+end
+ON[TOKEN.ORDER] = skip
+ON[TOKEN.COLINFO] = skip
+ON[TOKEN.TABNAME] = skip
+ON[TOKEN.SSPI] = skip
+
+ON[TOKEN.FEATUREEXTACK] = function(r)
+  while r.s:byte(r.p) ~= 0xFF do
+    r.p = r.p + 5 + rd_u(r.s, r.p + 1, 4)
+  end
+  r.p = r.p + 1
+end
+
+ON[TOKEN.RETURNSTATUS] = function(r)
+  r.p = r.p + 4
+end
+
+ON[TOKEN.RETURNVALUE] = function()
+  dberr.raise("decode", "RETURNVALUE tokens are not supported (use SELECT)")
+end
+
+---Parse a reply's tokens. Returns result sets, the first error, info messages.
+function M.parse_tokens(s, max_rows)
+  local r = { s = s, p = 1, results = {}, infos = {}, env = {}, max_rows = max_rows }
+  while r.p <= #s do
+    local t = s:byte(r.p)
+    r.p = r.p + 1
+    local on = ON[t]
+    if not on then
+      dberr.raise("decode", ("unexpected TDS token 0x%02x"):format(t))
+    end
+    on(r, t)
+  end
+  return r.results, r.err, r.infos, r.env
 end
 
 local function raise_sql(err, phase)
