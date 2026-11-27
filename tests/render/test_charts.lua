@@ -393,7 +393,8 @@ T["bar: grouped and stacked series, legend"] = function()
   eq(n, 6) -- one line per series and category
   show.stacked = true
   text = text_of(render.render(bar_rs(), show, { width = 60, height = 20 }))
-  eq({ text:find("■ 6 ", 1, true) ~= nil, text:find("■ 11", 1, true) ~= nil }, { true, true }) -- totals
+  -- totals
+  eq({ text:find("■ 6 ", 1, true) ~= nil, text:find("■ 11", 1, true) ~= nil }, { true, true })
 end
 
 T["bar: sort, top, inside values, mark_lines labels"] = function()

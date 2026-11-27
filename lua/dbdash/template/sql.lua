@@ -202,7 +202,8 @@ end
 ---Build a render env for a dialect.
 ---@param dialect dbdash.db.Dialect
 ---@param autoescape boolean?
----@param base_dir string? directory for {% import %} / {% include %} / {% extends %} (the config file's directory)
+---@param base_dir string? directory for {% import %} / {% include %} / {% extends %} (the
+---  config file's directory)
 ---@return dbdash.template.Env
 function M.env(dialect, autoescape, base_dir)
   return {

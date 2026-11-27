@@ -26,10 +26,6 @@ local function i32(n)
   )
 end
 
-local function i16(n)
-  return string.char(bit.band(bit.rshift(n, 8), 255), bit.band(n, 255))
-end
-
 local function read_i32(s, pos)
   local a, b, c, d = s:byte(pos, pos + 3)
   return bit.bor(bit.lshift(a, 24), bit.lshift(b, 16), bit.lshift(c, 8), d), pos + 4

@@ -5,8 +5,22 @@ local errors = require("dbdash.template.errors")
 
 local M = {}
 
+---@alias dbdash.template.TokenType
+---| "data"
+---| "var_begin"
+---| "var_end"
+---| "block_begin"
+---| "block_end"
+---| "name"
+---| "int"
+---| "float"
+---| "string"
+---| "op"
+---| "lua"
+---| "eof"
+
 ---@class dbdash.template.Token
----@field t "data"|"var_begin"|"var_end"|"block_begin"|"block_end"|"name"|"int"|"float"|"string"|"op"|"lua"|"eof"
+---@field t dbdash.template.TokenType
 ---@field v any
 ---@field line integer
 ---@field col integer

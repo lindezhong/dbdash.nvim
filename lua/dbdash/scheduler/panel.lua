@@ -3,12 +3,7 @@ local M = require("dbdash.scheduler")
 local S = require("dbdash.scheduler.shared")
 local Panel = S.Panel
 local opts, notify, now, close_timer, as_error = S.opts, S.notify, S.now, S.close_timer, S.as_error
-local args = require("dbdash.args")
-local config = require("dbdash.config")
 local db = require("dbdash.db")
-local W = require("dbdash.util.width")
-
-local W = require("dbdash.util.width")
 
 -- Panels -----------------------------------------------------------------------------------
 

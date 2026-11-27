@@ -164,16 +164,7 @@ local function used_pseudos(doc)
   return list, attrs, classes, ids
 end
 
-local function sharing_key(
-  doc,
-  n,
-  parent_computed,
-  pseudos,
-  scoped,
-  used_attrs,
-  used_classes,
-  used_ids
-)
+local function sharing_key(n, parent_computed, pseudos, scoped, used_attrs, used_classes, used_ids)
   -- only ids, classes and attributes some selector tests can tell elements apart
   local key = tostring(parent_computed) .. "\0" .. n.tag
   if n.id and used_ids[n.id] then
@@ -248,7 +239,6 @@ local function restyle_subtree(doc, n, parent_computed, stats)
     stats.share = share
   end
   local key = sharing_key(
-    doc,
     n,
     parent_computed,
     share.pseudos,

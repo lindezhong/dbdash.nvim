@@ -334,10 +334,10 @@ function M.render(rs, show, ctx)
     end
     local first_line = #lines
     local parts, groups, n = {}, {}, 1
-    for c, cell in ipairs(row) do
-      parts[c] = cell_lines(cell, c)
+    for c, rc in ipairs(row) do
+      parts[c] = cell_lines(rc, c)
       n = math.max(n, #parts[c])
-      groups[c] = cell.group
+      groups[c] = rc.group
     end
     for k = 1, n do
       local texts = {}

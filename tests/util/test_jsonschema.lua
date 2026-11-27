@@ -10,6 +10,10 @@ local function decode(s)
   return json.decode(s)
 end
 
+local function map_of(t)
+  return decode(vim.json.encode(t))
+end
+
 T["JSON-Schema-Test-Suite (draft 2020-12, supported keywords)"] = function()
   local text = table.concat(vim.fn.readfile("tests/fixtures/jsonschema_suite.json"), "\n")
   -- Decode each schema and instance on its own so that maps stay maps (dbdash.db.json).
@@ -96,10 +100,6 @@ T["formats are checked with opts.formats"] = function()
       eq(js.validate(schema, c[1]), nil) -- an annotation without opts.formats
     end
   end
-end
-
-function _G.map_of(t)
-  return decode(vim.json.encode(t))
 end
 
 T["OpenAPI 3.0 nullable"] = function()

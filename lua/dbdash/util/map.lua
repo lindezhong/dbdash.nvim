@@ -95,6 +95,14 @@ function M.pairs(t)
   end
 end
 
+---The first key and value of a mapping (in M.pairs order), or nil.
+function M.first(t)
+  local k = M.keys(t)[1]
+  if k ~= nil then
+    return k, t[k]
+  end
+end
+
 ---Build an ordered mapping from a list of `{k, v}` pairs.
 ---@param kvs {[1]: any, [2]: any}[]
 ---@return table

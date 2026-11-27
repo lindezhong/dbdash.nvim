@@ -5,7 +5,21 @@ local M = {}
 
 M.NULL = vim.NIL
 
----@alias dbdash.db.LogicalType "null"|"boolean"|"integer"|"number"|"decimal"|"string"|"bytes"|"date"|"time"|"datetime"|"json"|"array"|"uuid"|"unknown"
+---@alias dbdash.db.LogicalType
+---| "null"
+---| "boolean"
+---| "integer"
+---| "number"
+---| "decimal"
+---| "string"
+---| "bytes"
+---| "date"
+---| "time"
+---| "datetime"
+---| "json"
+---| "array"
+---| "uuid"
+---| "unknown"
 
 ---@class dbdash.db.Column
 ---@field name string

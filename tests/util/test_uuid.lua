@@ -51,11 +51,12 @@ end
 
 T["no random source is read"] = function()
   local real_open = io.open
+  -- luacheck: ignore 122 (io.open is replaced for this test and restored)
   io.open = function()
     error("io.open called")
   end
   local ok, id = pcall(uuid.v7)
-  io.open = real_open
+  io.open = real_open -- luacheck: ignore 122
   eq({ ok, type(id) }, { true, "string" })
 end
 

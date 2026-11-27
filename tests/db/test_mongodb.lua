@@ -60,13 +60,13 @@ T["documents to a result set, with flattening"] = function()
     json.parse('{"_id": 1, "customer": {"name": "Ann", "tier": {"level": 2}}, "amount": 9.5}'),
     json.parse('{"_id": 2, "amount": 3, "extra": "x"}'),
   }
-  local rs = mongo.to_resultset(docs, 0, 100, false)
+  local rs = mongo.to_resultset(docs, 0, false)
   eq(rs:column_names(), { "_id", "customer", "amount", "extra" })
   eq(rs.columns[2].type, "json")
   eq(rs.rows[2][2], vim.NIL)
-  rs = mongo.to_resultset(docs, 1, 100, false)
+  rs = mongo.to_resultset(docs, 1, false)
   eq(rs:column_names(), { "_id", "customer.name", "customer.tier", "amount", "extra" })
-  rs = mongo.to_resultset(docs, 2, 100, false)
+  rs = mongo.to_resultset(docs, 2, false)
   eq(rs:column_names(), { "_id", "customer.name", "customer.tier.level", "amount", "extra" })
 end
 

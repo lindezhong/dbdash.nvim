@@ -18,8 +18,12 @@ M.Error = dberr
 ---@field options table driver-specific options from the config (database.options)
 ---@field base_dir string? directory of the config file (for relative sqlite paths)
 
+---@class dbdash.db.ExecuteOpts
+---@field max_rows integer
+---@field timeout integer
+
 ---@class dbdash.db.Connection
----@field execute fun(self, query: string, opts: { max_rows: integer, timeout: integer }): dbdash.db.ResultSet
+---@field execute fun(self, query: string, opts: dbdash.db.ExecuteOpts): dbdash.db.ResultSet
 ---@field close fun(self)
 ---@field server_version fun(self): string?
 

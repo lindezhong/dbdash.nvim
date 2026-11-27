@@ -34,8 +34,8 @@ M.BASE = {
   DbDashCountdown = { link = "Comment" },
   DbDashArgName = { link = "Identifier" },
   DbDashArgValue = { link = "String" },
-  DbDashArgLocal = { link = "Special" },
-  DbDashDescIcon = { link = "Comment" }, -- ⓘ: a description to read with K -- a panel's local argument on its args_show line
+  DbDashArgLocal = { link = "Special" }, -- a panel's local argument on its args_show line
+  DbDashDescIcon = { link = "Comment" }, -- ⓘ: a description to read with K
   -- Stat chart: the value, and its change since the previous refresh.
   DbDashStatValue = { link = "Number" },
   DbDashUp = { link = "DiagnosticOk" },

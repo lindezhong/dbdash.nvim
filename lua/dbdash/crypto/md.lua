@@ -7,8 +7,15 @@ local M = {}
 ---@field final fun(self): string
 ---@field copy fun(self): dbdash.crypto.Hash
 
+---@class dbdash.crypto.md.DefineOpts
+---@field block integer
+---@field init fun(): table
+---@field compress fun(H: table, s: string, off: integer)
+---@field digest fun(H: table): string
+---@field length fun(bits: number): string
+
 ---Build a hash constructor.
----@param o { block: integer, init: fun(): table, compress: fun(H: table, s: string, off: integer), digest: fun(H: table): string, length: fun(bits: number): string }
+---@param o dbdash.crypto.md.DefineOpts
 function M.define(o)
   local Hash = {}
   Hash.__index = Hash

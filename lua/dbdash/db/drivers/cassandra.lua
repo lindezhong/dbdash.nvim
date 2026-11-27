@@ -621,7 +621,7 @@ function Conn:execute(query, opts)
   end
   local cols, rows = res.cols, res.rows
   while res.paging_state and #rows <= max do
-    kind, res = self:query(cql, page, res.paging_state)
+    res = select(2, self:query(cql, page, res.paging_state))
     vim.list_extend(rows, res.rows)
   end
   local truncated = #rows > max or res.paging_state ~= nil

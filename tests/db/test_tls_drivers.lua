@@ -100,8 +100,10 @@ T["it: https with verify-full (the default), pin, redirects and cookies"] = func
   h.require_it()
   local ca = "&ca=tests/fixtures/pki/root.pem"
   local base = "https://localhost:18443"
-  eq(h.ok(base .. "/items?tls=verify-full" .. ca, "curl").rows, { { 1, "a" }, { 2, "b" } }) -- columns by name: n, name
-  eq(h.ok("https://127.0.0.1:18443/items?x=1" .. ca, "curl").rows[1][2], "a") -- verify-full by default
+  -- columns by name: n, name
+  eq(h.ok(base .. "/items?tls=verify-full" .. ca, "curl").rows, { { 1, "a" }, { 2, "b" } })
+  -- verify-full by default
+  eq(h.ok("https://127.0.0.1:18443/items?x=1" .. ca, "curl").rows[1][2], "a")
   -- not trusted by the system store: verify-full fails without ca=; curl -k does not verify
   local r = h.query(base .. "/items", "curl")
   eq(r.err.phase, "tls")

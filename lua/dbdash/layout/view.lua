@@ -15,13 +15,17 @@ local replaced = require("dbdash.layout.replaced")
 
 local M = {}
 
+---@class dbdash.layout.FragmentRow
+---@field node dbdash.dom.Node?
+---@field out dbdash.render.Output
+
 ---@class dbdash.layout.Fragment
 ---@field node dbdash.dom.Node?
 ---@field x integer
 ---@field y integer
 ---@field width integer
 ---@field height integer? nil: as tall as its content
----@field rows { node: dbdash.dom.Node?, out: dbdash.render.Output }[]? block children (text rows), in order
+---@field rows dbdash.layout.FragmentRow[]? block children (text rows), in order
 ---@field chart { node: dbdash.dom.Node, out: dbdash.render.Output }? the replaced element
 ---@field box table? box settings (padding, border, background, alignment)
 ---@field border_title table? the title drawn in the top border
@@ -216,7 +220,8 @@ layout_panel = function(p, width, height, fill, exact)
   local bh = ih - (header and #header.lines or 0) - (args_line and 1 or 0)
   local body = replaced.raster(p, show, iw, bh, fill)
   body = box.position(body, st, iw, exact and bh or nil)
-  frag.caption_bottom = scope:get("panel-title")["caption-side"] == "bottom" -- the title under the chart
+  -- the title under the chart
+  frag.caption_bottom = scope:get("panel-title")["caption-side"] == "bottom"
   if header and not frag.caption_bottom then
     frag.rows[#frag.rows + 1] = { node = p.node, out = header }
   end
@@ -313,17 +318,17 @@ function M.grid(d, width, avail)
   for r = 1, nrows do
     tracks[r] = lay.rows[r] or lay.auto_row
   end
-  local cells, items = {}, {}
+  local cells, rows_wanted = {}, {}
   for i, p in ipairs(d.panels) do
     local pl = lay.places[i]
     local first, last = cols[pl.col], cols[pl.col + pl.span - 1]
     local w = last.x + last.width - first.x
     local hmin, hmax = M.measure(p, w)
     cells[i] = { x = first.x, width = w }
-    items[i] = { row = pl.row, row_span = pl.row_span, hmin = hmin, hmax = hmax }
+    rows_wanted[i] = { row = pl.row, row_span = pl.row_span, hmin = hmin, hmax = hmax }
   end
   local heights, fill =
-    L.rows(tracks, items, avail - lay.row_gap * math.max(nrows - 1, 0), lay.row_gap)
+    L.rows(tracks, rows_wanted, avail - lay.row_gap * math.max(nrows - 1, 0), lay.row_gap)
   local top, y = {}, 0
   for r = 1, nrows do
     top[r] = y
@@ -344,8 +349,14 @@ function M.grid(d, width, avail)
   return { fragments = frags }
 end
 
+---@class dbdash.layout.View
+---@field header dbdash.render.Output
+---@field single dbdash.layout.Fragment?
+---@field args dbdash.render.Output?
+---@field grid { fragments: dbdash.layout.Fragment[] }?
+
 ---Lay out the whole view at `width` x `height`.
----@return { header: dbdash.render.Output, single: dbdash.layout.Fragment?, args: dbdash.render.Output?, grid: { fragments: dbdash.layout.Fragment[] }? }
+---@return dbdash.layout.View
 function M.reflow(d, width, height)
   local header = M.header(d)
   local avail = height - #header.lines

@@ -64,7 +64,8 @@ end
 -- query, a command) is not checked while other code runs, and guarded code inside guarded
 -- code (dbdash.run() callbacks, modules) keeps the outer deadline too. The same hook stops
 -- guarded code whose cancel token (dbdash.db.cancel) was cancelled.
-local deadlines = setmetatable({}, { __mode = "k" }) -- coroutine -> { { at, timeout, token, done } }
+-- coroutine -> { { at, timeout, token, done } }
+local deadlines = setmetatable({}, { __mode = "k" })
 
 local function timeout_hook()
   local co = coroutine.running()
@@ -163,9 +164,22 @@ function M.current_cancel()
   end
 end
 
+---@class dbdash.db.lua_env.RunOpts
+---@field phase string
+---@field source string?
+---@field line integer?
+---@field args table?
+---@field meta table?
+---@field lua table?
+---@field vars table?
+---@field timeout integer?
+---@field max_rows integer?
+---@field cancel dbdash.db.CancelToken?
+---@field slice integer?
+
 ---Compile and run `code`. Must be called inside a util.async task.
 ---@param code string
----@param o { phase: string, source: string?, line: integer?, args: table?, meta: table?, lua: table?, vars: table?, timeout: integer?, max_rows: integer?, cancel: dbdash.db.CancelToken?, slice: integer? }
+---@param o dbdash.db.lua_env.RunOpts
 ---   vars: extra globals (e.g. rs for transform); line: line of the code in the config file;
 ---   lua: { store, helpers } of the panel's run (store, and dbdash with the run's helpers)
 ---@return any value what the script returned (checked as rows by db/lua_result.lua)

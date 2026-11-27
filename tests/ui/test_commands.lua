@@ -1011,7 +1011,8 @@ T["backoff: consecutive failures wait 2x, 4x... the interval; success resets"] =
     [[_G.wait_for(function() return (require("dbdash.scheduler").list()[1].panels[1].failures or 0) >= 3 end)]]
   )
   eq({ panel("failures"), panel("backoff_mult") }, { 3, 4 })
-  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1]:remaining() >= 3"), true) -- ~4s, not 1s
+  -- ~4s, not 1s
+  eq(child.lua_get("require('dbdash.scheduler').list()[1].panels[1]:remaining() >= 3"), true)
   eq(child.lua_get("require('dbdash.scheduler').list()[1]:status_word()"), "retrying")
   child.cmd("DbDashStatus")
   eq(table.concat(lines(), "\n"):find("Retrying:  failed 3 times in a row", 1, true) ~= nil, true)
@@ -1193,7 +1194,7 @@ T[":DbDashStyle re-renders cached data with another style"] = function()
   -- UTF-8 prefixes: braille U+2800-28FF, block elements U+2580-259F, arcs U+256D-2570.
   local BRAILLE, BLOCKS, ARCS = "\226[\160-\163]", "\226\150[\128-\159]", "\226\149[\173-\176]"
   eq(text():find(BRAILLE) ~= nil, true) -- braille by default
-  local runs = child.lua_get("#require('dbdash.scheduler').list()[1].panels[1].history")
+  local history = child.lua_get("#require('dbdash.scheduler').list()[1].panels[1].history")
   child.cmd("DbDashStyle line quadrant")
   eq(text():find(BRAILLE), nil)
   eq(text():find(BLOCKS) ~= nil, true)
@@ -1206,7 +1207,7 @@ T[":DbDashStyle re-renders cached data with another style"] = function()
   child.cmd("DbDashStyle reset")
   eq(text():find(BRAILLE) ~= nil, true)
   -- no new queries were run
-  eq(child.lua_get("#require('dbdash.scheduler').list()[1].panels[1].history"), runs)
+  eq(child.lua_get("#require('dbdash.scheduler').list()[1].panels[1].history"), history)
   eq(child.fn.getcompletion("DbDashStyle line q", "cmdline"), { "quadrant" })
 end
 

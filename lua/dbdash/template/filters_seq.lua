@@ -257,7 +257,7 @@ F.map = function(env, v, args, kw)
 end
 
 ---select / reject / selectattr / rejectattr.
-local function select_or_reject(env, v, args, kw, keep, lookup_attr)
+local function select_or_reject(env, v, args, _kw, keep, lookup_attr)
   if not R.truthy(v) then
     return {}
   end

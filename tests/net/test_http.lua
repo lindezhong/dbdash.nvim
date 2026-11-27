@@ -197,7 +197,8 @@ T["redirects: followed with -L only; --max-redirs"] = function()
   local base = server(function()
     return response("302 Found", { "Location: /again", "Content-Length: 0" })
   end)
-  eq(h.query(base, "curl").err.message:find("^HTTP 302 Found") ~= nil, true) -- as curl: not followed
+  -- as curl: not followed
+  eq(h.query(base, "curl").err.message:find("^HTTP 302 Found") ~= nil, true)
   eq(
     h.query(base, "curl -L --max-redirs 3").err.message,
     "too many redirects (more than 3) (" .. base .. "/)"
@@ -292,7 +293,8 @@ T["cookie jar: domain, path, secure, expiry, deletion"] = function()
     "evil=1; Domain=other.com",
   }, u("http://www.example.com/app/x"), now)
   eq(jar:header(u("http://api.example.com/"), nil, now), "a=1")
-  eq(jar:header(u("http://www.example.com/app/y"), nil, now), "b=2; d=4; a=1") -- d: default path /app
+  -- d: default path /app
+  eq(jar:header(u("http://www.example.com/app/y"), nil, now), "b=2; d=4; a=1")
   eq(jar:header(u("https://www.example.com/app/y"), nil, now), "b=2; c=3; d=4; a=1")
   eq(jar:header(u("http://www.example.com/application"), nil, now), "a=1") -- not under /app
   eq(jar:header(u("http://www.example.com/app/"), nil, now + 61), "b=2; a=1")

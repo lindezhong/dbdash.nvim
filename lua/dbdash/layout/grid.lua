@@ -174,9 +174,17 @@ function M.parse_tracks(v, axis)
   return tracks
 end
 
+---@class dbdash.layout.Area
+---@field row integer
+---@field col integer
+---@field row_span integer
+---@field span integer
+
 ---grid-template-areas: rows of names ("." is an empty cell); each name a rectangle.
 ---@param rows string[]
----@return table<string, { row: integer, col: integer, row_span: integer, span: integer }>?, integer? columns, string? err
+---@return table<string, dbdash.layout.Area>? areas
+---@return integer? columns
+---@return string? err
 function M.parse_areas(rows)
   local grid, width = {}, nil
   for r, line in ipairs(rows) do
@@ -563,11 +571,25 @@ local function grid_line(v)
 end
 M.grid_line = grid_line
 
+---@class dbdash.layout.Grid
+---@field columns table
+---@field rows table
+---@field auto_row table
+---@field gap integer
+---@field row_gap integer
+---@field places dbdash.layout.Place[]
+
+---@class dbdash.layout.GridError
+---@field index integer?
+---@field field string
+---@field message string
+
 ---The grid of a dashboard from computed styles: the container's tracks, gaps and areas,
 ---and each panel's placement (grid-area, grid-row, grid-column).
 ---@param container table computed style of the dashboard element
 ---@param items table[] computed style of every panel, in order
----@return { columns: table, rows: table, auto_row: table, gap: integer, row_gap: integer, places: dbdash.layout.Place[] }?, { index: integer?, field: string, message: string }? err
+---@return dbdash.layout.Grid? grid
+---@return dbdash.layout.GridError? err
 function M.from_styles(container, items)
   local areas, area_cols
   if container["grid-template-areas"] then

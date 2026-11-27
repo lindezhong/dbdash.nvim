@@ -139,16 +139,16 @@ T["Windows: sqlite:///C:/... is the drive path, relative paths join base_dir"] =
   local drv = require("dbdash.db.drivers.sqlite")
   local url = require("dbdash.db.url")
   local os_was = jit.os
-  jit.os = "Windows"
-  local ok, err = pcall(function()
+  jit.os = "Windows" -- luacheck: ignore 122 (the driver reads jit.os; restored below)
+  local passed, err = pcall(function()
     eq(drv.parse_url(url.parse("sqlite:///C:/data/app.db")).database, "C:/data/app.db")
     eq(drv.parse_url(url.parse("sqlite://C:/data/app.db")).database, "C:/data/app.db")
     local info = url.parse("sqlite://sub/app.db")
     info.base_dir = "D:/dash"
     eq(drv.parse_url(info).database, "D:/dash/sub/app.db")
   end)
-  jit.os = os_was
-  assert(ok, err)
+  jit.os = os_was -- luacheck: ignore 122
+  assert(passed, err)
   if os_was ~= "Windows" then -- elsewhere a leading slash stays
     eq(drv.parse_url(url.parse("sqlite:///C:/data/app.db")).database, "/C:/data/app.db")
   end

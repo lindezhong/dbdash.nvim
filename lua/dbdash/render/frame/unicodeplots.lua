@@ -206,9 +206,9 @@ function M.render(ctx, spec, body)
       start = math.min(start, width - w)
       if start > last_end or last_end == 0 then
         local i = start + 1
-        for ch in W.chars(t.label) do
-          cells[i] = ch
-          local cw = W.width(ch)
+        for c in W.chars(t.label) do
+          cells[i] = c
+          local cw = W.width(c)
           for k = 1, cw - 1 do
             cells[i + k] = ""
           end

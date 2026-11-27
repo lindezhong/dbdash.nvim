@@ -8,7 +8,6 @@ local M = {}
 
 local BITS = 24
 local BASE = 2 ^ BITS
-local MASK = BASE - 1
 
 local floor = math.floor
 

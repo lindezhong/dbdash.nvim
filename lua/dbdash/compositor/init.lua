@@ -5,9 +5,20 @@ local W = require("dbdash.util.width")
 
 local M = {}
 
+---@class dbdash.compositor.Region
+---@field row_s integer
+---@field row_e integer
+---@field x integer
+---@field width integer
+
+---@class dbdash.compositor.Frame
+---@field lines string[]
+---@field hl table[]
+---@field regions dbdash.compositor.Region[]
+
 ---@param cells { row: integer, x: integer, width: integer, y: integer?, height: integer? }[]
 ---@param outputs dbdash.render.Output[] one per cell
----@return { lines: string[], hl: table[], regions: { row_s: integer, row_e: integer, x: integer, width: integer }[] }
+---@return dbdash.compositor.Frame
 function M.compose(cells, outputs)
   -- Without y / height (the old flow layout): rows as tall as their tallest output,
   -- separated by a blank line.

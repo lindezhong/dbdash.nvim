@@ -235,9 +235,21 @@ local function protection(s, key, iv, mac_key, etm)
   return record.cbc12(key, s.mac(), mac_key, etm)
 end
 
+---@class dbdash.net.tls.handshake12.Ctx
+---@field opts table
+---@field suite integer
+---@field client_random string
+---@field server_random string
+---@field transcript string
+---@field leftover string
+---@field ems boolean
+---@field etm boolean
+---@field x25519 { priv: string }
+---@field p256 { priv: string }
+
 ---Continue the handshake after a TLS 1.2 ServerHello.
 ---@param io table socket-like object (raw_read_exact / raw_write)
----@param ctx { opts: table, suite: integer, client_random: string, server_random: string, transcript: string, leftover: string, ems: boolean, etm: boolean, x25519: { priv: string }, p256: { priv: string } }
+---@param ctx dbdash.net.tls.handshake12.Ctx
 ---@return dbdash.tls.Session
 function M.finish(io, ctx)
   local s = M.SUITES[ctx.suite]

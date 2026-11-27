@@ -1,7 +1,7 @@
 -- Minimal coroutine helpers: run a function as a task, and await callback-style APIs.
 local M = {}
 
-local unpack = unpack or table.unpack
+local unpack = unpack -- LuaJIT (table.unpack only with its Lua 5.2 compatibility)
 
 -- Maps a running coroutine to the function that resumes it.
 local resumers = setmetatable({}, { __mode = "k" })

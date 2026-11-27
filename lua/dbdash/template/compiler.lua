@@ -112,7 +112,7 @@ local function names_used(node, out)
     if
       type(v) == "table" and not ((node.k == "Macro" or node.k == "CallBlock") and key == "body")
     then
-      if not (v.k == "Macro") then
+      if v.k ~= "Macro" then
         names_used(v, out)
       end
     end

@@ -82,9 +82,14 @@ function M.x_axis(rs, name)
   return { numeric = numeric, values = values, labels = labels }
 end
 
+---@class dbdash.render.LongSeries
+---@field label string
+---@field points { x: number, y: number }[]
+
 ---Long data (one row per x and series, show.series_column) as series: the distinct x
 ---values in order of appearance, one series per distinct series_column value.
----@return { numeric: boolean, values: number[], labels: string[] } xaxis, { label: string, points: { x: number, y: number }[] }[] series
+---@return dbdash.render.XAxis xaxis
+---@return dbdash.render.LongSeries[] series
 function M.long(rs, show)
   local xi = M.col(rs, nn(show.x_column), "x_column")
   local yi = M.col(rs, nn(show.y_column), "y_column")
@@ -208,8 +213,18 @@ function M.item_style(ctx, kind, i, tag, child)
   return ctx.css:get(tag)
 end
 
+---@class dbdash.render.Axes
+---@field xlabel string?
+---@field ylabel string?
+---@field ymin number?
+---@field ymax number?
+---@field xmin number?
+---@field xmax number?
+---@field yformat string?
+---@field xformat string?
+
 ---Axis settings from show.axes.{x_axis,y_axis} or x_label/y_label.
----@return { xlabel: string?, ylabel: string?, ymin: number?, ymax: number?, xmin: number?, xmax: number?, yformat: string?, xformat: string? }
+---@return dbdash.render.Axes
 function M.axes(show)
   local axes = nn(show.axes) or {}
   local xa = nn(axes.x_axis) or {}

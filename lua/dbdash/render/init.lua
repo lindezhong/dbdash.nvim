@@ -11,7 +11,8 @@ local M = {}
 ---@field height integer
 ---@field color fun(spec: string?, fallback: string?): string
 ---@field strwidth fun(s: string): integer
----@field canvas fun(cols: integer, rows: integer, xlim: number[], ylim: number[]): dbdash.render.Canvas
+---@field canvas fun(cols: integer, rows: integer, xlim: number[], ylim: number[]):
+---  dbdash.render.Canvas a canvas of cols x rows characters over xlim x ylim
 ---@field canvas_type table the canvas module (px_per_char)
 ---@field ticks fun(lo: number, hi: number, count: integer): number[], string[]
 ---@field limits fun(lo: number, hi: number, count: integer): number, number, number
@@ -19,9 +20,15 @@ local M = {}
 ---@field palette fun(i: integer): string
 ---@field history number[]? recent values of this panel, oldest first (stat charts)
 
+---@class dbdash.render.Highlight
+---@field row integer
+---@field col_s integer
+---@field col_e integer
+---@field group string
+
 ---@class dbdash.render.Output
 ---@field lines string[]
----@field hl { row: integer, col_s: integer, col_e: integer, group: string }[] 0-based rows, byte columns
+---@field hl dbdash.render.Highlight[] 0-based rows, byte columns
 
 local function options()
   local ok, dbdash = pcall(require, "dbdash")
@@ -42,7 +49,16 @@ local function need(name)
   return impl
 end
 
----@param opts { width: integer, height: integer?, canvas: string?, ticks: string?, palette: string?, css: dbdash.css.Scope?, type: string? }
+---@class dbdash.render.CtxOpts
+---@field width integer
+---@field height integer?
+---@field canvas string?
+---@field ticks string?
+---@field palette string?
+---@field css dbdash.css.Scope?
+---@field type string?
+
+---@param opts dbdash.render.CtxOpts
 ---@return dbdash.render.Ctx
 function M.ctx(opts)
   local o = options()
@@ -123,11 +139,19 @@ local function message(text, group)
   return { lines = { text }, hl = { { row = 0, col_s = 0, col_e = #text, group = group } } }
 end
 
+---@class dbdash.render.RenderOpts
+---@field width integer
+---@field height integer?
+---@field history number[]?
+---@field fill boolean?
+---@field node dbdash.dom.Node?
+---@field style table?
+
 ---Render a result set according to the show config and the chart element's computed
 ---style (renderer, canvas, palette, plot sizes, title placement).
 ---@param rs dbdash.db.ResultSet
 ---@param show table
----@param opts { width: integer, height: integer?, history: number[]?, fill: boolean?, node: dbdash.dom.Node?, style: table? }
+---@param opts dbdash.render.RenderOpts
 ---  node: the chart's element in a dashboard; without it the chart gets a document of its
 ---  own with the default sheets and `style` (selector -> properties) as its sheet
 ---@return dbdash.render.Output

@@ -1,5 +1,4 @@
 -- Dashboards: the global timer, refreshing every panel, pause and resume.
-local M = require("dbdash.scheduler")
 local S = require("dbdash.scheduler.shared")
 local Dashboard = S.Dashboard
 local opts, now, close_timer = S.opts, S.now, S.close_timer

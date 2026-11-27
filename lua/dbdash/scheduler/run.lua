@@ -2,12 +2,10 @@
 local M = require("dbdash.scheduler")
 local S = require("dbdash.scheduler.shared")
 local Panel, Dashboard = S.Panel, S.Dashboard
-local opts, now = S.opts, S.now
+local opts = S.opts
 local args = require("dbdash.args")
-local config = require("dbdash.config")
 local db = require("dbdash.db")
 local template = require("dbdash.template")
-local W = require("dbdash.util.width")
 
 ---Render query.sql and query.transform for the current arguments: one template path for
 ---both (same variables, imports and helpers); the transform is Lua, so never autoescaped.
@@ -58,9 +56,11 @@ end
 ---@field args table what Lua code sees as `args`
 ---@field depth integer 0 for a refresh, n for a callback n levels deep (meta.run.depth)
 ---@field counter { n: integer, runs: table[], cancel: dbdash.db.CancelToken } the refresh's
+
 ---  life: dbdash.run() calls so far, the run records (meta.runs) and the token that cancels
 ---  the refresh, shared by its callbacks (= run.life)
 ---@field record table this run's record (meta.run): id, kind, depth, parent_id, refresh_id,
+
 ---  args, started_at, finished_at, elapsed_ms, ok, error, sql, query, result
 ---@field lua { store: table, helpers: table } globals of all Lua code of the run
 ---@field meta table? the metadata of this run
@@ -236,10 +236,21 @@ function Panel:helpers(run)
   return setmetatable(own, { __index = require("dbdash.db.lua_env").helpers })
 end
 
+---@class dbdash.scheduler.run.RenderTextOpts
+---@field dialect table?
+---@field autoescape boolean?
+---@field specs dbdash.ArgSpec[]
+---@field values table
+---@field meta table
+---@field lua table?
+---@field timeout integer?
+---@field cancel dbdash.db.CancelToken?
+---@field on_allow fun()?
+
 ---Render template `text` (at `line` of the config) of dashboard `d`. Templates see exactly
 ---two names: args.<name> (o.specs with o.values) and meta.<name> (o.meta); imported
 ---templates and Lua in templates too. Inside a util.async task; raises template errors.
----@param o { dialect: table?, autoescape: boolean?, specs: dbdash.ArgSpec[], values: table, meta: table, lua: table?, timeout: integer?, cancel: dbdash.db.CancelToken?, on_allow: fun()? }
+---@param o dbdash.scheduler.run.RenderTextOpts
 ---  lua: { store, helpers } globals of Lua in the template ({% lua %}, imported .lua);
 ---  run: the run whose `args` mapping this is; set_arg: {% set args.x = v %}
 function M.render_text(d, text, line, o)

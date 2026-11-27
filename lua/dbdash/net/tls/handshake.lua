@@ -107,11 +107,16 @@ local function is_dns_name(host)
   return host and not host:match("^[%d%.]+$") and not host:find(":", 1, true)
 end
 
+---@class dbdash.net.tls.handshake.ClientHelloOpts
+---@field alpn string[]?
+---@field tls12 boolean? false: offer TLS 1.3 only
+---@field tls13 boolean? false: offer TLS 1.2 only
+
 ---Build the ClientHello handshake message: TLS 1.3 with a TLS 1.2 fallback. Key shares
 ---for both groups are sent up front (some servers, e.g. PostgreSQL by default, only accept
 ---secp256r1), so no HelloRetryRequest is needed.
 ---@param shares { x25519: string, p256: string }
----@param o { alpn: string[]?, tls12: boolean?, tls13: boolean? }? tls12 = false offers TLS 1.3 only; tls13 = false offers TLS 1.2 only
+---@param o dbdash.net.tls.handshake.ClientHelloOpts?
 function M.client_hello(host, shares, random, session_id, o)
   o = o or {}
   local tls12 = o.tls12 ~= false
@@ -128,7 +133,8 @@ function M.client_hello(host, shares, random, session_id, o)
   }
   if tls13 then
     exts[#exts + 1] =
-      ext(43, tls12 and (u8(4) .. u16(0x0304) .. u16(0x0303)) or (u8(2) .. u16(0x0304))) -- supported_versions
+      -- supported_versions
+      ext(43, tls12 and (u8(4) .. u16(0x0304) .. u16(0x0303)) or (u8(2) .. u16(0x0304)))
     exts[#exts + 1] = ext(51, vec16(key_shares)) -- key_share
   end
   if tls12 then
@@ -350,9 +356,16 @@ end
 ---@field cert dbdash.x509.Cert
 ---@field fingerprint string
 
+---@class dbdash.net.tls.handshake.RunOpts
+---@field host string
+---@field mode "require"|"pin"|"verify-ca"|"verify-full"
+---@field fingerprint string?
+---@field ca string?
+---@field base_dir string?
+
 ---Run the handshake on a connected socket (raw I/O). Returns the session.
 ---@param sock dbdash.net.Socket
----@param opts { host: string, mode: "require"|"pin"|"verify-ca"|"verify-full", fingerprint: string?, ca: string?, base_dir: string? }
+---@param opts dbdash.net.tls.handshake.RunOpts
 ---@return dbdash.tls.Session
 function M.run(sock, opts)
   local priv, pub = x25519.keypair()

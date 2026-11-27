@@ -172,13 +172,23 @@ function M.forget(buf)
   shown[buf] = nil
 end
 
+---@class dbdash.view.buffer.Status
+---@field header string?
+---@field countdown string?
+---@field row integer?
+---@field error string?
+---@field position string?
+---@field panels { row: integer, col: integer, text: string }[]?
+---@field countdown_hl string?
+---@field error_hl string?
+
 ---Countdown and error display.
 ---`header`: the global countdown, right-aligned on the first line (the header).
 ---Single panel: `countdown` on line `row` (the first after the header) and `error` as
 ---virtual lines above it.
 ---Multiple panels: `panels` lists { row, col, text } marks at fixed window columns.
 ---@param buf integer
----@param status { header: string?, countdown: string?, row: integer?, error: string?, position: string?, panels: { row: integer, col: integer, text: string }[]?, countdown_hl: string?, error_hl: string? }
+---@param status dbdash.view.buffer.Status
 function M.set_status(buf, status)
   if not vim.api.nvim_buf_is_valid(buf) then
     return

@@ -70,8 +70,21 @@ function M.fragment(frag)
   return frag.painted
 end
 
+---@class dbdash.paint.Layer
+---@field x integer
+---@field y integer
+---@field width integer
+---@field height integer
+---@field out dbdash.render.Output
+---@field node dbdash.dom.Node?
+
+---@class dbdash.paint.DisplayList
+---@field header dbdash.render.Output
+---@field layers dbdash.paint.Layer[]
+---@field body dbdash.render.Output?
+
 ---The display list of a view: layers with their position (cells), in painting order.
----@return { header: dbdash.render.Output, layers: { x: integer, y: integer, width: integer, height: integer, out: dbdash.render.Output, node: dbdash.dom.Node? }[], body: dbdash.render.Output? }
+---@return dbdash.paint.DisplayList
 function M.view(tree)
   local list = { header = tree.header, layers = {} }
   if tree.single then

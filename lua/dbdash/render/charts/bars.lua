@@ -138,9 +138,26 @@ local function mark_group(ctx, m)
 end
 M.mark_group = mark_group
 
+---@class dbdash.render.charts.bars.HorizontalOpts
+---@field title string?
+---@field xlabel string?
+---@field ylabel string?
+---@field show_values boolean
+---@field fine boolean
+---@field glyph string?
+---@field value_format string?
+---@field stacked boolean?
+---@field bar_width integer?
+---@field bar_gap integer?
+---@field inside boolean?
+---@field axes table?
+---@field marks table?
+---@field legend table?
+---@field legend_position string?
+
 ---Horizontal bars: one row (or bar_width rows) per bar, labels on the left, values after.
 ---@param bars dbdash.render.Bar[]
----@param o { title: string?, xlabel: string?, ylabel: string?, show_values: boolean, fine: boolean, glyph: string?, value_format: string?, stacked: boolean?, bar_width: integer?, bar_gap: integer?, inside: boolean?, axes: table?, marks: table?, legend: table?, legend_position: string? }
+---@param o dbdash.render.charts.bars.HorizontalOpts
 function M.horizontal(ctx, bars, o)
   local stacked = o.stacked
   local thick = math.max(1, o.bar_width or 1)
@@ -329,8 +346,9 @@ function M.vertical(ctx, bars, o)
   }
   local _, labels = C.y_ticks(ctx, lo, hi, 15, o.value_format)
   spec.ylabels = labels
-  local cols, rows = ctx.frame.plot_size(ctx, spec)
+  local _, rows = ctx.frame.plot_size(ctx, spec)
   spec.yticks, spec.ylabels = C.y_ticks(ctx, lo, hi, rows, o.value_format)
+  local cols
   cols, rows = ctx.frame.plot_size(ctx, spec)
   local n = math.max(#bars, 1)
   local nseg = (not stacked and bars[1]) and #segments(bars[1]) or 1

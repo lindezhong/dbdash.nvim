@@ -300,19 +300,20 @@ function Api:operation(op, item, doc, method, key)
   if codes[1] then
     local r, rdoc = self:deref(codes[1].r, doc)
     out.status = codes[1].n
-    for mt, media in map.pairs(r.content or map.new()) do
+    -- the first media type of the first documented response, with its example
+    local mt, media = map.first(r.content or map.new())
+    if mt ~= nil then
       local m = self:deref(media, rdoc)
       local example = m.example
       if example == nil and is_map(m.examples) then
-        for _, ex in map.pairs(m.examples) do
+        local _, ex = map.first(m.examples)
+        if ex ~= nil then
           example = self:deref(ex, rdoc).value
-          break
         end
       end
       if example ~= nil then
         out.example = { type = mt, value = example }
       end
-      break
     end
   end
   return out
@@ -690,7 +691,9 @@ function Api:parameters(op, req, path_raw)
       else
         raw = cookies[name]
       end
-      for mt, media in map.pairs(p.content) do
+      -- a parameter's content has one media type
+      local mt, media = map.first(p.content)
+      if mt ~= nil then
         local m, mdoc = self:deref(media, doc)
         schema, sdoc = m.schema, mdoc
         if raw ~= nil then
@@ -704,7 +707,6 @@ function Api:parameters(op, req, path_raw)
             value = raw
           end
         end
-        break
       end
     else
       local t = self:schema_type(schema, doc)

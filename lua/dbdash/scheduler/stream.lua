@@ -259,7 +259,7 @@ function Panel:push_pipeline(run)
   else
     local value = item.value
     if type(value) == "string" then
-      local ok, decoded = pcall(vim.json.decode, value)
+      local ok = pcall(vim.json.decode, value)
       if not ok then
         require("dbdash.db.error").raise(
           "query",

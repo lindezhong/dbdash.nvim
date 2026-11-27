@@ -114,7 +114,7 @@ function Conn:auth(info)
   )
   client:verify(payload_of(reply))
   if reply.done ~= true then
-    reply = self:command(
+    self:command(
       doc({
         { "saslContinue", 1 },
         { "conversationId", reply.conversationId },
@@ -367,7 +367,7 @@ local function flatten(d, levels, prefix, out)
 end
 
 ---Documents -> ResultSet.
-function M.to_resultset(docs, flatten_levels, max_rows, truncated)
+function M.to_resultset(docs, flatten_levels, truncated)
   local names, index = {}, {}
   local flat = {}
   for i, d in ipairs(docs) do
@@ -506,7 +506,7 @@ function Conn:execute(query, opts)
     end
     fields[#fields + 1] = { "batchSize", math.min(max + 1, 10000) }
     local docs, truncated = self:cursor(command(fields), coll, max)
-    return M.to_resultset(docs, levels, max, truncated)
+    return M.to_resultset(docs, levels, truncated)
   elseif op == "aggregate" then
     local pipeline = opt(q, "pipeline") or {}
     local docs, truncated = self:cursor(
@@ -518,7 +518,7 @@ function Conn:execute(query, opts)
       coll,
       max
     )
-    return M.to_resultset(docs, levels, max, truncated)
+    return M.to_resultset(docs, levels, truncated)
   elseif op == "count" then
     local r = self:command(command({ { "count", coll }, { "query", filter } }))
     return resultset.new({ { name = "count", type = "integer", db_type = "int" } }, { { r.n } })
@@ -532,7 +532,7 @@ function Conn:execute(query, opts)
     for i, v in ipairs(r.values or {}) do
       docs[i] = map.from_pairs({ { field, v } })
     end
-    return M.to_resultset(docs, 0, max, false)
+    return M.to_resultset(docs, 0, false)
   end
   if op == "command" then
     -- Any database command; the reply becomes one row (without "ok").
@@ -552,7 +552,7 @@ function Conn:execute(query, opts)
         map.set(row, k, v)
       end
     end
-    return M.to_resultset({ row }, levels, max, false)
+    return M.to_resultset({ row }, levels, false)
   end
   dberr.raise(
     "query",

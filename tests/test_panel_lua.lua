@@ -1106,7 +1106,8 @@ query:
   )
   local p = d.panels[1]
   assert(p.rs, p.error and sched.format_error(p.error))
-  eq(p.rs.rows, { { 7, 0 }, { 14, 1 }, { 28, 2 }, { 56, 3 } }) -- columns sorted by name: days, depth
+  -- columns sorted by name: days, depth
+  eq(p.rs.rows, { { 7, 0 }, { 14, 1 }, { 28, 2 }, { 56, 3 } })
 end
 
 return T

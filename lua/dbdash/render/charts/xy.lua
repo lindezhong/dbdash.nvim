@@ -47,8 +47,21 @@ local function numeric_ticks(ctx, lo, hi, cols, xformat, count, log)
   return ticks
 end
 
+---@class dbdash.render.PlotPoint
+---@field x number
+---@field y number
+---@field size number?
+---@field text string?
+---@field brk boolean? a gap in the line before this point
+
+---@class dbdash.render.PlotSeries
+---@field label string
+---@field group string
+---@field points dbdash.render.PlotPoint[]
+
 ---Collect the series to plot.
----@return { label: string, group: string, points: { x: number, y: number, size: number?, text: string?, brk: boolean? }[] }[], dbdash.render.XAxis
+---@return dbdash.render.PlotSeries[] series
+---@return dbdash.render.XAxis xaxis
 local function collect(rs, show, ctx, kind)
   local series = {}
   if kind == "scatter" or kind == "bubble" then
@@ -294,10 +307,11 @@ function M.render(rs, show, ctx, kind)
   -- Size the margin with a first set of tick labels, then compute the real ticks.
   local _, labels = C.y_ticks(ctx, ylo, yhi, 15, axes.yformat, axes.yticks, ylog)
   spec.ylabels = labels
-  local cols, rows = ctx.frame.plot_size(ctx, spec)
+  local _, rows = ctx.frame.plot_size(ctx, spec)
   local yticks
   yticks, spec.ylabels = C.y_ticks(ctx, ylo, yhi, rows, axes.yformat, axes.yticks, ylog)
   spec.yticks = yticks
+  local cols
   cols, rows = ctx.frame.plot_size(ctx, spec)
   if xaxis.numeric then
     spec.xticks = numeric_ticks(ctx, xlo, xhi, cols, axes.xformat, axes.xticks, xlog)

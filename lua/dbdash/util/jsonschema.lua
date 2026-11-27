@@ -599,9 +599,14 @@ function V:check_keywords(s, v, path, base)
   return nil
 end
 
+---@class dbdash.jsonschema.Opts
+---@field formats boolean?
+---@field nullable boolean?
+---@field resolve fun(ref: string, base: any): any, any a $ref to its schema and base
+
 ---Validate `value` against `schema` (in `doc`, the document its $refs point into; default:
 ---the schema itself).
----@param opts { formats: boolean?, nullable: boolean?, resolve: fun(ref: string, base: any): any, any }?
+---@param opts dbdash.jsonschema.Opts?
 ---@return { path: string, message: string }? error the first problem, nil when valid
 function M.validate(schema, value, opts, doc)
   local v = setmetatable({ opts = opts or {}, depth = 0 }, V)

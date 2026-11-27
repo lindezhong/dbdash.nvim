@@ -3,12 +3,22 @@ local M = {}
 
 ---@alias dbdash.Size integer|string columns/rows, or "N%" of the editor width/height
 
+---@alias dbdash.Key
+---| "modify"
+---| "show_args"
+---| "refresh"
+---| "reset"
+---| "show_sql"
+---| "export"
+---| "describe"
+
 ---@class dbdash.SidebarOptions
 ---@field width dbdash.Size (default 30)
 ---@field position "left"|"right" (default "left")
 ---@field dir string|fun(): string|nil directory to list (default: the current directory)
 ---@field pattern string[] file globs to list (default { "*.yaml", "*.yml" })
----@field exclude string[] file and directory name globs to skip (default { "*.schema.yaml", "*.schema.yml" })
+---@field exclude string[] file and directory name globs to skip
+---  (default { "*.schema.yaml", "*.schema.yml" })
 ---@field keys table<"select"|"stop"|"refresh"|"close", string|false>
 ---@field cursorline "line"|"name"|false cursor line: the global CursorLine over the whole line
 ---  (default), DbDashSidebarCursor on the name only (keeps the ●/◐/○ marker's color), or none
@@ -16,7 +26,7 @@ local M = {}
 ---@class dbdash.DashboardOptions
 ---@field open "current"|"vsplit"|"split"|"tab" where :DbDashStart shows a dashboard
 ---@field pause_hidden boolean stop refreshing while no window of the current tab shows it
----@field keys table<"modify"|"show_args"|"refresh"|"reset"|"show_sql"|"export"|"describe", string|false>
+---@field keys table<dbdash.Key, string|false>
 
 ---@class dbdash.PopupOptions
 ---@field border string|string[] floating window border (default "rounded")
@@ -213,9 +223,9 @@ local SPEC = {
     if type(v) ~= "table" then
       return "must be a style sheet (selector -> properties)"
     end
-    local keys = vim.tbl_keys(v)
-    table.sort(keys)
-    local _, err = require("dbdash.css.parser").sheet(v, keys)
+    local selectors = vim.tbl_keys(v)
+    table.sort(selectors)
+    local _, err = require("dbdash.css.parser").sheet(v, selectors)
     if err then
       -- a declaration's message names its property, a selector's the selector
       return err.property and ("%s: %s"):format(err.key, err.message) or err.message

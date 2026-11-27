@@ -47,8 +47,9 @@ paths:
 ]],
     { base_path = "/api" }
   )
-  local op, values = api:match("GET", "/api/items/latest")
+  local op = api:match("GET", "/api/items/latest")
   eq(op.id, "latest")
+  local values
   op, values = api:match("GET", "/api/items/42")
   eq({ op.id, values.id }, { "one", "42" })
   op, values = api:match("POST", "/api/a/1/b/2")

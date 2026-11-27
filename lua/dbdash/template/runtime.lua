@@ -1175,7 +1175,7 @@ end
 
 ---{% extends target %}: remember the parent; the output so far (`cut` parts) is kept,
 ---the rest of this template only defines blocks.
-function R.extends(env, reg, target, cut)
+function R.extends(_env, reg, target, cut)
   check(target)
   if reg.parent then
     raise("value", "extended multiple times")

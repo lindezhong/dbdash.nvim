@@ -219,7 +219,7 @@ local function send_once(req, url, o)
     local lines =
       { ("%s %s%s HTTP/1.1"):format(req.method, url.path, url.query and ("?" .. url.query) or "") }
     local have = {}
-    for name, value in pairs(req.headers) do
+    for name in pairs(req.headers) do
       have[name:lower()] = true
     end
     local function add(name, value)
@@ -274,9 +274,17 @@ local function send_once(req, url, o)
   return res
 end
 
+---@class dbdash.net.http.RequestOpts
+---@field jar dbdash.http.Jar?
+---@field tls table?
+---@field timeout integer?
+---@field connect_timeout integer?
+---@field redirects integer?
+---@field max_body integer?
+
 ---Send a request, following redirects.
 ---@param req dbdash.http.Request
----@param o { jar: dbdash.http.Jar?, tls: table?, timeout: integer?, connect_timeout: integer?, redirects: integer?, max_body: integer? }
+---@param o dbdash.net.http.RequestOpts
 ---@return dbdash.http.Response
 function M.request(req, o)
   o = vim.tbl_extend("keep", { first_origin = origin(req.url) }, o or {})

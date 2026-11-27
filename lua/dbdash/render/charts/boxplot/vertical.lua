@@ -43,8 +43,9 @@ function M.render(rs, show, ctx)
   local spec = { xlabel = axes.xlabel, ylabel = axes.ylabel, height = ctx.plot_height }
   local _, labels = C.y_ticks(ctx, lo, hi, 15, axes.yformat)
   spec.ylabels = labels
-  local cols, rows = ctx.frame.plot_size(ctx, spec)
+  local _, rows = ctx.frame.plot_size(ctx, spec)
   spec.yticks, spec.ylabels = C.y_ticks(ctx, lo, hi, rows, axes.yformat)
+  local cols
   cols, rows = ctx.frame.plot_size(ctx, spec)
 
   local grid, colors = {}, {}

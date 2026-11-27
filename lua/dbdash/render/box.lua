@@ -12,18 +12,22 @@ local borders = require("dbdash.render.borders")
 
 local M = {}
 
-local function nn(v)
-  if v == vim.NIL then
-    return nil
-  end
-  return v
-end
+---@class dbdash.render.BoxSettings
+---@field pad integer[]
+---@field border table?
+---@field border_group string
+---@field background string?
+---@field justify string
+---@field align string
+---@field title_group string
+---@field title_align string?
+---@field ellipsis string
 
 ---The box settings of an element from its computed style: padding, border (with
 ---border-color), background-color, justify-self / align-self, and its title part's
 ---color, text-align and text-overflow.
 ---@param css dbdash.css.Scope? the panel's element (default: a panel of its own)
----@return { pad: integer[], border: table?, border_group: string, background: string?, justify: string, align: string, title_group: string, title_align: string?, ellipsis: string }
+---@return dbdash.render.BoxSettings
 function M.settings(css)
   css = css or require("dbdash.css").scope(nil, nil)
   local c = css.node.tag == "panel" and css:get() or css:get("panel")

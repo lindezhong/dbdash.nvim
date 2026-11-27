@@ -39,12 +39,12 @@ local function common_ancestor(a, b)
     n = n.parent
   end
   local seen = {}
-  for _, n in ipairs(a:ancestors()) do
-    seen[n] = true
+  for _, x in ipairs(a:ancestors()) do
+    seen[x] = true
   end
-  for _, n in ipairs(b:ancestors()) do
-    if seen[n] then
-      return n
+  for _, x in ipairs(b:ancestors()) do
+    if seen[x] then
+      return x
     end
   end
   return nil
@@ -81,8 +81,11 @@ function Document:needs_update()
   return self.dirty_root ~= nil or next(self.reasons) ~= nil
 end
 
----Hand the dirty state to an update and reset it.
----@return dbdash.dom.Node? dirty_root, table<dbdash.dom.Node, string> pending, table<string, boolean> reasons
+---Hand the dirty state to an update and reset it: the dirty root, the pending kind of
+---each node, the reasons.
+---@return dbdash.dom.Node? dirty_root
+---@return table<dbdash.dom.Node, string> pending
+---@return table<string, boolean> reasons
 function Document:take_dirty()
   local root, pending, reasons = self.dirty_root, self.pending, self.reasons
   self.dirty_root, self.pending, self.reasons = nil, {}, {}

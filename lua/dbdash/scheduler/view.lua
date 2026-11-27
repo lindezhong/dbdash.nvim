@@ -1,9 +1,8 @@
 -- Drawing a dashboard: header, countdowns, argument lines and the panel grid.
 local M = require("dbdash.scheduler")
 local S = require("dbdash.scheduler.shared")
-local Panel, Dashboard = S.Panel, S.Dashboard
+local Dashboard = S.Dashboard
 local opts, now = S.opts, S.now
-local args = require("dbdash.args")
 local buffer = require("dbdash.view.buffer")
 
 ---Countdown text: {time} the seconds left, {clock} m:ss (h:mm:ss from an hour);

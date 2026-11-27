@@ -71,12 +71,28 @@ local DEFAULTS = setmetatable({}, {
 ---@field description string?
 ---@field choices any[]?
 
+---@class dbdash.ConfigDatabase
+---@field type string
+---@field url string
+---@field options table
+
+---@class dbdash.ConfigQuery
+---@field sql string
+---@field sql_line integer
+---@field transform string?
+---@field transform_line integer
+---@field autoescape boolean
+---@field max_rows integer
+---@field timeout integer?
+---@field args_show boolean
+---@field args dbdash.ArgSpec[]
+
 ---@class dbdash.Config
 ---@field path string absolute path of the YAML file
 ---@field dir string directory containing the file
----@field database { type: string, url: string, options: table }? top-level database: the default of every panel
+---@field database dbdash.ConfigDatabase? top-level database: the default of every panel
 ---@field panels dbdash.PanelConfig[]
----@field query { sql: string, sql_line: integer, transform: string?, transform_line: integer, autoescape: boolean, max_rows: integer, timeout: integer?, args_show: boolean, args: dbdash.ArgSpec[] }
+---@field query dbdash.ConfigQuery
 ---@field show table show section, with interval (ms), title, show_countdown, countdown_format
 ---@field positions table<string, {line: integer, col: integer}>
 ---@field grid boolean `panels:` (a grid, even of one panel)
