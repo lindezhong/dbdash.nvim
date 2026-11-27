@@ -487,6 +487,23 @@ function M.on_resize()
   end
 end
 
+---A dbdash://<path> buffer is read (:edit, a session): its running dashboard is drawn again
+---(:edit cleared the buffer), else the dashboard starts in it.
+---@param buf integer
+---@param name string the buffer's name
+function M.on_read(buf, name)
+  local path = buffer.path_of(name)
+  if not path then
+    return
+  end
+  local d = require("dbdash.dashboard").get(path)
+  if d and d.buf == buf then
+    M.redraw(d)
+  else
+    M.start(path, { buf = buf, no_show = true })
+  end
+end
+
 ---Start dashboards for restored session buffers named dbdash://<path>.
 function M.adopt_session_buffers()
   for _, b in ipairs(vim.api.nvim_list_bufs()) do

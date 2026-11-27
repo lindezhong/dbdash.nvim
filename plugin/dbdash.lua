@@ -135,17 +135,7 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
   group = group,
   pattern = "dbdash://*",
   callback = function(ev)
-    local path = require("dbdash.view.buffer").path_of(ev.match)
-    if not path then
-      return
-    end
-    local sched = require("dbdash.dashboard")
-    local d = sched.get(path)
-    if d and d.buf == ev.buf then
-      require("dbdash.view.dashboard").redraw(d) -- :edit cleared the buffer of a running dashboard
-    else
-      require("dbdash.view.dashboard").start(path, { buf = ev.buf, no_show = true })
-    end
+    require("dbdash.view.dashboard").on_read(ev.buf, ev.match)
   end,
 })
 vim.api.nvim_create_autocmd("BufWriteCmd", {
