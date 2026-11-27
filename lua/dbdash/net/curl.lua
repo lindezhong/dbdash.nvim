@@ -259,6 +259,170 @@ end
 ---@field timeout integer? ms (-m)
 ---@field connect_timeout integer? ms
 
+local NO_URL =
+  "curl: write the path only (e.g. /search): the scheme, host and port are database.url's, not %s"
+
+---Data of -d, --data-binary, --data-raw, --data-urlencode.
+local function add_data(p, v)
+  p.data[#p.data + 1] = v
+  p.has_data = true
+end
+
+---What each option does to the request being parsed (`p`: { r, data, json, get, head,
+---has_data, base_dir }).
+local APPLY = {
+  method = function(p, v)
+    p.r.method = v:upper()
+  end,
+  header = function(p, v, opt)
+    local name, value = v:match("^([^:]+):%s*(.*)$")
+    if not name then
+      fail("curl %s needs 'Name: value', not %q", opt, v)
+    end
+    p.r.headers[#p.r.headers + 1] = { vim.trim(name), value }
+  end,
+  data = function(p, v)
+    add_data(p, v:sub(1, 1) == "@" and file_data(v:sub(2), p.base_dir, true) or v)
+  end,
+  data_binary = function(p, v)
+    add_data(p, v:sub(1, 1) == "@" and file_data(v:sub(2), p.base_dir, false) or v)
+  end,
+  data_raw = add_data,
+  data_urlencode = function(p, v)
+    add_data(p, data_urlencode(v, p.base_dir))
+  end,
+  json = function(p, v)
+    p.json[#p.json + 1] = v:sub(1, 1) == "@" and file_data(v:sub(2), p.base_dir, false) or v
+    p.has_data = true
+  end,
+  get = function(p)
+    p.get = true
+  end,
+  head = function(p)
+    p.head = true
+  end,
+  -- as curl: a value with "=" is cookies, else a file to read; either starts the cookie
+  -- engine (-b '' only starts it)
+  cookie = function(p, v)
+    local r = p.r
+    r.cookie_engine = true
+    if v:find("=", 1, true) then
+      r.cookie_strings[#r.cookie_strings + 1] = v
+    elseif v ~= "" then
+      r.cookie_files[#r.cookie_files + 1] = v
+    end
+  end,
+  cookie_jar = function(p, v)
+    if v == "-" then
+      fail("curl -c - writes to the standard output, which has no meaning here: give a file")
+    end
+    p.r.cookie_jar, p.r.cookie_engine = v, true
+  end,
+  junk_session = function(p)
+    p.r.junk_session = true
+  end,
+  user = function(p, v)
+    p.r.user = v
+  end,
+  agent = function(p, v)
+    p.r.headers[#p.r.headers + 1] = { "User-Agent", v }
+  end,
+  referer = function(p, v)
+    p.r.headers[#p.r.headers + 1] = { "Referer", v }
+  end,
+  location = function(p)
+    p.r.follow = true
+  end,
+  max_redirs = function(p, v)
+    p.r.max_redirs = tonumber(v) or fail("curl --max-redirs needs a number, not %q", v)
+  end,
+  insecure = function(p)
+    p.r.insecure = true
+  end,
+  max_time = function(p, v, opt)
+    p.r.timeout = seconds(v, opt)
+  end,
+  connect_timeout = function(p, v, opt)
+    p.r.connect_timeout = seconds(v, opt)
+  end,
+  ignore = function() end, -- -s, -S, -v ...: about curl's own output
+  url = function(p, v)
+    if v:match("^%a[%w+.-]*://") then
+      fail(NO_URL, v)
+    end
+    if p.r.url then
+      fail("curl: one URL per request (%s and %s)", p.r.url, v)
+    end
+    p.r.url = v
+  end,
+}
+
+---The definition of option `opt`, or an error.
+local function option(opt)
+  if UNSUPPORTED[opt] then
+    fail("curl %s", UNSUPPORTED[opt])
+  end
+  local def = OPTS[opt]
+  if not def then
+    fail("curl option %s is not supported here (:help dbdash-http lists those that are)", opt)
+  end
+  return def
+end
+
+---The value of option `opt`: the next word.
+local function next_word(p, opt)
+  p.i = p.i + 1
+  local v = p.words[p.i]
+  if v == nil then
+    fail("curl %s needs a value", opt)
+  end
+  return v
+end
+
+---A long option (--name value, --name=value, --flag).
+local function long_option(p, w)
+  local name, value = w:match("^(%-%-[^=]+)=(.*)$")
+  name = name or w
+  local def = option(name)
+  APPLY[def[1]](p, def[2] and (value or next_word(p, name)) or nil, name)
+end
+
+---Short options: clustered flags (-sSL), the last one may take the rest or the next word
+---as its value (-XPOST, -H 'a: b').
+local function short_options(p, w)
+  local k = 2
+  while k <= #w do
+    local opt = "-" .. w:sub(k, k)
+    local def = option(opt)
+    if def[2] then
+      local rest = w:sub(k + 1)
+      APPLY[def[1]](p, rest ~= "" and rest or next_word(p, opt), opt)
+      return
+    end
+    APPLY[def[1]](p, nil, opt)
+    k = k + 1
+  end
+end
+
+-----json: the data as is, sent and accepted as JSON (unless the headers say otherwise).
+local function json_data(p)
+  local r = p.r
+  p.data[#p.data + 1] = table.concat(p.json)
+  local function has(name)
+    for _, h in ipairs(r.headers) do
+      if h[1]:lower() == name then
+        return true
+      end
+    end
+  end
+  if not has("content-type") then
+    r.headers[#r.headers + 1] = { "Content-Type", "application/json" }
+  end
+  if not has("accept") then
+    r.headers[#r.headers + 1] = { "Accept", "application/json" }
+  end
+end
+
 ---Parse a curl command (the leading word `curl` is optional).
 ---@param text string
 ---@param base_dir string? where @file and cookie files are read
@@ -280,170 +444,36 @@ function M.parse(text, base_dir)
     cookie_engine = false,
     junk_session = false,
   }
-  local data, json = {}, {}
-  local get, head, has_data = false, false, false
-  local i = 1
-  local function arg(opt)
-    i = i + 1
-    local v = words[i]
-    if v == nil then
-      fail("curl %s needs a value", opt)
-    end
-    return v
-  end
-  local function apply(opt, v)
-    local def = OPTS[opt]
-    local key = def[1]
-    if key == "method" then
-      r.method = v:upper()
-    elseif key == "header" then
-      local name, value = v:match("^([^:]+):%s*(.*)$")
-      if not name then
-        fail("curl %s needs 'Name: value', not %q", opt, v)
-      end
-      r.headers[#r.headers + 1] = { vim.trim(name), value }
-    elseif key == "data" then
-      data[#data + 1] = v:sub(1, 1) == "@" and file_data(v:sub(2), base_dir, true) or v
-      has_data = true
-    elseif key == "data_binary" then
-      data[#data + 1] = v:sub(1, 1) == "@" and file_data(v:sub(2), base_dir, false) or v
-      has_data = true
-    elseif key == "data_raw" then
-      data[#data + 1] = v
-      has_data = true
-    elseif key == "data_urlencode" then
-      data[#data + 1] = data_urlencode(v, base_dir)
-      has_data = true
-    elseif key == "json" then
-      json[#json + 1] = v:sub(1, 1) == "@" and file_data(v:sub(2), base_dir, false) or v
-      has_data = true
-    elseif key == "get" then
-      get = true
-    elseif key == "cookie" then
-      -- as curl: a value with "=" is cookies, else a file to read; either starts the
-      -- cookie engine (-b '' only starts it)
-      r.cookie_engine = true
-      if v:find("=", 1, true) then
-        r.cookie_strings[#r.cookie_strings + 1] = v
-      elseif v ~= "" then
-        r.cookie_files[#r.cookie_files + 1] = v
-      end
-    elseif key == "cookie_jar" then
-      if v == "-" then
-        fail("curl -c - writes to the standard output, which has no meaning here: give a file")
-      end
-      r.cookie_jar, r.cookie_engine = v, true
-    elseif key == "junk_session" then
-      r.junk_session = true
-    elseif key == "user" then
-      r.user = v
-    elseif key == "agent" then
-      r.headers[#r.headers + 1] = { "User-Agent", v }
-    elseif key == "referer" then
-      r.headers[#r.headers + 1] = { "Referer", v }
-    elseif key == "location" then
-      r.follow = true
-    elseif key == "max_redirs" then
-      r.max_redirs = tonumber(v) or fail("curl --max-redirs needs a number, not %q", v)
-    elseif key == "insecure" then
-      r.insecure = true
-    elseif key == "max_time" then
-      r.timeout = seconds(v, opt)
-    elseif key == "connect_timeout" then
-      r.connect_timeout = seconds(v, opt)
-    elseif key == "head" then
-      head = true
-    elseif key == "url" then
-      if v:match("^%a[%w+.-]*://") then
-        fail(
-          "curl: write the path only (e.g. /search): the scheme, host and port are database.url's, not %s",
-          v
-        )
-      end
-      if r.url then
-        fail("curl: one URL per request (%s and %s)", r.url, v)
-      end
-      r.url = v
-    end
-  end
-  while i <= #words do
-    local w = words[i]
+  local p = { r = r, words = words, i = 1, data = {}, json = {}, base_dir = base_dir }
+  while p.i <= #words do
+    local w = words[p.i]
     if w:sub(1, 2) == "--" and #w > 2 then
-      local name, value = w:match("^(%-%-[^=]+)=(.*)$")
-      name = name or w
-      if UNSUPPORTED[name] then
-        fail("curl %s", UNSUPPORTED[name])
-      end
-      local def = OPTS[name]
-      if not def then
-        fail("curl option %s is not supported here (:help dbdash-http lists those that are)", name)
-      end
-      if def[2] then
-        apply(name, value or arg(name))
-      else
-        apply(name)
-      end
+      long_option(p, w)
     elseif w:sub(1, 1) == "-" and #w > 1 then
-      -- short options: clustered flags (-sSL), the last one may take the rest or the
-      -- next word as its value (-XPOST, -H 'a: b')
-      local k = 2
-      while k <= #w do
-        local opt = "-" .. w:sub(k, k)
-        if UNSUPPORTED[opt] then
-          fail("curl %s", UNSUPPORTED[opt])
-        end
-        local def = OPTS[opt]
-        if not def then
-          fail("curl option %s is not supported here (:help dbdash-http lists those that are)", opt)
-        end
-        if def[2] then
-          local rest = w:sub(k + 1)
-          apply(opt, rest ~= "" and rest or arg(opt))
-          break
-        end
-        apply(opt)
-        k = k + 1
-      end
+      short_options(p, w)
     else
       if r.url then
         fail("curl: one URL per request (%s and %s)", r.url, w)
       end
       r.url = w
     end
-    i = i + 1
+    p.i = p.i + 1
   end
   if r.url and r.url:match("^%a[%w+.-]*://") then
-    fail(
-      "curl: write the path only (e.g. /search): the scheme, host and port are database.url's, not %s",
-      r.url
-    )
+    fail(NO_URL, r.url)
   end
-  if #json > 0 then
-    -- --json: the data as is, sent and accepted as JSON
-    data[#data + 1] = table.concat(json)
-    local function has(name)
-      for _, h in ipairs(r.headers) do
-        if h[1]:lower() == name then
-          return true
-        end
-      end
-    end
-    if not has("content-type") then
-      r.headers[#r.headers + 1] = { "Content-Type", "application/json" }
-    end
-    if not has("accept") then
-      r.headers[#r.headers + 1] = { "Accept", "application/json" }
-    end
+  if #p.json > 0 then
+    json_data(p)
   end
-  if has_data then
-    local joined = #json > 0 and #data == 1 and data[1] or table.concat(data, "&")
-    if get then
+  if p.has_data then
+    local joined = #p.json > 0 and #p.data == 1 and p.data[1] or table.concat(p.data, "&")
+    if p.get then
       r.query = joined
     else
       r.body = joined
     end
   end
-  r.method = r.method or (head and "HEAD") or ((r.body and not get) and "POST" or "GET")
+  r.method = r.method or (p.head and "HEAD") or ((r.body and not p.get) and "POST" or "GET")
   return r
 end
 
