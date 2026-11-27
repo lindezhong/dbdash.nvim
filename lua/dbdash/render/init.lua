@@ -30,11 +30,6 @@ local M = {}
 ---@field lines string[]
 ---@field hl dbdash.render.Highlight[] 0-based rows, byte columns
 
-local function options()
-  local ok, dbdash = pcall(require, "dbdash")
-  return ok and dbdash.options or {}
-end
-
 local function need(name)
   local impl = registry.get(name)
   if not impl then
@@ -61,9 +56,8 @@ end
 ---@param opts dbdash.render.CtxOpts
 ---@return dbdash.render.Ctx
 function M.ctx(opts)
-  local o = options()
   local canvas_type = need("canvas/" .. (opts.canvas or "braille"))
-  local ticks = need("ticks/" .. (opts.ticks or o.ticks or "nice"))
+  local ticks = need("ticks/" .. (opts.ticks or registry.ticks))
   local palette = need("palette/" .. (opts.palette or "theme"))
   return {
     width = math.max(opts.width or 80, 20),

@@ -5,6 +5,9 @@ local M = {}
 
 local items = {}
 
+---The tick algorithm of charts that name none (setup ticks).
+M.ticks = "nice"
+
 local MODULES = {
   chart = "dbdash.render.charts.",
   canvas = "dbdash.render.canvas.",

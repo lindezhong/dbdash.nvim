@@ -138,9 +138,9 @@ function M.start(path, o)
       }, Panel)
     end
     require("dbdash.dom.build").dashboard(d) -- d.doc: the dashboard's document
-    local restored = require("dbdash")._take_pending(path)
+    local restored = require("dbdash.session").take_pending(path)
     if restored then
-      require("dbdash")._apply_args(d, restored)
+      require("dbdash.session").apply_args(d, restored)
     end
     d.buf = buffer.create(path, o.buf)
     M.dashboards[path] = d

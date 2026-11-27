@@ -21,16 +21,16 @@ local T = MiniTest.new_set({
 
 T["defaults keep the previous behavior"] = function()
   dbdash.setup()
-  local o = dbdash.options
+  local o = require("dbdash.options").current
   eq(
     { o.sidebar.width, o.sidebar.position, o.dashboard.open, o.popup.border },
     { 30, "left", "current", "rounded" }
   )
   eq(o.sidebar.keys, { select = "<CR>", stop = "t", refresh = "r", close = "q" })
   eq({
-    dbdash.default_ms("interval"),
-    dbdash.default_ms("timeout"),
-    dbdash.default_ms("connect_timeout"),
+    require("dbdash.options").default_ms("interval"),
+    require("dbdash.options").default_ms("timeout"),
+    require("dbdash.options").default_ms("connect_timeout"),
   }, { 30000, 30000, 10000 })
   eq(#notes, 0)
 end
@@ -40,12 +40,12 @@ T["nested options merge with the defaults; lists replace them"] = function()
     sidebar = { width = "30%", keys = { stop = "x", refresh = false }, pattern = { "*.dash.yaml" } },
     defaults = { interval = "1m" },
   })
-  local o = dbdash.options
+  local o = require("dbdash.options").current
   eq(o.sidebar.width, "30%")
   eq(o.sidebar.keys, { select = "<CR>", stop = "x", refresh = false, close = "q" })
   eq(o.sidebar.pattern, { "*.dash.yaml" })
   eq(o.sidebar.exclude, { "*.schema.yaml", "*.schema.yml" })
-  eq(dbdash.default_ms("interval"), 60000)
+  eq(require("dbdash.options").default_ms("interval"), 60000)
   eq(#notes, 0)
 end
 
@@ -69,7 +69,7 @@ T["invalid values are reported with their path and fall back to the default"] = 
   }) do
     eq({ part, notes[1].msg:find(part, 1, true) ~= nil }, { part, true })
   end
-  local o = dbdash.options
+  local o = require("dbdash.options").current
   eq(
     { o.sidebar.width, o.sidebar.position, o.dashboard.open, o.defaults.history },
     { 30, "left", "current", 20 }

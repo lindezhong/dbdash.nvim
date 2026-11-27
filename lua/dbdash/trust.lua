@@ -304,7 +304,10 @@ end
 ---"deny" or "cancel" once the window is closed.
 function M.view(config_path, files, on_decided)
   local width = math.min(
-    require("dbdash.util.size").resolve(require("dbdash").options.popup.max_width, vim.o.columns),
+    require("dbdash.util.size").resolve(
+      require("dbdash.options").current.popup.max_width,
+      vim.o.columns
+    ),
     vim.o.columns - 4
   )
   local lines, seps = M.view_lines(files, width - 2)

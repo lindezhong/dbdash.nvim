@@ -118,14 +118,14 @@ end
 function M.values(panel, run)
   local cfg = panel.cfg
   local q, show = cfg.query, cfg.show
-  local dbdash = require("dbdash")
+  local options = require("dbdash.options")
   local out = M.dashboard_values(panel.d, cfg.database)
   out.panel_index = panel.index
   out.panel_title = show.title ~= "" and show.title or nil
   out.chart_type = show.type
   out.interval = show.interval
-  out.max_rows = q.max_rows or dbdash.options.defaults.max_rows
-  out.timeout = q.timeout or dbdash.default_ms("timeout")
+  out.max_rows = q.max_rows or options.current.defaults.max_rows
+  out.timeout = q.timeout or options.default_ms("timeout")
   out.refresh_count = panel.refresh_count or 0
   -- Run records (scheduler Panel:new_run): this run and its refresh's life so far, the
   -- previous refresh (prev, prev_runs) and the last successful one (prev_ok, prev_ok_runs).
@@ -238,15 +238,7 @@ end
 
 ---The values as a read-only table for Lua code (missing values are nil).
 function M.for_lua(values)
-  return setmetatable({}, {
-    __index = values,
-    __newindex = function(_, k)
-      error(("meta is read-only (meta.%s)"):format(tostring(k)), 2)
-    end,
-    __pairs = function()
-      return next, values, nil
-    end,
-  })
+  return require("dbdash.util.readonly").proxy(values, "meta")
 end
 
 return M

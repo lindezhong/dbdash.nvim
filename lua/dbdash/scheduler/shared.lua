@@ -43,7 +43,7 @@ Dashboard.__index = Dashboard
 M.Panel, M.Dashboard = Panel, Dashboard
 
 function M.opts()
-  return require("dbdash").options
+  return require("dbdash.options").current
 end
 
 ---Report an error (§3.8: only errors produce messages).

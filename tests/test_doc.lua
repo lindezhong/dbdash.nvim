@@ -51,7 +51,7 @@ end
 
 T["every setup option is documented"] = function()
   local names = {}
-  for k, v in pairs(require("dbdash").DEFAULTS) do
+  for k, v in pairs(require("dbdash.options").DEFAULTS) do
     names[#names + 1] = k
     if type(v) == "table" and not vim.islist(v) then
       for sub in pairs(v) do

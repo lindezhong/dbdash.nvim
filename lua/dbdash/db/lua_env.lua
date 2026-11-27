@@ -190,7 +190,7 @@ function M.run(code, o)
   local g = o.lua or {}
   local env = setmetatable({
     args = o.args or {},
-    meta = require("dbdash.metadata").for_lua(o.meta or {}),
+    meta = require("dbdash.util.readonly").proxy(o.meta or {}, "meta"),
     store = g.store or {},
     dbdash = g.helpers or M.helpers,
   }, { __index = _G })

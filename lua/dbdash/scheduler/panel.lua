@@ -136,8 +136,8 @@ function Panel:pipeline(run)
       args = run.args,
       meta = run.meta,
       lua = run.lua,
-      timeout = q.timeout or require("dbdash").default_ms("timeout"),
-      max_rows = q.max_rows or require("dbdash").options.defaults.max_rows,
+      timeout = q.timeout or require("dbdash.options").default_ms("timeout"),
+      max_rows = q.max_rows or require("dbdash.options").current.defaults.max_rows,
       cancel = run.life.cancel,
     })
     out.elapsed_ms = rs.elapsed_ms

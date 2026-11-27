@@ -711,7 +711,7 @@ function R.lua_env(env, extra)
   local g = env.lua or {}
   local t = setmetatable({
     args = g.args or {},
-    meta = g.meta or require("dbdash.metadata").for_lua({}),
+    meta = g.meta or require("dbdash.util.readonly").proxy({}, "meta"),
     store = g.store or {},
     dbdash = g.helpers or require("dbdash.db.lua_env").helpers,
   }, { __index = _G })

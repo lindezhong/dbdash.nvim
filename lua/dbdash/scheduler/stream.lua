@@ -252,7 +252,7 @@ function Panel:push_pipeline(run)
       args = run.args,
       meta = run.meta,
       lua = run.lua,
-      timeout = q.timeout or require("dbdash").default_ms("timeout"),
+      timeout = q.timeout or require("dbdash.options").default_ms("timeout"),
       max_rows = q.max_rows or opts().defaults.max_rows,
       cancel = run.life.cancel,
     })

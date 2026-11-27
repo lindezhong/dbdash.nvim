@@ -34,7 +34,7 @@ function M.start(fargs, bang)
   local path = table.remove(fargs, 1)
   sched.start(
     path,
-    { tokens = fargs, ask_all = bang, open = require("dbdash").options.dashboard.open }
+    { tokens = fargs, ask_all = bang, open = require("dbdash.options").current.dashboard.open }
   )
 end
 

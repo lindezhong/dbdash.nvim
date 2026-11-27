@@ -35,7 +35,7 @@ function M.open(lines, opts)
   for _, l in ipairs(lines) do
     longest = math.max(longest, W.width(l))
   end
-  local o = require("dbdash").options.popup
+  local o = require("dbdash.options").current.popup
   local size = require("dbdash.util.size")
   -- Fit the content, within popup.max_width / max_height and the editor.
   local max_w = math.min(size.resolve(o.max_width, vim.o.columns), vim.o.columns - 4)

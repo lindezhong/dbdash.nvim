@@ -8,6 +8,7 @@ local dberr = require("dbdash.util.error")
 local dialect = require("dbdash.db.dialect")
 local resultset = require("dbdash.db.resultset")
 local url = require("dbdash.db.url")
+local defaults = require("dbdash.db.defaults")
 
 local M = {}
 
@@ -117,7 +118,7 @@ function M.driver_for(raw)
 end
 
 ---@class dbdash.db.QueryOpts
----@field max_rows integer?
+---@field max_rows integer? (default: dbdash.db.defaults)
 ---@field timeout integer? ms, overrides the url's timeout
 ---@field options table? driver options (database.options)
 ---@field base_dir string?
@@ -267,7 +268,7 @@ function M.query(raw_url, query, opts, callback)
   end
   local q_timeout = opts.timeout or info.timeout
   local exec_opts = {
-    max_rows = opts.max_rows or require("dbdash").options.defaults.max_rows,
+    max_rows = opts.max_rows or defaults.current.max_rows,
     timeout = q_timeout,
     args = opts.args,
     meta = opts.meta,
@@ -453,8 +454,7 @@ function M.stream(raw_url, query, opts, on_item, on_end)
     finish(prep)
     return handle
   end
-  local max = require("dbdash.util.bytes").parse(require("dbdash").options.push.max_record)
-    or 1048576
+  local max = require("dbdash.util.bytes").parse(defaults.current.max_record) or 1048576
   local function emit(value, vars)
     if done then
       return
@@ -498,7 +498,7 @@ function M.stream(raw_url, query, opts, on_item, on_end)
     lua = opts.lua,
     source = opts.source,
     line = opts.line,
-    max_rows = opts.max_rows or require("dbdash").options.defaults.max_rows,
+    max_rows = opts.max_rows or defaults.current.max_rows,
     timeout = opts.timeout or prep.info.timeout, -- (luastream: the longest stretch without waiting)
   }
   async.run(function()

@@ -45,7 +45,7 @@ function M.apply_keys(buf)
   for _, lhs in ipairs(vim.b[buf].dbdash_keys or {}) do
     pcall(vim.keymap.del, "n", lhs, { buffer = buf })
   end
-  local keys = require("dbdash").options.dashboard.keys
+  local keys = require("dbdash.options").current.dashboard.keys
   local mapped = {}
   for action, def in pairs(ACTIONS) do
     local lhs = keys[action]

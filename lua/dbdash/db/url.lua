@@ -129,13 +129,12 @@ function M.parse(raw)
     u.fingerprint = M.parse_fingerprint(p.fingerprint)
   end
   local err
-  local dbdash = require("dbdash")
-  u.connect_timeout, err =
-    duration.parse(p.connect_timeout or dbdash.options.defaults.connect_timeout)
+  local defaults = require("dbdash.db.defaults").current
+  u.connect_timeout, err = duration.parse(p.connect_timeout or defaults.connect_timeout)
   if err then
     fail("connect_timeout: %s", err)
   end
-  u.timeout, err = duration.parse(p.timeout or dbdash.options.defaults.timeout)
+  u.timeout, err = duration.parse(p.timeout or defaults.timeout)
   if err then
     fail("timeout: %s", err)
   end

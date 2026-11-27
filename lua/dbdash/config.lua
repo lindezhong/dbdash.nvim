@@ -54,11 +54,11 @@ M.ARG_TYPES = { string = true, number = true, int = true, boolean = true, list =
 -- Values a config does not set come from setup({ defaults = ... }).
 local DEFAULTS = setmetatable({}, {
   __index = function(_, k)
-    local dbdash = require("dbdash")
+    local options = require("dbdash.options")
     if k == "interval" then
-      return dbdash.default_ms("interval")
+      return options.default_ms("interval")
     end
-    return dbdash.options.defaults[k]
+    return options.current.defaults[k]
   end,
 })
 

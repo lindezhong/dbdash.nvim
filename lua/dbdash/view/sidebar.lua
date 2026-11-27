@@ -2,7 +2,7 @@
 local M = {}
 
 local function opts()
-  return require("dbdash").options.sidebar
+  return require("dbdash.options").current.sidebar
 end
 
 local HEADER_LINES = 5

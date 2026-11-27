@@ -281,7 +281,7 @@ function M.render_text(d, text, line, o)
     helpers = o.lua and o.lua.helpers,
     after = o.lua and o.lua.after,
   }
-  env.timeout = o.timeout or require("dbdash").default_ms("timeout")
+  env.timeout = o.timeout or require("dbdash.options").default_ms("timeout")
   env.cancel = o.cancel -- cancelling the refresh stops Lua in the template
   env.set_arg = o.set_arg
   env.check_file = function(path, t, kind)

@@ -40,12 +40,15 @@ function M.document(root_tag)
   return doc
 end
 
+---The user sheet: setup({ style = ... }), set by dbdash.options.
+---@type table?
+M.user_style = nil
+
 local user_rules, user_src
 
----The user sheet from setup({ style = ... }), parsed when it changes.
+---The user sheet, parsed when it changes.
 function M.user_rules()
-  local ok, dbdash = pcall(require, "dbdash")
-  local src = ok and dbdash.options and dbdash.options.style or nil
+  local src = M.user_style
   if src == nil or src == vim.NIL or next(src) == nil then
     return nil
   end

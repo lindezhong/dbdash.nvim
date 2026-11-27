@@ -7,7 +7,7 @@ M.DATABASES = DATABASES
 
 function M.check()
   local health = vim.health
-  local dbdash = require("dbdash")
+  local options = require("dbdash.options")
 
   health.start("Neovim")
   if vim.fn.has("nvim-0.12") == 1 then
@@ -27,10 +27,10 @@ function M.check()
   end
 
   health.start("Setup")
-  if #dbdash.setup_errors == 0 then
+  if #options.setup_errors == 0 then
     health.ok("setup() options are valid")
   else
-    for _, e in ipairs(dbdash.setup_errors) do
+    for _, e in ipairs(options.setup_errors) do
       health.warn(e, "The default is used for this option; see :help dbdash-setup")
     end
   end
