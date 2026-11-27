@@ -313,183 +313,206 @@ end
 ---@field ca string?
 ---@field base_dir string?
 
----Run the handshake on a connected socket (raw I/O). Returns the session.
----@param sock dbdash.net.Socket
----@param opts dbdash.net.tls.handshake.RunOpts
----@return dbdash.tls.Session
-function M.run(sock, opts)
+---@class dbdash.net.tls.handshake.State
+---@field sock dbdash.net.Socket
+---@field opts dbdash.net.tls.handshake.RunOpts
+---@field transcript string the handshake messages so far
+---@field hbuf string handshake bytes read but not taken yet
+---@field read_cipher dbdash.tls.Cipher? the server's handshake protection
+
+---The next handshake message (type, body, the whole message): plaintext before the
+---ServerHello, protected after it (compatibility ChangeCipherSpec records are ignored).
+local function next_handshake(h)
+  while true do
+    if #h.hbuf >= 4 then
+      local len = rd24(h.hbuf, 2)
+      if #h.hbuf >= 4 + len then
+        local msg = h.hbuf:sub(1, 4 + len)
+        h.hbuf = h.hbuf:sub(5 + len)
+        return msg:byte(1), msg:sub(5), msg
+      end
+    end
+    local typ, hdr, body = record.read(h.sock)
+    if typ == TYPE.change_cipher_spec then
+      -- middlebox compatibility record: ignore
+    elseif typ == TYPE.alert and not h.read_cipher then
+      record.alert(body)
+    elseif h.read_cipher then
+      if typ ~= TYPE.application_data then
+        fail("unexpected plaintext record type %d after ServerHello", typ)
+      end
+      local inner_type, content = h.read_cipher:open(hdr, body)
+      if inner_type == TYPE.alert then
+        record.alert(content)
+      elseif inner_type ~= TYPE.handshake then
+        fail("unexpected record type %d during the handshake", inner_type)
+      end
+      h.hbuf = h.hbuf .. content
+    elseif typ == TYPE.handshake then
+      h.hbuf = h.hbuf .. body
+    else
+      fail("unexpected record type %d before ServerHello", typ)
+    end
+  end
+end
+
+---Certificate (TLS 1.3): the chain (with per-certificate extensions), authenticated.
+local function read_certificate(body, opts)
+  local p = 2 + body:byte(1) -- after the request context
+  local list_len
+  list_len, p = rd24(body, p)
+  local stop = p + list_len
+  local ders = {}
+  while p < stop do
+    local clen
+    clen, p = rd24(body, p)
+    ders[#ders + 1] = body:sub(p, p + clen - 1)
+    p = p + clen
+    local elen
+    elen, p = rd16(body, p) -- per-certificate extensions
+    p = p + elen
+  end
+  return auth.authenticate(ders, opts)
+end
+
+---CertificateVerify: the server's signature over the transcript (an error in strict
+---modes); true when it checks.
+local function check_verify(h, cert, body)
+  if not cert then
+    fail("CertificateVerify without a certificate")
+  end
+  local alg = rd16(body, 1)
+  local slen = rd16(body, 3)
+  local sig = body:sub(5, 4 + slen)
+  local ok, err = false, "certificate key could not be parsed"
+  if cert.key_type then
+    ok, err = M.check_signature(cert, alg, sig, sha256.digest(h.transcript))
+  end
+  if not ok and auth.STRICT[h.opts.mode] then
+    fail("CertificateVerify signature check failed%s", err and (": " .. err) or "")
+  end
+  return ok
+end
+
+---The server's encrypted flight up to its Finished: EncryptedExtensions,
+---[CertificateRequest], Certificate, CertificateVerify, Finished. Returns the certificate
+---and whether a client certificate was asked for.
+local function server_flight(h, s_hs)
+  local cert, cert_requested, cv_ok
+  while true do
+    local t, body, raw = next_handshake(h)
+    if t == HS.certificate_request then
+      cert_requested = true
+    elseif t == HS.certificate then
+      cert = read_certificate(body, h.opts)
+    elseif t == HS.certificate_verify then
+      cv_ok = check_verify(h, cert, body)
+    elseif t == HS.finished then
+      if not util.equal(body, finished_mac(s_hs, h.transcript)) then
+        fail("server Finished verification failed")
+      end
+    elseif t ~= HS.encrypted_extensions then
+      fail("unexpected handshake message %d", t)
+    end
+    h.transcript = h.transcript .. raw
+    if t == HS.finished then
+      break
+    end
+  end
+  if auth.STRICT[h.opts.mode] and not cv_ok then
+    fail("the server did not prove possession of its certificate key")
+  end
+  return cert, cert_requested
+end
+
+---The shared secret of the key share the server chose (P-256 or x25519).
+local function shared_secret(sh, keys)
+  if sh.group == GROUP_P256 then
+    return require("dbdash.crypto.ecdsa_p256").ecdh(keys.p256_priv, sh.share)
+  end
+  local shared = x25519.scalarmult(keys.x25519_priv, sh.share)
+  if shared == string.rep("\0", 32) then
+    fail("invalid x25519 shared secret")
+  end
+  return shared
+end
+
+---Send the ClientHello and read the ServerHello: its fields and the client's key pairs.
+local function hello(h)
   local priv, pub = x25519.keypair()
-  local p256 = require("dbdash.crypto.ecdsa_p256")
-  local ppriv, ppub = p256.ecdh_keypair()
+  local ppriv, ppub = require("dbdash.crypto.ecdsa_p256").ecdh_keypair()
   local rand = require("dbdash.crypto.random")
   local client_random = rand.bytes(32)
+  local opts = h.opts
   local ch = M.client_hello(
     opts.host,
     { x25519 = pub, p256 = ppub },
     client_random,
     rand.bytes(32),
-    {
-      alpn = opts.alpn,
-      tls12 = opts.tls12,
-      tls13 = opts.tls13,
-    }
+    { alpn = opts.alpn, tls12 = opts.tls12, tls13 = opts.tls13 }
   )
-  sock:raw_write(record.header(TYPE.handshake, #ch) .. ch)
-  local transcript = ch
-
+  h.sock:raw_write(record.header(TYPE.handshake, #ch) .. ch)
+  h.transcript = ch
   -- ServerHello (plaintext; may be preceded by nothing else).
-  local hbuf = ""
-  local read_cipher
-  local function next_handshake()
-    while true do
-      if #hbuf >= 4 then
-        local len = rd24(hbuf, 2)
-        if #hbuf >= 4 + len then
-          local msg = hbuf:sub(1, 4 + len)
-          hbuf = hbuf:sub(5 + len)
-          return msg:byte(1), msg:sub(5), msg
-        end
-      end
-      local typ, hdr, body = record.read(sock)
-      if typ == TYPE.change_cipher_spec then
-        -- middlebox compatibility record: ignore
-      elseif typ == TYPE.alert and not read_cipher then
-        record.alert(body)
-      elseif read_cipher then
-        if typ ~= TYPE.application_data then
-          fail("unexpected plaintext record type %d after ServerHello", typ)
-        end
-        local inner_type, content = read_cipher:open(hdr, body)
-        if inner_type == TYPE.alert then
-          record.alert(content)
-        elseif inner_type ~= TYPE.handshake then
-          fail("unexpected record type %d during the handshake", inner_type)
-        end
-        hbuf = hbuf .. content
-      elseif typ == TYPE.handshake then
-        hbuf = hbuf .. body
-      else
-        fail("unexpected record type %d before ServerHello", typ)
-      end
-    end
-  end
-
-  local t, body, raw = next_handshake()
+  local t, body, raw = next_handshake(h)
   if t ~= HS.server_hello then
     fail("expected ServerHello, got handshake message %d", t)
   end
-  local sh = M.parse_server_hello(body, opts.tls13)
-  transcript = transcript .. raw
+  h.transcript = h.transcript .. raw
+  local keys = { x25519_priv = priv, p256_priv = ppriv, p256_pub = ppub }
+  return M.parse_server_hello(body, opts.tls13), client_random, keys
+end
+
+---Run the handshake on a connected socket (raw I/O). Returns the session. A TLS 1.2
+---server continues in handshake12.lua.
+---@param sock dbdash.net.Socket
+---@param opts dbdash.net.tls.handshake.RunOpts
+---@return dbdash.tls.Session
+function M.run(sock, opts)
+  local h = { sock = sock, opts = opts, transcript = "", hbuf = "" }
+  local sh, client_random, keys = hello(h)
   if sh.version == 0x0303 then
     return require("dbdash.net.tls.handshake12").finish(sock, {
       opts = opts,
       suite = sh.suite,
       client_random = client_random,
       server_random = sh.random,
-      transcript = transcript,
-      leftover = hbuf,
+      transcript = h.transcript,
+      leftover = h.hbuf,
       ems = sh.ems,
       etm = sh.etm,
-      x25519 = { priv = priv },
-      p256 = { priv = ppriv, pub = ppub },
+      x25519 = { priv = keys.x25519_priv },
+      p256 = { priv = keys.p256_priv, pub = keys.p256_pub },
     })
   end
-  local suite, server_pub, group = sh.suite, sh.share, sh.group
-  if #hbuf > 0 then
+  local suite = sh.suite
+  if #h.hbuf > 0 then
     fail("unexpected data after ServerHello in the same record")
-  end
-
-  local shared
-  if group == GROUP_P256 then
-    shared = p256.ecdh(ppriv, server_pub)
-  else
-    shared = x25519.scalarmult(priv, server_pub)
-    if shared == string.rep("\0", 32) then
-      fail("invalid x25519 shared secret")
-    end
   end
   local zeros = string.rep("\0", 32)
   local early = hkdf.extract(sha256, zeros, zeros)
-  local hs_secret = hkdf.extract(sha256, derive_secret(early, "derived", ""), shared)
-  local c_hs = derive_secret(hs_secret, "c hs traffic", transcript)
-  local s_hs = derive_secret(hs_secret, "s hs traffic", transcript)
-  read_cipher = traffic(suite, s_hs)
+  local hs_secret =
+    hkdf.extract(sha256, derive_secret(early, "derived", ""), shared_secret(sh, keys))
+  local c_hs = derive_secret(hs_secret, "c hs traffic", h.transcript)
+  local s_hs = derive_secret(hs_secret, "s hs traffic", h.transcript)
+  h.read_cipher = traffic(suite, s_hs)
   local write_cipher = traffic(suite, c_hs)
-
-  local cert, cert_requested, cv_ok
-  while true do
-    t, body, raw = next_handshake()
-    if t == HS.encrypted_extensions then
-      transcript = transcript .. raw
-    elseif t == HS.certificate_request then
-      cert_requested = true
-      transcript = transcript .. raw
-    elseif t == HS.certificate then
-      local ctx_len = body:byte(1)
-      local p = 2 + ctx_len
-      local list_len
-      list_len, p = rd24(body, p)
-      local stop = p + list_len
-      local ders = {}
-      while p < stop do
-        local clen
-        clen, p = rd24(body, p)
-        ders[#ders + 1] = body:sub(p, p + clen - 1)
-        p = p + clen
-        local elen
-        elen, p = rd16(body, p) -- per-certificate extensions
-        p = p + elen
-      end
-      cert = auth.authenticate(ders, opts)
-      transcript = transcript .. raw
-    elseif t == HS.certificate_verify then
-      if not cert then
-        fail("CertificateVerify without a certificate")
-      end
-      local alg = rd16(body, 1)
-      local slen = rd16(body, 3)
-      local sig = body:sub(5, 4 + slen)
-      local ok, err = false, "certificate key could not be parsed"
-      if cert.key_type then
-        ok, err = M.check_signature(cert, alg, sig, sha256.digest(transcript))
-      end
-      if not ok and auth.STRICT[opts.mode] then
-        fail("CertificateVerify signature check failed%s", err and (": " .. err) or "")
-      end
-      cv_ok = ok
-      transcript = transcript .. raw
-    elseif t == HS.finished then
-      local expected = finished_mac(s_hs, transcript)
-      if not util.equal(body, expected) then
-        fail("server Finished verification failed")
-      end
-      transcript = transcript .. raw
-      break
-    else
-      fail("unexpected handshake message %d", t)
-    end
-  end
-  if auth.STRICT[opts.mode] and not cv_ok then
-    fail("the server did not prove possession of its certificate key")
-  end
-
+  local cert, cert_requested = server_flight(h, s_hs)
   -- Application traffic secrets are derived from the transcript up to server Finished.
   local master = hkdf.extract(sha256, derive_secret(hs_secret, "derived", ""), zeros)
-  local c_ap = derive_secret(master, "c ap traffic", transcript)
-  local s_ap = derive_secret(master, "s ap traffic", transcript)
-
+  local c_ap = derive_secret(master, "c ap traffic", h.transcript)
+  local s_ap = derive_secret(master, "s ap traffic", h.transcript)
   -- Client flight: (compat CCS), [empty Certificate], Finished.
   local out = { record.header(TYPE.change_cipher_spec, 1) .. "\1" }
   if cert_requested then
     local empty = u8(HS.certificate) .. u24(4) .. u8(0) .. u24(0)
     out[#out + 1] = write_cipher:seal(TYPE.handshake, empty)
-    transcript = transcript .. empty
+    h.transcript = h.transcript .. empty
   end
-  local fin_body = finished_mac(c_hs, transcript)
+  local fin_body = finished_mac(c_hs, h.transcript)
   local fin = u8(HS.finished) .. u24(#fin_body) .. fin_body
   out[#out + 1] = write_cipher:seal(TYPE.handshake, fin)
   sock:raw_write(table.concat(out))
-
   return {
     version = 0x0304,
     suite = suite,
@@ -499,7 +522,7 @@ function M.run(sock, opts)
     s_secret = s_ap,
     c_secret = c_ap,
     cert = cert,
-    leftover = hbuf,
+    leftover = h.hbuf,
   }
 end
 
