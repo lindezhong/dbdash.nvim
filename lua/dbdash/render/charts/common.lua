@@ -168,7 +168,7 @@ function M.color(ctx, _, i, _, name)
   if not ctx then
     return nil
   end
-  local node = require("dbdash.render.content.chart").item(ctx.css.node, "series", i)
+  local node = require("dbdash.render.content.find").item(ctx.css.node, "series", i)
   if node then
     return require("dbdash.css").hl_of(node) or ctx.palette(i)
   end
@@ -178,7 +178,7 @@ end
 ---Highlight group of an item's element (render/content/chart.lua: "legend", "marks", ...),
 ---else of the chart's part `tag` (charts drawn without their content).
 function M.item_hl(ctx, kind, i, tag, child)
-  local chart = require("dbdash.render.content.chart")
+  local chart = require("dbdash.render.content.find")
   local node = chart.item(ctx.css.node, kind, i)
   if child then
     node = chart.child(node, child)
@@ -202,7 +202,7 @@ end
 
 ---Computed style of an item's element (or of the chart's part `tag`).
 function M.item_style(ctx, kind, i, tag, child)
-  local chart = require("dbdash.render.content.chart")
+  local chart = require("dbdash.render.content.find")
   local node = chart.item(ctx.css.node, kind, i)
   if child then
     node = chart.child(node, child)

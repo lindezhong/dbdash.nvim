@@ -6,6 +6,7 @@
 --   pin      the leaf certificate's SHA-256 must equal the configured fingerprint and its
 --            CertificateVerify signature must verify (otherwise a server could replay the
 --            real certificate)
+local auth = require("dbdash.net.tls.auth")
 local record = require("dbdash.net.tls.record")
 local sha256 = require("dbdash.crypto.sha256")
 local hkdf = require("dbdash.crypto.hkdf")
@@ -257,57 +258,6 @@ function M.verify_content(transcript_hash)
   return string.rep(" ", 64) .. "TLS 1.3, server CertificateVerify\0" .. transcript_hash
 end
 
--- Modes that require the server to prove possession of its certificate key.
-M.STRICT = { pin = true, ["verify-ca"] = true, ["verify-full"] = true }
-
----Authenticate the server's certificate list (DER strings, leaf first) for the mode:
----pin compares the leaf fingerprint; verify-ca / verify-full validate the chain against
----the trust store, and verify-full also the host name. Returns the parsed leaf.
----@param ders string[]
----@param opts { host: string, mode: string, fingerprint: string?, ca: string?, base_dir: string? }
----@return dbdash.x509.Cert
-function M.authenticate(ders, opts)
-  local x509 = require("dbdash.net.tls.x509")
-  local der = ders[1]
-  if not der then
-    fail("the server sent no certificate")
-  end
-  local fp = x509.fingerprint(der)
-  if opts.mode == "pin" and not util.equal(sha256.digest(der), opts.fingerprint) then
-    fail("certificate fingerprint mismatch: the server presented %s", fp)
-  end
-  local ok, cert = pcall(x509.parse, der)
-  if not ok then
-    if M.STRICT[opts.mode] then
-      error(cert, 0)
-    end
-    cert = { der = der }
-  end
-  cert.fingerprint = fp
-  if opts.mode == "verify-ca" or opts.mode == "verify-full" then
-    local verify = require("dbdash.net.tls.verify")
-    local inters = {}
-    for k = 2, #ders do
-      local iok, ic = pcall(x509.parse, ders[k])
-      if iok then
-        inters[#inters + 1] = ic
-      end
-    end
-    local store = require("dbdash.net.tls.truststore").for_info(opts.ca, opts.base_dir)
-    local vok, why = verify.chain(cert, inters, store)
-    if not vok then
-      fail("certificate verification failed: %s (presented %s)", why, fp)
-    end
-    if opts.mode == "verify-full" then
-      local hok, hwhy = verify.host(cert, opts.host)
-      if not hok then
-        fail("certificate verification failed: %s", hwhy)
-      end
-    end
-  end
-  return cert
-end
-
 ---Check a CertificateVerify signature with the leaf certificate's key.
 ---@return boolean ok, string? err
 function M.check_signature(cert, alg, sig, transcript_hash)
@@ -490,7 +440,7 @@ function M.run(sock, opts)
         elen, p = rd16(body, p) -- per-certificate extensions
         p = p + elen
       end
-      cert = M.authenticate(ders, opts)
+      cert = auth.authenticate(ders, opts)
       transcript = transcript .. raw
     elseif t == HS.certificate_verify then
       if not cert then
@@ -503,7 +453,7 @@ function M.run(sock, opts)
       if cert.key_type then
         ok, err = M.check_signature(cert, alg, sig, sha256.digest(transcript))
       end
-      if not ok and M.STRICT[opts.mode] then
+      if not ok and auth.STRICT[opts.mode] then
         fail("CertificateVerify signature check failed%s", err and (": " .. err) or "")
       end
       cv_ok = ok
@@ -519,7 +469,7 @@ function M.run(sock, opts)
       fail("unexpected handshake message %d", t)
     end
   end
-  if M.STRICT[opts.mode] and not cv_ok then
+  if auth.STRICT[opts.mode] and not cv_ok then
     fail("the server did not prove possession of its certificate key")
   end
 

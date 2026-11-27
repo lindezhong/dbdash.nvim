@@ -257,7 +257,7 @@ function M.finish(io, ctx)
     fail("server chose an unsupported cipher suite 0x%04x", ctx.suite)
   end
   local opts = ctx.opts
-  local strict = require("dbdash.net.tls.handshake").STRICT[opts.mode]
+  local strict = require("dbdash.net.tls.auth").STRICT[opts.mode]
   local transcript = { ctx.transcript }
   local hbuf = ctx.leftover or ""
   local read_cipher
@@ -306,7 +306,7 @@ function M.finish(io, ctx)
         ders[#ders + 1] = body:sub(p, p + clen - 1)
         p = p + clen
       end
-      cert = require("dbdash.net.tls.handshake").authenticate(ders, opts)
+      cert = require("dbdash.net.tls.auth").authenticate(ders, opts)
     elseif t == HS.server_key_exchange then
       if s.kx ~= "ecdhe" then
         fail("unexpected ServerKeyExchange for RSA key exchange")
