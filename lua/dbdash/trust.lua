@@ -278,6 +278,22 @@ end
 ---@type fun(config_path: string, files: dbdash.trust.File[], on_decided: fun(answer: string))?
 M.viewer = nil
 
+---False when setup turns the trust question off for this config (lua.confirm = false, or
+---the config is under one of lua.trusted_dirs).
+function M.required(path)
+  local o = require("dbdash.options").current.lua
+  if o.confirm == false then
+    return false
+  end
+  for _, d in ipairs(o.trusted_dirs or {}) do
+    local dir = vim.fs.normalize(vim.fn.fnamemodify(vim.fn.expand(d), ":p")):gsub("/$", "")
+    if path:sub(1, #dir + 1) == dir .. "/" then
+      return false
+    end
+  end
+  return true
+end
+
 ---True when the config may run with these files. Asks when its trust is unknown and
 ---records Allow and Deny. Otherwise returns false, a message and its level (viewing or
 ---"Not now" is not an error; no message while the files are being viewed).

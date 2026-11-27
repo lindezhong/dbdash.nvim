@@ -118,7 +118,7 @@ T["a timer tick while a refresh runs is skipped, not a cancel"] = function()
   local d = start(SLOW)
   local p = d.panels[1]
   wait_running(p)
-  p:refresh() -- a timer tick
+  p:emit("panel:tick") -- a timer tick
   eq(p.history[1].skipped, true)
   vim.wait(2500, function()
     return p.rs ~= nil

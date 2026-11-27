@@ -213,7 +213,7 @@ function M.run(code, o)
     end
     dberr.raise(o.phase, message_of(ret))
   end
-  -- Arguments the script assigned (args.x = v) apply now (see scheduler Panel:sync_args).
+  -- Arguments the script assigned (args.x = v) apply now (see Run:sync_args, dashboard/run.lua).
   if g.after then
     local aok, aerr = pcall(g.after)
     if not aok then

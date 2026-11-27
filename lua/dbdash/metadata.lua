@@ -112,8 +112,8 @@ local function url_parts(raw, typ)
 end
 
 ---The metadata of a panel for one render.
----@param panel table scheduler Panel (cfg, d, index, refresh_count)
----@param run table? the run (scheduler dbdash.Run) being rendered
+---@param panel dbdash.Panel
+---@param run dbdash.Run? the run being rendered
 ---@return table values by name (nil where there is no value)
 function M.values(panel, run)
   local cfg = panel.cfg
@@ -127,7 +127,7 @@ function M.values(panel, run)
   out.max_rows = q.max_rows or options.current.defaults.max_rows
   out.timeout = q.timeout or options.default_ms("timeout")
   out.refresh_count = panel.refresh_count or 0
-  -- Run records (scheduler Panel:new_run): this run and its refresh's life so far, the
+  -- Run records (dashboard/run.lua): this run and its refresh's life so far, the
   -- previous refresh (prev, prev_runs) and the last successful one (prev_ok, prev_ok_runs).
   out.run = run and run.record
   out.runs = run and run.life and run.life.runs
@@ -140,7 +140,7 @@ end
 
 ---The metadata outside any panel (the dashboard's description): no panel_*, chart_type,
 ---interval, ...; db_* of `dbcfg` (default: the top-level database, none without one).
----@param d table scheduler Dashboard (path, cfg)
+---@param d dbdash.Dashboard
 ---@param dbcfg table?
 function M.dashboard_values(d, dbcfg)
   dbcfg = dbcfg or d.cfg.database

@@ -175,63 +175,87 @@ end
 
 ---The producer of a driver with connect: on every tick (ctx.wait_tick) the query (a
 ---function renders it anew: sql, a tag passed along with its result, and options of this
----query) runs once (M.execute); its result or error is passed on. It does not end by
----itself: when wait_tick says the run stops. The consumer reports how each result went
----(ctx.report): failures in a row back off, the next query waiting interval x 2^(n-1)
----(at most x opts.backoff), told through opts.on_backoff(retry_at, multiple, failures)
----(retry_at nil: no waiting longer).
+---query) runs once (M.execute); its result or error is passed on, and the loop waits for
+---the consumer to report how it went (ctx.report). Failures in a row back off: the next
+---query not before interval x 2^(n-1) (at most x opts.backoff) from now; it waits with
+---ctx.wait_tick(not_before, failures) and lets earlier ticks pass. It does not end by
+---itself: when wait_tick says the run stops (or it is stopped). A run without ticks of
+---its own (db.query) queries once.
 ---@param driver dbdash.db.Driver
 function M.producer(driver)
   ---@param ctx dbdash.db.StreamCtx
   return function(info, query, ctx)
     local opts = ctx.opts
     local failures = opts.failures or 0 -- (a restarted run goes on counting)
+    local not_before
+    local waiting, reported
     ctx.report = function(ok)
-      local interval = opts.interval
-      if ok then
-        if failures > 0 then
-          failures = 0
-          if opts.on_backoff then
-            opts.on_backoff(nil, nil, 0)
-          end
-        end
-        return
-      end
-      failures = failures + 1
-      if not interval then
-        return
-      end
-      local delay = M.backoff_delay(interval, failures, opts.backoff)
-      if opts.on_backoff then
-        vim.uv.update_time()
-        if delay > interval then
-          opts.on_backoff(vim.uv.now() + delay, math.floor(delay / interval + 0.5), failures)
-        else
-          opts.on_backoff(nil, nil, failures)
-        end
+      if waiting then
+        local w = waiting
+        waiting = nil
+        w(ok)
+      else
+        reported = ok
       end
     end
-    while ctx.wait_tick() do
-      local ok, sql, tag, extra = pcall(function()
-        if type(query) == "function" then
-          return query()
-        end
-        return query
+    ctx.on_stop(function()
+      if waiting then
+        local w = waiting
+        waiting = nil
+        w(nil)
+      end
+    end)
+    ---How the consumer took the last result: true, false, or nil when the run stopped.
+    local function outcome()
+      if reported ~= nil then
+        local r = reported
+        reported = nil
+        return r
+      end
+      return async.await(function(cb)
+        waiting = cb
       end)
-      if not ok then
-        ctx.fail(sql) -- the query could not be rendered
-      elseif not info then
-        ctx.fail(ctx.prep_error, tag) -- the URL or its driver is wrong: on every tick
-      else
-        local qopts = vim.tbl_extend("force", {}, opts, extra or {}, { cancel = ctx.cancel })
-        local err, rs = async.await(M.execute, driver, info, sql, qopts)
-        if ctx.cancel.cancelled then
-          return
-        end
-        if err then
-          ctx.fail(err, tag)
+    end
+    local function now()
+      vim.uv.update_time()
+      return vim.uv.now()
+    end
+    while ctx.wait_tick(not_before, failures) do
+      local slack = math.max(50, math.floor((opts.interval or 0) / 100))
+      if not (not_before and now() + slack < not_before) then -- (earlier ticks pass)
+        local ok, sql, tag, extra = pcall(function()
+          if type(query) == "function" then
+            return query()
+          end
+          return query
+        end)
+        if not ok then
+          ctx.fail(sql) -- the query could not be rendered
+        elseif not info then
+          ctx.fail(ctx.prep_error, tag) -- the URL or its driver is wrong: on every tick
         else
-          ctx.emit(rs, nil, tag)
+          local qopts = vim.tbl_extend("force", {}, opts, extra or {}, { cancel = ctx.cancel })
+          local err, rs = async.await(M.execute, driver, info, sql, qopts)
+          if ctx.cancel.cancelled then
+            return
+          end
+          if err then
+            ctx.fail(err, tag)
+          else
+            ctx.emit(rs, nil, tag)
+          end
+        end
+        -- a run of one tick has no next query to wait for
+        local result = ctx.ticked and outcome() or not ctx.ticked
+        if result == nil then
+          return
+        elseif result then
+          failures, not_before = 0, nil
+        else
+          failures = failures + 1
+          local interval = opts.interval
+          local delay = interval and M.backoff_delay(interval, failures, opts.backoff)
+          not_before = delay and delay > interval and now() + delay or nil
         end
       end
     end

@@ -391,7 +391,7 @@ T["a file loaded through a computed path, or changed while running, asks again"]
   -- dyn.lua changes while the dashboard runs: the next refresh asks again
   write("dyn.lua", { "return { v = function() return 8 end }" })
   answer = "cancel"
-  p:refresh()
+  p:emit("panel:tick")
   vim.wait(5000, function()
     return not p.running
   end, 10)
@@ -401,7 +401,7 @@ T["a file loaded through a computed path, or changed while running, asks again"]
     true
   )
   answer = "allow"
-  p:refresh()
+  p:emit("panel:tick")
   vim.wait(5000, function()
     return not p.running and p.error == nil
   end, 10)

@@ -400,10 +400,14 @@ M.HEADER_LINES = HEADER_LINES
 
 -- The list follows the dashboards: started, stopped, hidden, shown again.
 local events = require("dbdash.dashboard.events")
-for _, e in ipairs({ "started", "stopped", "paused", "resumed" }) do
-  events:on(e, function()
-    M.refresh()
-  end)
+local function refresh()
+  M.refresh()
 end
+events:on("dashboard:started", function(d)
+  d.events:on("dashboard:hidden", refresh)
+  d.events:on("dashboard:shown", refresh)
+  refresh()
+end)
+events:on("dashboard:stopped", refresh)
 
 return M

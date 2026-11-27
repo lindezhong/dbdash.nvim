@@ -101,6 +101,7 @@ end
 T["requests in one batch render once"] = function()
   local d = start()
   local before = counters(d)
+  d.doc:note_reason("viewport") -- something to update (a frame of nothing draws nothing)
   for _ = 1, 5 do
     require("dbdash.view.dashboard").request_render(d)
   end
@@ -108,6 +109,20 @@ T["requests in one batch render once"] = function()
     return not d.render_pending
   end, 5)
   eq(delta(before, counters(d)).draws, 1)
+end
+
+T["a change of element data only (the status) draws no frame"] = function()
+  local d = start()
+  vim.wait(500, function()
+    return not d.render_pending
+  end, 5)
+  local before = counters(d)
+  d.panels[1].node:set_data("running", "yes") -- (as a commit of the status does)
+  vim.wait(500, function()
+    return not d.render_pending
+  end, 5)
+  eq(delta(before, counters(d)).draws, 0)
+  eq(d.doc.data_changed, false) -- the status line took it
 end
 
 T["hit testing finds the node; events capture, then bubble"] = function()

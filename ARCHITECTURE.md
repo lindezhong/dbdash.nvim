@@ -13,9 +13,9 @@ is shown into the dashboard's document (a DOM). A view draws that document the w
 browser renders a page: style, layout, paint, composite, into a Neovim buffer.
 
 ```
-config file ─► config.load ─► dashboard (model) ─► db.run ─► results ─► consumer
-                                   │                                       │
-                                   │ commit: the display state into the DOM ◄┘
+config file ─► config.load ─► dashboard (model) ─► db.run (producer) ─► results ─► consumer
+                                   │  clock: panel:tick                                │
+                                   │ commit: the display state into the DOM ◄──────────┘
                                    ▼
 buffer ◄─ compositor ◄─ paint ◄─ layout ◄─ css ◄─ document (dirty) ◄─ frame (view)
 ```
@@ -41,8 +41,9 @@ Rules that keep it so:
 - Lower layers do not read setup's options. `options.set()` hands them what they use:
   `db/defaults` (timeouts, max rows, the longest push item), the user style sheet
   (`css.user_style`), the tick algorithm and user implementations (`render.registry`).
-- The model never requires a view. It tells the rest through events
-  (`dashboard/events.lua`) and through its document (a change asks its view for a frame).
+- The model never requires a view. It tells the rest through events (each dashboard's
+  `d.events`, and `dashboard/events.lua` for all of them) and through its document (a
+  change asks its view for a frame).
 - Hooks the entry module wires for lower layers: the trust prompt's View float
   (`trust.viewer`) and the dashboard keys' actions (the `action` event → `commands`).
 
@@ -51,7 +52,7 @@ Rules that keep it so:
 ```
 :DbDashStart file.yaml / require("dbdash").start()
   └ view/dashboard.start                         the UI side
-      ├ dashboard.prepare(path, tokens)          dashboard/lifecycle.lua
+      ├ dashboard.prepare(path, tokens)          dashboard/init.lua
       │   ├ config.load                          the only reader of config files
       │   │   ├ yaml.parse_file                  every value knows its line
       │   │   ├ structure and types              (config.lua)
@@ -63,8 +64,9 @@ Rules that keep it so:
       │   └ the command line's arguments
       ├ view/args_ui.ask_all                     missing required arguments
       ├ dashboard.create(path, cfg, state, restored)
-      │   panels, the document (dashboard/document.lua), the session's argument values,
-      │   the clock and every panel's source; event `started`
+      │   Dashboard.new: its events, clock, panels, document (dashboard/document.lua) and
+      │   subscribers (history, track, thresholds, commit); the session's argument values;
+      │   event `dashboard:started`; Dashboard:start: commit, the clock, every source
       └ attach: the buffer, Document.on_update → a frame, the key actions, countdowns
 ```
 
@@ -73,49 +75,61 @@ OpenAPI document or SQL.
 
 ## Data sources
 
-Every data source is a driver (`db/init.lua`): it has `connect` (a database, queried) or
+Every data source is a driver (`db/types.lua`): it has `connect` (a database, queried) or
 `produce` (a source that sends data), the options it reads (`options`, checked by
-`db/options.lua`) and the name of its template dialect (`template/dialect.lua`).
+`db/options.lua`) and the name of its template dialect (`template/dialect.lua`). A
+database's producer is the same for all of them (`db/driver.lua`).
 
 ```
-db.run(url, query, opts, on_result, on_end) → handle { stop, stats, status }
+db.run(url, query, opts, on_result, on_end) → handle { stop, report, stats, status }
   common: ${NAME} → driver → db.validate (URL, options) → parse_url
-          cancel token, on_stop cleanups, error wrapping, stats, back to the main loop
+          cancel token, on_stop cleanups, error wrapping, stats, back to the main loop;
+          without query.transform an item becomes rows (JSON rows, or one record)
   produce(info, query, ctx)       exec, luastream, webhook: ctx.emit(value, vars),
                                   ctx.writer(delimiter) cut into items, ctx.set_status,
                                   ctx.on_stop; the run ends when it returns
-  connect (pull loop)             sqlite, postgres, mysql, mssql, cassandra, mongodb, redis,
-                                  http, lua: on every ctx.wait_tick(), query() renders the
-                                  query anew and db.query runs it (timeouts, cancelling on
-                                  the server); its result or error goes on, the loop goes on
+  connect: db/driver.producer     sqlite, postgres, mysql, mssql, cassandra, mongodb, redis,
+                                  http, lua; the loop:
+    ctx.wait_tick(not_before, failures)   the next tick (opts.wait_tick: the panel's);
+                                          earlier than not_before: it passes
+    query()                               renders the query anew: sql, tag, options
+    driver.execute: connect → execute → close (timeouts; cancelling stops it on the server)
+    ctx.emit(rs, tag) / ctx.fail(err, tag), then wait for handle:report(ok) (the consumer)
+    failures in a row: not_before = now + interval × min(2^(n-1), errors.backoff)
   on_result(err, value, vars, tag)  a result (one may hold many rows), or a query's error
 ```
 
-`db.query` (the Lua API, `dbdash.query` in Lua code) runs one query; the pull loop uses it
-for each of its queries.
+`db.query` (the Lua API, `dbdash.query` in Lua code) is a run of one tick: its first
+result.
 
 ## Scheduling
 
-One clock per dashboard (`dashboard/timer.lua`) keeps every panel's next tick
-(`show.interval`) and the top-level interval's (a tick for every panel) on one uv timer.
+`show.interval` is a panel's period: it shows new data at most once per period. One clock
+per dashboard (`dashboard/timer.lua`) keeps every panel's next tick and the top-level
+interval's (a tick for every panel) on one uv timer, and tells each tick as `panel:tick`.
 
 ```
 wake: the deadlines that passed
   top-level due   → every panel (except one backing off: its retry time stays)
   a panel's own   → that panel
   both at once    → one tick (deadlines within 1% of the interval, at least 50 ms)
-  each due panel: Panel:on_tick(), and its count restarts from now; a panel whose interval
-  is the top-level one or longer only ever ticks with the others
-paused (hidden): only show.refresh_hidden panels tick; shown again, what came due ticks
+  each due panel: panel:tick, and its count restarts from now; a panel whose interval is
+  the top-level one or longer only ever ticks with the others
+dashboard:hidden  only show.refresh_hidden panels tick
+dashboard:shown   what came due ticks now
+dashboard:args    every count starts again (and every panel's run)
 ```
 
-`Panel:on_tick()` gives a waiting pull loop its tick (it queries); a tick while the query
-runs is skipped (history). A source that sends data never waits for ticks; for it a tick
-only draws what came. User actions (`r`, changed arguments) restart the panel's run at once.
+`panel:tick` listeners: the panel (a database's loop waiting in `ctx.wait_tick` queries; a
+tick while the query runs is skipped, `panel:skipped`) and commit (a new period). A source
+that sends data never waits for ticks. User actions (`r`, changed arguments) restart the
+panel's run at once. Each run has a number (`Panel.gen`): ticks and results of an older
+run are dropped.
 
-Failures of a source that waits for ticks back off: after the n-th in a row the next query
-waits interval × 2^(n-1), at most interval × `errors.backoff`; the first success returns
-to the interval.
+Failures of a database back off in its loop (`db/driver.lua`): after the n-th in a row the
+next query waits interval × 2^(n-1), at most interval × `errors.backoff`; the panel keeps
+that time as its next deadline (countdown, `:DbDashStatus`); the first success returns to
+the interval.
 
 ## Results
 
@@ -124,9 +138,11 @@ on_result → Panel:on_result: queued (setup push.max_queue, unlimited by defaul
           → Panel:consume: one task, in order, one result at a time
               a query's result: query.transform (rendered with the query), rows check
               an item: query.transform rendered for it (or the item as JSON rows)
-          → Panel:settle: the run's record (meta.prev), history, the result or the error
-              (event `error`), stat values, thresholds (event `threshold`)
-          → commit: a query's result at once; an item at the panel's next tick
+          → Panel:settle: the run's record (meta.prev), the result (`panel:result`) or
+              the error (`panel:error`); handle:report(ok) tells the source how it went
+  panel:result / panel:error listeners, in order:
+              history (dashboard/history.lua), stat values (track.lua), thresholds
+              (thresholds.lua: `panel:threshold`), commit (commit.lua)
 ```
 
 `dbdash.run(args)` in Lua code runs the panel's pipeline again with other arguments: a
@@ -134,34 +150,52 @@ query panel queries once, a push panel takes the current item again; nothing is 
 
 ## Drawing
 
-The model commits: `Dashboard:commit()` brings the document up to date
-(`dashboard/document.lua`: titles, errors, argument lines, each chart's content through
-`render/content`). Only changes mark nodes dirty; a document that gets something to
-update asks its view for a frame (`Document.on_update`).
+The model commits (`dashboard/commit.lua`): it writes what is shown into the document
+(built by `dashboard/document.lua`): titles, errors, argument lines, each chart's content
+through `render/content`, and the status as element data (`Node:set_data`: running, a
+source's state, the next tick). A panel's results are committed at most once per period:
+the first of a period at once (a database's query of the tick), later ones at the next
+`panel:tick`; a tick with nothing pending writes nothing. Only changes mark nodes dirty; a
+document that gets something to update asks its view for a frame (`Document.on_update`).
 
 ```
 view/dashboard.request_render  one frame for every request within 20 ms; none while hidden
+  only element data changed: the status line, nothing else
   frame: css/style.restyle          cascade, styles shared by key, dirty subtrees only
          layout/view.reflow         grid tracks, panel sizes, a layout cache
            layout/replaced.raster   a chart is a replaced element: render.render draws it
          paint.view                 a display list (render/box: borders and padding)
          compositor.compose         layers into lines
          view/buffer.draw           changed lines and extmarks
-  the status line (update_status): countdowns, running / listening / ended, errors
+         update_status              the status line from the document's data: countdowns,
+                                    running / listening / ended, a single chart's error
 ```
 
 ## Events
 
-`dashboard/events.lua` is the emitter of the model; listeners get the dashboard first.
+Each dashboard tells on its own emitter, `d.events` (`util/emitter.lua`: listeners run at
+once, in order); listeners of panel events get the panel first.
 
 | Event | When | Listeners |
 |---|---|---|
-| `started` / `stopped` | a dashboard runs / stopped | sidebar; the view closes its buffer |
-| `paused` / `resumed` | hidden / shown again | sidebar; the view's countdowns and catch-up frame |
-| `state` | what the status line shows changed | view (status line) |
-| `error` | an error of a result or a source | view/notifier (`errors.notify`) |
-| `threshold` | a value rose to a step that notifies | view/notifier |
+| `panel:tick` | the clock: a panel's deadline, the top-level one, catching up | the panel (its database's loop), commit |
+| `panel:result` | a result settled | history, track, thresholds, commit |
+| `panel:error` | a result or the source failed | history, commit, view/notifier (`errors.notify`) |
+| `panel:skipped` / `panel:cancelled` | a tick while the query ran / a run cancelled | history |
+| `panel:state` | what the status shows changed (running, listening..., retrying, ended) | commit |
+| `panel:threshold` | a value rose to a step that notifies | view/notifier |
+| `dashboard:args` | the arguments changed | the clock, every panel (restart), commit |
+| `dashboard:hidden` / `shown` | no window shows it / shown again | the clock, sidebar |
+
+For whoever follows every dashboard, `dashboard/events.lua`:
+
+| Event | When | Listeners |
+|---|---|---|
+| `dashboard:started` / `stopped` | created / stopped | sidebar, notifier (they listen to its `d.events`); the view closes its buffer |
+| `dashboard:error` | a config could not start | view/notifier |
 | `action` | a dashboard key's event reached the document's root | commands (wired in init.lua) |
+
+The view listens to no data event: what it shows comes from the document.
 
 ## How it compares to a browser
 
@@ -192,7 +226,9 @@ lua/dbdash/
   init.lua, commands.lua   setup, mappings, the Lua API; commands and key actions
   view/                    dashboard (frames, starting), buffer, sidebar, popups, notifier,
                            trust's View float, argument prompts
-  dashboard/               the model: dashboards, panels, runs, clock, document, events
+  dashboard/               the model: the running dashboards (init), Dashboard, Panel, Run,
+                           clock (timer), document, commit, history, track, thresholds,
+                           events
   config.lua, config/      loading configs; the validator list
   options.lua, session.lua setup's options; argument values in sessions
   trust.lua, metadata.lua  trust records; meta for templates and Lua

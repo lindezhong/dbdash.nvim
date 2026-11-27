@@ -17,6 +17,7 @@ local M = {}
 ---@field version integer bumped by every change
 ---@field on_update fun()? called when the document gets something to update (set by its view)
 ---@field updating boolean? a frame is updating it (changes then need no other frame)
+---@field data_changed boolean? an element's data changed (Node:set_data) since the last frame
 local Document = {}
 Document.__index = Document
 
@@ -94,7 +95,16 @@ function Document:note_reason(reason)
   end
 end
 
----Is there anything for the next update to do?
+---An element's data changed: the next frame shows it (nothing to restyle or lay out).
+function Document:note_data()
+  local idle = not self:needs_update() and not self.data_changed
+  self.data_changed = true
+  if idle then
+    self:updated()
+  end
+end
+
+---Is there anything for the next update to do (data changes aside)?
 function Document:needs_update()
   return self.dirty_root ~= nil or next(self.reasons) ~= nil
 end

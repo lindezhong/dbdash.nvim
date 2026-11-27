@@ -1,5 +1,5 @@
 -- Push sources at the driver level (db.run): cutting output into items, exec:// and
--- luastream://. The scheduler's side is in tests/test_push.lua.
+-- luastream://. The panels' side is in tests/test_push.lua.
 local db = require("dbdash.db")
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()

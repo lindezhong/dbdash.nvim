@@ -13,9 +13,11 @@ local function run(query, ticks)
     n = n + 1
     return n <= ticks
   end or nil
-  db.run("sqlite:///:memory:", query, { wait_tick = wait }, function(err, value, _, tag)
+  local handle
+  handle = db.run("sqlite:///:memory:", query, { wait_tick = wait }, function(err, value, _, tag)
     results[#results + 1] =
       { err = err and err.message or nil, rows = value and value.rows, tag = tag }
+    handle:report(err == nil) -- the consumer took it: the next tick may query
   end, function(err)
     ended = { err = err }
   end)

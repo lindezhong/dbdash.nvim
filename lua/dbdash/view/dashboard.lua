@@ -1,9 +1,11 @@
 -- The view of a dashboard (ARCHITECTURE.md#drawing): its buffer and windows, the frames
--- that draw its document (restyle, layout, paint, composite), the status line, and the UI
--- side of starting and stopping it.
+-- that draw its document (restyle, layout, paint, composite) and the status line from the
+-- document's data, and the UI side of starting and stopping it. The only entry from the
+-- model is its document asking for a frame (Document.on_update); of the dashboards' events
+-- the view follows dashboard:stopped (it closes the buffer).
 local buffer = require("dbdash.view.buffer")
 local events = require("dbdash.dashboard.events")
-local format_error = require("dbdash.util.error").format
+local child = require("dbdash.dom.node").child
 require("dbdash.view.notifier") -- it tells what the dashboards report
 
 local M = {}
@@ -30,12 +32,12 @@ function M.countdown_text(fmt, secs, running)
   return (fmt:gsub("{time}", tostring(secs)):gsub("{clock}", clock))
 end
 
----Seconds until the next refresh of every panel (cfg.refresh_all).
-function M.remaining_global(d)
-  if not d.gnext_at then
+---Seconds until `at` (loop time in ms), 0 without one.
+local function remaining(at)
+  if not at then
     return 0
   end
-  return math.max(0, math.ceil((d.gnext_at - now()) / 1000))
+  return math.max(0, math.ceil((at - now()) / 1000))
 end
 
 ---Style queries on an element of the dashboard's document (css.scope).
@@ -83,13 +85,13 @@ function M.render_view(d, width, height)
     }
   end
   d.doc.updating = false
-  d.doc.updating = false
   return lines, hl, body, offset, regions
 end
 
 ---Ask for a rendering update (Servo: a task marks state dirty and the event loop runs
 ---"update the rendering" once): every request until it runs is one update, at most one
----every 20 ms. User actions call redraw() directly.
+---every 20 ms. Only data of elements changed (the status): only the status line is drawn.
+---User actions call redraw() directly.
 function M.request_render(d)
   if d.render_pending then
     return
@@ -105,7 +107,11 @@ function M.request_render(d)
       d.render_skipped = true -- hidden: drawn when shown again (resume)
       return
     end
-    M.redraw(d)
+    if d.doc:needs_update() then
+      M.redraw(d)
+    else
+      M.update_status(d)
+    end
   end, math.max(0, 20 - since))
 end
 
@@ -138,39 +144,38 @@ function M.redraw(d)
   M.update_status(d)
 end
 
----Countdown and error extmarks.
+---The status line (extmarks) from the document's data (dashboard/commit.lua): countdowns,
+---running ("…"), a push source's state, a single chart's error.
 function M.update_status(d)
+  d.doc.data_changed = false
   local header
+  local hdata = d.header_node.data or {}
   local shown, format = require("dbdash.css").countdown(d.header_node)
-  if shown and d.cfg.refresh_all then
-    local running = false
-    if d.refreshing_all then
-      for _, p in ipairs(d.panels) do
-        running = running or p.running
-      end
-      d.refreshing_all = running or nil
+  if shown and hdata.next_at then
+    header = M.countdown_text(format, remaining(hdata.next_at), hdata.refreshing)
+  end
+  ---The status of panel element `node`: its countdown, after its source's state.
+  local function panel_status(node, countdown_shown, fmt)
+    local data = node.data or {}
+    local text = countdown_shown and M.countdown_text(fmt, remaining(data.next_at), data.running)
+      or nil
+    if data.state then
+      text = data.state .. (text and data.state ~= "ended" and ("  " .. text) or "")
     end
-    header = M.countdown_text(format, M.remaining_global(d), running)
+    return text, data
   end
   if not d.cfg.grid then
-    local p = d.panels[1]
-    local countdown
-    local p_shown, p_format = require("dbdash.css").countdown(p.node)
-    if p_shown then
-      countdown = M.countdown_text(p_format, p:remaining(), p.running)
-    end
-    if p.push then
-      countdown = p:push_state()
-        .. (countdown and p:push_state() ~= "ended" and ("  " .. countdown) or "")
-    end
+    local node = d.panels[1].node
+    local p_shown, p_format = require("dbdash.css").countdown(node)
+    local countdown = panel_status(node, p_shown, p_format)
     buffer.set_status(d.buf, {
       header = header,
       countdown = countdown,
       row = d.header_rows or 0,
-      error = p.error and format_error(p.error) or nil,
+      error = child(node, "error").text,
       position = opts().countdown_position,
       countdown_hl = scope(d.header_node):hl("countdown"),
-      error_hl = scope(p.node):hl("error"),
+      error_hl = scope(node):hl("error"),
     })
     return
   end
@@ -178,10 +183,10 @@ function M.update_status(d)
   for i, p in ipairs(d.panels) do
     local r = d.regions and d.regions[i]
     local p_shown, p_format = require("dbdash.css").countdown(p.node)
-    if r and (p_shown or p.running or p.push) then
-      local text = M.countdown_text(p_format, p:remaining(), p.running)
-      if p.push then
-        text = p:push_state() .. (p_shown and p:push_state() ~= "ended" and ("  " .. text) or "")
+    local text, data = panel_status(p.node, true, p_format)
+    if r and (p_shown or data.running or data.state) then
+      if data.state and not p_shown then
+        text = data.state
       end
       marks[#marks + 1] =
         { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text), text = text }
@@ -214,7 +219,6 @@ end
 ---@field win integer? window to show the dashboard in (default: current, or `open`)
 ---@field open "current"|"vsplit"|"split"|"tab"|nil how to show it when no `win` is given
 ---@field no_show boolean? do not display the buffer
----@field on_started fun(d: dbdash.Dashboard)?
 
 ---Show `buf` in `win`; without a window, per `open` ("current" | "vsplit" | "split" |
 ---"tab", see setup({ dashboard = { open = ... } })). A dashboard already visible in a
@@ -257,7 +261,7 @@ local function start_countdowns(d)
   local every = opts().countdown_interval
   d.ctimer:start(every, every, function()
     vim.schedule(function()
-      if d.ctimer then
+      if d.ctimer and not d.paused then
         M.update_status(d)
       end
     end)
@@ -311,26 +315,19 @@ function M.start(path, o)
   o = o or {}
   local dashboards = require("dbdash.dashboard")
   local args = require("dbdash.args")
-  local notifier = require("dbdash.view.notifier")
   path = dashboards.normalize(path)
   local existing = dashboards.get(path)
   if existing then
     if o.tokens and #o.tokens > 0 then
       local ok, cli = pcall(args.parse_cli, existing.cfg.args, o.tokens)
       if not ok then
-        return notifier.error(cli)
+        return events:emit("dashboard:error", path, cli)
       end
-      for k, v in pairs(cli) do
-        existing.state.cli[k] = v
-      end
-      existing:restart()
+      existing:set_cli(cli)
     end
     buffer.apply_keys(existing.buf)
     if not o.no_show then
       show_in(existing.buf, o.win, o.open)
-    end
-    if o.on_started then
-      o.on_started(existing)
     end
     return existing
   end
@@ -355,7 +352,7 @@ function M.start(path, o)
     if type(state) == "string" then
       vim.notify("dbdash: " .. state, level or vim.log.levels.WARN)
     elseif state then
-      notifier.error(state)
+      events:emit("dashboard:error", path, state)
     end
     return
   end
@@ -365,9 +362,6 @@ function M.start(path, o)
     end
     local d = dashboards.create(path, cfg, state, require("dbdash.session").take_pending(path))
     attach(d, o)
-    if o.on_started then
-      o.on_started(d)
-    end
   end
   local to_ask = o.ask_all and cfg.args or args.missing_required(cfg.args, state)
   if #to_ask == 0 then
@@ -383,10 +377,14 @@ function M.start(path, o)
     end
     local missing = args.missing_required(cfg.args, state)
     if #missing > 0 then
-      return notifier.error({
-        phase = "args",
-        message = "missing required argument '" .. (missing[1].key or missing[1].name) .. "'",
-      })
+      return events:emit(
+        "dashboard:error",
+        path,
+        require("dbdash.util.error").new({
+          phase = "args",
+          message = "missing required argument '" .. (missing[1].key or missing[1].name) .. "'",
+        })
+      )
     end
     launch()
   end)
@@ -428,9 +426,19 @@ function M.update_visibility()
   end
   for _, d in ipairs(require("dbdash.dashboard").list()) do
     if not pause_hidden or shown[d.buf] then
-      d:resume()
-    else
+      if d.paused then
+        d:resume()
+        -- shown again: the countdowns, and the frame that waited
+        start_countdowns(d)
+        if d.render_skipped then
+          d.render_skipped = false
+          M.request_render(d)
+        end
+        M.update_status(d)
+      end
+    elseif not d.paused then
       d:pause()
+      stop_countdowns(d)
     end
   end
 end
@@ -481,31 +489,16 @@ function M.adopt_session_buffers()
   end
 end
 
--- The model's events ----------------------------------------------------------------------
-
-events:on("state", function(d)
-  if d.buf then
-    M.update_status(d)
+---Neovim exits (VimLeavePre): the countdowns stop, and the dashboards (kept for session
+---hooks that run later).
+function M.on_exit()
+  for _, d in ipairs(require("dbdash.dashboard").list()) do
+    stop_countdowns(d)
   end
-end)
+  require("dbdash.dashboard").freeze_all()
+end
 
-events:on("paused", function(d)
-  stop_countdowns(d)
-end)
-
-events:on("resumed", function(d)
-  if not d.buf then
-    return
-  end
-  start_countdowns(d)
-  if d.render_skipped then
-    d.render_skipped = false
-    M.request_render(d)
-  end
-  M.update_status(d)
-end)
-
-events:on("stopped", function(d, o)
+events:on("dashboard:stopped", function(d, o)
   stop_countdowns(d)
   if not o.keep_buffer then
     close_buffer(d)

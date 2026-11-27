@@ -1,61 +1,15 @@
--- Runs of a panel's pipeline (refreshes and dbdash.run() callbacks) with their records,
-local M = {}
-local S = require("dbdash.dashboard.shared")
----@class dbdash.Panel
-local Panel = S.Panel
----@class dbdash.Dashboard
-local Dashboard = S.Dashboard
-local opts = S.opts
+-- A run of a panel's pipeline (a refresh, an item of a source that sends data, or a
+-- dbdash.run() callback): its record (meta.run), its arguments, its templates and the
+-- globals of its Lua code. Also the template rendering of a dashboard (render_text).
 local args = require("dbdash.args")
 local db = require("dbdash.db")
 local template = require("dbdash.template")
 local dialect = require("dbdash.template.dialect")
 
----Render query.sql and query.transform for the current arguments: one template path for
----both (same variables, imports and helpers); the transform is Lua, so never autoescaped.
----Runs inside a util.async task (template Lua may wait on dbdash.* helpers); raises a
----template or database error.
----@return string sql, string? transform_code
----@param run dbdash.Run
-function Panel:render_templates(run)
-  local q = self.cfg.query
-  local o = self:template_opts(run)
-  local sql = M.render_text(
-    self.d,
-    q.sql,
-    q.sql_line,
-    vim.tbl_extend("force", o, { autoescape = q.autoescape })
-  )
-  local code = q.transform and M.render_text(self.d, q.transform, q.transform_line, o) or nil
-  return sql, code
-end
-
----The options of M.render_text for the templates of `run` (and its `meta`, set on it).
-function Panel:template_opts(run)
-  local q = self.cfg.query
-  run.meta = require("dbdash.metadata").values(self, run) -- `meta` of templates and Lua
-  if run.depth == 0 then
-    self.meta = run.meta
-  end
-  return {
-    dialect = dialect.get(db.driver(self.cfg.database.type).dialect),
-    specs = self.cfg.visible_args,
-    values = run.args,
-    meta = run.meta,
-    lua = run.lua,
-    run = run,
-    set_arg = function(name, v)
-      self:set_arg(run, name, v)
-    end,
-    timeout = q.timeout,
-    cancel = run.life.cancel,
-    on_allow = function()
-      self:refresh({ queue = true })
-    end,
-  }
-end
+local M = {}
 
 ---@class dbdash.Run one run of a panel's pipeline: a refresh (depth 0) or a callback
+---@field panel dbdash.Panel
 ---@field values table<string, any> the arguments by name
 ---@field args table what Lua code sees as `args`
 ---@field depth integer 0 for a refresh, n for a callback n levels deep (meta.run.depth)
@@ -75,22 +29,71 @@ end
 ---@field meta_version integer?
 ---@field seen table the values when the run started
 ---@field read_only boolean?
+local Run = {}
+Run.__index = Run
+M.Run = Run
 
----A run of the panel's pipeline with `values` (default: the current arguments).
+---Render query.sql and query.transform for the current arguments: one template path for
+---both (same variables, imports and helpers); the transform is Lua, so never autoescaped.
+---Runs inside a util.async task (template Lua may wait on dbdash.* helpers); raises a
+---template or database error.
+---@return string sql, string? transform_code
+function Run:render_templates()
+  local q = self.panel.cfg.query
+  local o = self:template_opts()
+  local sql = M.render_text(
+    self.panel.d,
+    q.sql,
+    q.sql_line,
+    vim.tbl_extend("force", o, { autoescape = q.autoescape })
+  )
+  local code = q.transform and M.render_text(self.panel.d, q.transform, q.transform_line, o) or nil
+  return sql, code
+end
+
+---The options of M.render_text for the run's templates (and its `meta`, set on it).
+function Run:template_opts()
+  local p = self.panel
+  local q = p.cfg.query
+  self.meta = require("dbdash.metadata").values(p, self) -- `meta` of templates and Lua
+  if self.depth == 0 then
+    p.meta = self.meta
+  end
+  return {
+    dialect = dialect.get(db.driver(p.cfg.database.type).dialect),
+    specs = p.cfg.visible_args,
+    values = self.args,
+    meta = self.meta,
+    lua = self.lua,
+    run = self,
+    set_arg = function(name, v)
+      self:set_arg(name, v)
+    end,
+    timeout = q.timeout,
+    cancel = self.life.cancel,
+    on_allow = function()
+      p:restart()
+    end,
+  }
+end
+
+---A run of panel `p`'s pipeline with `values` (default: the current arguments).
+---@param p dbdash.Panel
 ---@param parent dbdash.Run? the run this one is a callback of
----@return dbdash.Run
 ---@param kind "refresh"|"callback"|"push"|"render"? render: :DbDashShowSQL and descriptions
 ---  (not a run of the life); push: an item of a push source; default refresh, or callback
 ---  with a parent
-function Panel:new_run(values, parent, kind)
-  local run = {
-    values = values or args.resolve_panel(self.cfg, self.d.state),
+---@return dbdash.Run
+function M.new(p, values, parent, kind)
+  local run = setmetatable({
+    panel = p,
+    values = values or args.resolve_panel(p.cfg, p.d.state),
     depth = parent and parent.depth + 1 or 0,
     -- The life: callbacks so far, records, and the cancel token of the refresh.
     counter = parent and parent.counter
       or { n = 0, runs = {}, version = 0, cancel = require("dbdash.db.cancel").new() },
     item = parent and parent.item or nil, -- push sources: the item a callback works on too
-  }
+  }, Run)
   run.life = run.counter
   -- The run record: meta.run, and in meta.runs (meta.prev_runs ... once the life is over).
   local uuid = require("dbdash.util.uuid")
@@ -110,23 +113,33 @@ function Panel:new_run(values, parent, kind)
   end
   run.meta_maps = {} -- the template `meta` mappings of this run (their run / runs follow)
   run.maps = {} -- the template `args` mappings of this run (kept in step with assignments)
-  run.args = run.values -- Lua code sees (and may assign) the values; see Panel:sync_args
+  run.args = run.values -- Lua code sees (and may assign) the values; see Run:sync_args
   run.seen = vim.deepcopy(run.values)
   run.lua = {
-    store = self.store,
-    helpers = self:helpers(run),
+    store = p.store,
+    helpers = run:helpers(),
     after = function()
-      self:sync_args(run)
+      run:sync_args()
     end,
   }
   return run
 end
 
+---Close the run's record: finished_at, elapsed_ms, ok and error.
+function Run:finish(err)
+  local r = self.record
+  r.finished_at = require("dbdash.util.uuid").now_ms()
+  r.elapsed_ms = r.finished_at - r.started_at
+  r.ok = err == nil
+  r.error = err ~= nil and require("dbdash.util.error").format(err) or nil
+  self.life.version = self.life.version + 1
+end
+
 ---After Lua code ran (a {% lua %} block, a module, query.transform, lua://): apply the
----arguments it assigned (`args.x = v`) with Panel:set_arg. An invalid one is put back
+---arguments it assigned (`args.x = v`) with Run:set_arg. An invalid one is put back
 ---and raises.
----@param run dbdash.Run
-function Panel:sync_args(run)
+function Run:sync_args()
+  local run = self
   -- Templates see meta.run / meta.runs as they are now (a callback may have run).
   if #run.meta_maps > 0 and run.meta_version ~= run.life.version then
     run.meta_version = run.life.version
@@ -149,7 +162,7 @@ function Panel:sync_args(run)
     local v = values[name]
     if not vim.deep_equal(v, seen[name]) then
       values[name] = seen[name] -- set_arg stores it once it is valid
-      self:set_arg(run, name, v)
+      run:set_arg(name, v)
     end
   end
 end
@@ -158,12 +171,12 @@ end
 ---seen by the rest of the run (its templates, transform, lua://) and kept like an edit in
 ---the dashboard (from the next refresh on; a local argument shadows a shared one). A
 ---callback's run keeps its own values: the caller's do not change. Raises a message.
----@param run dbdash.Run
-function Panel:set_arg(run, name, v)
+function Run:set_arg(name, v)
+  local run = self
   if run.read_only then
     error("arguments cannot be assigned in a description", 0)
   end
-  local spec = type(name) == "string" and self:arg_spec(name)
+  local spec = type(name) == "string" and run.panel:arg_spec(name)
   if not spec then
     error(("'%s' is not an argument of this panel"):format(tostring(name)), 0)
   end
@@ -180,29 +193,21 @@ function Panel:set_arg(run, name, v)
   for _, m in ipairs(run.maps) do
     require("dbdash.util.map").set(m, name, R.from_lua(v))
   end
-  args.set_modified(self.d.state, spec.key, v == nil and vim.NIL or v)
-end
-
----A visible argument of the panel by name (a local one shadows a shared one).
-function Panel:arg_spec(name)
-  for _, spec in ipairs(self.cfg.visible_args) do
-    if spec.name == name then
-      return spec
-    end
-  end
+  args.set_modified(run.panel.d.state, spec.key, v == nil and vim.NIL or v)
 end
 
 ---The `dbdash` table of a run's Lua code: the shared helpers plus the run's own:
 ---dbdash.run(args) runs the panel's pipeline again with `args` merged over the run's
 ---arguments (a callback: meta.run.kind is "callback", meta.run.depth its depth) and returns
 ---its rows as Lua data.
-function Panel:helpers(run)
+function Run:helpers()
+  local run, p = self, self.panel
   local own = {
     run = function(over)
       if over ~= nil and type(over) ~= "table" then
         error(("dbdash.run: expected a table of arguments, got %s"):format(type(over)), 2)
       end
-      local limits = opts().lua
+      local limits = require("dbdash.options").current.lua
       if run.counter.n + 1 > limits.max_callbacks then
         error(
           ("dbdash.run: more than %d callbacks in one refresh (lua.max_callbacks)"):format(
@@ -224,7 +229,7 @@ function Panel:helpers(run)
         values[k] = v
       end
       for name, v in pairs(over or {}) do
-        local spec = type(name) == "string" and self:arg_spec(name)
+        local spec = type(name) == "string" and p:arg_spec(name)
         if not spec then
           error(("dbdash.run: '%s' is not an argument of this panel"):format(tostring(name)), 2)
         end
@@ -235,9 +240,9 @@ function Panel:helpers(run)
         values[name] = v
       end
       run.counter.n = run.counter.n + 1
-      local child = self:new_run(values, run)
-      local ok, err = pcall(self.pipeline, self, child)
-      self:finish_record(child, not ok and err or nil)
+      local child = M.new(p, values, run)
+      local ok, err = pcall(p.pipeline, p, child)
+      child:finish(not ok and err or nil)
       if not ok then
         error(err, 0)
       end
@@ -247,7 +252,7 @@ function Panel:helpers(run)
   return setmetatable(own, { __index = require("dbdash.db.lua_env").helpers })
 end
 
----@class dbdash.scheduler.run.RenderTextOpts
+---@class dbdash.dashboard.RenderTextOpts
 ---@field dialect table?
 ---@field autoescape boolean?
 ---@field specs dbdash.ArgSpec[]
@@ -261,7 +266,7 @@ end
 ---Render template `text` (at `line` of the config) of dashboard `d`. Templates see exactly
 ---two names: args.<name> (o.specs with o.values) and meta.<name> (o.meta); imported
 ---templates and Lua in templates too. Inside a util.async task; raises template errors.
----@param o dbdash.scheduler.run.RenderTextOpts
+---@param o dbdash.dashboard.RenderTextOpts
 ---  lua: { store, helpers } globals of Lua in the template ({% lua %}, imported .lua);
 ---  run: the run whose `args` mapping this is; set_arg: {% set args.x = v %}
 function M.render_text(d, text, line, o)
@@ -309,83 +314,13 @@ function M.render_text(d, text, line, o)
   return out
 end
 
----Render a description (a template) in a task; `cb(err, text)` on the main loop.
-local function describe_async(fn, cb)
-  require("dbdash.util.async").run(fn, function(err, text)
-    vim.schedule(function()
-      cb(err, text)
-    end)
-  end)
-end
-
----The panel's show.description rendered with its arguments and metadata (Markdown).
-function Panel:describe_async(cb)
-  local show = self.cfg.show
-  describe_async(function()
-    local run = self:new_run(nil, nil, "render")
-    run.read_only = true -- showing a description does not change arguments
-    return M.render_text(self.d, show.description, show.description_line, {
-      dialect = dialect.get(db.driver(self.cfg.database.type).dialect),
-      specs = self.cfg.visible_args,
-      values = run.args,
-      meta = require("dbdash.metadata").values(self, run),
-      lua = run.lua,
-      set_arg = function(name, v)
-        self:set_arg(run, name, v)
-      end,
-      timeout = self.cfg.query.timeout,
-    })
-  end, cb)
-end
-
----The dashboard's description rendered with the shared arguments and the metadata
----outside any panel (db_* of the top-level database).
-function Dashboard:describe_async(cb)
-  local cfg = self.cfg
-  describe_async(function()
-    local values = args.resolve(cfg.shared_args, self.state)
-    local seen = vim.deepcopy(values)
-    local function refuse()
-      error("arguments cannot be assigned in a description", 0)
-    end
-    return M.render_text(self, cfg.description, cfg.description_line, {
-      dialect = cfg.database and dialect.get(db.driver(cfg.database.type).dialect) or nil,
-      specs = cfg.shared_args,
-      values = values,
-      meta = require("dbdash.metadata").dashboard_values(self),
-      lua = {
-        -- showing a description does not change arguments
-        after = function()
-          if not vim.deep_equal(values, seen) then
-            refuse()
-          end
-        end,
-      },
-      set_arg = refuse,
-    })
-  end, cb)
-end
-
----A file with Lua loaded while rendering (an imported .lua module or template with a
----{% lua %} block) must be covered by the config's trust. One that is not (imported
----through a computed path, or changed since the dashboard started) asks again, with all
----the config's files; allowing it from the View float refreshes the panel.
-function Panel:check_file(path, text, kind)
-  M.check_file(self.d, path, text, kind, function()
-    self:refresh({ queue = true })
-  end)
-end
-
 ---check_file for any template of dashboard `d`; `on_allow` runs when it is allowed then.
 function M.check_file(d, path, text, kind, on_allow)
   local trust = require("dbdash.trust")
   if kind == "template" and not trust.has_lua_block(text) then
     return
   end
-  if
-    not require("dbdash.dashboard.lifecycle").trust_required(d.path)
-    or trust.covers(d.path, path, text)
-  then
+  if not trust.required(d.path) or trust.covers(d.path, path, text) then
     return
   end
   local files = trust.collect(d.path, d.cfg)
@@ -417,16 +352,11 @@ function M.check_file(d, path, text, kind, on_allow)
   end
 end
 
----Render the templates in a task; `cb(err, sql, transform_code)` on the main loop.
-function Panel:render_async(cb)
-  require("dbdash.util.async").run(function()
-    return self:render_templates(self:new_run(nil, nil, "render"))
-  end, function(err, sql, code)
+---Render a description (a template) in a task; `cb(err, text)` on the main loop.
+function M.describe_async(fn, cb)
+  require("dbdash.util.async").run(fn, function(err, text)
     vim.schedule(function()
-      if not err then
-        self.sql, self.transform_code = sql, code
-      end
-      cb(err, sql, code)
+      cb(err, text)
     end)
   end)
 end

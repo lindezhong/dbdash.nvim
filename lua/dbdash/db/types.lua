@@ -56,8 +56,11 @@
 ---   written is cut at `delimiter` (default "\n"), each piece is one item
 ---@field emit fun(value: any, vars: table?, tag: any?) one result
 ---@field fail fun(err: any, tag: any?) a query's error (the run goes on)
----@field wait_tick fun(): boolean the next tick of a database's run (false: it stops)
+---@field wait_tick fun(not_before: integer?, failures: integer?): boolean the next tick of a
+---  database's run (false: it stops); backing off, not before `not_before` (loop time, ms)
 ---@field report fun(ok: boolean)? set by a producer: how the consumer took a result
+---@field ticked boolean the run has ticks of its own (opts.wait_tick): the consumer reports
+---  each result (handle:report)
 ---@field opts dbdash.db.QueryOpts the run's options
 ---@field prep_error table? the URL or driver could not be prepared
 ---@field cancel dbdash.db.CancelToken cancelled when the stream stops

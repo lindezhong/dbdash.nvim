@@ -199,6 +199,10 @@ T["errors are reported with their phase and shown above the content"] = function
   local n = child.lua_get("_G.notes[1]")
   eq(n.level, vim.log.levels.ERROR)
   eq(n.msg:find("sqlite query error") ~= nil, true)
+  -- the status line follows with the next frame
+  child.lua(
+    [[_G.wait_for(function() return #vim.api.nvim_buf_get_extmarks(0, require("dbdash.view.buffer").ns_status, 0, -1, {}) > 0 end)]]
+  )
   local vl = child.lua_get(
     [[vim.api.nvim_buf_get_extmarks(0, require("dbdash.view.buffer").ns_status, 0, -1, { details = true })[1][4].virt_lines[1][1][1] ]]
   )

@@ -52,7 +52,7 @@ end
 ---Refresh panel `p` once more and wait for it.
 local function again(p)
   local before = p.refresh_count
-  p:refresh({ queue = true })
+  p:restart()
   vim.wait(10000, function()
     return p.refresh_count > before and not p.running
   end, 10)

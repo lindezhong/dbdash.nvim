@@ -203,7 +203,7 @@ T["meta.refresh_count and meta.now change per refresh"] = function()
     "query: { sql: 'SELECT {{ meta.refresh_count }} AS c' }",
   })
   eq(p.rs.rows[1][1], 1)
-  p:refresh()
+  p:emit("panel:tick")
   vim.wait(5000, function()
     return not p.running and p.rs.rows[1][1] == 2
   end, 10)

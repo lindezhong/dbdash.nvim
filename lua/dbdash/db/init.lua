@@ -233,13 +233,14 @@ function M.run(raw_url, query, opts, on_result, on_end)
   opts = opts or {}
   local token = require("dbdash.db.cancel").new(opts.cancel)
   local stats = { items = 0, truncated = 0, rejected = {} } -- rejected: count by HTTP status
-  local ctx_report
+  local ctx
   local handle = {
     stats = stats,
-    ---The consumer took a result: ok, or it failed (a database backs off after failures).
+    ---The consumer took a result: ok, or it failed (a database waits for this, and backs
+    ---off after failures).
     report = function(_, ok)
-      if ctx_report then
-        ctx_report(ok)
+      if ctx and ctx.report then
+        ctx.report(ok)
       end
     end,
     stop = function(_, reason)
@@ -359,8 +360,9 @@ function M.run(raw_url, query, opts, on_result, on_end)
     return first
   end
   ---@type dbdash.db.StreamCtx
-  local ctx = {
+  ctx = {
     opts = opts,
+    ticked = opts.wait_tick ~= nil,
     prep_error = prep.error,
     emit = emit,
     fail = fail,
@@ -402,11 +404,6 @@ function M.run(raw_url, query, opts, on_result, on_end)
       prep.driver.produce(prep.info, type(query) == "function" and query() or query, ctx)
     else
       local producer = require("dbdash.db.driver").producer(prep.driver)
-      ctx_report = function(ok_result)
-        if ctx.report then
-          ctx.report(ok_result)
-        end
-      end
       producer(prep.driver and prep.info or nil, query, ctx)
     end
   end, function(err)

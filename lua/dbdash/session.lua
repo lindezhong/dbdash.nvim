@@ -35,9 +35,7 @@ function M.restore(state)
       path = sched.normalize(path)
       local d = sched.get(path)
       if d then
-        if sched.apply_args(d, values) then
-          d:restart()
-        end
+        d:apply_args(values)
       else
         pending[path] = values
       end

@@ -19,6 +19,8 @@ local M = {}
 ---@field style_data table? { computed: table, damage: integer }
 ---@field layout_data table? the box of the last layout
 ---@field handlers table<string, fun(ev: table)[]>?
+---@field data table<string, any>? values no selector reads (a browser's dataset), e.g. the
+---  status a view shows next to the element
 ---@field scope boolean? the root of an inline style sheet's scope (a panel)
 ---@field version integer bumped when the node or a descendant changes (Servo's
 ---  inclusive_descendants_version): caches of a subtree's layout and paint key on it
@@ -183,6 +185,17 @@ function Node:set_attr(name, value)
   if self.attrs[name] ~= value then
     self.attrs[name] = value
     self:dirty(M.STYLE)
+  end
+end
+
+---Set a value of the element's data: no restyle, the document only asks for a frame.
+function Node:set_data(name, value)
+  self.data = self.data or {}
+  if self.data[name] ~= value then
+    self.data[name] = value
+    if self.document then
+      self.document:note_data()
+    end
   end
 end
 

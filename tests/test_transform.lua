@@ -184,7 +184,7 @@ T["http: cookies the server sets reach the next refresh through the -c / -b file
   local p = run("cookies", lines)
   eq(p.error, nil)
   p.rs, p.error = nil, nil
-  p:refresh()
+  p:emit("panel:tick")
   vim.wait(5000, function()
     return #seen >= 2 and not p.running
   end, 10)

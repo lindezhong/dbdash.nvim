@@ -165,7 +165,7 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
   group = group,
   callback = function()
     if package.loaded["dbdash.dashboard"] then
-      require("dbdash.dashboard").freeze_all()
+      require("dbdash.view.dashboard").on_exit()
     end
   end,
 })

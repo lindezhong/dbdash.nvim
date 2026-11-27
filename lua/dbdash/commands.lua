@@ -152,7 +152,7 @@ function M.status()
   if d.cfg.refresh_all then
     lines[#lines + 1] = ("Interval:  every panel refreshes every %ds, next in %ds"):format(
       d.cfg.refresh_all / 1000,
-      require("dbdash.view.dashboard").remaining_global(d)
+      d:remaining_global()
     )
   end
   for _, p in ipairs(d.panels) do
@@ -293,8 +293,7 @@ function M.modify_variable()
     end
     require("dbdash.view.args_ui").ask(spec, args.value(spec, d.state), function(v)
       if v ~= nil and sched.get(d.path) == d then
-        args.set_modified(d.state, spec.key or spec.name, v)
-        d:restart()
+        d:set_arg(spec.key or spec.name, v)
       end
     end)
   end)
@@ -314,17 +313,13 @@ function M.update_variable(name, value)
   if not ok then
     return err(values.message or tostring(values))
   end
-  for key, v in pairs(values) do
-    args.set_modified(d.state, key, v)
-  end
-  d:restart()
+  d:set_args(values)
 end
 
 function M.reset_variables()
   local d = current()
   if d then
-    args.reset(d.state)
-    d:restart()
+    d:reset_args()
   end
 end
 

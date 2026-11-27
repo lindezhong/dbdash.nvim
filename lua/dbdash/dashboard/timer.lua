@@ -1,9 +1,10 @@
 -- The clock of a dashboard (ARCHITECTURE.md#scheduling): every panel's next tick (show.interval)
 -- and the top-level interval's (cfg.refresh_all, a tick for every panel) on one uv timer.
--- A wake sends each due panel one tick (Panel:on_tick), however many deadlines it met: a
+-- A wake sends each due panel one tick (panel:tick), however many deadlines it met: a
 -- panel's own deadline and the top-level one at the same moment are one tick. A tick
 -- restarts the panel's own count, so a panel whose interval is the top-level one or longer
--- only ever ticks with the others (cfg.follows_global).
+-- only ever ticks with the others (cfg.follows_global). Hidden (dashboard:hidden) only
+-- show.refresh_hidden panels tick; shown again (dashboard:shown), what came due ticks.
 local M = {}
 
 ---@class dbdash.Clock
@@ -22,10 +23,24 @@ local function slack(interval)
   return math.max(50, math.floor(interval / 100))
 end
 
+---The clock of dashboard `d` (it starts with Clock:start).
 ---@param d dbdash.Dashboard
 ---@return dbdash.Clock
 function M.new(d)
-  return setmetatable({ d = d }, Clock)
+  local clock = setmetatable({ d = d }, Clock)
+  d.events:on("dashboard:hidden", function()
+    clock:pause()
+  end)
+  d.events:on("dashboard:shown", function()
+    clock:resume()
+  end)
+  return clock
+end
+
+---A tick of panel `p`: its count restarts from now.
+local function tick(p, t)
+  p.next_at = t + p.cfg.show.interval
+  p:emit("panel:tick")
 end
 
 ---A panel counts on its own: it has a deadline of its own (not only the top-level one).
@@ -109,8 +124,7 @@ function Clock:wake()
         -- backing off after failures: the top-level tick leaves it alone
         p.next_at = p.retry_at
       elseif global or mine then
-        p.next_at = t + p.cfg.show.interval
-        p:on_tick()
+        tick(p, t)
       end
     end
   end
@@ -124,6 +138,9 @@ end
 
 ---Shown again: what came due while hidden ticks now, the rest keeps its remaining time.
 function Clock:resume()
+  if not self.timer then
+    return
+  end
   local d, t = self.d, now()
   if d.cfg.refresh_all and d.gnext_at and d.gnext_at <= t then
     self:wake() -- the top-level interval passed: every panel
@@ -131,8 +148,7 @@ function Clock:resume()
   end
   for _, p in ipairs(d.panels) do
     if not p.ended and own(p) and p.next_at and p.next_at <= t then
-      p.next_at = t + p.cfg.show.interval
-      p:on_tick()
+      tick(p, t)
     end
   end
   self:arm()

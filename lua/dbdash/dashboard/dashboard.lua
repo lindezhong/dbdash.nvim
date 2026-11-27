@@ -1,57 +1,190 @@
--- Dashboards: their clock (dashboard/timer.lua), refreshing every panel, pause and resume.
-local S = require("dbdash.dashboard.shared")
+-- A dashboard (the model, ARCHITECTURE.md#overview): its panels, its document, its clock and
+-- its events. What it tells, on d.events (listeners get the panel first):
+--   panel:*                  dashboard/panel.lua
+--   dashboard:args           the arguments changed: the clock and every panel start again
+--   dashboard:hidden/shown   no window shows it / shown again: the clock pauses / catches up
+local Panel = require("dbdash.dashboard.panel")
+local args = require("dbdash.args")
+
+local M = {}
+
 ---@class dbdash.Dashboard
-local Dashboard = S.Dashboard
-local events = require("dbdash.dashboard.events")
+---@field path string
+---@field cfg dbdash.Config
+---@field state dbdash.ArgState
+---@field panels dbdash.Panel[]
+---@field events dbdash.Emitter what the dashboard and its panels tell
+---@field doc dbdash.dom.Document its document (dashboard/document.lua)
+---@field header_node dbdash.dom.Node
+---@field clock dbdash.Clock the panels' ticks and the top-level interval's (dashboard/timer.lua)
+---@field paused boolean? hidden
+---@field gnext_at integer? loop time (ms) of the next top-level tick
+---@field refreshing_all boolean? the top-level tick's queries run ("…")
+---@field writes_trusted boolean? the config was trusted with what it writes (curl -c files)
+---@field runtime_style table? :DbDashStyle rules of the dashboard
+---The view's (view/dashboard.lua):
+---@field buf integer
+---@field ctimer uv.uv_timer_t? countdown display timer
+---@field regions table[]? buffer regions of the panels (multi-panel)
+---@field hits table[]? hit-test regions (events/)
+---@field header_rows integer?
+---@field last_size integer[]?
+---@field last_render_at integer?
+---@field last_restyle table?
+---@field render_pending boolean?
+---@field render_skipped boolean? a frame waits for the dashboard to be shown
+local Dashboard = {}
+Dashboard.__index = Dashboard
+M.Dashboard = Dashboard
 
----Commit (dashboard/document.lua): the document takes the dashboard's state; a panel whose
----result settled is laid out again (its chart's values may change with the same result).
----@param p dbdash.Panel?
-function Dashboard:commit(p)
-  if not self.doc then
-    return
+---A dashboard of a loaded config with its argument state; Dashboard:start runs it.
+---@param path string
+---@param cfg dbdash.Config
+---@param state dbdash.ArgState
+---@return dbdash.Dashboard
+function M.new(path, cfg, state)
+  local d = setmetatable({
+    path = path,
+    cfg = cfg,
+    state = state,
+    panels = {},
+    events = require("dbdash.util.emitter").new(),
+    -- curl -c in its queries: trusted (or trust is not required here)
+    writes_trusted = require("dbdash.trust").writes(cfg),
+  }, Dashboard)
+  -- the listeners in order: the clock restarts first when the arguments change
+  d.clock = require("dbdash.dashboard.timer").new(d)
+  d.events:on("dashboard:args", function()
+    d.clock:start()
+  end)
+  for i, pc in ipairs(cfg.panels) do
+    d.panels[i] = Panel.new(d, i, pc)
   end
-  require("dbdash.dashboard.document").sync(self)
-  if p and p.chart_node then
-    p.chart_node:dirty("content")
-  end
+  require("dbdash.dashboard.document").dashboard(d) -- d.doc
+  -- a result is recorded, kept and checked before it is committed
+  require("dbdash.dashboard.history").attach(d)
+  require("dbdash.dashboard.track").attach(d)
+  require("dbdash.dashboard.thresholds").attach(d)
+  require("dbdash.dashboard.commit").attach(d)
+  return d
 end
 
----Refresh every panel now (r, changed arguments): a query running is cancelled, and every
----panel counts its interval from now.
-function Dashboard:restart()
-  if self.clock then
-    self.clock:start()
-  end
-  for _, p in ipairs(self.panels) do
-    p:restart()
-  end
+---Commit everything into the document (a changed style: :DbDashStyle).
+function Dashboard:commit()
+  require("dbdash.dashboard.commit").all(self)
 end
 
----Start the dashboard's clock and every panel's source (its first query now).
-function Dashboard:start_timers()
-  self.clock = require("dbdash.dashboard.timer").new(self)
+---Start the clock and every panel's source (its first query now).
+function Dashboard:start()
+  self:commit()
   self.clock:start()
   for _, p in ipairs(self.panels) do
     p:start()
   end
 end
 
----Cancel what runs in the dashboard's panels (Panel:cancel).
+---Refresh every panel now (r): a query running is cancelled, and every panel counts its
+---interval from now.
+function Dashboard:restart()
+  self.clock:start()
+  for _, p in ipairs(self.panels) do
+    p:restart()
+  end
+end
+
+---Stop: the clock stops and what runs is cancelled.
 ---@param reason string
-function Dashboard:cancel(reason)
+function Dashboard:stop(reason)
+  self.clock:stop()
   for _, p in ipairs(self.panels) do
     p:cancel(reason)
   end
 end
 
-function Dashboard:stop_timers()
-  if self.clock then
-    self.clock:stop()
-  end
+-- Arguments: a change restarts the dashboard (dashboard:args) ----------------------------
+
+---Set an argument by key ("name" shared, "<panel>.name" local).
+function Dashboard:set_arg(key, value)
+  args.set_modified(self.state, key, value)
+  self.events:emit("dashboard:args")
 end
 
----State summary across panels: "running query", "error" or "idle".
+---Set arguments by key at once.
+---@param values table<string, any>
+function Dashboard:set_args(values)
+  for key, v in pairs(values) do
+    args.set_modified(self.state, key, v)
+  end
+  self.events:emit("dashboard:args")
+end
+
+---Command-line values (name=value) over the config's defaults.
+---@param cli table<string, any>
+function Dashboard:set_cli(cli)
+  for k, v in pairs(cli) do
+    self.state.cli[k] = v
+  end
+  self.events:emit("dashboard:args")
+end
+
+---Back to the command line's and the config's values.
+function Dashboard:reset_args()
+  args.reset(self.state)
+  self.events:emit("dashboard:args")
+end
+
+---Set argument values given as text (a session); returns true if any was applied.
+---@param values table<string, string>
+---@param quiet boolean? apply them without telling (before the dashboard starts)
+function Dashboard:apply_args(values, quiet)
+  local applied = false
+  for key, text in pairs(values) do
+    -- By key ("name" shared, "<panel>.name" local); a key of no argument (sessions from
+    -- before local arguments) sets every argument of that name.
+    local specs = {}
+    if type(text) == "string" and type(key) == "string" then
+      local spec = args.find(self.cfg.args, key)
+      specs = spec and { spec } or args.match(self.cfg.args, key)
+    end
+    for _, spec in ipairs(specs) do
+      local ok, v = pcall(args.parse_value, spec, text)
+      if ok then
+        args.set_modified(self.state, spec.key or spec.name, v)
+        applied = true
+      end
+    end
+  end
+  if applied and not quiet then
+    self.events:emit("dashboard:args")
+  end
+  return applied
+end
+
+-- Visibility -----------------------------------------------------------------------------
+
+---No window of the current tab page shows the dashboard: only show.refresh_hidden panels
+---keep refreshing (dashboard:hidden).
+function Dashboard:pause()
+  if self.paused then
+    return
+  end
+  self.paused = true
+  self.events:emit("dashboard:hidden")
+end
+
+---Shown again: what came due while hidden refreshes now, the rest keeps its remaining time
+---(dashboard:shown).
+function Dashboard:resume()
+  if not self.paused then
+    return
+  end
+  self.paused = false
+  self.events:emit("dashboard:shown")
+end
+
+-- What :DbDashStatus and the sidebar show ------------------------------------------------
+
+---State summary across panels: "paused", "retrying", "running query", "error" or "idle".
 function Dashboard:status_word()
   if self.paused then
     return "paused"
@@ -74,32 +207,7 @@ function Dashboard:status_word()
   return "idle"
 end
 
----Stop refreshing while no window of the current tab page shows the dashboard
----(show.refresh_hidden panels keep refreshing).
-function Dashboard:pause()
-  if self.paused then
-    return
-  end
-  self.paused = true
-  if self.clock then
-    self.clock:pause()
-  end
-  events:emit("paused", self)
-end
-
----Continue after pause(): what came due while hidden refreshes now, the rest keeps its
----remaining time.
-function Dashboard:resume()
-  if not self.paused then
-    return
-  end
-  self.paused = false
-  if self.clock then
-    self.clock:resume()
-  end
-  events:emit("resumed", self)
-end
-
+---Seconds until the next refresh of any panel.
 function Dashboard:remaining()
   local r
   for _, p in ipairs(self.panels) do
@@ -107,3 +215,47 @@ function Dashboard:remaining()
   end
   return r or 0
 end
+
+---Seconds until the next refresh of every panel (the top-level interval).
+function Dashboard:remaining_global()
+  if not self.gnext_at then
+    return 0
+  end
+  vim.uv.update_time()
+  return math.max(0, math.ceil((self.gnext_at - vim.uv.now()) / 1000))
+end
+
+---The dashboard's description rendered with the shared arguments and the metadata
+---outside any panel (db_* of the top-level database).
+function Dashboard:describe_async(cb)
+  local cfg = self.cfg
+  local Run = require("dbdash.dashboard.run")
+  Run.describe_async(function()
+    local values = args.resolve(cfg.shared_args, self.state)
+    local seen = vim.deepcopy(values)
+    local function refuse()
+      error("arguments cannot be assigned in a description", 0)
+    end
+    local dialect = cfg.database
+      and require("dbdash.template.dialect").get(
+        require("dbdash.db").driver(cfg.database.type).dialect
+      )
+    return Run.render_text(self, cfg.description, cfg.description_line, {
+      dialect = dialect or nil,
+      specs = cfg.shared_args,
+      values = values,
+      meta = require("dbdash.metadata").dashboard_values(self),
+      lua = {
+        -- showing a description does not change arguments
+        after = function()
+          if not vim.deep_equal(values, seen) then
+            refuse()
+          end
+        end,
+      },
+      set_arg = refuse,
+    })
+  end, cb)
+end
+
+return M

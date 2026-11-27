@@ -80,7 +80,7 @@ function M.at_cursor(d, type, detail)
   end
 end
 
----The panel of a node (its nearest panel ancestor), as the scheduler's panel object.
+---The panel of a node (its nearest panel ancestor), as the dashboard's Panel.
 function M.panel_of(d, node)
   while node do
     if node.tag == "panel" then

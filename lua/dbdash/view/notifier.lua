@@ -1,5 +1,6 @@
 -- What dashboards tell the user (vim.notify): errors by setup errors.notify ("once" when
--- an error appears or changes, "always", "never"), threshold steps that notify.
+-- an error appears or changes, "always", "never"), threshold steps that notify, configs
+-- that could not start.
 local events = require("dbdash.dashboard.events")
 local format_error = require("dbdash.util.error").format
 
@@ -9,14 +10,15 @@ function M.error(err)
   vim.notify("dbdash: " .. format_error(err), vim.log.levels.ERROR)
 end
 
-events:on("error", function(_, _, err, o)
+local function on_error(_, err, o)
   local mode = require("dbdash.options").current.errors.notify
   if o.always or mode == "always" or (mode == "once" and o.changed) then
     M.error(err)
   end
-end)
+end
 
-events:on("threshold", function(d, p, cur)
+local function on_threshold(p, cur)
+  local d = p.d
   local t = p.cfg.show.title
   local title = (t and t ~= "") and t
     or d.cfg.title
@@ -33,6 +35,15 @@ events:on("threshold", function(d, p, cur)
     ),
     vim.log.levels.WARN
   )
+end
+
+events:on("dashboard:started", function(d)
+  d.events:on("panel:error", on_error)
+  d.events:on("panel:threshold", on_threshold)
+end)
+
+events:on("dashboard:error", function(_, err)
+  M.error(err)
 end)
 
 return M
