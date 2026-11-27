@@ -1,32 +1,21 @@
 -- Template error objects shared by the lexer, parser, compiler and runtime.
 local M = {}
 
----@class dbdash.template.Error
+---@class dbdash.template.Error: dbdash.Error
 ---@field phase "template"
 ---@field kind "syntax"|"undefined"|"type"|"value"|"internal"
----@field message string
----@field line integer? 1-based template line
 ---@field col integer?
----@field source string? template name used in messages
 
-local Error = {}
-Error.__index = Error
-Error.__tostring = function(e)
-  local where = e.line and ((e.source or "template") .. ":" .. e.line .. ": ") or ""
-  return where .. e.message
-end
-M.Error = Error
+local errors = require("dbdash.util.error")
+M.Error = errors.Error
 
 ---@return dbdash.template.Error
 function M.new(kind, message, line, col)
-  return setmetatable(
-    { phase = "template", kind = kind, message = message, line = line, col = col },
-    Error
-  )
+  return errors.new({ phase = "template", kind = kind, message = message, line = line, col = col })
 end
 
 function M.is(e)
-  return getmetatable(e) == Error
+  return errors.is(e) and e.phase == "template"
 end
 
 ---Raise a syntax error at a position.

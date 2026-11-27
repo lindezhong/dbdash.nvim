@@ -55,7 +55,7 @@ local KNOWN = {
 }
 
 local function fail(msg)
-  error({ phase = "tls", message = "certificate: " .. msg }, 0)
+  require("dbdash.util.error").raise("tls", "certificate: " .. msg)
 end
 
 ---Seconds since the epoch from UTCTime / GeneralizedTime.

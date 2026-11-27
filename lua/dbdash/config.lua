@@ -154,7 +154,10 @@ function Ctx:fail(path, msg, ...)
     p = self.pos[at]
   end
   local where = p and (":%d:%d"):format(p.line, p.col) or ""
-  error({ phase = "config", message = ("%s%s: %s"):format(self.file, where, msg:format(...)) }, 0)
+  require("dbdash.util.error").raise(
+    "config",
+    ("%s%s: %s"):format(self.file, where, msg:format(...))
+  )
 end
 
 function Ctx:expect(path, v, kind, optional)

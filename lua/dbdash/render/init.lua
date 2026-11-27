@@ -33,13 +33,13 @@ local M = {}
 local function need(name)
   local impl = registry.get(name)
   if not impl then
-    error({
-      phase = "render",
-      message = ("unknown style '%s' (available: %s)"):format(
+    require("dbdash.util.error").raise(
+      "render",
+      ("unknown style '%s' (available: %s)"):format(
         name,
         table.concat(registry.names(name:match("^(.*/)")), ", ")
-      ),
-    }, 0)
+      )
+    )
   end
   return impl
 end

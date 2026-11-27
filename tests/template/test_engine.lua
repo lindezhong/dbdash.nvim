@@ -31,7 +31,7 @@ end
 T["error line maps to the YAML file with line_offset"] = function()
   local e = err_of("SELECT\n  {{ missing }}", {}, { source = "cfg.yaml", line_offset = 9 })
   eq({ e.kind, e.line, e.source }, { "undefined", 11, "cfg.yaml" })
-  eq(tostring(e), "cfg.yaml:11: 'missing' is undefined")
+  eq(tostring(e), "template error: cfg.yaml:11: 'missing' is undefined")
 end
 
 T["syntax errors carry a column"] = function()

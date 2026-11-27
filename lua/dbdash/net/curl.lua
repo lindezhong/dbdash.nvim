@@ -12,7 +12,7 @@
 local M = {}
 
 local function fail(msg, ...)
-  error({ phase = "query", kind = "value", message = msg:format(...) }, 0)
+  require("dbdash.util.error").raise("query", msg:format(...), { kind = "value" })
 end
 
 local C_ESC = {

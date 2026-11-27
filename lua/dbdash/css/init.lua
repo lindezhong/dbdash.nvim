@@ -88,7 +88,7 @@ function M.scope(node, chart_type, sheet)
       end
       local rules, err = parser.sheet(sheet, keys)
       if not rules then
-        error({ phase = "render", message = ("style %s: %s"):format(err.key, err.message) }, 0)
+        require("dbdash.util.error").raise("render", ("style %s: %s"):format(err.key, err.message))
       end
       doc:set_sheet("author", rules)
     end

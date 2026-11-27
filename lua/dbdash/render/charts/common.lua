@@ -8,7 +8,7 @@ local nn = require("dbdash.util.null").nn
 
 ---Raise a render error shown in place of the chart.
 function M.fail(msg, ...)
-  error({ phase = "render", message = msg:format(...) }, 0)
+  require("dbdash.util.error").raise("render", msg:format(...))
 end
 
 ---Column index, failing with the available names when missing.

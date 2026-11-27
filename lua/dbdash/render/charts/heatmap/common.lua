@@ -67,10 +67,10 @@ function M.colors(show, g, ctx)
     for _, c in ipairs(scale) do
       local rgb = rgb_of(c)
       if not rgb then
-        error({
-          phase = "render",
-          message = ("color-scale: %q is not a #rrggbb color"):format(tostring(c)),
-        }, 0)
+        require("dbdash.util.error").raise(
+          "render",
+          ("color-scale: %q is not a #rrggbb color"):format(tostring(c))
+        )
       end
       stops[#stops + 1] = rgb
     end

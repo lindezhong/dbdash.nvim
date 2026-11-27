@@ -20,7 +20,7 @@ M.TAG = {
 ---@field children dbdash.asn1.Node[]? for constructed types
 
 local function fail(msg)
-  error({ phase = "tls", message = "ASN.1: " .. msg }, 0)
+  require("dbdash.util.error").raise("tls", "ASN.1: " .. msg)
 end
 
 ---Read one TLV at `pos`. Returns node and the position after it.

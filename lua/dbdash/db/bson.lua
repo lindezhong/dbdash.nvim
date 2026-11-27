@@ -15,7 +15,7 @@ local M = {}
 local NULL = vim.NIL
 
 local function fail(msg, ...)
-  error({ phase = "query", message = msg:format(...) }, 0)
+  require("dbdash.util.error").raise("query", msg:format(...))
 end
 
 -- Little-endian helpers ---------------------------------------------------------------------

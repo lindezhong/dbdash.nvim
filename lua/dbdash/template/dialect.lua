@@ -17,7 +17,7 @@ local function numstr(v)
 end
 
 local function fail(msg, ...)
-  error({ phase = "template", kind = "value", message = msg:format(...) }, 0)
+  require("dbdash.util.error").raise("template", msg:format(...), { kind = "value" })
 end
 
 ---Validate an identifier: letters, digits, underscore, optionally dotted (schema.table).

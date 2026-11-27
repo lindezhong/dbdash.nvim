@@ -43,7 +43,7 @@ end
 function M.parse(s)
   local i = 1
   local function fail(msg)
-    error({ phase = "query", message = ("invalid JSON at offset %d: %s"):format(i, msg) }, 0)
+    require("dbdash.util.error").raise("query", ("invalid JSON at offset %d: %s"):format(i, msg))
   end
   local function ws()
     i = s:match("^[ \t\r\n]*()", i)

@@ -1,7 +1,7 @@
--- Uniform database error object (:help dbdash-errors).
+-- The error object of dbdash and its text (:help dbdash-errors).
 local M = {}
 
----@alias dbdash.db.Phase
+---@alias dbdash.Phase
 ---| "connect"
 ---| "tls"
 ---| "auth"
@@ -12,19 +12,36 @@ local M = {}
 ---| "config"
 ---| "internal"
 ---| "transform"
+---| "template"
+---| "args"
+---| "render"
 
----@class dbdash.db.DbError
----@field driver string?
----@field phase dbdash.db.Phase
----@field code string? server error code (e.g. SQLSTATE)
+---@class dbdash.Error every error of dbdash: what failed (phase) and why
+---@field phase dbdash.Phase
 ---@field message string
----@field detail string?
+---@field driver string? the database driver it came from
+---@field code string? server error code (e.g. SQLSTATE)
+---@field detail string? more lines (shown under it)
 ---@field position integer? 1-based character position in the query (pg)
+---@field kind string? a template error's kind ("syntax", "undefined", "type", "value"...)
+---@field source string? the file of a template or Lua code
+---@field line integer? its line
 
-local DbError = {}
-DbError.__index = DbError
-DbError.__tostring = function(e)
-  local s = ("%s%s error: %s"):format(e.driver and (e.driver .. " ") or "", e.phase, e.message)
+local Error = {}
+Error.__index = Error
+---The text of every error: "[<driver> ]<phase> error: [<source>:<line>: ]<message>", the
+---server's code in brackets, the detail on the next lines.
+Error.__tostring = function(e)
+  local where = ""
+  if e.line and e.phase == "template" then
+    where = ("%s:%d: "):format(e.source or "template", e.line)
+  end
+  local s = ("%s%s error: %s%s"):format(
+    e.driver and (e.driver .. " ") or "",
+    e.phase,
+    where,
+    e.message
+  )
   if e.code then
     s = s .. " [" .. e.code .. "]"
   end
@@ -33,21 +50,21 @@ DbError.__tostring = function(e)
   end
   return s
 end
-M.DbError = DbError
+M.Error = Error
 
 ---@param fields table
----@return dbdash.db.DbError
+---@return dbdash.Error
 function M.new(fields)
-  assert(fields.phase and fields.message, "DbError needs phase and message")
-  return setmetatable(fields, DbError)
+  assert(fields.phase and fields.message, "an error needs a phase and a message")
+  return setmetatable(fields, Error)
 end
 
 function M.is(e)
-  return getmetatable(e) == DbError
+  return getmetatable(e) == Error
 end
 
----Raise a DbError.
----@param phase dbdash.db.Phase
+---Raise an error.
+---@param phase dbdash.Phase
 ---@param message string
 ---@param extra table? additional fields (code, detail, position, driver)
 function M.raise(phase, message, extra)
@@ -56,10 +73,10 @@ function M.raise(phase, message, extra)
   error(M.new(e), 0)
 end
 
----Convert anything raised inside a driver into a DbError.
+---Anything raised as an error (an error table, a string from Lua) as an Error.
 ---@param err any
 ---@param driver string?
----@return dbdash.db.DbError
+---@return dbdash.Error
 function M.wrap(err, driver)
   if M.is(err) then
     err.driver = err.driver or driver
@@ -72,25 +89,30 @@ function M.wrap(err, driver)
   return M.new({ driver = driver, phase = "internal", message = tostring(err) })
 end
 
----Human-readable error with its phase.
+---The text of an error (Error.__tostring); a cancelled one is its message ("query
+---cancelled: <reason>").
+---@param err any
+---@return string
 function M.format(err)
   if type(err) ~= "table" then
     return tostring(err)
   end
   if err.phase == "cancelled" then
-    return err.message -- "query cancelled: <reason>"
+    return err.message
   end
-  local phase = err.phase or "error"
-  local msg = getmetatable(err) and getmetatable(err).__tostring and tostring(err) or err.message
-  if err.phase == "template" and err.message then
-    msg = (err.source and (err.source .. ":") or "")
-      .. (err.line and (err.line .. ": ") or "")
-      .. err.message
+  if M.is(err) then
+    return tostring(err)
   end
-  if msg:find("^" .. vim.pesc(phase)) or msg:find("^%w+ " .. vim.pesc(phase)) then
-    return msg
-  end
-  return ("[%s] %s"):format(phase, msg)
+  return tostring(
+    M.new(
+      vim.tbl_extend(
+        "force",
+        {},
+        err,
+        { phase = err.phase or "internal", message = err.message or vim.inspect(err) }
+      )
+    )
+  )
 end
 
 return M

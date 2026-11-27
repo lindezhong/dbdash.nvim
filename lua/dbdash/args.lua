@@ -12,7 +12,7 @@ local map = require("dbdash.util.map")
 local M = {}
 
 local function fail(msg, ...)
-  error({ phase = "args", message = msg:format(...) }, 0)
+  require("dbdash.util.error").raise("args", msg:format(...))
 end
 
 ---Split on unescaped, unquoted separator characters.

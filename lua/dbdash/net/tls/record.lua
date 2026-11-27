@@ -36,7 +36,7 @@ local ALERTS = {
 M.ALERTS = ALERTS
 
 local function fail(msg, ...)
-  error({ phase = "tls", message = msg:format(...) }, 0)
+  require("dbdash.util.error").raise("tls", msg:format(...))
 end
 M.fail = fail
 
@@ -270,11 +270,11 @@ function M.alert(content)
   local level, desc = content:byte(1), content:byte(2)
   local name = ALERTS[desc] or ("alert " .. tostring(desc))
   if desc == 0 then
-    error({
-      phase = "connect",
-      message = "connection closed by the server (close_notify)",
-      tls_closed = true,
-    }, 0)
+    require("dbdash.util.error").raise(
+      "connect",
+      "connection closed by the server (close_notify)",
+      { tls_closed = true }
+    )
   end
   fail("server sent %s alert: %s", level == 2 and "fatal" or "warning", name)
 end

@@ -15,7 +15,7 @@ local NUMERIC = { integer = true, number = true, decimal = true }
 local nn = require("dbdash.util.null").nn
 
 local function fail(msg, ...)
-  error({ phase = "render", message = msg:format(...) }, 0)
+  require("dbdash.util.error").raise("render", msg:format(...))
 end
 
 ---The show fields the content depends on.

@@ -17,7 +17,7 @@ local NULL = vim.NIL
 local METHODS = { "get", "put", "post", "delete", "patch", "head", "options", "trace" }
 
 local function cfg_error(msg, ...)
-  error({ phase = "config", message = "OpenAPI: " .. msg:format(...) }, 0)
+  require("dbdash.util.error").raise("config", "OpenAPI: " .. msg:format(...))
 end
 
 local function bad(status, msg, ...)

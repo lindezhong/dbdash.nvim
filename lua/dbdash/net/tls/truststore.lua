@@ -23,7 +23,7 @@ M.SYSTEM_FILES = {
 local cache = {}
 
 local function fail(msg, ...)
-  error({ phase = "tls", message = msg:format(...) }, 0)
+  require("dbdash.util.error").raise("tls", msg:format(...))
 end
 
 ---Build a store from DER certificates (unparseable ones are skipped).

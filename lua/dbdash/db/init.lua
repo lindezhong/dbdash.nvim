@@ -163,7 +163,7 @@ end
 ---@param raw_url string
 ---@param query string
 ---@param opts dbdash.db.QueryOpts?
----@param callback fun(err: dbdash.db.DbError?, rs: dbdash.db.ResultSet?)
+---@param callback fun(err: dbdash.Error?, rs: dbdash.db.ResultSet?)
 ---@return { cancel: fun(self, reason: string?) }
 function M.query(raw_url, query, opts, callback)
   opts = opts or {}
@@ -436,7 +436,7 @@ end
 ---@param query string|fun(): string, any the query, or a function rendering it on each tick
 ---@param opts dbdash.db.QueryOpts
 ---@param on_result fun(err: table?, value: any, vars: table?, tag: any)
----@param on_end fun(err: dbdash.db.DbError?)
+---@param on_end fun(err: dbdash.Error?)
 ---@return { stop: fun(self, reason: string?), stats: { items: integer, truncated: integer } }
 function M.run(raw_url, query, opts, on_result, on_end)
   opts = opts or {}
@@ -575,7 +575,7 @@ function M.run(raw_url, query, opts, on_result, on_end)
   return handle
 end
 
----Coroutine-style query for use inside util.async tasks. Raises DbError.
+---Coroutine-style query for use inside util.async tasks. Raises an Error (util/error).
 ---@return dbdash.db.ResultSet
 function M.query_async(raw_url, query, opts)
   local err, rs = async.await(M.query, raw_url, query, opts)

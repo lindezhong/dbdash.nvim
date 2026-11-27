@@ -63,7 +63,7 @@ function M.require_it()
 end
 
 ---Run a query through the DriverManager and wait for the result.
----@return { err: dbdash.db.DbError?, rs: dbdash.db.ResultSet? }
+---@return { err: dbdash.Error?, rs: dbdash.db.ResultSet? }
 function M.query(url, q, opts)
   local res
   require("dbdash.db").query(url, q, opts or {}, function(err, rs)

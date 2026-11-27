@@ -28,7 +28,7 @@ function M.from_spki(der)
   local spki = type(der) == "table" and der or asn1.parse(der)
   local alg = asn1.oid(spki.children[1].children[1])
   if alg ~= "1.2.840.113549.1.1.1" then
-    error({ phase = "auth", message = "not an RSA public key (algorithm " .. alg .. ")" }, 0)
+    require("dbdash.util.error").raise("auth", "not an RSA public key (algorithm " .. alg .. ")")
   end
   return M.from_pkcs1(asn1.bits(spki.children[2]))
 end
@@ -68,7 +68,7 @@ function M.oaep_encrypt(key, msg, hash, seed)
   hash = hash or require("dbdash.crypto.sha1")
   local k, h = key.size, hash.size
   if #msg > k - 2 * h - 2 then
-    error({ phase = "auth", message = "message too long for RSA-OAEP" }, 0)
+    require("dbdash.util.error").raise("auth", "message too long for RSA-OAEP")
   end
   local db = hash.digest("") .. string.rep("\0", k - #msg - 2 * h - 2) .. "\1" .. msg
   seed = seed or require("dbdash.crypto.random").bytes(h)
@@ -116,7 +116,7 @@ end
 function M.pkcs1_encrypt(key, msg)
   local k = key.size
   if #msg > k - 11 then
-    error({ phase = "tls", message = "message too long for RSA PKCS#1 v1.5" }, 0)
+    require("dbdash.util.error").raise("tls", "message too long for RSA PKCS#1 v1.5")
   end
   local rand = require("dbdash.crypto.random")
   local ps = {}

@@ -223,11 +223,11 @@ function Curve:ecdh(priv, peer)
   local F = self.F
   local key, err = self:public_key(peer)
   if not key then
-    error({ phase = "tls", message = ("invalid %s key share: %s"):format(self.name, err) }, 0)
+    require("dbdash.util.error").raise("tls", ("invalid %s key share: %s"):format(self.name, err))
   end
   local pt = scalar_mul(F, bn.from_bytes(priv), { F:to(key.x), F:to(key.y), F.one })
   if bn.is_zero(pt[3]) then
-    error({ phase = "tls", message = ("invalid %s shared secret"):format(self.name) }, 0)
+    require("dbdash.util.error").raise("tls", ("invalid %s shared secret"):format(self.name))
   end
   local x = affine(F, pt)
   return bn.to_bytes(x, self.size)

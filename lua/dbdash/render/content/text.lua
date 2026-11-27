@@ -35,10 +35,10 @@ local function columns(rs, show)
     local name = type(spec) == "table" and nn(spec.column) or spec
     local i = by_name[tostring(name)]
     if not i then
-      error({
-        phase = "render",
-        message = ("column_list: no column '%s' in the result"):format(tostring(name)),
-      }, 0)
+      require("dbdash.util.error").raise(
+        "render",
+        ("column_list: no column '%s' in the result"):format(tostring(name))
+      )
     end
     out[#out + 1] = i
   end
@@ -65,10 +65,10 @@ function M.build(chart, rs, show)
   for _, r in ipairs(nn(show.highlight) or {}) do
     local ok, re = pcall(vim.regex, tostring(nn(r.pattern) or ""))
     if not ok then
-      error({
-        phase = "render",
-        message = ("show.highlight: invalid pattern %q"):format(tostring(nn(r.pattern))),
-      }, 0)
+      require("dbdash.util.error").raise(
+        "render",
+        ("show.highlight: invalid pattern %q"):format(tostring(nn(r.pattern)))
+      )
     end
     rules[#rules + 1] = { re = re, class = nn(r.class) or "warning" }
   end
