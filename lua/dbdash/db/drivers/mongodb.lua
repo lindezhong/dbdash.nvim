@@ -453,8 +453,81 @@ function Conn:cursor(cmd, coll, max_rows)
   return docs, truncated
 end
 
+-- The operations of a query (`x`: { q, coll, filter, levels, max, command } where
+-- command(fields) is the command document with the comment and the database).
+local OPS = {}
+
+function OPS.find(self, x)
+  local q = x.q
+  local fields = { { "find", x.coll }, { "filter", x.filter } }
+  for _, name in ipairs({ "projection", "sort", "skip" }) do
+    if opt(q, name) then
+      fields[#fields + 1] = { name, q[name] }
+    end
+  end
+  local limit = tonumber(opt(q, "limit"))
+  if limit then
+    fields[#fields + 1] = { "limit", limit }
+  end
+  fields[#fields + 1] = { "batchSize", math.min(x.max + 1, 10000) }
+  local docs, truncated = self:cursor(x.command(fields), x.coll, x.max)
+  return M.to_resultset(docs, x.levels, truncated)
+end
+
+function OPS.aggregate(self, x)
+  local docs, truncated = self:cursor(
+    x.command({
+      { "aggregate", x.coll },
+      { "pipeline", opt(x.q, "pipeline") or {} },
+      { "cursor", doc({ { "batchSize", math.min(x.max + 1, 10000) } }) },
+    }),
+    x.coll,
+    x.max
+  )
+  return M.to_resultset(docs, x.levels, truncated)
+end
+
+function OPS.count(self, x)
+  local r = self:command(x.command({ { "count", x.coll }, { "query", x.filter } }))
+  return resultset.new({ { name = "count", type = "integer", db_type = "int" } }, { { r.n } })
+end
+
+function OPS.distinct(self, x)
+  local field = opt(x.q, "field")
+  if type(field) ~= "string" then
+    dberr.raise("query", 'distinct needs "field": "<name>"')
+  end
+  local r =
+    self:command(x.command({ { "distinct", x.coll }, { "key", field }, { "query", x.filter } }))
+  local docs = {}
+  for i, v in ipairs(r.values or {}) do
+    docs[i] = map.from_pairs({ { field, v } })
+  end
+  return M.to_resultset(docs, 0, false)
+end
+
+---Any database command; the reply becomes one row (without "ok").
+function OPS.command(self, x)
+  local cmd = opt(x.q, "command")
+  if not map.is_map(cmd) then
+    dberr.raise("query", 'operation "command" needs "command": { ... }')
+  end
+  local full = map.new()
+  for k, v in map.pairs(cmd) do
+    map.set(full, k, v)
+  end
+  map.set(full, "$db", self.db)
+  local reply = self:command(full)
+  local row = map.new()
+  for k, v in map.pairs(reply) do
+    if k ~= "ok" and k:sub(1, 1) ~= "$" then
+      map.set(row, k, v)
+    end
+  end
+  return M.to_resultset({ row }, x.levels, false)
+end
+
 function Conn:execute(query, opts)
-  local max = opts.max_rows or 10000
   local q = json.parse(query)
   if not map.is_map(q) then
     dberr.raise("query", "a MongoDB query must be a JSON object")
@@ -466,9 +539,14 @@ function Conn:execute(query, opts)
   elseif op ~= "command" and type(coll) ~= "string" then
     dberr.raise("query", 'the query needs "collection": "<name>"')
   end
+  local run = OPS[op]
+  if not run then
+    dberr.raise(
+      "query",
+      ("unknown operation %q (use find, aggregate, count, distinct or command)"):format(op)
+    )
+  end
   local db = opt(q, "database") or self.db
-  local filter = opt(q, "filter") or map.new()
-  local levels = tonumber(opt(q, "flatten")) or 0
   self.db = db
   -- A comment marks the operation so that M.cancel can find it (servers from 4.4 accept it
   -- on every command used here).
@@ -476,87 +554,20 @@ function Conn:execute(query, opts)
   if (self.max_wire or 0) >= 9 and op ~= "command" then
     self.op_comment = "dbdash:" .. require("dbdash.util.uuid").v7()
   end
-  ---The command document of `fields`, with the comment and the database.
-  local function command(fields)
-    if self.op_comment then
-      fields[#fields + 1] = { "comment", self.op_comment }
-    end
-    fields[#fields + 1] = { "$db", db }
-    return doc(fields)
-  end
-
-  if op == "find" then
-    local limit = tonumber(opt(q, "limit"))
-    local fields = {
-      { "find", coll },
-      { "filter", filter },
-    }
-    if opt(q, "projection") then
-      fields[#fields + 1] = { "projection", q.projection }
-    end
-    if opt(q, "sort") then
-      fields[#fields + 1] = { "sort", q.sort }
-    end
-    if opt(q, "skip") then
-      fields[#fields + 1] = { "skip", q.skip }
-    end
-    if limit then
-      fields[#fields + 1] = { "limit", limit }
-    end
-    fields[#fields + 1] = { "batchSize", math.min(max + 1, 10000) }
-    local docs, truncated = self:cursor(command(fields), coll, max)
-    return M.to_resultset(docs, levels, truncated)
-  elseif op == "aggregate" then
-    local pipeline = opt(q, "pipeline") or {}
-    local docs, truncated = self:cursor(
-      command({
-        { "aggregate", coll },
-        { "pipeline", pipeline },
-        { "cursor", doc({ { "batchSize", math.min(max + 1, 10000) } }) },
-      }),
-      coll,
-      max
-    )
-    return M.to_resultset(docs, levels, truncated)
-  elseif op == "count" then
-    local r = self:command(command({ { "count", coll }, { "query", filter } }))
-    return resultset.new({ { name = "count", type = "integer", db_type = "int" } }, { { r.n } })
-  elseif op == "distinct" then
-    local field = opt(q, "field")
-    if type(field) ~= "string" then
-      dberr.raise("query", 'distinct needs "field": "<name>"')
-    end
-    local r = self:command(command({ { "distinct", coll }, { "key", field }, { "query", filter } }))
-    local docs = {}
-    for i, v in ipairs(r.values or {}) do
-      docs[i] = map.from_pairs({ { field, v } })
-    end
-    return M.to_resultset(docs, 0, false)
-  end
-  if op == "command" then
-    -- Any database command; the reply becomes one row (without "ok").
-    local cmd = opt(q, "command")
-    if not map.is_map(cmd) then
-      dberr.raise("query", 'operation "command" needs "command": { ... }')
-    end
-    local full = map.new()
-    for k, v in map.pairs(cmd) do
-      map.set(full, k, v)
-    end
-    map.set(full, "$db", db)
-    local reply = self:command(full)
-    local row = map.new()
-    for k, v in map.pairs(reply) do
-      if k ~= "ok" and k:sub(1, 1) ~= "$" then
-        map.set(row, k, v)
+  return run(self, {
+    q = q,
+    coll = coll,
+    filter = opt(q, "filter") or map.new(),
+    levels = tonumber(opt(q, "flatten")) or 0,
+    max = opts.max_rows or 10000,
+    command = function(fields)
+      if self.op_comment then
+        fields[#fields + 1] = { "comment", self.op_comment }
       end
-    end
-    return M.to_resultset({ row }, levels, false)
-  end
-  dberr.raise(
-    "query",
-    ("unknown operation %q (use find, aggregate, count, distinct or command)"):format(op)
-  )
+      fields[#fields + 1] = { "$db", db }
+      return doc(fields)
+    end,
+  })
 end
 
 function Conn:close()
