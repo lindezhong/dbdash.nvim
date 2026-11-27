@@ -9,7 +9,7 @@ local M = {}
 local raise = errors.raise
 local NONE = R.NONE
 
-local bind = require("dbdash.template.bind")
+local bind = require("dbdash.template.bind").bind
 
 local function length(v)
   if type(v) == "string" then

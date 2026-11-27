@@ -12,4 +12,6 @@
 ---@field document fun(self, cfg: dbdash.Config): table the config's document (a stand-in
 ---  dashboard, dashboard/document.lua)
 
-return {}
+local M = {}
+
+return M

@@ -1,7 +1,7 @@
 -- The UA (user agent) style sheet: how everything looks before any user, dashboard or
 -- panel rule. Colors are the DbDash* highlight groups, which link to standard groups and
 -- so follow the colorscheme (:help dbdash-highlights).
-return {
+local M = {
   -- the dashboard view
   ["header-title"] = { color = "DbDashTitle" },
   ["description-icon"] = { color = "DbDashDescIcon", content = "ⓘ" },
@@ -64,3 +64,5 @@ return {
   ["sidebar-item.idle"] = { color = "DbDashSidebarIdle" },
   ["sidebar-item.cursor"] = { color = "DbDashSidebarCursor" },
 }
+
+return M

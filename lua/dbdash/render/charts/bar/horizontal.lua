@@ -1,7 +1,7 @@
 -- Bar chart, horizontal bars.
 local bars = require("dbdash.render.charts.bars")
 
-return {
+local M = {
   name = "horizontal",
   render = function(rs, show, ctx)
     local list, legend = bars.from_show(rs, show, ctx)
@@ -10,3 +10,5 @@ return {
     return bars.horizontal(ctx, list, o)
   end,
 }
+
+return M

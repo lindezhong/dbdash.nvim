@@ -1,2 +1,7 @@
 -- :checkhealth dbdash.mysql
-return { check = require("dbdash.health_util").network("mysql") }
+
+local M = {}
+
+M.check = require("dbdash.health_util").network("mysql")
+
+return M

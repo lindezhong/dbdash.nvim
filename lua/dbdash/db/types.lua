@@ -74,4 +74,6 @@
 ---@field args table?, meta table?, lua table?, source string?, line integer? as for lua://
 ---@field timeout integer ms (query.timeout, else the URL's)
 
-return {}
+local M = {}
+
+return M

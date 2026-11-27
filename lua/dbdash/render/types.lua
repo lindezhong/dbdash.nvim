@@ -58,4 +58,6 @@
 ---@field lines string[]
 ---@field hl dbdash.render.Highlight[] 0-based rows, byte columns
 
-return {}
+local M = {}
+
+return M

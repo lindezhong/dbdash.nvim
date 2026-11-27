@@ -5,4 +5,6 @@
 --   dashboard:stopped(d, o)     stopped (o.keep_buffer: its view keeps the buffer)
 --   dashboard:error(path, err)  a config could not start
 --   action(d, action, ev)       a dashboard key's event reached its document's root
-return require("dbdash.util.emitter").new()
+local M = require("dbdash.util.emitter").new()
+
+return M

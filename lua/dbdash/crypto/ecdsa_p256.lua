@@ -1,7 +1,7 @@
 -- P-256 wrapper over dbdash.crypto.ecdsa (kept for existing callers).
 local C = require("dbdash.crypto.ecdsa").curves.p256
 
-return {
+local M = {
   public_key = function(point)
     return C:public_key(point)
   end,
@@ -15,3 +15,5 @@ return {
     return C:ecdh(priv, peer)
   end,
 }
+
+return M

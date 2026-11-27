@@ -2,7 +2,7 @@
 local bars = require("dbdash.render.charts.bars")
 local fmt = require("dbdash.render.format")
 
-return {
+local M = {
   name = "vertical",
   render = function(rs, show, ctx)
     local bins, vals = bars.histogram(rs, show, ctx)
@@ -22,3 +22,5 @@ return {
     return bars.vertical(ctx, bins, o)
   end,
 }
+
+return M

@@ -21,8 +21,10 @@ local GLYPHS = {
   "█",
 }
 
-return base.define("quadrant", 2, 2, function(sx, sy)
+local M = base.define("quadrant", 2, 2, function(sx, sy)
   return sy == 0 and (sx == 0 and 1 or 2) or (sx == 0 and 4 or 8)
 end, function(mask)
   return GLYPHS[mask]
 end)
+
+return M

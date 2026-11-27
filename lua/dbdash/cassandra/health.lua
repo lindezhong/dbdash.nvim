@@ -1,2 +1,7 @@
 -- :checkhealth dbdash.cassandra
-return { check = require("dbdash.health_util").network("cassandra") }
+
+local M = {}
+
+M.check = require("dbdash.health_util").network("cassandra")
+
+return M

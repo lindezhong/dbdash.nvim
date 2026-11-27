@@ -9,7 +9,7 @@ local BITS = {
 
 local cache = {}
 
-return base.define("braille", 2, 4, function(sx, sy)
+local M = base.define("braille", 2, 4, function(sx, sy)
   return BITS[sx][sy]
 end, function(mask)
   local g = cache[mask]
@@ -24,3 +24,5 @@ end, function(mask)
   end
   return g
 end)
+
+return M

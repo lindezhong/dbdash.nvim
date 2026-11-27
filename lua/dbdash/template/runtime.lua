@@ -11,10 +11,10 @@ local pystr = require("dbdash.util.pystr")
 local map = require("dbdash.util.map")
 local errors = require("dbdash.template.errors")
 
-local R = {}
+local M = {}
 
-R.NONE = vim.NIL
-R.MISSING = setmetatable({}, {
+M.NONE = vim.NIL
+M.MISSING = setmetatable({}, {
   __tostring = function()
     return "<missing>"
   end,
@@ -28,28 +28,28 @@ local Undefined = {}
 Undefined.__index = Undefined
 
 ---@param hint string message raised when the value is used
-function R.undef(hint)
+function M.undef(hint)
   return setmetatable({ hint = hint }, Undefined)
 end
 
-function R.is_undef(v)
+function M.is_undef(v)
   return getmetatable(v) == Undefined
 end
 
 ---Raise if `v` is undefined; otherwise return it.
-function R.check(v)
+function M.check(v)
   if getmetatable(v) == Undefined then
     raise("undefined", v.hint)
   end
   return v
 end
-local check = R.check
+local check = M.check
 
 -- Safe strings (output verbatim even with autoescape) -------------------------------------
 
 local Safe = markup.Safe
-R.safe = markup.safe
-R.is_safe = markup.is_safe
+M.safe = markup.safe
+M.is_safe = markup.is_safe
 
 ---The text of a string or safe string; nil for other values.
 local function as_str(v)
@@ -70,12 +70,12 @@ local Macro = {}
 
 ---The state of one loop: its items, depth (recursive loops) and loop.changed() memory.
 ---@param rec function? the recursive loop's function (loop(items) renders it again)
-function R.loop_state(items, depth, rec)
+function M.loop_state(items, depth, rec)
   return { items = items, depth = depth, rec = rec }
 end
 
 ---The `loop` variable of iteration `i`.
-function R.loop(state, i)
+function M.loop(state, i)
   local items = state.items
   local n = #items
   return setmetatable({
@@ -88,8 +88,8 @@ function R.loop(state, i)
     length = n,
     depth = state.depth,
     depth0 = state.depth - 1,
-    previtem = i > 1 and items[i - 1] or R.undef("there is no previous item"),
-    nextitem = i < n and items[i + 1] or R.undef("there is no next item"),
+    previtem = i > 1 and items[i - 1] or M.undef("there is no previous item"),
+    nextitem = i < n and items[i + 1] or M.undef("there is no next item"),
     cycle = function(args)
       if #args == 0 then
         raise("type", "no items for cycling given")
@@ -97,7 +97,7 @@ function R.loop(state, i)
       return args[(i - 1) % #args + 1]
     end,
     changed = function(args)
-      local changed = state.last == nil or not R.eq(args, state.last)
+      local changed = state.last == nil or not M.eq(args, state.last)
       state.last = args
       return changed
     end,
@@ -106,7 +106,7 @@ function R.loop(state, i)
 end
 
 ---{% for x in xs if test %}: the items for which `keep(item)` is true.
-function R.loop_filter(items, keep)
+function M.loop_filter(items, keep)
   local out = {}
   for _, item in ipairs(items) do
     if keep(item) then
@@ -122,17 +122,17 @@ Loop.__call = function(self, args, _, env)
   if not state.rec then
     raise("type", "Tried to call non recursive loop. Maybe you forgot the 'recursive' modifier.")
   end
-  return R.markup(env, state.rec(args[1], state.depth + 1))
+  return M.markup(env, state.rec(args[1], state.depth + 1))
 end
 
 -- Floats with an integral value ------------------------------------------------------------
 
 local Float = number.Float
-R.float = number.float
-R.is_float_box = number.is_float_box
+M.float = number.float
+M.is_float_box = number.is_float_box
 
 ---True for any float (boxed, non-integral, inf or nan).
-function R.is_float(v)
+function M.is_float(v)
   if type(v) == "number" then
     return v ~= math.floor(v) or v ~= v or v == math.huge or v == -math.huge
   end
@@ -142,11 +142,11 @@ end
 ---A number result: a float when `isf` (or not integral), else an int.
 local function mknum(x, isf)
   if isf then
-    return R.float(x)
+    return M.float(x)
   end
   return x
 end
-R.mknum = mknum
+M.mknum = mknum
 
 -- Tuples -----------------------------------------------------------------------------------
 
@@ -154,11 +154,11 @@ local Tuple = {}
 Tuple.__index = Tuple
 
 ---Mark a Lua array as a tuple.
-function R.tuple(t)
+function M.tuple(t)
   return setmetatable(t, Tuple)
 end
 
-function R.is_tuple(v)
+function M.is_tuple(v)
   return getmetatable(v) == Tuple
 end
 
@@ -166,9 +166,9 @@ end
 local tuple_names = setmetatable({}, { __mode = "k" })
 
 ---A tuple whose items are also attributes `fields` (it prints as a tuple).
-function R.named_tuple(name, fields, values)
+function M.named_tuple(name, fields, values)
   tuple_names[values] = { name = name, fields = fields }
-  return R.tuple(values)
+  return M.tuple(values)
 end
 
 -- Dictionary views (d.keys(), d.values(), d.items()): sequences shown as dict_keys([...])
@@ -177,21 +177,21 @@ local View = {}
 View.__index = View
 local view_names = setmetatable({}, { __mode = "k" })
 
-function R.view(list, name)
+function M.view(list, name)
   view_names[list] = name
   return setmetatable(list, View)
 end
 
 -- Read-only values (args, meta): mutating methods refuse them --------------------------
 
-R.frozen = setmetatable({}, { __mode = "k" }) -- table -> name shown in the error
+M.frozen = setmetatable({}, { __mode = "k" }) -- table -> name shown in the error
 
 ---Mark `v` and the tables in it read-only (`name` for messages).
-function R.freeze(v, name)
-  if type(v) == "table" and v ~= vim.NIL and not R.frozen[v] then
-    R.frozen[v] = name
+function M.freeze(v, name)
+  if type(v) == "table" and v ~= vim.NIL and not M.frozen[v] then
+    M.frozen[v] = name
     for _, x in pairs(v) do
-      R.freeze(x, name)
+      M.freeze(x, name)
     end
   end
   return v
@@ -200,20 +200,20 @@ end
 -- Type helpers -----------------------------------------------------------------------------
 
 -- Type names of other values (namespace, cycler, ...).
-R.typenames = setmetatable({}, { __mode = "k" })
+M.typenames = setmetatable({}, { __mode = "k" })
 
 ---Python type name used in error messages.
-function R.typename(v)
+function M.typename(v)
   local t = type(v)
-  if t == "table" and R.typenames[v] then
-    return R.typenames[v]
+  if t == "table" and M.typenames[v] then
+    return M.typenames[v]
   end
-  if v == R.NONE then
+  if v == M.NONE then
     return "NoneType"
   elseif t == "boolean" then
     return "bool"
   elseif t == "number" then
-    return R.is_float(v) and "float" or "int"
+    return M.is_float(v) and "float" or "int"
   elseif getmetatable(v) == Float then
     return "float"
   elseif getmetatable(v) == Tuple then
@@ -237,17 +237,17 @@ function R.typename(v)
   end
   return t
 end
-local typename = R.typename
+local typename = M.typename
 
 ---Lists and tuples (sequences of values).
 local function is_list(v)
-  if type(v) ~= "table" or v == R.NONE then
+  if type(v) ~= "table" or v == M.NONE then
     return false
   end
   local mt = getmetatable(v)
   return mt == nil or mt == Tuple or mt == View
 end
-R.is_list = is_list
+M.is_list = is_list
 
 ---Numbers, with booleans as 0/1 like Python. Returns nil for non-numbers; the second
 ---value is true for floats.
@@ -261,12 +261,12 @@ local function num(v)
     return v.v, true
   end
 end
-R.num = num
+M.num = num
 
 local CHAR = "[%z\1-\127\192-\247][\128-\191]*"
 
 ---Split a string into UTF-8 characters (Python indexes code points).
-function R.chars(s)
+function M.chars(s)
   local out = {}
   for ch in s:gmatch(CHAR) do
     out[#out + 1] = ch
@@ -276,9 +276,9 @@ end
 
 -- Truthiness and string conversion --------------------------------------------------------
 
-function R.truthy(v)
+function M.truthy(v)
   check(v)
-  if v == nil or v == false or v == R.NONE then
+  if v == nil or v == false or v == M.NONE then
     return false
   elseif v == 0 or v == "" then
     return false
@@ -295,51 +295,51 @@ function R.truthy(v)
   return true
 end
 
-R.floatstr = number.floatstr
-R.numstr = number.numstr
+M.floatstr = number.floatstr
+M.numstr = number.numstr
 
-R.strrepr = pystr.strrepr
+M.strrepr = pystr.strrepr
 
 ---Python repr(): template values here (tuples, dict views, namespaces, ...), plain data
 ---in util.pystr.
-function R.repr(v)
+function M.repr(v)
   local mt = getmetatable(v)
   if mt == Tuple or mt == View then
     local parts = {}
     for i = 1, #v do
-      parts[i] = R.repr(v[i])
+      parts[i] = M.repr(v[i])
     end
     if mt == Tuple then
       return "(" .. table.concat(parts, ", ") .. (#v == 1 and ",)" or ")")
     end
     return (view_names[v] or "dict_keys") .. "([" .. table.concat(parts, ", ") .. "])"
-  elseif R.repr_hook[mt or false] then
-    return R.repr_hook[mt](v)
+  elseif M.repr_hook[mt or false] then
+    return M.repr_hook[mt](v)
   elseif type(v) == "string" or mt == Safe or map.is_map(v) or is_list(v) then
-    return pystr.repr(v, R.repr)
+    return pystr.repr(v, M.repr)
   end
-  return R.str(v)
+  return M.str(v)
 end
 
 ---repr() of other value types by metatable (namespace, cycler, ...).
-R.repr_hook = {}
+M.repr_hook = {}
 
 ---Python str(): template values here (loops, macros), the rest in util.pystr.
-function R.str(v)
+function M.str(v)
   check(v)
   local mt = getmetatable(v)
   if mt == Loop then
     return "<LoopContext>"
   elseif mt == Macro then
     return ("<Macro '%s'>"):format(v.name)
-  elseif type(v) == "table" and v ~= R.NONE and mt ~= Safe and mt ~= Float then
-    return R.repr(v)
+  elseif type(v) == "table" and v ~= M.NONE and mt ~= Safe and mt ~= Float then
+    return M.repr(v)
   end
   return pystr.str(v)
 end
 
 ---HTML escaping (Jinja's escape / autoescape outside SQL).
-function R.html_escape(s)
+function M.html_escape(s)
   return (
     s:gsub(
       "[&<>\"']",
@@ -350,7 +350,7 @@ end
 
 ---Value written for {{ expr }}: with autoescape, the dialect's literal in SQL (env.escape),
 ---HTML escaping elsewhere.
-function R.out(env, v)
+function M.out(env, v)
   check(v)
   if getmetatable(v) == Safe then
     return v.s
@@ -358,68 +358,68 @@ function R.out(env, v)
     if env.escape then
       return env.escape(v)
     end
-    return R.html_escape(R.str(v))
+    return M.html_escape(M.str(v))
   end
-  return R.str(v)
+  return M.str(v)
 end
 
 ---Template output as a value: marked safe with autoescape (Jinja's Markup), so it is not
 ---escaped again.
-function R.markup(env, s)
+function M.markup(env, s)
   if env.autoescape then
-    return R.safe(s)
+    return M.safe(s)
   end
   return s
 end
 
 -- Lookup and access ------------------------------------------------------------------------
 
-R.globals = {}
+M.globals = {}
 
 -- Set by the engine (template/init.lua) from modules that require this one:
 ---Call a Python method of a value ("a".upper()): found, result.
 ---@type fun(obj: any, name: string, args: any[], kwargs: table): boolean, any
-R.call_method = nil
+M.call_method = nil
 ---printf-style formatting: "x=%s" % value.
 ---@type fun(s: string, values: any): string
-R.percent = nil
+M.percent = nil
 
----A context with `vars` (template variables: name -> value, R.MISSING skipped) over `ctx`:
+---A context with `vars` (template variables: name -> value, M.MISSING skipped) over `ctx`:
 ---what an include or an import "with context" sees.
-function R.layer(ctx, vars)
+function M.layer(ctx, vars)
   local t = {}
   for k, v in pairs(vars) do
-    if v ~= R.MISSING then
+    if v ~= M.MISSING then
       t[k] = v
     end
   end
   return setmetatable(t, { __index = ctx })
 end
 
-function R.lookup(ctx, name)
+function M.lookup(ctx, name)
   local v = ctx[name]
   if v ~= nil then
     return v
   end
-  v = R.globals[name]
+  v = M.globals[name]
   if v ~= nil then
     return v
   end
   local args = ctx.args
   if map.is_map(args) and args[name] ~= nil then
     -- Dashboards pass their arguments as args.<name> (and metadata as meta.<name>).
-    return R.undef(("'%s' is undefined; arguments are written args.%s"):format(name, name))
+    return M.undef(("'%s' is undefined; arguments are written args.%s"):format(name, name))
   end
-  return R.undef(("'%s' is undefined"):format(name))
+  return M.undef(("'%s' is undefined"):format(name))
 end
 
 ---{% set args.name = value %}: assign a dashboard argument through env.set_arg (the
 ---dashboard checks it, updates `args` and keeps the value).
-function R.set_arg(env, name, value)
+function M.set_arg(env, name, value)
   if not env.set_arg then
     raise("value", "args can only be assigned in a dashboard (args.%s)", name)
   end
-  local ok, err = pcall(env.set_arg, name, R.to_lua(value))
+  local ok, err = pcall(env.set_arg, name, M.to_lua(value))
   if not ok then
     if type(err) == "table" then
       error(err, 0)
@@ -429,9 +429,9 @@ function R.set_arg(env, name, value)
 end
 
 ---Read a template-local variable, falling back to the context when it was never assigned.
-function R.v(val, ctx, name)
-  if val == R.MISSING then
-    return R.lookup(ctx, name)
+function M.v(val, ctx, name)
+  if val == M.MISSING then
+    return M.lookup(ctx, name)
   end
   return val
 end
@@ -458,9 +458,9 @@ local function key_of(k)
   end
   return k
 end
-R.key_of = key_of
+M.key_of = key_of
 
-function R.getitem(obj, key)
+function M.getitem(obj, key)
   check(obj)
   check(key)
   if map.is_map(obj) then
@@ -472,28 +472,28 @@ function R.getitem(obj, key)
     if v ~= nil then
       return v
     end
-    return R.undef(("'dict object' has no attribute %s"):format(R.repr(key)))
+    return M.undef(("'dict object' has no attribute %s"):format(M.repr(key)))
   elseif getmetatable(obj) == Loop then
-    return R.getattr(obj, key)
+    return M.getattr(obj, key)
   elseif is_list(obj) then
     local i = index(#obj, key)
     if i then
       return obj[i]
     end
-    return R.undef(("list object has no element %s"):format(R.repr(key)))
+    return M.undef(("list object has no element %s"):format(M.repr(key)))
   elseif type(obj) == "string" then
-    local cs = R.chars(obj)
+    local cs = M.chars(obj)
     local i = index(#cs, key)
     if i then
       return cs[i]
     end
-    return R.undef(("str object has no element %s"):format(R.repr(key)))
+    return M.undef(("str object has no element %s"):format(M.repr(key)))
   end
-  return R.undef(("'%s' object has no attribute %s"):format(typename(obj), R.repr(key)))
+  return M.undef(("'%s' object has no attribute %s"):format(typename(obj), M.repr(key)))
 end
 
 ---obj.name
-function R.getattr(obj, name)
+function M.getattr(obj, name)
   check(obj)
   local mt = getmetatable(obj)
   if mt == Macro then
@@ -501,8 +501,8 @@ function R.getattr(obj, name)
     if v ~= nil and name ~= "fn" then
       return v
     end
-  elseif R.getattr_hook[mt or false] then
-    local v = R.getattr_hook[mt](obj, name)
+  elseif M.getattr_hook[mt or false] then
+    local v = M.getattr_hook[mt](obj, name)
     if v ~= nil then
       return v
     end
@@ -515,13 +515,13 @@ function R.getattr(obj, name)
   elseif map.is_map(obj) and obj[name] ~= nil then
     return obj[name]
   end
-  return R.undef(("'%s object' has no attribute '%s'"):format(typename(obj), name))
+  return M.undef(("'%s object' has no attribute '%s'"):format(typename(obj), name))
 end
 
 ---Attributes of other value types by metatable (namespace, cycler, self, ...).
-R.getattr_hook = {}
+M.getattr_hook = {}
 
-R.getattr_hook[Tuple] = function(t, name)
+M.getattr_hook[Tuple] = function(t, name)
   local named = tuple_names[t]
   for i, f in ipairs(named and named.fields or {}) do
     if f == name then
@@ -533,7 +533,7 @@ end
 -- Methods ------------------------------------------------------------------------------------
 
 ---Python str.upper(): like toupper, but "ß" becomes "SS".
-function R.upper(s)
+function M.upper(s)
   return vim.fn.toupper((s:gsub("ß", "SS")))
 end
 
@@ -547,26 +547,26 @@ local function strip_chars(s, chars, left, right)
   end
   return s
 end
-R.strip_chars = strip_chars
+M.strip_chars = strip_chars
 
 ---obj.name(args): a macro or function in a mapping (imported template, .lua module), a
 ---method of the value (dbdash.template.methods: Python's str, dict, list methods), or a
 ---callable attribute (namespace, cycler, ...).
-function R.call_attr(env, obj, name, args, kwargs)
+function M.call_attr(env, obj, name, args, kwargs)
   check(obj)
   if map.is_map(obj) and (getmetatable(obj[name]) == Macro or type(obj[name]) == "function") then
-    return R.call(env, obj[name], args, kwargs) -- a macro, or a function of a .lua module
+    return M.call(env, obj[name], args, kwargs) -- a macro, or a function of a .lua module
   end
   for i = 1, #args do
     check(args[i])
   end
-  local found, out = R.call_method(obj, name, args, kwargs)
+  local found, out = M.call_method(obj, name, args, kwargs)
   if found then
     return out
   end
-  local attr = R.getattr(obj, name)
-  if not R.is_undef(attr) then
-    return R.call(env, attr, args, kwargs)
+  local attr = M.getattr(obj, name)
+  if not M.is_undef(attr) then
+    return M.call(env, attr, args, kwargs)
   end
   raise("undefined", "'%s object' has no attribute '%s'", typename(obj), name)
 end
@@ -575,13 +575,13 @@ end
 local kw_order = setmetatable({}, { __mode = "k" })
 
 ---Keyword arguments `t` written in the order `names`.
-function R.kw(t, names)
+function M.kw(t, names)
   kw_order[t] = names
   return t
 end
 
 ---Names of keyword arguments in the order they were written.
-function R.kw_keys(t)
+function M.kw_keys(t)
   local out, seen = {}, {}
   for _, k in ipairs(kw_order[t] or {}) do
     if t[k] ~= nil and not seen[k] then
@@ -600,23 +600,23 @@ function R.kw_keys(t)
 end
 
 ---*list in a call: extra positional arguments.
-function R.dyn_args(args, extra)
+function M.dyn_args(args, extra)
   check(extra)
   local out = vim.list_extend({}, args)
-  for _, v in ipairs(R.iter(extra)) do
+  for _, v in ipairs(M.iter(extra)) do
     out[#out + 1] = v
   end
   return out
 end
 
 ---**mapping in a call: extra keyword arguments.
-function R.dyn_kwargs(kwargs, extra)
+function M.dyn_kwargs(kwargs, extra)
   check(extra)
   if not map.is_map(extra) then
     raise("type", "argument after ** must be a mapping, not %s", typename(extra))
   end
   local out, names = {}, {}
-  for _, k in ipairs(R.kw_keys(kwargs)) do
+  for _, k in ipairs(M.kw_keys(kwargs)) do
     out[k] = kwargs[k]
     names[#names + 1] = k
   end
@@ -627,18 +627,18 @@ function R.dyn_kwargs(kwargs, extra)
     out[k] = v
     names[#names + 1] = k
   end
-  return R.kw(out, names)
+  return M.kw(out, names)
 end
 
 ---Call a global function value: fn(args, kwargs, env).
-function R.call(env, fn, args, kwargs)
+function M.call(env, fn, args, kwargs)
   check(fn)
   local mt = getmetatable(fn)
   if
     type(fn) ~= "function"
     and mt ~= Macro
     and mt ~= Loop
-    and not (mt and mt.__call and R.callable_types[mt])
+    and not (mt and mt.__call and M.callable_types[mt])
   then
     raise("type", "'%s' object is not callable", typename(fn))
   end
@@ -649,7 +649,7 @@ function R.call(env, fn, args, kwargs)
 end
 
 ---Metatables of other callable values (joiner, cycler methods, ...).
-R.callable_types = {}
+M.callable_types = {}
 
 -- Lua in templates ------------------------------------------------------------------------
 
@@ -657,25 +657,25 @@ local module_raw = setmetatable({}, { __mode = "k" }) -- template mapping -> Lua
 
 ---A template value as Lua data: none / undefined / missing -> nil, safe -> its string,
 ---lists and mappings element by element (mappings stay util.map tables).
-function R.to_lua(v)
-  if v == R.NONE or v == R.MISSING or R.is_undef(v) then
+function M.to_lua(v)
+  if v == M.NONE or v == M.MISSING or M.is_undef(v) then
     return nil
   elseif module_raw[v] then
     return module_raw[v] -- an imported .lua module: its own table
-  elseif R.is_safe(v) then
+  elseif M.is_safe(v) then
     return v.s
   elseif getmetatable(v) == Float then
     return v.v
   elseif map.is_map(v) then
     local out = map.new()
     for k, x in map.pairs(v) do
-      map.set(out, k, R.to_lua(x))
+      map.set(out, k, M.to_lua(x))
     end
     return out
   elseif is_list(v) then
     local out = {}
     for i = 1, #v do
-      out[i] = R.to_lua(v[i])
+      out[i] = M.to_lua(v[i])
     end
     return out
   end
@@ -684,21 +684,21 @@ end
 
 ---Lua data as a template value: nil -> none, arrays -> lists, other tables -> mappings
 ---(keys sorted), safe strings and callables kept.
-function R.from_lua(v)
+function M.from_lua(v)
   if v == nil then
-    return R.NONE
+    return M.NONE
   elseif type(v) ~= "table" or getmetatable(v) ~= nil and not map.is_map(v) then
     return v -- strings, numbers, booleans, functions, safe strings, macros
   elseif map.is_map(v) then
     local out = map.new()
     for k, x in map.pairs(v) do
-      map.set(out, k, R.from_lua(x))
+      map.set(out, k, M.from_lua(x))
     end
     return out
   elseif vim.islist(v) then
     local out = {}
     for i = 1, #v do
-      out[i] = R.from_lua(v[i])
+      out[i] = M.from_lua(v[i])
     end
     return out
   end
@@ -708,7 +708,7 @@ function R.from_lua(v)
   end)
   local out = map.new()
   for _, k in ipairs(keys) do
-    map.set(out, k, R.from_lua(v[k]))
+    map.set(out, k, M.from_lua(v[k]))
   end
   return out
 end
@@ -716,7 +716,7 @@ end
 ---The Lua environment of template code: the globals plus args, meta, store and the dbdash
 ---helpers (env.lua: { args, meta, store, helpers } from the dashboard; without helpers,
 ---those of util/sandbox.lua), and `extra` names.
-function R.lua_env(env, extra)
+function M.lua_env(env, extra)
   local g = env.lua or {}
   local t = setmetatable({
     args = g.args or {},
@@ -732,7 +732,7 @@ end
 
 ---Run Lua with env.timeout; Lua errors become template errors at their own line when they
 ---come from this template's code (chunk `chunk_name`), else at the current line.
-function R.run_lua(env, fn, chunk_name, source)
+function M.run_lua(env, fn, chunk_name, source)
   local ok, ret = require("dbdash.util.sandbox").guard(fn, env.timeout, env.cancel)
   if ok then
     -- Arguments the code assigned (args.x = v) apply now: later template text sees them.
@@ -767,16 +767,16 @@ end
 ---Run a .lua module (once per render, so its functions see this render's args and meta)
 ---and export its table: functions become callable from expressions (h.f(x)), other
 ---values template values. In {% lua %} blocks vars.h is the module's own table.
-function R.lua_module(env, path, text)
+function M.lua_module(env, path, text)
   local name = vim.fn.fnamemodify(path, ":~:.")
-  local chunk, err = load(text, "=" .. name, "t", R.lua_env(env))
+  local chunk, err = load(text, "=" .. name, "t", M.lua_env(env))
   if not chunk then
     local l, rest = tostring(err):match(":(%d+): (.*)$")
     local e = errors.new("lua", "syntax error: " .. (rest or tostring(err)), tonumber(l))
     e.source = name
     error(e, 0)
   end
-  local t = R.run_lua(env, chunk, name, name)
+  local t = M.run_lua(env, chunk, name, name)
   if type(t) ~= "table" then
     local e = errors.new("lua", ("a module must return a table (got %s)"):format(type(t)))
     e.source = name
@@ -797,15 +797,15 @@ function R.lua_module(env, path, text)
         end
         local lua_args = {}
         for i = 1, #args do
-          lua_args[i] = R.to_lua(args[i])
+          lua_args[i] = M.to_lua(args[i])
         end
         local n = #args
-        return R.from_lua(R.run_lua(call_env, function()
+        return M.from_lua(M.run_lua(call_env, function()
           return fn(unpack(lua_args, 1, n))
         end, name, name))
       end)
     else
-      map.set(mod, k, R.from_lua(v))
+      map.set(mod, k, M.from_lua(v))
     end
   end
   module_raw[mod] = t
@@ -815,11 +815,11 @@ end
 ---{% lua %} ... {% endlua %}: run the code; its return value is output like {{ }}.
 ---@param line integer template line where the code starts
 ---@param vars_fn fun(): table the template variables visible here (set, for, macro args)
-function R.lua_block(env, code, line, vars_fn)
+function M.lua_block(env, code, line, vars_fn)
   local name = env.source or "template"
   local vars = {}
   for k, v in pairs(vars_fn()) do
-    vars[k] = R.to_lua(v)
+    vars[k] = M.to_lua(v)
   end
   local view = setmetatable({}, {
     __index = vars,
@@ -830,47 +830,47 @@ function R.lua_block(env, code, line, vars_fn)
   -- Compiled for each run with its own environment: two renders may run the same block
   -- at once (each waiting inside it on a dbdash helper).
   local chunk, err =
-    load(string.rep("\n", line - 1) .. code, "=" .. name, "t", R.lua_env(env, { vars = view }))
+    load(string.rep("\n", line - 1) .. code, "=" .. name, "t", M.lua_env(env, { vars = view }))
   if not chunk then
     local l, rest = tostring(err):match(":(%d+): (.*)$")
     error(errors.new("lua", "syntax error: " .. (rest or tostring(err)), tonumber(l) or line), 0)
   end
-  local ret = R.run_lua(env, chunk, name)
+  local ret = M.run_lua(env, chunk, name)
   if ret == nil then
     return ""
   end
-  return R.out(env, R.from_lua(ret))
+  return M.out(env, M.from_lua(ret))
 end
 
 -- Macros and imports ------------------------------------------------------------------------
 
 Macro.__index = Macro
 Macro.__call = function(self, args, kwargs, env)
-  return R.markup(env, self.fn(args, kwargs, env)) -- like Jinja's Markup: not escaped again
+  return M.markup(env, self.fn(args, kwargs, env)) -- like Jinja's Markup: not escaped again
 end
 
 ---Wrap a compiled macro body as a callable value. Its attributes are those of Jinja's
 ---Macro: name, arguments, catch_varargs, catch_kwargs, caller.
-function R.macro(name, fn, params, flags)
+function M.macro(name, fn, params, flags)
   flags = flags or {}
   return setmetatable({
     name = name,
     fn = fn,
-    arguments = R.tuple(vim.list_extend({}, params or {})),
+    arguments = M.tuple(vim.list_extend({}, params or {})),
     catch_varargs = flags.catch_varargs == true,
     catch_kwargs = flags.catch_kwargs == true,
     caller = flags.caller == true,
   }, Macro)
 end
 
-function R.is_macro(v)
+function M.is_macro(v)
   return getmetatable(v) == Macro
 end
 
 ---Check a macro call's arguments against its parameters: surplus positional arguments
 ---become varargs (or are an error), unknown keyword arguments kwargs (or an error), and a
 ---caller is only taken by macros that use it. Returns { varargs, kwargs, caller }.
-function R.check_args(name, args, kwargs, params, flags)
+function M.check_args(name, args, kwargs, params, flags)
   local info = {}
   if #args > #params then
     if not flags.catch_varargs then
@@ -882,7 +882,7 @@ function R.check_args(name, args, kwargs, params, flags)
     for i = #params + 1, #args do
       extra[#extra + 1] = args[i]
     end
-    info.varargs = R.tuple(extra)
+    info.varargs = M.tuple(extra)
   end
   local known = {}
   for i, p in ipairs(params) do
@@ -892,7 +892,7 @@ function R.check_args(name, args, kwargs, params, flags)
     end
   end
   local extra_kw = map.new()
-  for _, k in ipairs(R.kw_keys(kwargs)) do
+  for _, k in ipairs(M.kw_keys(kwargs)) do
     if k == "caller" and flags.caller then
       info.caller = kwargs[k]
     elseif not known[k] then
@@ -913,7 +913,7 @@ function R.check_args(name, args, kwargs, params, flags)
     info.kwargs = extra_kw
   end
   if flags.caller and info.caller == nil then
-    info.caller = R.undef("No caller defined")
+    info.caller = M.undef("No caller defined")
   end
   return info
 end
@@ -923,7 +923,7 @@ local module_names = setmetatable({}, { __mode = "k" })
 ---Run another template and return its top-level variables and macros as a mapping.
 ---Without `wctx` it sees the globals only (a dashboard's args and meta; cached per
 ---render); "with context" passes `wctx`, the caller's context and variables.
-function R.import(env, target, wctx)
+function M.import(env, target, wctx)
   check(target)
   if type(target) ~= "string" then
     raise("type", "import target must be a string, not %s", typename(target))
@@ -946,7 +946,7 @@ function R.import(env, target, wctx)
     env.check_file(path or target, text or "", tpl.lua and "lua" or "template")
   end
   if tpl.lua then
-    local mod = R.lua_module(env, path or target, text or "")
+    local mod = M.lua_module(env, path or target, text or "")
     env._importing[target] = nil
     module_names[mod] = target
     env._modules[target] = mod
@@ -969,7 +969,7 @@ function R.import(env, target, wctx)
   end
   local mod = map.new()
   for _, e in ipairs(exports) do
-    if e[2] ~= R.MISSING then
+    if e[2] ~= M.MISSING then
       map.set(mod, e[1], e[2])
     end
   end
@@ -981,10 +981,10 @@ function R.import(env, target, wctx)
 end
 
 ---A name from an imported module; missing names stay undefined until used (like Jinja).
-function R.import_name(mod, name)
+function M.import_name(mod, name)
   local v = mod[name]
   if v == nil then
-    return R.undef(
+    return M.undef(
       ("the template '%s' does not export the requested name '%s'"):format(
         module_names[mod] or "?",
         name
@@ -1047,7 +1047,7 @@ end
 
 ---{% include target %}: the output of another template (the first that exists of a list),
 ---with the caller's context and variables (`wctx`), or only the globals.
-function R.include(env, target, ignore_missing, wctx)
+function M.include(env, target, ignore_missing, wctx)
   check(target)
   local names = is_list(target) and target or { target }
   for _, name in ipairs(names) do
@@ -1059,16 +1059,16 @@ function R.include(env, target, ignore_missing, wctx)
   if ignore_missing then
     return ""
   end
-  raise("value", "template not found: %s", table.concat(vim.tbl_map(R.str, names), ", "))
+  raise("value", "template not found: %s", table.concat(vim.tbl_map(M.str, names), ", "))
 end
 
 ---The block registry of a render: block name -> implementations, the most derived first.
-function R.blocks(reg)
+function M.blocks(reg)
   return { chains = reg and reg.chains or {}, required = reg and reg.required or {} }
 end
 
 ---Register a template's blocks (a child's run first, so its blocks come first).
-function R.add_blocks(reg, fns, required)
+function M.add_blocks(reg, fns, required)
   for name, fn in pairs(fns) do
     reg.chains[name] = reg.chains[name] or {}
     table.insert(reg.chains[name], { fn = fn, required = required[name] })
@@ -1077,7 +1077,7 @@ end
 
 ---{% extends target %}: remember the parent; the output so far (`cut` parts) is kept,
 ---the rest of this template only defines blocks.
-function R.extends(_env, reg, target, cut)
+function M.extends(_env, reg, target, cut)
   check(target)
   if reg.parent then
     raise("value", "extended multiple times")
@@ -1096,14 +1096,14 @@ local function call_block(env, reg, name, i, bctx)
     raise("value", "Required block '%s' not found", name)
   end
   local super = function()
-    return R.markup(env, call_block(env, reg, name, i + 1, bctx))
+    return M.markup(env, call_block(env, reg, name, i + 1, bctx))
   end
   return impl.fn(bctx, super)
 end
 
 ---{% block name %}: the most derived implementation of the block (none after extends:
 ---the parent renders it).
-function R.render_block(env, reg, name, bctx)
+function M.render_block(env, reg, name, bctx)
   if reg.parent then
     return ""
   end
@@ -1112,31 +1112,31 @@ end
 
 ---The output of a template that extends `reg.parent`: its text before the extends tag,
 ---then the parent rendered with this template's blocks and top-level variables.
-function R.render_parent(env, reg, ctx, top, o)
+function M.render_parent(env, reg, ctx, top, o)
   local tpl, path = load_named(env, reg.parent, false)
   local before = table.concat(o, "", 1, reg.cut)
-  return before .. run_template(env, tpl, path, R.layer(ctx, top), R.blocks(reg))
+  return before .. run_template(env, tpl, path, M.layer(ctx, top), M.blocks(reg))
 end
 
 -- `self`: self.name() renders block `name`.
 local SelfRef = {}
 SelfRef.__index = SelfRef
 
-function R.self_ref(env, reg, ctx)
+function M.self_ref(env, reg, ctx)
   return setmetatable({ env = env, reg = reg, ctx = ctx }, SelfRef)
 end
 
-R.getattr_hook[SelfRef] = function(obj, name)
+M.getattr_hook[SelfRef] = function(obj, name)
   if obj.reg.chains[name] then
     return function()
-      return R.markup(obj.env, call_block(obj.env, obj.reg, name, 1, obj.ctx))
+      return M.markup(obj.env, call_block(obj.env, obj.reg, name, 1, obj.ctx))
     end
   end
 end
 
 -- Collections ----------------------------------------------------------------------------
 
-function R.dict(flat)
+function M.dict(flat)
   local d = map.new()
   for i = 1, #flat, 2 do
     map.set(d, key_of(check(flat[i])), flat[i + 1])
@@ -1147,7 +1147,7 @@ end
 ---Python slice bounds for a sequence of `n` items: start, stop, step (0-based indexes).
 local function slice_bounds(n, start, stop, step)
   local function int(v, default)
-    if v == nil or v == R.NONE then
+    if v == nil or v == M.NONE then
       return default
     end
     local x, isf = num(check(v))
@@ -1180,12 +1180,12 @@ local function slice_bounds(n, start, stop, step)
 end
 
 ---obj[start:stop:step] of a string (code points), list or tuple.
-function R.slice(obj, start, stop, step)
+function M.slice(obj, start, stop, step)
   check(obj)
   local seq
   local str = as_str(obj)
   if str then
-    seq = R.chars(str)
+    seq = M.chars(str)
   elseif is_list(obj) then
     seq = obj
   else
@@ -1200,31 +1200,31 @@ function R.slice(obj, start, stop, step)
   end
   if str then
     return table.concat(out)
-  elseif R.is_tuple(obj) then
-    return R.tuple(out)
+  elseif M.is_tuple(obj) then
+    return M.tuple(out)
   end
   return out
 end
 
 ---Items to iterate over in a for loop.
-function R.iter(v)
+function M.iter(v)
   check(v)
   if map.is_map(v) then
     return map.keys(v)
   elseif is_list(v) then
     return v
   elseif type(v) == "string" then
-    return R.chars(v)
+    return M.chars(v)
   elseif getmetatable(v) == Safe then
-    return R.chars(v.s)
+    return M.chars(v.s)
   end
   raise("type", "'%s' object is not iterable", typename(v))
 end
 
 ---Unpack an item into `n` loop/set targets.
-function R.unpack(item, n)
+function M.unpack(item, n)
   check(item)
-  local seq = is_list(item) and item or (type(item) == "string" and R.chars(item)) or nil
+  local seq = is_list(item) and item or (type(item) == "string" and M.chars(item)) or nil
   if not seq then
     raise("type", "cannot unpack non-iterable %s object", typename(item))
   end
@@ -1240,7 +1240,7 @@ local function op_error(op, a, b)
   raise("type", "unsupported operand type(s) for %s: '%s' and '%s'", op, typename(a), typename(b))
 end
 
-function R.add(a, b)
+function M.add(a, b)
   check(a)
   check(b)
   local x, fx = num(a)
@@ -1252,16 +1252,16 @@ function R.add(a, b)
   if s and t then
     return s .. t
   end
-  if is_list(a) and is_list(b) and R.is_tuple(a) == R.is_tuple(b) then
+  if is_list(a) and is_list(b) and M.is_tuple(a) == M.is_tuple(b) then
     local out = {}
     vim.list_extend(out, a)
     vim.list_extend(out, b)
-    return R.is_tuple(a) and R.tuple(out) or out
+    return M.is_tuple(a) and M.tuple(out) or out
   end
   op_error("+", a, b)
 end
 
-function R.sub(a, b)
+function M.sub(a, b)
   local x, fx = num(check(a))
   local y, fy = num(check(b))
   if not (x and y) then
@@ -1270,7 +1270,7 @@ function R.sub(a, b)
   return mknum(x - y, fx or fy)
 end
 
-function R.mul(a, b)
+function M.mul(a, b)
   check(a)
   check(b)
   local x, fx = num(a)
@@ -1291,13 +1291,13 @@ function R.mul(a, b)
       for _ = 1, n do
         vim.list_extend(out, seq)
       end
-      return R.is_tuple(seq) and R.tuple(out) or out
+      return M.is_tuple(seq) and M.tuple(out) or out
     end
   end
   op_error("*", a, b)
 end
 
-function R.div(a, b)
+function M.div(a, b)
   local x = num(check(a))
   local y = num(check(b))
   if not (x and y) then
@@ -1306,10 +1306,10 @@ function R.div(a, b)
   if y == 0 then
     raise("value", "division by zero")
   end
-  return R.float(x / y)
+  return M.float(x / y)
 end
 
-function R.floordiv(a, b)
+function M.floordiv(a, b)
   local x, fx = num(check(a))
   local y, fy = num(check(b))
   if not (x and y) then
@@ -1321,7 +1321,7 @@ function R.floordiv(a, b)
   return mknum(math.floor(x / y), fx or fy)
 end
 
-function R.mod(a, b)
+function M.mod(a, b)
   check(a)
   check(b)
   local x, fx = num(a)
@@ -1330,8 +1330,8 @@ function R.mod(a, b)
     local s = as_str(a)
     if s then
       -- printf-style formatting: 'x=%s' % value
-      local out = R.percent(s, b)
-      return R.is_safe(a) and R.safe(out) or out
+      local out = M.percent(s, b)
+      return M.is_safe(a) and M.safe(out) or out
     end
     op_error("%", a, b)
   end
@@ -1341,7 +1341,7 @@ function R.mod(a, b)
   return mknum(x - math.floor(x / y) * y, fx or fy)
 end
 
-function R.pow(a, b)
+function M.pow(a, b)
   local x, fx = num(check(a))
   local y, fy = num(check(b))
   if not (x and y) then
@@ -1350,11 +1350,11 @@ function R.pow(a, b)
   return mknum(x ^ y, fx or fy or y < 0)
 end
 
-function R.concat(a, b)
-  return R.str(a) .. R.str(b)
+function M.concat(a, b)
+  return M.str(a) .. M.str(b)
 end
 
-function R.neg(a)
+function M.neg(a)
   local x, fx = num(check(a))
   if not x then
     raise("type", "bad operand type for unary -: '%s'", typename(a))
@@ -1362,7 +1362,7 @@ function R.neg(a)
   return mknum(-x, fx)
 end
 
-function R.pos(a)
+function M.pos(a)
   local x, fx = num(check(a))
   if not x then
     raise("type", "bad operand type for unary +: '%s'", typename(a))
@@ -1372,7 +1372,7 @@ end
 
 -- Comparison ------------------------------------------------------------------------------
 
-function R.eq(a, b)
+function M.eq(a, b)
   check(a)
   check(b)
   local x, y = num(a), num(b)
@@ -1385,7 +1385,7 @@ function R.eq(a, b)
   end
   if map.is_map(a) and map.is_map(b) then
     for k, v in pairs(a) do
-      if b[k] == nil or not R.eq(v, b[k]) then
+      if b[k] == nil or not M.eq(v, b[k]) then
         return false
       end
     end
@@ -1397,11 +1397,11 @@ function R.eq(a, b)
     return true
   end
   if is_list(a) and is_list(b) then
-    if #a ~= #b or R.is_tuple(a) ~= R.is_tuple(b) then
+    if #a ~= #b or M.is_tuple(a) ~= M.is_tuple(b) then
       return false
     end
     for i = 1, #a do
-      if not R.eq(a[i], b[i]) then
+      if not M.eq(a[i], b[i]) then
         return false
       end
     end
@@ -1421,7 +1421,7 @@ local function lt(a, b, op)
   end
   if is_list(a) and is_list(b) then
     for i = 1, math.min(#a, #b) do
-      if not R.eq(a[i], b[i]) then
+      if not M.eq(a[i], b[i]) then
         return lt(a[i], b[i], op)
       end
     end
@@ -1439,7 +1439,7 @@ end
 ---Python's sorted(): stable, by `key(item)` (default: the item), raising on values that
 ---cannot be compared.
 ---@param key fun(v: any): any?
-function R.sorted(seq, key, reverse)
+function M.sorted(seq, key, reverse)
   local items = {}
   for i, v in ipairs(seq) do
     items[i] = { v = v, k = key and key(v) or v, i = i }
@@ -1463,7 +1463,7 @@ function R.sorted(seq, key, reverse)
   return out
 end
 
-function R.contains(container, item)
+function M.contains(container, item)
   check(container)
   check(item)
   local s = as_str(container)
@@ -1477,7 +1477,7 @@ function R.contains(container, item)
     return container[key_of(item)] ~= nil
   elseif is_list(container) then
     for _, v in ipairs(container) do
-      if R.eq(v, item) then
+      if M.eq(v, item) then
         return true
       end
     end
@@ -1486,36 +1486,36 @@ function R.contains(container, item)
   raise("type", "argument of type '%s' is not iterable", typename(container))
 end
 
-function R.cmp(op, a, b)
+function M.cmp(op, a, b)
   check(a)
   check(b)
   if op == "==" then
-    return R.eq(a, b)
+    return M.eq(a, b)
   elseif op == "!=" then
-    return not R.eq(a, b)
+    return not M.eq(a, b)
   elseif op == "<" then
     return lt(a, b, op)
   elseif op == ">" then
     return lt(b, a, op)
   elseif op == "<=" then
-    return R.eq(a, b) or lt(a, b, op)
+    return M.eq(a, b) or lt(a, b, op)
   elseif op == ">=" then
-    return R.eq(a, b) or lt(b, a, op)
+    return M.eq(a, b) or lt(b, a, op)
   elseif op == "in" then
-    return R.contains(b, a)
+    return M.contains(b, a)
   elseif op == "notin" then
-    return not R.contains(b, a)
+    return not M.contains(b, a)
   end
   error("unknown comparison " .. op)
 end
 
 -- Filters and tests -----------------------------------------------------------------------
 
-R.filters = {}
-R.tests = {}
+M.filters = {}
+M.tests = {}
 
-function R.filter(env, name, v, args, kwargs)
-  local f = R.filters[name]
+function M.filter(env, name, v, args, kwargs)
+  local f = M.filters[name]
   if name ~= "default" and name ~= "d" and name ~= "items" then
     check(v) -- (default and items take an undefined value)
   end
@@ -1525,8 +1525,8 @@ function R.filter(env, name, v, args, kwargs)
   return f(env, v, args, kwargs)
 end
 
-function R.test(env, name, v, args)
-  return R.tests[name](env, v, args)
+function M.test(env, name, v, args)
+  return M.tests[name](env, v, args)
 end
 
-return R
+return M

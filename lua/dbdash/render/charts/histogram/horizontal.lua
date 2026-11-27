@@ -1,7 +1,7 @@
 -- Histogram, horizontal bars with 1/8-cell precision.
 local bars = require("dbdash.render.charts.bars")
 
-return {
+local M = {
   name = "horizontal",
   render = function(rs, show, ctx)
     local bins, vals = bars.histogram(rs, show, ctx)
@@ -15,3 +15,5 @@ return {
     return bars.horizontal(ctx, bins, o)
   end,
 }
+
+return M

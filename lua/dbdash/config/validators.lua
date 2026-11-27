@@ -9,7 +9,7 @@
 --   panel      a panel's config (path: its prefix, "" or "panels[i].")
 --   style      a style sheet as written (selector -> properties), top-level or a panel's
 --   dashboard  the whole config
-return {
+local M = {
   "dbdash.css",
   "dbdash.args",
   "dbdash.db",
@@ -18,3 +18,5 @@ return {
   "dbdash.layout.grid",
   "dbdash.dashboard.timer",
 }
+
+return M

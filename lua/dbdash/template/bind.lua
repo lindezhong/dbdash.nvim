@@ -8,7 +8,9 @@ local raise = require("dbdash.template.errors").raise
 ---@param kwargs table<string, any>
 ---@param params { [1]: string, [2]: any }[] name and default (nil = required)
 ---@return any ...
-local function bind(fname, args, kwargs, params)
+local M = {}
+
+function M.bind(fname, args, kwargs, params)
   local out = {}
   if #args > #params then
     raise("type", "%s() takes at most %d arguments (%d given)", fname, #params, #args)
@@ -39,4 +41,4 @@ local function bind(fname, args, kwargs, params)
   return unpack(out, 1, #params)
 end
 
-return bind
+return M
