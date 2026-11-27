@@ -235,8 +235,9 @@ lua/dbdash/
   layout/, paint/          grid and panels; display lists
   render/, compositor/     charts, their content and parts, the registry; layers into lines
   css/, dom/               style system; documents and nodes
-  db/                      db.run, drivers, results, the Lua sandbox of queries
+  db/                      db.run, drivers, results, the Lua of queries (db/lua_env.lua)
   template/                the Jinja2 engine and SQL dialects
   net/, crypto/, yaml/     sockets, TLS, HTTP, OpenAPI; cryptography; YAML
-  util/                    errors, JSON, UTF-8, numbers, time, shell, URLs, events, ...
+  util/                    errors, JSON, UTF-8, numbers, time, shell, URLs, events, the Lua
+                           sandbox (guard and helpers: Lua of queries and of templates), ...
 ```

@@ -714,14 +714,15 @@ function R.from_lua(v)
 end
 
 ---The Lua environment of template code: the globals plus args, meta, store and the dbdash
----helpers (env.lua: { args, meta, store, helpers } from the dashboard), and `extra` names.
+---helpers (env.lua: { args, meta, store, helpers } from the dashboard; without helpers,
+---those of util/sandbox.lua), and `extra` names.
 function R.lua_env(env, extra)
   local g = env.lua or {}
   local t = setmetatable({
     args = g.args or {},
     meta = g.meta or require("dbdash.util.readonly").proxy({}, "meta"),
     store = g.store or {},
-    dbdash = g.helpers or require("dbdash.db.lua_env").helpers,
+    dbdash = g.helpers or require("dbdash.util.sandbox").helpers,
   }, { __index = _G })
   for k, v in pairs(extra or {}) do
     t[k] = v
@@ -732,7 +733,7 @@ end
 ---Run Lua with env.timeout; Lua errors become template errors at their own line when they
 ---come from this template's code (chunk `chunk_name`), else at the current line.
 function R.run_lua(env, fn, chunk_name, source)
-  local ok, ret = require("dbdash.db.lua_env").guard(fn, env.timeout, env.cancel)
+  local ok, ret = require("dbdash.util.sandbox").guard(fn, env.timeout, env.cancel)
   if ok then
     -- Arguments the code assigned (args.x = v) apply now: later template text sees them.
     local after = env.lua and env.lua.after

@@ -294,7 +294,8 @@ function M.render_text(d, text, line, o)
     args = o.values,
     meta = metadata.for_lua(o.meta),
     store = o.lua and o.lua.store,
-    helpers = o.lua and o.lua.helpers,
+    -- the helpers of Lua code, dbdash.query included (the template engine knows no data)
+    helpers = o.lua and o.lua.helpers or require("dbdash.db.lua_env").helpers,
     after = o.lua and o.lua.after,
   }
   env.timeout = o.timeout or require("dbdash.options").default_ms("timeout")
