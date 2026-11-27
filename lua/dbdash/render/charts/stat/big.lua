@@ -98,81 +98,45 @@ function M.classes(v, show)
   return {}
 end
 
----One value: the number (big or normal), its label, the change and the sparkline. Its
----parts are the elements of the i-th stat (render/content/chart.lua).
-local function one(rs, show, ctx, history, i)
-  local chart = require("dbdash.render.content.find")
-  local style = require("dbdash.css.style")
-  local hl_of = require("dbdash.css").hl_of
-  local stat = chart.item(ctx.css.node, "stats", i or 1)
-  ---the computed style and group of a part of this stat (or of the chart's part)
-  local function part(tag)
-    local node = chart.child(stat, tag)
-    if node then
-      return style.get(node), hl_of(node), node
-    end
-    return ctx.css:get(tag), ctx.css:hl(tag)
+---The computed style, group and element of a part of stat `stat` (or of the chart's part).
+local function part_of(ctx, stat, tag)
+  local node = require("dbdash.render.content.find").child(stat, tag)
+  if node then
+    return require("dbdash.css.style").get(node), require("dbdash.css").hl_of(node), node
   end
-  local lines, hl = {}, {}
-  local function add(s, spans)
-    lines[#lines + 1] = s
-    for _, sp in ipairs(spans or {}) do
-      hl[#hl + 1] = { row = #lines - 1, col_s = sp[1], col_e = sp[2], group = sp[3] }
-    end
-  end
-  local title = show.title ~= vim.NIL and show.title or ""
-  if title ~= "" then
-    title = W.truncate(title, ctx.width)
-    add(title, { { 0, #title, ctx.css:hl("title") } })
-  end
+  return ctx.css:get(tag), ctx.css:hl(tag)
+end
 
-  local v, err = C.value(rs, show)
-  if err then
-    add(err, { { 0, #err, ctx.css:hl("warning") } })
-    return { lines = lines, hl = hl }
-  end
-  local text, unit = C.text(v, show)
-  -- the value element: its threshold class (set when the DOM was built) colors it
-  -- (Grafana colorMode is a rule: value.danger { background-color: ... })
-  local vstyle, group = part("value")
-  if not chart.child(stat, "value") then
-    local classes = M.classes(v, show)
-    vstyle, group =
-      ctx.css:get("value", { classes = classes }), ctx.css:hl("value", { classes = classes })
-  end
-
-  local size = vstyle["font-size"]
-  local rows = size ~= "normal" and big(text) or nil
+---The value: three rows of big digits when its font-size asks and they fit (the unit after
+---the last), else one line.
+local function value_lines(ctx, stat, out, text, unit, vstyle, group)
+  local rows = vstyle["font-size"] ~= "normal" and big(text) or nil
   local fits = rows and W.width(rows[1]) + (unit and (W.width(unit) + 1) or 0) <= ctx.width
-  if fits then
-    for r = 1, 3 do
-      local s = rows[r]
-      local spans = { { 0, #s, group } }
-      if r == 3 and unit then
-        spans[#spans + 1] = { #s + 1, #s + 1 + #unit, select(2, part("unit")) }
-        s = s .. " " .. unit
-      end
-      add(s, spans)
-    end
-  else
+  if not fits then
     local s = W.truncate(text .. (unit and (" " .. unit) or ""), ctx.width)
-    add(s, { { 0, math.min(#s, #text), group } })
+    out:add(s, { { 0, math.min(#s, #text), group } })
+    return
   end
-  local label = show.label ~= vim.NIL and show.label or nil
-  if label then -- a muted line under the value (Grafana stat text)
-    local l = W.truncate(tostring(label), ctx.width)
-    add(l, { { 0, #l, select(2, part("label")) } })
+  for r = 1, 3 do
+    local s = rows[r]
+    local spans = { { 0, #s, group } }
+    if r == 3 and unit then
+      spans[#spans + 1] = { #s + 1, #s + 1 + #unit, select(2, part_of(ctx, stat, "unit")) }
+      s = s .. " " .. unit
+    end
+    out:add(s, spans)
   end
+end
 
-  -- change and sparkline
-  history = history or {}
+---The change since the previous value and the sparkline of the history, on one line.
+local function trend_line(ctx, stat, out, show, history)
   local parts, spans, pos = {}, {}, 0
   local function put(s, g)
     spans[#spans + 1] = { pos, pos + #s, g }
     parts[#parts + 1] = s
     pos = pos + #s
   end
-  local delta_style, _, delta_node = part("delta")
+  local delta_style, _, delta_node = part_of(ctx, stat, "delta")
   if delta_style.display ~= "none" then
     local d = C.delta(history, show.delta_mode ~= vim.NIL and show.delta_mode or nil)
     if d then
@@ -180,13 +144,13 @@ local function one(rs, show, ctx, history, i)
       -- (the class restyles it) before reading its color
       if delta_node then
         delta_node:set_classes({ d.dir })
-        put(d.text, hl_of(delta_node))
+        put(d.text, require("dbdash.css").hl_of(delta_node))
       else
         put(d.text, ctx.css:hl("delta", { classes = { d.dir } }))
       end
     end
   end
-  if part("sparkline").display ~= "none" then
+  if part_of(ctx, stat, "sparkline").display ~= "none" then
     local len = tonumber(show.sparkline_length ~= vim.NIL and show.sparkline_length or nil)
       or C.HISTORY
     local room = ctx.width - (pos > 0 and (W.width(table.concat(parts)) + 2) or 0)
@@ -196,13 +160,53 @@ local function one(rs, show, ctx, history, i)
         parts[#parts + 1] = "  "
         pos = pos + 2
       end
-      put(spark, select(2, part("sparkline")))
+      put(spark, select(2, part_of(ctx, stat, "sparkline")))
     end
   end
   if #parts > 0 then
-    add(table.concat(parts), spans)
+    out:add(table.concat(parts), spans)
   end
-  return { lines = lines, hl = hl }
+end
+
+---One value: the number (big or normal), its label, the change and the sparkline. Its
+---parts are the elements of the i-th stat (render/content/chart.lua).
+local function one(rs, show, ctx, history, i)
+  local chart = require("dbdash.render.content.find")
+  local stat = chart.item(ctx.css.node, "stats", i or 1)
+  local out = { lines = {}, hl = {} }
+  function out.add(o, s, spans)
+    o.lines[#o.lines + 1] = s
+    for _, sp in ipairs(spans or {}) do
+      o.hl[#o.hl + 1] = { row = #o.lines - 1, col_s = sp[1], col_e = sp[2], group = sp[3] }
+    end
+  end
+  local title = show.title ~= vim.NIL and show.title or ""
+  if title ~= "" then
+    title = W.truncate(title, ctx.width)
+    out:add(title, { { 0, #title, ctx.css:hl("title") } })
+  end
+  local v, err = C.value(rs, show)
+  if err then
+    out:add(err, { { 0, #err, ctx.css:hl("warning") } })
+    return { lines = out.lines, hl = out.hl }
+  end
+  local text, unit = C.text(v, show)
+  -- the value element: its threshold class (set when the DOM was built) colors it
+  -- (Grafana colorMode is a rule: value.danger { background-color: ... })
+  local vstyle, group = part_of(ctx, stat, "value")
+  if not chart.child(stat, "value") then
+    local classes = M.classes(v, show)
+    vstyle, group =
+      ctx.css:get("value", { classes = classes }), ctx.css:hl("value", { classes = classes })
+  end
+  value_lines(ctx, stat, out, text, unit, vstyle, group)
+  local label = show.label ~= vim.NIL and show.label or nil
+  if label then -- a muted line under the value (Grafana stat text)
+    local l = W.truncate(tostring(label), ctx.width)
+    out:add(l, { { 0, #l, select(2, part_of(ctx, stat, "label")) } })
+  end
+  trend_line(ctx, stat, out, show, history or {})
+  return { lines = out.lines, hl = out.hl }
 end
 
 ---Several values side by side (show.value_columns: names or { column, label, format,
