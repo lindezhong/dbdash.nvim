@@ -86,4 +86,36 @@ function M.value(v, fmt)
   return M.number(v)
 end
 
+---Display text for a cell value. Line breaks become "↵" unless `keep_lines` (wrapping
+---tables break the cell there).
+---@return string text, boolean is_null
+function M.value_text(v, ltype, null_text, keep_lines)
+  if v == nil or v == vim.NIL then
+    return null_text, true
+  end
+  local t = type(v)
+  local s
+  if t == "string" then
+    if ltype == "bytes" then
+      s = "\\x" .. require("dbdash.crypto.util").hex(v)
+    else
+      s = v
+    end
+  elseif t == "number" then
+    s = require("dbdash.util.number").numstr(v)
+  elseif t == "boolean" then
+    s = v and "true" or "false"
+  elseif t == "table" then
+    local ok, j = pcall(vim.json.encode, v)
+    s = ok and j or tostring(v)
+  else
+    s = tostring(v)
+  end
+  s = s:gsub("\r\n?", "\n"):gsub("\t", " ")
+  if not keep_lines then
+    s = s:gsub("\n", "↵")
+  end
+  return s, false
+end
+
 return M

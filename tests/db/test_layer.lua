@@ -211,4 +211,16 @@ T["manager: query_async inside a task"] = function()
   eq(got, { nil, 3 })
 end
 
+T["register: a driver has connect or produce, one of them"] = function()
+  local function err(d)
+    local ok, e = pcall(db.register, d)
+    eq(ok, false)
+    return e
+  end
+  eq(err({}), "a driver is a table with a name")
+  local both = { name = "x", connect = function() end, produce = function() end }
+  eq(err({ name = "x" }):find("one of them", 1, true) ~= nil, true)
+  eq(err(both):find("one of them", 1, true) ~= nil, true)
+end
+
 return T

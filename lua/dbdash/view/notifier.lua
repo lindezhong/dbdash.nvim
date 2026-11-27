@@ -22,7 +22,7 @@ events:on("threshold", function(d, p, cur)
     or d.cfg.title
     or (d.cfg.grid and p:title() or vim.fn.fnamemodify(d.path, ":t"))
   local what = cur.column and (cur.column .. " = ") or ""
-  local value = require("dbdash.render.table").format_value(cur.value, nil, "NULL")
+  local value = require("dbdash.render.format").value_text(cur.value, nil, "NULL")
   vim.notify(
     ("dbdash: %s: %s%s %s %s"):format(
       title,

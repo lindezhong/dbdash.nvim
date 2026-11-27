@@ -112,7 +112,7 @@ function M.build(chart, rs, show)
     row_below = nn(row_th.below) == true
     row_steps = T.steps(nn(row_th.steps) or {}, row_below)
   end
-  local fmt = require("dbdash.render.table").format_value
+  local fmt = require("dbdash.render.format").value_text
   local python = require("dbdash.render.format").python
   content.set(tbl, {
     data = { columns = cols, total = #rs.rows, truncated = rs.truncated or false },

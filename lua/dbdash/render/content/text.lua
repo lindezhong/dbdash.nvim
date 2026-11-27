@@ -4,7 +4,7 @@
 -- rule whose pattern matches. A line's text is its cells joined by show.separator; a NULL
 -- cell is the character "\1" there, which layout replaces with cell.null { content }.
 local content = require("dbdash.render.content")
-local tbl = require("dbdash.render.table")
+local tbl = require("dbdash.render.format")
 
 local M = {}
 
@@ -53,7 +53,7 @@ local function cell_text(v, ltype)
   if type(v) == "string" and ltype ~= "bytes" then
     return v
   end
-  return (tbl.format_value(v, ltype, ""))
+  return (tbl.value_text(v, ltype, ""))
 end
 
 ---@return dbdash.dom.Node lines

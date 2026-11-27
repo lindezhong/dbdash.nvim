@@ -5,14 +5,6 @@
 -- [xlim] x [ylim]. Each character cell has one color: the last one drawn wins.
 local M = {}
 
----@class dbdash.render.Canvas
----@field cols integer
----@field rows integer
----@field px_x integer
----@field px_y integer
----@field xlim number[]
----@field ylim number[]
----@field glyph fun(mask: integer): string
 local Canvas = {}
 Canvas.__index = Canvas
 

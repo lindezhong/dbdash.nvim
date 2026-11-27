@@ -205,6 +205,20 @@ T["every chart fits the requested width"] = function()
   end
 end
 
+T["registry: an implementation missing what its category needs is a clear error"] = function()
+  local registry = require("dbdash.render.registry")
+  local function err(name, impl)
+    local ok, e = pcall(registry.register, name, impl)
+    eq(ok, false)
+    return e
+  end
+  eq(err("chart/bar/x", {}), "chart/bar/x needs render (a function)")
+  eq(err("chart/bar/x", function() end), "chart/bar/x must be a table, not a function")
+  eq(err("palette/p", { colors = {} }), "palette/p needs color (a function)")
+  eq(err("ticks/t", { ticks = function() end }), "ticks/t needs limits (a function)")
+  eq(err("mine", {}):match("^registry names are category/name") ~= nil, true)
+end
+
 T["registry: custom renderers; renderer and canvas from computed styles"] = function()
   local registry = require("dbdash.render.registry")
   registry.register("chart/bar/mine", {

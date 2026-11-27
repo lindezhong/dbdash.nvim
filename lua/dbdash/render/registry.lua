@@ -54,10 +54,46 @@ M.BUILTIN = {
   palette = { "theme", "tableau" },
 }
 
+-- What an implementation of each category provides (render/types.lua).
+local REQUIRED = {
+  chart = { render = "function" },
+  canvas = { new = "function", px_per_char = "table" },
+  ticks = { ticks = "function", limits = "function" },
+  palette = { color = "function" },
+  frame = { render = "function", plot_size = "function", apply_style = "function" },
+}
+
+---Raise unless `impl` provides what its category requires.
+local function check(name, impl)
+  local kind = name:match("^(%w+)/.+$")
+  local required = kind and REQUIRED[kind]
+  if not required then
+    error(
+      ("registry names are category/name with a category of %s, not %q"):format(
+        table.concat(vim.tbl_keys(REQUIRED), ", "),
+        name
+      ),
+      0
+    )
+  end
+  if type(impl) ~= "table" then
+    error(("%s must be a table, not a %s"):format(name, type(impl)), 0)
+  end
+  for field, want in pairs(required) do
+    if type(impl[field]) ~= want then
+      error(("%s needs %s (a %s)"):format(name, field, want), 0)
+    end
+  end
+  if (kind == "chart" or kind == "canvas") and impl.name == nil then
+    impl.name = name:match("([^/]+)$") -- its name in the registry
+  end
+end
+
+---Register an implementation (built-in ones load on first use, checked the same way).
 ---@param name string e.g. "chart/bar/mine", "canvas/sextant"
----@param impl any
+---@param impl table what its category provides (render/types.lua)
 function M.register(name, impl)
-  assert(name:match("^%w+/.+$"), "registry names look like 'category/name'")
+  check(name, impl)
   items[name] = impl
 end
 
@@ -72,9 +108,10 @@ function M.get(name)
   if not prefix then
     return nil
   end
-  local mod = name == "chart/table/box" and "dbdash.render.table" or (prefix .. rest:gsub("/", "."))
+  local mod = prefix .. rest:gsub("/", ".")
   local ok, res = pcall(require, mod)
   if ok then
+    check(name, res)
     items[name] = res
     return res
   end

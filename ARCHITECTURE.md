@@ -180,10 +180,10 @@ view/dashboard.request_render  one frame for every request within 20 ms; none wh
 
 | Interface | Defined in | Implemented by |
 |---|---|---|
-| `dbdash.db.Driver`, `Connection`, `StreamCtx` | `db/init.lua` | `db/drivers/*` |
-| a config part's rules (`M.validators`) | `config/validators.lua` | `db`, `render/registry` |
-| chart renderers, canvases, ticks, palettes, frames | `render/registry.lua` | `render/charts/*`, `render/{canvas,ticks,palette,frame}/*` |
-| `dbdash.render.Output` (lines and highlights) | `render/init.lua` | every renderer |
+| `dbdash.db.Driver`, `Connection`, `StreamCtx` | `db/types.lua` (base: `db/driver.lua`) | `db/drivers/*` |
+| a config part's rules (`M.validators`) | `config/types.lua` (listed in `config/validators.lua`) | `db`, `render/registry` |
+| chart renderers, canvases, ticks, palettes, frames | `render/types.lua` (checked by `render/registry.lua`) | `render/charts/*`, `render/{canvas,ticks,palette,frame}/*` |
+| `dbdash.render.Output` (lines and highlights) | `render/types.lua` | every renderer |
 
 ## Directory map
 

@@ -8,7 +8,7 @@
 -- block }, chart { line-clamp: N } (lines shown).
 local W = require("dbdash.util.width")
 
-local M = {}
+local M = { name = "plain" }
 
 local nn = require("dbdash.util.null").nn
 

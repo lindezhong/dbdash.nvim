@@ -23,38 +23,6 @@ local M = { name = "box" }
 
 local MIN_COL = 3
 
----Display text for a cell value. Line breaks become "↵" unless `keep_lines` (wrapping
----tables break the cell there).
----@return string text, boolean is_null
-function M.format_value(v, ltype, null_text, keep_lines)
-  if v == nil or v == vim.NIL then
-    return null_text, true
-  end
-  local t = type(v)
-  local s
-  if t == "string" then
-    if ltype == "bytes" then
-      s = "\\x" .. require("dbdash.crypto.util").hex(v)
-    else
-      s = v
-    end
-  elseif t == "number" then
-    s = require("dbdash.util.number").numstr(v)
-  elseif t == "boolean" then
-    s = v and "true" or "false"
-  elseif t == "table" then
-    local ok, j = pcall(vim.json.encode, v)
-    s = ok and j or tostring(v)
-  else
-    s = tostring(v)
-  end
-  s = s:gsub("\r\n?", "\n"):gsub("\t", " ")
-  if not keep_lines then
-    s = s:gsub("\n", "↵")
-  end
-  return s, false
-end
-
 ---Shrink columns until the total fits, in order of least damage: text columns first, then
 ---numeric headers wider than their values, and numbers themselves only as a last resort.
 local function fit(widths, budget, cols, data_w)

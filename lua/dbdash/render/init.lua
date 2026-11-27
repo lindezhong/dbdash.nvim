@@ -6,30 +6,6 @@ local W = require("dbdash.util.width")
 
 local M = {}
 
----@class dbdash.render.Ctx
----@field width integer
----@field height integer
----@field color fun(spec: string?, fallback: string?): string
----@field strwidth fun(s: string): integer
----@field canvas fun(cols: integer, rows: integer, xlim: number[], ylim: number[]):
----  dbdash.render.Canvas a canvas of cols x rows characters over xlim x ylim
----@field canvas_type table the canvas module (px_per_char)
----@field ticks fun(lo: number, hi: number, count: integer): number[], string[]
----@field limits fun(lo: number, hi: number, count: integer): number, number, number
----@field frame table
----@field palette fun(i: integer): string
----@field history number[]? recent values of this panel, oldest first (stat charts)
-
----@class dbdash.render.Highlight
----@field row integer
----@field col_s integer
----@field col_e integer
----@field group string
-
----@class dbdash.render.Output
----@field lines string[]
----@field hl dbdash.render.Highlight[] 0-based rows, byte columns
-
 local function need(name)
   local impl = registry.get(name)
   if not impl then
@@ -180,7 +156,7 @@ function M.render(rs, show, opts)
     if title and title ~= "" then
       ctx.height = math.max(ctx.height - (subtitle and 2 or 1), 5)
     end
-    local out = (style.render or style)(rs, inner, ctx)
+    local out = style.render(rs, inner, ctx)
     if title and title ~= "" then
       out = M.with_title(out, title, subtitle, ctx.width, show.type, css)
     end

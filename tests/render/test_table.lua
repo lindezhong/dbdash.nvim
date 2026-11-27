@@ -73,13 +73,13 @@ T["every line fits the width and has the same display width"] = function()
 end
 
 T["values are formatted by type"] = function()
-  local tbl = require("dbdash.render.table")
-  eq(tbl.format_value(vim.NIL, "string", "NULL"), "NULL")
-  eq(tbl.format_value("\1\255", "bytes", "NULL"), "\\x01ff")
-  eq(tbl.format_value(1.5, "number", "NULL"), "1.5")
-  eq(tbl.format_value(true, "boolean", "NULL"), "true")
-  eq(tbl.format_value("a\nb", "string", "NULL"), "a↵b")
-  eq(tbl.format_value({ 1, 2 }, "array", "NULL"), "[1,2]")
+  local tbl = require("dbdash.render.format")
+  eq(tbl.value_text(vim.NIL, "string", "NULL"), "NULL")
+  eq(tbl.value_text("\1\255", "bytes", "NULL"), "\\x01ff")
+  eq(tbl.value_text(1.5, "number", "NULL"), "1.5")
+  eq(tbl.value_text(true, "boolean", "NULL"), "true")
+  eq(tbl.value_text("a\nb", "string", "NULL"), "a↵b")
+  eq(tbl.value_text({ 1, 2 }, "array", "NULL"), "[1,2]")
 end
 
 T["unknown chart types are reported in place of the chart"] = function()
