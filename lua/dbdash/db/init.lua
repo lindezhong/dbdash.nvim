@@ -248,7 +248,7 @@ function M.query(raw_url, query, opts, callback)
     if not expanded then
       dberr.raise("config", env_err)
     end
-    local d = M.driver_for(expanded)
+    local d = M.validate(expanded, opts.options)
     driver_name = d.name
     local i = url.parse(expanded)
     i.options = opts.options or {}
@@ -475,7 +475,7 @@ function M.run(raw_url, query, opts, on_result, on_end)
     if not expanded then
       dberr.raise("config", env_err)
     end
-    local d = M.driver_for(expanded)
+    local d = M.validate(expanded, opts.options)
     driver_name = d.name
     local i = url.parse(expanded)
     i.options = opts.options or {}
@@ -583,5 +583,48 @@ function M.query_async(raw_url, query, opts)
   end
   return rs
 end
+
+---Check a database URL (${NAME} expanded) and its options against its driver: the URL's
+---parameters (tls, timeouts...) and the options the driver declares (driver.options).
+---Raises a config error; returns the driver.
+---@param raw_url string
+---@param options table?
+---@return dbdash.db.Driver
+function M.validate(raw_url, options)
+  local d = M.driver_for(raw_url)
+  url.parse(raw_url)
+  if d.options then
+    require("dbdash.db.options").check(d.name, options or {}, d.options, {})
+  end
+  return d
+end
+
+-- The rules of a config's database (dbdash.config.validators).
+M.validators = {
+  {
+    field = "database",
+    ---@param db { url: string, options: table }
+    validate = function(db, ctx, path)
+      local expanded = require("dbdash.db.credentials").expand_env(db.url)
+      if not expanded then
+        return -- (config.lua reports the missing variable)
+      end
+      local d
+      local ok, err = pcall(function()
+        d = M.driver_for(expanded)
+        url.parse(expanded)
+      end)
+      if not ok then
+        ctx:fail(path .. ".url", "%s", type(err) == "table" and err.message or tostring(err))
+      end
+      if d.options then
+        ok, err = pcall(require("dbdash.db.options").check, d.name, db.options or {}, d.options, {})
+        if not ok then
+          ctx:fail(path .. ".options", "%s", type(err) == "table" and err.message or tostring(err))
+        end
+      end
+    end,
+  },
+}
 
 return M

@@ -131,6 +131,18 @@ end
 local Ctx = {}
 Ctx.__index = Ctx
 
+---Run the rules other modules have for this part of the config (config/validators.lua).
+function Ctx:validate(field, value, path)
+  for _, mod in ipairs(require("dbdash.config.validators")) do
+    for _, v in ipairs(require(mod).validators or {}) do
+      if v.field == field then
+        v.validate(value, self, path)
+      end
+    end
+  end
+  return value
+end
+
 function Ctx:fail(path, msg, ...)
   -- Keys inside a flow mapping ({ a: 1 }) have no position: use the nearest parent's.
   local p, at = self.pos[path], path
@@ -226,12 +238,12 @@ function Ctx:database(db, prefix)
   if not M.DB_TYPES[typ] then
     self:fail(prefix .. "database.type", "unsupported database type '%s'", typ)
   end
-  return {
+  return self:validate("database", {
     type = typ,
     url = url,
     password_cmd = password_cmd,
     options = self:expect(prefix .. "database.options", db.options, "map", true) or map.new(),
-  }
+  }, prefix .. "database")
 end
 
 function Ctx:arg(a, i, base)
@@ -455,7 +467,7 @@ function Ctx:style(raw, path)
     end
     self:fail(where, "%s", err.message)
   end
-  return rules
+  return self:validate("style", rules, path)
 end
 
 -- Fields that describe one chart: with panels they cannot be top-level defaults.

@@ -639,4 +639,7 @@ function Conn:close()
   self.sock:close()
 end
 
+-- database.options: none (dbdash.db.options)
+M.options = {}
+
 return M

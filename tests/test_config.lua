@@ -526,10 +526,10 @@ end
 
 T["style sheets: parsed in order, errors name the declaration's line"] = function()
   local cfg =
-    assert(load(MINIMAL .. "style:\n  title: { color: Error }\n  chart:\n    renderer: x\n"))
+    assert(load(MINIMAL .. "style:\n  title: { color: Error }\n  chart:\n    renderer: canvas\n"))
   eq(
     { #cfg.style_rules, cfg.style_rules[1].selector.text, cfg.style_rules[2].decls.renderer },
-    { 2, "title", "x" }
+    { 2, "title", "canvas" }
   )
   local msg = err_of(MINIMAL .. "style:\n  title:\n    colour: red\n")
   eq(msg:find(":%d+:%d+: .*unknown property 'colour'") ~= nil, true)
@@ -642,6 +642,28 @@ T["every driver URL scheme is accepted, with drivers not loaded yet"] = function
       eq({ scheme, fresh.driver(scheme).name }, { scheme, drv.name })
     end
   end
+end
+
+T["load-time rules of other modules: renderer names, the URL, driver options"] = function()
+  local msg = err_of(MINIMAL .. "style:\n  chart:\n    renderer: nope\n")
+  eq(msg:find(":%d+:%d+: unknown renderer 'nope' %(known: ") ~= nil, true)
+  msg = err_of(
+    "database: { url: 'postgres://h/db?tls=maybe' }\nquery: { sql: x }\nshow: { type: table }\n"
+  )
+  eq(msg:find("tls must be disable, require", 1, true) ~= nil, true)
+  msg = err_of(
+    "database:\n  url: 'sqlite:///:memory:'\n  options: { lib: x }\nquery: { sql: x }\nshow: { type: table }\n"
+  )
+  eq(
+    msg:find(
+      ":3:%d+: sqlite://: unknown option database.options.lib %(known: create, lib_path, readonly%)"
+    ) ~= nil,
+    true
+  )
+  msg = err_of(
+    "database:\n  url: 'postgres://h/db'\n  options: { lib_path: x }\nquery: { sql: x }\nshow: { type: table }\n"
+  )
+  eq(msg:find("postgres://: unknown option database.options.lib_path", 1, true) ~= nil, true)
 end
 
 return T

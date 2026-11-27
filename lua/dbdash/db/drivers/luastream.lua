@@ -6,7 +6,7 @@
 -- database.options.cwd is the code's directory: Lua runs inside Neovim, so instead of
 -- changing the process's directory, io.open / io.lines / dofile / loadfile resolve relative
 -- paths there and io.popen / os.execute / dbdash.system() run commands there.
-local options = require("dbdash.db.push.options")
+local options = require("dbdash.db.options")
 
 local M = {
   name = "luastream",
@@ -116,5 +116,8 @@ function M.produce(info, code, ctx)
     ctx.emit(value)
   end
 end
+
+-- database.options this driver reads (dbdash.db.options)
+M.options = SPEC
 
 return M

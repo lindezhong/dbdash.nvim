@@ -591,4 +591,7 @@ function M.cancel(conn, info)
   c:close()
 end
 
+-- database.options: none (dbdash.db.options)
+M.options = {}
+
 return M

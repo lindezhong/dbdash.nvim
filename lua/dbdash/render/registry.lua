@@ -125,4 +125,43 @@ function M.resolve(t, computed)
   return computed.renderer or d.renderer or "canvas", computed.canvas or d.canvas or "braille"
 end
 
+---Known names of a kind: "renderer" (of any chart type), "canvas", "ticks", "palette",
+---"frame".
+local function known(kind)
+  if kind == "renderer" then
+    local out = {}
+    for t in pairs(M.BUILTIN.chart) do
+      vim.list_extend(out, M.names("chart/" .. t .. "/"))
+    end
+    return out
+  end
+  return M.names(kind .. "/")
+end
+
+-- The rules of a config's style sheets (dbdash.config.validators): implementations named
+-- in renderer, canvas and palette exist.
+M.validators = {
+  {
+    field = "style",
+    validate = function(rules, ctx, path)
+      for _, rule in ipairs(rules or {}) do
+        for _, kind in ipairs({ "renderer", "canvas", "palette" }) do
+          local name = rule.decls[kind]
+          if type(name) == "string" and not vim.tbl_contains(known(kind), name) then
+            local names = known(kind)
+            table.sort(names)
+            ctx:fail(
+              ("%s.%s.%s"):format(path, rule.key, kind),
+              "unknown %s '%s' (known: %s)",
+              kind,
+              name,
+              table.concat(vim.fn.uniq(names), ", ")
+            )
+          end
+        end
+      end
+    end,
+  },
+}
+
 return M

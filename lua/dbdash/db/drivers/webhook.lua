@@ -13,7 +13,7 @@
 -- limits on body size, connections and slow requests.
 local dberr = require("dbdash.util.error")
 local map = require("dbdash.util.map")
-local options = require("dbdash.db.push.options")
+local options = require("dbdash.db.options")
 
 local M = {
   name = "webhook",
@@ -359,5 +359,8 @@ function M.produce(info, text, ctx)
     end)
   end)
 end
+
+-- database.options this driver reads (dbdash.db.options)
+M.options = SPEC
 
 return M

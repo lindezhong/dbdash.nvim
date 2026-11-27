@@ -3,7 +3,7 @@
 -- the delimiter (:help dbdash-exec). It ends when the script exits.
 local async = require("dbdash.util.async")
 local dberr = require("dbdash.util.error")
-local options = require("dbdash.db.push.options")
+local options = require("dbdash.db.options")
 
 local M = {
   name = "exec",
@@ -141,5 +141,8 @@ function M.produce(info, script, ctx)
     )
   end
 end
+
+-- database.options this driver reads (dbdash.db.options)
+M.options = SPEC
 
 return M

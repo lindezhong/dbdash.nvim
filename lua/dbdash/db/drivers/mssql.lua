@@ -858,4 +858,7 @@ function Conn:server_version()
   return self.version
 end
 
+-- database.options: none (dbdash.db.options)
+M.options = {}
+
 return M

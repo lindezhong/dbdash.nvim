@@ -1,4 +1,5 @@
--- database.options of push sources: checked by type, unknown names are errors.
+-- database.options of a driver: checked against the names and types it declares
+-- (driver.options); unknown names are errors.
 local dberr = require("dbdash.util.error")
 local map = require("dbdash.util.map")
 

@@ -45,4 +45,7 @@ function Conn:server_version()
   return jit and jit.version or _VERSION
 end
 
+-- database.options: none (dbdash.db.options)
+M.options = {}
+
 return M

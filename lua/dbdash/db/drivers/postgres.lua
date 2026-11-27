@@ -537,4 +537,7 @@ function M.cancel(conn, info)
   sock:close()
 end
 
+-- database.options: none (dbdash.db.options)
+M.options = {}
+
 return M

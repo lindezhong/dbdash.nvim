@@ -444,4 +444,7 @@ function Conn:server_version()
   return self.version
 end
 
+-- database.options this driver reads (dbdash.db.options)
+M.options = { lib_path = "string", readonly = "boolean", create = "boolean" }
+
 return M
