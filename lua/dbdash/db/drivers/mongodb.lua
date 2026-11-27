@@ -33,6 +33,7 @@ local Conn = {}
 Conn.__index = Conn
 
 ---Send a command document and return the reply document. Raises on ok: 0.
+---@return any reply the reply document
 function Conn:command(cmd, phase)
   self.request_id = (self.request_id or 0) + 1
   local body = "\0\0\0\0" .. "\0" .. bson.encode(cmd)
@@ -489,7 +490,7 @@ function OPS.aggregate(self, x)
 end
 
 function OPS.count(self, x)
-  local r = self:command(x.command({ { "count", x.coll }, { "query", x.filter } }))
+  local r = self:command(x.command({ { "count", x.coll }, { "query", x.filter } })) ---@type any
   return resultset.new({ { name = "count", type = "integer", db_type = "int" } }, { { r.n } })
 end
 
@@ -498,6 +499,7 @@ function OPS.distinct(self, x)
   if type(field) ~= "string" then
     dberr.raise("query", 'distinct needs "field": "<name>"')
   end
+  ---@type any
   local r =
     self:command(x.command({ { "distinct", x.coll }, { "key", field }, { "query", x.filter } }))
   local docs = {}
@@ -511,8 +513,9 @@ end
 function OPS.command(self, x)
   local cmd = opt(x.q, "command")
   if not map.is_map(cmd) then
-    dberr.raise("query", 'operation "command" needs "command": { ... }')
+    return dberr.raise("query", 'operation "command" needs "command": { ... }')
   end
+  ---@cast cmd table
   local full = map.new()
   for k, v in map.pairs(cmd) do
     map.set(full, k, v)

@@ -41,6 +41,7 @@ function M.render(rs, show, ctx)
   local hl = require("dbdash.css.hl")
   -- the lines' DOM (render/content/text.lua), one line element per row
   local root = require("dbdash.render.content").build(css.node, rs, show)
+  ---@cast root -nil (a text chart's content has a root)
   local line_nodes = require("dbdash.render.content").list(root, "line")
   local null_text = css:get("cell", { classes = { "null" } }).content or ""
   local lines, hls = {}, {}

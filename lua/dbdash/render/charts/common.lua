@@ -216,6 +216,10 @@ end
 ---@field xmax number?
 ---@field yformat string?
 ---@field xformat string?
+---@field yscale "linear"|"log"|string
+---@field xscale "linear"|"log"|string
+---@field yticks table?
+---@field xticks table?
 
 ---Axis settings from show.axes.{x_axis,y_axis} or x_label/y_label.
 ---@return dbdash.render.Axes
@@ -272,7 +276,8 @@ function M.y_ticks(ctx, lo, hi, rows, yformat, count, log)
 end
 
 ---Ticks of a log10 axis: lo and hi are exponents; one tick per power of ten.
----@return number[] values (exponents), string[] labels
+---@return number[] values the exponents
+---@return string[] labels
 function M.log_ticks(lo, hi)
   local values, labels = {}, {}
   for e = math.ceil(lo - 1e-9), math.floor(hi + 1e-9) do

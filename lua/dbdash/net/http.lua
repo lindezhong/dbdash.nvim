@@ -285,7 +285,8 @@ function M.request(req, o)
   o = vim.tbl_extend("keep", { first_origin = origin(req.url) }, o or {})
   local url = req.url
   local max = o.redirects or M.MAX_REDIRECTS
-  for hop = 0, max do
+  local hop = 0
+  while true do -- (the last hop returns)
     local res = send_once(req, url, o)
     local loc = res.headers.location
     if not (REDIRECT[res.status] and loc) or hop == max then
@@ -310,6 +311,7 @@ function M.request(req, o)
       end
       req.headers = headers
     end
+    hop = hop + 1
   end
 end
 

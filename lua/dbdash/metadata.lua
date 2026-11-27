@@ -75,7 +75,7 @@ end
 ---%z is not portable: Windows prints the zone name).
 function M.iso_now(t)
   t = t or os.time()
-  local offset = os.difftime(t, os.time(os.date("!*t", t)))
+  local offset = os.difftime(t, os.time(os.date("!*t", t) --[[@as osdateparam]]))
   if os.date("*t", t).isdst then
     offset = offset + 3600
   end
@@ -102,8 +102,9 @@ local function url_parts(raw, typ)
   end
   local okd, driver = pcall(require("dbdash.db").driver, typ)
   if okd and driver.parse_url then
-    u.options = {}
-    local okp, parsed = pcall(driver.parse_url, u)
+    local info = u --[[@as dbdash.db.ConnInfo]]
+    info.options = {}
+    local okp, parsed = pcall(driver.parse_url, info)
     if okp and parsed then
       u = parsed
     end

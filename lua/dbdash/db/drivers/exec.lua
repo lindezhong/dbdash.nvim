@@ -99,7 +99,7 @@ function M.produce(info, script, ctx)
     local ok, p = pcall(vim.system, argv, {
       cwd = cwd,
       env = next(env) and env or nil,
-      stdin = o.stdin or false,
+      stdin = o.stdin,
       text = false,
       stdout = out and function(_, data)
         if data then

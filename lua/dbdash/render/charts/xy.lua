@@ -523,7 +523,9 @@ local function draw_mark_lines(plot)
       if y then
         canvas:line(plot.xlo, y, plot.xhi, y, group, 2)
         local text = nn(m.label)
-          or (type(v) == "string" and ("%s %s"):format(v, fmt.number(real)))
+          or (
+            type(v) == "string" and ("%s %s"):format(v, fmt.number(real --[[@as number]]))
+          )
           or nil
         if text then
           local row = canvas:cell_of(plot.xhi, y)
@@ -566,7 +568,7 @@ end
 ---@param kind "line"|"area"|"scatter"|"bubble"
 function M.render(rs, show, ctx, kind)
   local axes = C.axes(show)
-  local stacked = kind == "area" and nn(show.stacked)
+  local stacked = (kind == "area" and nn(show.stacked)) or false ---@type boolean|string
   stacked = (stacked == true or stacked == "percent") and stacked or false
   local series, xaxis = collect(rs, show, ctx, kind)
   local plot = {

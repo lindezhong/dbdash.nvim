@@ -11,6 +11,7 @@
 -- variables, globs or command substitution: they are kept as written.
 local M = {}
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg, ...)
   require("dbdash.util.error").raise("query", msg:format(...), { kind = "value" })
 end
@@ -216,10 +217,7 @@ local function file_data(name, base_dir, strip)
   if not path:match("^/") and not path:match("^%a:[/\\]") and base_dir then
     path = base_dir .. "/" .. path
   end
-  local f = io.open(path, "rb")
-  if not f then
-    fail("curl: cannot read the data file %s", name)
-  end
+  local f = io.open(path, "rb") or fail("curl: cannot read the data file %s", name)
   local s = f:read("*a")
   f:close()
   return strip and (s:gsub("[\r\n]", "")) or s

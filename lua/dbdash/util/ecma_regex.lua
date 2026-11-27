@@ -36,6 +36,7 @@ local function cps(s)
 end
 M.codepoints = cps
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg, ...)
   error({ regex = true, message = msg:format(...) }, 0)
 end
@@ -683,7 +684,8 @@ function M.get(pattern)
   end
   local ok, res = pcall(M.compile, pattern)
   if not ok then
-    return nil, type(res) == "table" and res.message or tostring(res)
+    local e = res ---@type any (the error)
+    return nil, type(e) == "table" and e.message or tostring(e)
   end
   cache[pattern] = res
   return res

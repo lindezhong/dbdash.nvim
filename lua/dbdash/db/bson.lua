@@ -14,6 +14,7 @@ local M = {}
 
 local NULL = vim.NIL
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg, ...)
   require("dbdash.util.error").raise("query", msg:format(...))
 end
@@ -32,11 +33,12 @@ end
 
 ---int64 from a Lua number (|n| < 2^53) or decimal string.
 local function i64(v)
-  local x = type(v) == "string" and ffi.new("int64_t", 0) or nil
-  if x then
+  local x ---@type any (an int64_t cdata)
+  if type(v) == "string" then
+    x = ffi.new("int64_t", 0)
     local neg = v:sub(1, 1) == "-"
     for d in v:gsub("^[-+]", ""):gmatch("%d") do
-      x = x * 10 + tonumber(d)
+      x = x * 10 + (tonumber(d) or 0)
     end
     if neg then
       x = -x
@@ -44,10 +46,10 @@ local function i64(v)
   else
     x = ffi.new("int64_t", v)
   end
-  local u = ffi.cast("uint64_t", x)
+  local u = ffi.cast("uint64_t", x) ---@type any (a uint64_t cdata)
   local out = {}
   for k = 0, 7 do
-    out[k + 1] = string.char(tonumber(bit.band(bit.rshift(u, k * 8), 0xff)))
+    out[k + 1] = string.char(tonumber(bit.band(bit.rshift(u, k * 8), 0xff)) or 0)
   end
   return table.concat(out)
 end

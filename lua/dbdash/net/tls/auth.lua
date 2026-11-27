@@ -31,7 +31,9 @@ function M.authenticate(ders, opts)
     if M.STRICT[opts.mode] then
       error(cert, 0)
     end
-    cert = { der = der }
+    -- the certificate does not parse: only what pinning needs (require and pin modes)
+    ---@diagnostic disable-next-line: missing-fields
+    cert = { der = der } --[[@as dbdash.x509.Cert]]
   end
   cert.fingerprint = fp
   if opts.mode == "verify-ca" or opts.mode == "verify-full" then

@@ -1,10 +1,8 @@
 -- Template error objects shared by the lexer, parser, compiler and runtime.
 local M = {}
 
----@class dbdash.template.Error: dbdash.Error
----@field phase "template"
----@field kind "syntax"|"undefined"|"type"|"value"|"internal"
----@field col integer?
+-- A template error is a dbdash.Error of phase "template" (with kind, line, col, source).
+---@alias dbdash.template.Error dbdash.Error
 
 local errors = require("dbdash.util.error")
 M.Error = errors.Error
@@ -24,6 +22,7 @@ function M.syntax(line, col, msg, ...)
 end
 
 ---Raise a runtime error; the line is filled in by the renderer.
+---@return any (it never returns)
 function M.raise(kind, msg, ...)
   error(M.new(kind, select("#", ...) > 0 and msg:format(...) or msg), 0)
 end

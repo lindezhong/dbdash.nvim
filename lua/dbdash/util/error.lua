@@ -26,6 +26,9 @@ local M = {}
 ---@field kind string? a template error's kind ("syntax", "undefined", "type", "value"...)
 ---@field source string? the file of a template or Lua code
 ---@field line integer? its line
+---@field col integer? its column (template syntax errors)
+---@field not_found boolean? a template that does not exist ({% include ... ignore missing %})
+---@field tls_closed boolean? the peer closed the connection during the TLS handshake
 
 local Error = {}
 Error.__index = Error
@@ -63,10 +66,12 @@ function M.is(e)
   return getmetatable(e) == Error
 end
 
----Raise an error.
+---Raise an error. It never returns: `x or raise(...)` and `return raise(...)` keep the
+---types of their code.
 ---@param phase dbdash.Phase
 ---@param message string
 ---@param extra table? additional fields (code, detail, position, driver)
+---@return any
 function M.raise(phase, message, extra)
   local e = extra or {}
   e.phase, e.message = phase, message

@@ -13,6 +13,8 @@ local M = {}
 ---@field host string
 ---@field port integer
 ---@field timeout integer default per-operation timeout (ms)
+---@field tls dbdash.tls.Session? after starttls
+---@field filter table? transforms the data on the wire (TLS)
 local Socket = {}
 Socket.__index = Socket
 
@@ -20,7 +22,7 @@ Socket.__index = Socket
 local function with_timeout(ms, start)
   return async.await(function(cb)
     local done = false
-    local timer = vim.uv.new_timer()
+    local timer = assert(vim.uv.new_timer())
     timer:start(ms, 0, function()
       if done then
         return
@@ -60,7 +62,7 @@ function M.connect(host, port, opts)
   end
   local last
   for _, a in ipairs(addrs or {}) do
-    local tcp = vim.uv.new_tcp()
+    local tcp = assert(vim.uv.new_tcp())
     local cerr = with_timeout(ctimeout, function(cb)
       tcp:connect(a.addr, a.port, cb)
     end)
@@ -87,7 +89,7 @@ function M.connect(host, port, opts)
       tcp:close()
     end
   end
-  dberr.raise(
+  return dberr.raise(
     last == "timeout" and "timeout" or "connect",
     ("cannot connect to %s:%d: %s"):format(
       host,

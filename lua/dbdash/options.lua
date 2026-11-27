@@ -17,7 +17,7 @@ local db_defaults = require("dbdash.db.defaults") -- the built-in values
 ---@class dbdash.SidebarOptions
 ---@field width dbdash.Size (default 30)
 ---@field position "left"|"right" (default "left")
----@field dir string|fun(): string|nil directory to list (default: the current directory)
+---@field dir (string|fun(): string)? directory to list (default: the current directory)
 ---@field pattern string[] file globs to list (default { "*.yaml", "*.yml" })
 ---@field exclude string[] file and directory name globs to skip
 ---  (default { "*.schema.yaml", "*.schema.yml" })
@@ -81,7 +81,7 @@ local defaults = {
   sidebar = {
     width = 30,
     position = "left",
-    dir = nil,
+    -- dir: none (the current directory)
     pattern = { "*.yaml", "*.yml" },
     exclude = { "*.schema.yaml", "*.schema.yml" },
     keys = { select = "<CR>", stop = "t", refresh = "r", close = "q" },
@@ -331,7 +331,9 @@ end
 ---@param name "interval"|"timeout"|"connect_timeout"
 ---@return integer
 function M.default_ms(name)
-  return (duration.parse(M.current.defaults[name])) or (duration.parse(defaults.defaults[name]))
+  return (duration.parse(M.current.defaults[name]))
+    or (duration.parse(defaults.defaults[name]))
+    or 0
 end
 
 ---Set the options from setup(): invalid or unknown entries are reported (setup_errors)

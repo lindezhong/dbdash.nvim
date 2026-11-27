@@ -16,10 +16,12 @@ local M = {}
 local NULL = vim.NIL
 local METHODS = { "get", "put", "post", "delete", "patch", "head", "options", "trace" }
 
+---@return any (it raises: `x or cfg_error(...)` keeps x's type)
 local function cfg_error(msg, ...)
   require("dbdash.util.error").raise("config", "OpenAPI: " .. msg:format(...))
 end
 
+---@return any (it raises: `x or bad(...)` keeps x's type)
 local function bad(status, msg, ...)
   error({ http_status = status, detail = msg:format(...) }, 0)
 end
@@ -60,10 +62,7 @@ function Api:external(file, from)
   if self.docs[path] then
     return self.docs[path]
   end
-  local f = io.open(path, "rb")
-  if not f then
-    cfg_error("$ref to a missing file: %s", path)
-  end
+  local f = io.open(path, "rb") or cfg_error("$ref to a missing file: %s", path)
   local text = f:read("*a")
   f:close()
   local doc = parse(text, path)
@@ -109,8 +108,9 @@ function Api:validate(schema, value, doc)
       return self:resolve(ref, base)
     end,
   }, doc)
-  if e and e.schema_error then
-    cfg_error("%s", e.message)
+  local se = e ---@type any (a schema problem has schema_error)
+  if se and se.schema_error then
+    cfg_error("%s", se.message)
   end
   return e
 end
@@ -1047,11 +1047,12 @@ function Api:route(req, hidden)
       error({
         http_status = 405,
         detail = "method not allowed",
-        headers = { Allow = table.concat(allow, ", ") },
+        headers = { Allow = table.concat(allow or {}, ", ") },
       }, 0)
     end
     bad(404, "no such path")
   end
+  ---@cast op -nil
   local authorized, challenge = self:authorize(op, req.headers)
   if not authorized then
     error({

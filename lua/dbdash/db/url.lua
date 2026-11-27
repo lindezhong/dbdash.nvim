@@ -24,6 +24,7 @@ local M = {}
 ---@field timeout integer ms
 ---@field application_name string
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg, ...)
   dberr.raise("config", msg:format(...))
 end

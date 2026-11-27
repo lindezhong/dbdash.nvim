@@ -236,12 +236,6 @@ end
 ---@field span integer columns
 ---@field row_span integer rows
 
----Place items on a grid of `ncols` columns: areas and explicit positions first, the rest
----in order into the first free cells after the previous auto item (CSS sparse placement).
----@param items dbdash.layout.Item[]
----@param ncols integer
----@param areas table?
----@return dbdash.layout.Place[]?, { index: integer, field: string, message: string }? err
 ---Cells taken by placed items.
 local Used = {}
 Used.__index = Used
@@ -342,6 +336,12 @@ local function place_flowing(used, i, it, cursor)
   return p
 end
 
+---Place items on a grid of `ncols` columns: areas and explicit positions first, the rest
+---in order into the first free cells after the previous auto item (CSS sparse placement).
+---@param items dbdash.layout.Item[]
+---@param ncols integer
+---@param areas table?
+---@return dbdash.layout.Place[]?, { index: integer, field: string, message: string }? err
 function M.place(items, ncols, areas)
   local used = setmetatable({ ncols = ncols }, Used)
   local out = {}
@@ -580,11 +580,11 @@ local function grid_line(v)
   end
   local a, b = v:match("^(%d+)%s*/%s*span%s+(%d+)$")
   if a then
-    return tonumber(a), tonumber(b)
+    return tonumber(a), tonumber(b) or 1
   end
   local n = v:match("^span%s+(%d+)$")
   if n then
-    return nil, tonumber(n)
+    return nil, tonumber(n) or 1
   end
   return tonumber(v), 1
 end
@@ -633,7 +633,7 @@ function M.from_styles(container, items)
         message = ("%d columns, but grid-template-areas has %d"):format(#columns, area_cols),
       }
   end
-  local rows = {}
+  local rows = {} ---@type dbdash.layout.Track[]?
   if container["grid-template-rows"] then
     rows, err = M.parse_tracks(container["grid-template-rows"], "rows")
     if not rows then
@@ -661,6 +661,7 @@ function M.from_styles(container, items)
   end
   local places, perr = M.place(list, #columns, areas)
   if not places then
+    ---@cast perr -nil
     local field = ({ area = "grid-area", row = "grid-row", column = "grid-column" })[perr.field]
       or perr.field
     return nil, { index = perr.index, field = field, message = perr.message }
@@ -682,12 +683,12 @@ end
 ---@param gap integer
 ---@return { row: integer, col: integer, width: integer, x: integer }[]
 function M.plan(spans, width, columns, gap)
-  local tracks = M.parse_tracks(math.max(1, columns), "columns")
+  local tracks = assert(M.parse_tracks(math.max(1, columns), "columns"))
   local items = {}
   for i, s in ipairs(spans) do
     items[i] = { span = s }
   end
-  local places = M.place(items, #tracks, nil)
+  local places = assert(M.place(items, #tracks, nil)) -- (spans only: they always fit)
   local cols = M.columns(tracks, width, gap)
   local cells = {}
   for i, p in ipairs(places) do

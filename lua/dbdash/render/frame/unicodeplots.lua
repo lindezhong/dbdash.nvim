@@ -26,6 +26,7 @@ local M = { name = "unicodeplots" }
 ---@field x_axis boolean? reserve a line for x tick labels (default true)
 ---@field height integer? preferred plot rows
 ---@field min_rows integer?
+---@field chars table? the border's characters (plot { border }, set by apply_style)
 
 ---Line builder that tracks byte offsets for highlights.
 local function builder()

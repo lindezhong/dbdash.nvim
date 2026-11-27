@@ -4,8 +4,9 @@
 -- = true } and run by the runtime.
 local M = {}
 
-local cache = {} ---@type table<string, { mtime: integer, tpl: table }>
+local cache = {} ---@type table<string, { mtime: integer, tpl: table, src: string }>
 
+---@return any (it raises)
 local function not_found(name)
   local e = require("dbdash.template.errors").new("value", "template not found: " .. name)
   e.not_found = true -- {% include ... ignore missing %}
@@ -20,10 +21,7 @@ function M.files(base_dir)
   return function(name)
     local absolute = name:sub(1, 1) == "/" or name:match("^%a:[/\\]")
     local path = vim.fs.normalize(absolute and name or vim.fs.joinpath(base_dir, name))
-    local stat = vim.uv.fs_stat(path)
-    if not stat then
-      not_found(path)
-    end
+    local stat = vim.uv.fs_stat(path) or not_found(path)
     local mtime = stat.mtime.sec * 1e9 + stat.mtime.nsec
     local c = cache[path]
     if c and c.mtime == mtime then

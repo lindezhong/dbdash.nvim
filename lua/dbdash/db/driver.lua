@@ -93,7 +93,8 @@ function Query:run(query, exec_opts, opts)
   end
   self.conn = c
   local ok, rs = pcall(c.execute, c, query, exec_opts)
-  if not ok and type(rs) == "table" and rs.phase == "timeout" then
+  local e = rs ---@type any (the error when not ok)
+  if not ok and type(e) == "table" and e.phase == "timeout" then
     self:stop_server()
   elseif not self.server_stopped then
     self:close_conn()

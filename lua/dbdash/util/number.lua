@@ -58,7 +58,7 @@ function M.numstr(v)
   if digits == "" then
     digits = "0"
   end
-  exp = tonumber(exp)
+  exp = tonumber(exp) or 0 -- (the pattern matched digits)
   if exp >= -4 and exp < 16 then
     if exp < 0 then
       return sign .. "0." .. string.rep("0", -exp - 1) .. digits

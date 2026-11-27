@@ -11,6 +11,8 @@ local map = require("dbdash.util.map")
 
 local M = {}
 
+---Raise an args error (it never returns; `x or fail(...)` keeps x's type).
+---@return any
 local function fail(msg, ...)
   require("dbdash.util.error").raise("args", msg:format(...))
 end
@@ -128,10 +130,7 @@ function M.parse_value(spec, s)
   if t == "string" then
     return s
   elseif t == "number" or t == "int" then
-    local n = tonumber(vim.trim(s))
-    if not n then
-      fail("argument '%s': %q is not a number", spec.name, s)
-    end
+    local n = tonumber(vim.trim(s)) or fail("argument '%s': %q is not a number", spec.name, s)
     if t == "int" and n ~= math.floor(n) then
       fail("argument '%s': %q is not an integer", spec.name, s)
     end

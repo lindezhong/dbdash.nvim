@@ -257,7 +257,7 @@ function M.show_variables()
       col_e = #key,
       group = css:hl("arg-name", { classes = s.panel and { "local" } or nil }),
     }
-    local extra = { s.type }
+    local extra = { s.type } ---@type string[]
     if s.default ~= nil and not vim.deep_equal(s.default, v) then
       extra[#extra + 1] = "default " .. args.format_value(s.default)
     end

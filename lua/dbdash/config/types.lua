@@ -7,10 +7,7 @@
 ---  ctx:fail(path, msg, ...) reports a problem with the line of `path`; a value returned
 ---  replaces the part (normalized) for the next rules and the config
 
----@class dbdash.config.Ctx
----@field fail fun(self, path: string, msg: string, ...)
----@field document fun(self, cfg: dbdash.Config): table the config's document (a stand-in
----  dashboard, dashboard/document.lua)
+-- dbdash.config.Ctx (config.lua) gives rules ctx:fail(path, msg, ...) and ctx:document(cfg).
 
 local M = {}
 

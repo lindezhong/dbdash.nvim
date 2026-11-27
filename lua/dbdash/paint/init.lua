@@ -58,6 +58,14 @@ end
 ---@field header dbdash.render.Output
 ---@field layers dbdash.paint.Layer[]
 ---@field body dbdash.render.Output?
+---@field hits dbdash.paint.Hit[]?
+
+---@class dbdash.paint.Hit where an element is drawn
+---@field row_s integer
+---@field row_e integer
+---@field x integer
+---@field width integer
+---@field node dbdash.dom.Node
 
 ---The display list of a view: layers with their position (cells), in painting order.
 ---@return dbdash.paint.DisplayList

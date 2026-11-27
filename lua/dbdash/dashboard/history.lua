@@ -11,7 +11,7 @@ local M = {}
 ---@field cancelled string? why the refresh was cancelled
 
 ---@param p dbdash.Panel
----@param entry dbdash.HistoryEntry
+---@param entry table the entry without its time
 local function push(p, entry)
   entry.at = os.time()
   table.insert(p.history, 1, entry)

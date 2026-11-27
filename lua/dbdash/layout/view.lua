@@ -30,6 +30,8 @@ local M = {}
 ---@field box table? box settings (padding, border, background, alignment)
 ---@field border_title table? the title drawn in the top border
 ---@field caption_bottom boolean?
+---@field after dbdash.layout.FragmentRow? a row after the chart (caption-side: bottom)
+---@field painted dbdash.render.Output? its display list item (paint/)
 
 local function child(node, tag)
   return require("dbdash.dom.node").child(node, tag)
@@ -301,6 +303,7 @@ function M.grid(d, width, avail)
   end
   local lay, err = L.from_styles(style.get(d.doc.root), items)
   if not lay then
+    ---@cast err -nil
     -- a runtime rule broke the grid: say so instead of drawing (config rules were checked)
     local msg = ("style: %s%s: %s"):format(
       err.index and ("panel %d "):format(err.index) or "",

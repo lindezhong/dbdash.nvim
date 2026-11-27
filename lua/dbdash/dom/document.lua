@@ -18,6 +18,7 @@ local M = {}
 ---@field on_update fun()? called when the document gets something to update (set by its view)
 ---@field updating boolean? a frame is updating it (changes then need no other frame)
 ---@field data_changed boolean? an element's data changed (Node:set_data) since the last frame
+---@field restyled table? what the last restyle did (css/style.lua, for tests and :DbDashInspect)
 local Document = {}
 Document.__index = Document
 

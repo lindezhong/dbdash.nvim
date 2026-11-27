@@ -11,6 +11,7 @@ local M = {}
 local TYPE = record.TYPE
 
 ---@class dbdash.tls.Filter
+---@field session dbdash.tls.Session
 local Filter = {}
 Filter.__index = Filter
 
@@ -98,7 +99,7 @@ end
 
 ---Upgrade a connected socket to TLS 1.3.
 ---@param sock dbdash.net.Socket
----@param opts { host: string, mode: "require"|"pin", fingerprint: string? }
+---@param opts dbdash.net.tls.handshake.RunOpts
 ---@return dbdash.tls.Session
 ---@param io table? transport for the handshake only (raw_write / raw_read_exact), e.g. TLS
 ---records wrapped in TDS packets; application data then uses `sock` directly.
@@ -112,7 +113,7 @@ function M.starttls(sock, opts, io)
   end
   local ok, session = pcall(handshake.run, io or sock, opts)
   if not ok then
-    local e = session
+    local e = session ---@type any (the error)
     if type(e) == "table" and e.phase == "connect" and not e.tls_closed then
       e.phase = "tls"
       e.message = "handshake failed: " .. e.message

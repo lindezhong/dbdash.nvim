@@ -34,6 +34,7 @@ M.NULL = vim.NIL
 ---@field affected integer?
 ---@field elapsed_ms number
 ---@field warnings string[]
+---@field item any? the item of a source that sends data, as it came (meta.prev.query)
 local ResultSet = {}
 ResultSet.__index = ResultSet
 M.ResultSet = ResultSet

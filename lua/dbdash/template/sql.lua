@@ -127,7 +127,7 @@ F.sql_limit = function(_, v, args, kw)
   if v == NONE then
     return ""
   end
-  local n = R.num(v) or tonumber(type(v) == "string" and vim.trim(v) or nil)
+  local n = R.num(v) or tonumber(type(v) == "string" and vim.trim(v) or nil) ---@type number?
   if type(v) == "boolean" then
     n = nil
   end

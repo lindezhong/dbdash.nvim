@@ -39,6 +39,7 @@ local REASONS = {
 }
 M.REASONS = REASONS
 
+---@return any (it raises: `x or http_error(...)` keeps x's type)
 local function http_error(status, detail)
   error({ http_status = status, detail = detail }, 0)
 end
@@ -166,10 +167,7 @@ local function body_reader(sock, req)
     if not cl then
       return -- no body
     end
-    local n = tonumber(cl:match("^%s*(%d+)%s*$") or "")
-    if not n then
-      http_error(400, "invalid Content-Length")
-    end
+    local n = tonumber(cl:match("^%s*(%d+)%s*$") or "") or http_error(400, "invalid Content-Length")
     if n > limit then
       http_error(413, ("the request body is larger than %d bytes"):format(limit))
     end
@@ -206,14 +204,14 @@ M.response = response
 ---@return { close: fun(self), port: integer, host: string }
 function M.listen(host, port, opts, handler)
   opts = opts or {}
-  local tcp = vim.uv.new_tcp()
+  local tcp = assert(vim.uv.new_tcp())
   local ok, err = tcp:bind(host, port)
   if ok then
     ok, err = tcp:listen(128, function(lerr)
       if lerr then
         return
       end
-      local client = vim.uv.new_tcp()
+      local client = assert(vim.uv.new_tcp())
       if not tcp:accept(client) then
         client:close()
         return

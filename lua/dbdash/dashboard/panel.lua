@@ -252,8 +252,8 @@ end
 ---A tick (panel:tick from the clock): a source waiting for it queries now; one that is
 ---still querying skips it (and it is recorded).
 function Panel:on_tick()
-  if self.waiter and not self.running then
-    local w = self.waiter
+  local w = self.waiter
+  if w and not self.running then
     self.waiter = nil
     w(true)
   elseif self.waits_ticks and not self.ended then
@@ -342,8 +342,8 @@ end
 function Panel:stop_run(reason)
   local feed = self.feed
   self.gen = (self.gen or 0) + 1
-  if self.waiter then
-    local w = self.waiter
+  local w = self.waiter
+  if w then
     self.waiter = nil
     w(false)
   end
@@ -387,13 +387,13 @@ function Panel:on_result(gen, err, value, vars, run)
     feed.dropped = feed.dropped + 1
   end
   feed.queue[#feed.queue + 1] = { err = err, value = value, vars = vars, run = run }
-  self:consume(gen)
+  self:consume(gen, feed)
 end
 
 ---The consumer: one task taking the queued results in order, one at a time, through
 ---query.transform and the rows check to settle().
-function Panel:consume(gen)
-  local feed = self.feed
+---@param feed dbdash.Feed
+function Panel:consume(gen, feed)
   if feed.busy then
     return
   end

@@ -63,11 +63,11 @@ end
 ---@return dbdash.Config? cfg, dbdash.ArgState|table|string|nil state_or_err, integer? level
 function M.prepare(path, tokens, on_viewed)
   if vim.fn.filereadable(path) == 0 then
-    return nil,
-      require("dbdash.util.error").new({
-        phase = "config",
-        message = "config file not found: " .. path,
-      })
+    local err = require("dbdash.util.error").new({
+      phase = "config",
+      message = "config file not found: " .. path,
+    })
+    return nil, err
   end
   local cfg, err = require("dbdash.config").load(path)
   if not cfg then

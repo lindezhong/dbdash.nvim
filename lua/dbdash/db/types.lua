@@ -5,9 +5,21 @@
 ---@field options table driver-specific options from the config (database.options)
 ---@field base_dir string? directory of the config file (for relative sqlite paths)
 
----@class dbdash.db.ExecuteOpts
+---@class dbdash.db.LuaGlobals the globals of a run's Lua code
+---@field store table? the panel's table
+---@field helpers table? `dbdash` (db/lua_env.lua helpers, with the run's own)
+---@field after fun()? runs after each piece of Lua code (assigned arguments apply)
+
+---@class dbdash.db.ExecuteOpts what a connection's execute gets
 ---@field max_rows integer
----@field timeout integer
+---@field timeout integer ms
+---@field args table? dashboard arguments (lua://: `args`)
+---@field meta table? dashboard metadata (lua://: `meta`)
+---@field lua dbdash.db.LuaGlobals? lua://: the panel's store and helpers
+---@field source string? config file name (lua:// error locations)
+---@field line integer? the query's line in the config file
+---@field allow_writes boolean? the query may write files (curl -c)
+---@field cancel dbdash.db.CancelToken stops Lua code of the query
 
 ---@class dbdash.db.Connection
 ---@field execute fun(self, query: string, opts: dbdash.db.ExecuteOpts): dbdash.db.ResultSet
@@ -40,7 +52,7 @@
 ---@field password_cmd string|string[]? command printing the password (database.password_cmd)
 ---@field args table? dashboard arguments (lua:// scripts get them as `args`)
 ---@field meta table? dashboard metadata (lua:// scripts get it as `meta`)
----@field lua { store: table, helpers: table }? lua:// scripts: the panel's store and dbdash helpers
+---@field lua dbdash.db.LuaGlobals? lua:// scripts: the panel's store and dbdash helpers
 ---@field source string? config file name for messages (lua:// error locations)
 ---@field line integer? line of the query in the config file (lua:// error locations)
 ---@field raw boolean? return a raw driver result (lua://, http) as is, for query.transform;
@@ -49,8 +61,12 @@
 ---   set for configs that were trusted with it
 ---@field cancel dbdash.db.CancelToken? cancelling it stops the query (see M.query)
 ---@field on_status fun(text: string)? push sources: their status changed (M.run)
----@field wait_tick (fun(): boolean)? a run of a driver with connect: waits for its next tick, false
----  when the run stops (default: one tick)
+---@field wait_tick (fun(not_before: integer?, failures: integer?): boolean)? a run of a
+---  driver with connect: waits for its next tick, false when the run stops (default: one)
+---@field query_only boolean? a query (db.query): a source that sends data is an error
+---@field interval integer? ms between ticks (a database's backoff)
+---@field backoff integer? errors.backoff: the longest wait, in intervals
+---@field failures integer? failures in a row so far (a restarted run goes on counting)
 
 ---@class dbdash.db.StreamCtx what a push source's producer gets
 ---@field writer fun(delimiter: string?, vars: table?): fun(text: string) a stream: the text
@@ -71,7 +87,11 @@
 ---@field on_stop fun(fn: fun()) cleanup when the stream ends or stops (kill a process, ...)
 ---@field base_dir string? the config file's directory
 ---@field options table database.options
----@field args table?, meta table?, lua table?, source string?, line integer? as for lua://
+---@field args table? as for lua://
+---@field meta table?
+---@field lua dbdash.db.LuaGlobals?
+---@field source string?
+---@field line integer?
 ---@field timeout integer ms (query.timeout, else the URL's)
 
 local M = {}

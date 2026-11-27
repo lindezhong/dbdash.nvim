@@ -31,7 +31,9 @@ local M = {}
 
 local IDENT = "[%a_][%w_-]*"
 
----Parse one compound selector at `s:sub(i)`; returns it and the next index.
+---Parse one compound selector at `s:sub(i)`; returns it and the next index (and for
+---::part(x), the part x, a descendant), or nil and an error.
+---@return table? compound, integer|string next_or_err, table? part
 local function compound(s, i, text)
   local c = { classes = {}, attrs = {}, pseudos = {} }
   local tag = s:match("^" .. IDENT, i)
@@ -121,8 +123,9 @@ function M.selector(text)
   while i <= #s do
     local c, nexti, part = compound(s, i, text)
     if not c then
-      return nil, nexti
+      return nil, tostring(nexti)
     end
+    ---@cast nexti integer
     if nexti == i then
       return nil, ("selector %q: unexpected %q"):format(text, s:sub(i, i))
     end
@@ -152,7 +155,7 @@ function M.selector(text)
 end
 
 ---Parse a declaration block { property = value }.
----@return table<string, any>?, string? err (with the property name)
+---@return table<string, any>?, string? err, string? property the property at fault
 function M.declarations(block)
   if type(block) ~= "table" then
     return nil, "expected a mapping of properties"

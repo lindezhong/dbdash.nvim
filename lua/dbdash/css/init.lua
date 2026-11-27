@@ -88,12 +88,18 @@ function M.scope(node, chart_type, sheet)
       end
       local rules, err = parser.sheet(sheet, keys)
       if not rules then
+        ---@cast err -nil
         require("dbdash.util.error").raise("render", ("style %s: %s"):format(err.key, err.message))
       end
+      ---@cast rules -nil
       doc:set_sheet("author", rules)
     end
-    node =
-      doc.root:append(dom.new("chart", { classes = { chart_type }, attrs = { type = chart_type } }))
+    node = doc.root:append(dom.new("chart", {
+      classes = { chart_type },
+      attrs = {
+        type = chart_type --[[@as string]],
+      },
+    }))
   end
   -- the parts live on the node, so every render of the same chart reuses them
   node.css_parts = node.css_parts or {}
@@ -186,6 +192,7 @@ M.validators = {
       local rules, err =
         require("dbdash.css.parser").sheet(sheet, require("dbdash.util.map").keys(sheet))
       if not rules then
+        ---@cast err -nil
         local where = path .. "." .. err.key
         if err.property then
           where = where .. "." .. err.property

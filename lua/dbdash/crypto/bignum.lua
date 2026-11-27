@@ -233,6 +233,10 @@ end
 
 ---Arithmetic modulo an odd prime in Montgomery form (used for elliptic curves).
 ---@class dbdash.bignum.Field
+---@field p integer[] the modulus
+---@field ctx table its Montgomery context
+---@field one integer[] 1 in Montgomery form
+---@field zero integer[]
 local Field = {}
 Field.__index = Field
 

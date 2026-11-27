@@ -30,7 +30,8 @@ M.helpers = vim.tbl_extend("force", {}, sandbox.helpers, {
     local rs = require("dbdash.db").query_async(url, query, opts)
     local lua_result = require("dbdash.db.lua_result")
     if lua_result.is_raw(rs) then
-      return rs.value, rs.vars.response
+      local raw = rs ---@type any (a raw result: value, vars)
+      return raw.value, raw.vars.response
     end
     return rs
   end,

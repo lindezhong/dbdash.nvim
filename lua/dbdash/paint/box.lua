@@ -152,7 +152,7 @@ function M.wrap(content, s, width, height, title)
   local g = s.border_group
   if b then
     local t = title and title.text or ""
-    if t ~= "" then
+    if title and t ~= "" then
       -- ╭─ Title ───╮ (the legend of a fieldset), aligned by title_align
       local room = width - 4
       local tt = W.truncate(t, math.max(room - 2, 1), s.ellipsis)

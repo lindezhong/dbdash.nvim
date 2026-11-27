@@ -1,23 +1,25 @@
--- Render entry point: resolves the chart style through the registry, builds the render
--- context and runs the style. Chart styles are pure functions (rs, show, ctx) -> Output.
+-- Render entry point: resolves the chart's renderer through the registry, builds the render
+-- context and runs it. Renderers are { name, render(rs, show, ctx) -> Output }.
 local highlight = require("dbdash.css.hl")
 local registry = require("dbdash.render.registry")
 local W = require("dbdash.util.width")
 
 local M = {}
 
+---The implementation registered as `name`, or a render error.
+---@return table
 local function need(name)
   local impl = registry.get(name)
-  if not impl then
-    require("dbdash.util.error").raise(
-      "render",
-      ("unknown style '%s' (available: %s)"):format(
-        name,
-        table.concat(registry.names(name:match("^(.*/)")), ", ")
-      )
-    )
+  if impl then
+    return impl
   end
-  return impl
+  return require("dbdash.util.error").raise(
+    "render",
+    ("unknown style '%s' (available: %s)"):format(
+      name,
+      table.concat(registry.names(name:match("^(.*/)")), ", ")
+    )
+  )
 end
 
 ---@class dbdash.render.CtxOpts
@@ -28,6 +30,7 @@ end
 ---@field palette string?
 ---@field css dbdash.css.Scope?
 ---@field type string?
+---@field frame string? (default "unicodeplots")
 
 ---@param opts dbdash.render.CtxOpts
 ---@return dbdash.render.Ctx
@@ -133,7 +136,7 @@ function M.render(rs, show, opts)
     ctx.history = opts.history
     local style = need("chart/" .. show.type .. "/" .. renderer)
     -- the chart's content as DOM (render/content): a dashboard's is built by its commit
-    -- (dashboard/document.lua); a chart rendered on its own builds it here (a result the
+    -- (dashboard/commit.lua); a chart rendered on its own builds it here (a result the
     -- content cannot use is left to the renderer to report)
     if not opts.node then
       pcall(require("dbdash.render.content").build, css.node, rs, show)

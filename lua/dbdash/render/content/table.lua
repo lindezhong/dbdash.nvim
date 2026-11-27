@@ -14,6 +14,7 @@ local NUMERIC = { integer = true, number = true, decimal = true }
 
 local nn = require("dbdash.util.null").nn
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg, ...)
   require("dbdash.util.error").raise("render", msg:format(...))
 end

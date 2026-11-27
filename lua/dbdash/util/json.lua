@@ -44,6 +44,7 @@ P.__index = P
 local ESC =
   { ['"'] = '"', ["\\"] = "\\", ["/"] = "/", b = "\b", f = "\f", n = "\n", r = "\r", t = "\t" }
 
+---@return any (it raises)
 function P:fail(msg)
   require("dbdash.util.error").raise("query", ("invalid JSON at offset %d: %s"):format(self.i, msg))
 end
@@ -76,10 +77,7 @@ function P:string()
   self.i = self.i + 1
   local out = {}
   while true do
-    local j = s:find('["\\]', self.i)
-    if not j then
-      self:fail("unterminated string")
-    end
+    local j = s:find('["\\]', self.i) or self:fail("unterminated string")
     out[#out + 1] = s:sub(self.i, j - 1)
     if s:sub(j, j) == '"' then
       self.i = j + 1
@@ -157,10 +155,7 @@ function P:number(c)
     self:fail("unexpected character '" .. c .. "'")
   end
   self.i = self.i + #num
-  local n = tonumber(num)
-  if not n then
-    self:fail("bad number")
-  end
+  local n = tonumber(num) or self:fail("bad number")
   if num:find("[.eE]") then
     return M.double(n)
   end

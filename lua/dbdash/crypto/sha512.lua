@@ -6,7 +6,7 @@ local md = require("dbdash.crypto.md")
 local band, bxor, bnot, rshift, bor, lshift, ror =
   bit.band, bit.bxor, bit.bnot, bit.rshift, bit.bor, bit.lshift, bit.ror
 
-local U64 = ffi.typeof("uint64_t")
+local U64 = ffi.typeof("uint64_t") --[[@as fun(v: any): any]] -- uint64_t values
 
 local K = {
   0x428a2f98d728ae22ULL,
@@ -95,7 +95,7 @@ local W = {}
 
 local function compress(H, s, off)
   for i = 0, 15 do
-    local w = U64(0)
+    local w = U64(0) ---@type any (a uint64_t cdata)
     for k = 0, 7 do
       w = bor(lshift(w, 8), U64(s:byte(off + i * 8 + k)))
     end
@@ -123,7 +123,7 @@ end
 local function be64(w)
   local out = {}
   for k = 7, 0, -1 do
-    out[#out + 1] = string.char(tonumber(band(rshift(w, k * 8), 0xff)))
+    out[#out + 1] = string.char(tonumber(band(rshift(w, k * 8), 0xff)) or 0)
   end
   return table.concat(out)
 end

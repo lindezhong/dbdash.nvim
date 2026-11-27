@@ -11,6 +11,12 @@ local M = {}
 ---@field name string
 ---@field size integer field element size in bytes
 ---@field bits integer order size in bits
+---@field P integer[] the field's prime
+---@field N integer[] the group's order
+---@field F dbdash.bignum.Field arithmetic modulo P
+---@field FN dbdash.bignum.Field arithmetic modulo N
+---@field GX integer[] the generator
+---@field GY integer[]
 local Curve = {}
 Curve.__index = Curve
 
@@ -128,6 +134,7 @@ local function on_curve(C, x, y)
 end
 
 ---Parse an uncompressed public point (04 || X || Y).
+---@return { x: integer[], y: integer[], curve: string }? key, string? err
 function Curve:public_key(point)
   local n = self.size
   if #point ~= 2 * n + 1 or point:byte(1) ~= 4 then
@@ -222,9 +229,11 @@ end
 function Curve:ecdh(priv, peer)
   local F = self.F
   local key, err = self:public_key(peer)
-  if not key then
-    require("dbdash.util.error").raise("tls", ("invalid %s key share: %s"):format(self.name, err))
-  end
+  key = key
+    or require("dbdash.util.error").raise(
+      "tls",
+      ("invalid %s key share: %s"):format(self.name, err)
+    )
   local pt = scalar_mul(F, bn.from_bytes(priv), { F:to(key.x), F:to(key.y), F.one })
   if bn.is_zero(pt[3]) then
     require("dbdash.util.error").raise("tls", ("invalid %s shared secret"):format(self.name))

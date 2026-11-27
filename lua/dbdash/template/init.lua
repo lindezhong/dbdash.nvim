@@ -19,6 +19,15 @@ M.compile = require("dbdash.template.compile").compile
 ---@field autoescape boolean?
 ---@field escape fun(v: any): string? dialect literal formatter used when autoescape is on
 ---@field dialect table?
+---@field context table? the variables of the template (args, meta)
+---@field lua { args: table?, meta: table?, store: table?, helpers: table?, after: fun()? }?
+---  what Lua in templates sees ({% lua %}, imported .lua)
+---@field timeout integer? ms for Lua in templates
+---@field cancel dbdash.db.CancelToken? stops Lua in templates
+---@field set_arg fun(name: string, v: any)? {% set args.x = v %}
+---@field check_file fun(path: string, text: string, kind: string)? a file with Lua loaded
+---  while rendering must be trusted
+---@field source string? the chunk name of {% lua %} code
 
 ---Compile and render, returning an error object instead of raising.
 ---@param src string
@@ -38,6 +47,7 @@ function M.render(src, vars, opts)
   if not errors.is(res) then
     res = errors.new("internal", tostring(res))
   end
+  ---@cast res dbdash.template.Error
   if res.source then
     return nil, res -- raised in an imported file: its own name and line
   end

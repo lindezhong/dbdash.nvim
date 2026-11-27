@@ -42,7 +42,7 @@ function M.render(rs, show, ctx)
       local v = H.get(g, x, y)
       local s, group
       if v then
-        local hex = scale.color(v)
+        local hex = scale.color(v) or ""
         if show_values then
           s = W.pad(fmt.value(v, axes.yformat), cw, "center")
           group = hex:match("^#%x%x%x%x%x%x$") and ctx.color(text_color(hex) .. " on " .. hex)

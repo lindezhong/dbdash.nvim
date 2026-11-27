@@ -100,6 +100,7 @@ local function db_error(r, phase)
 end
 
 ---Open `path` (read-only, read-write, created when asked); returns an error or nil.
+---@return table? err
 local function open(r, path, readonly, create)
   local READONLY, READWRITE, CREATE, URI = 0x01, 0x02, 0x04, 0x40
   local flags = readonly == "1" and READONLY or READWRITE
@@ -121,6 +122,7 @@ end
 
 ---A progress handler that interrupts SQLite at the deadline or when the main loop sets
 ---the cancel flag (the int32 at `cancel_addr`).
+---@return any progress the callback (a cdata, freed after the query)
 local function guard(r, timeout, cancel_addr)
   local deadline = vim.uv.hrtime() + timeout * 1e6
   local cancel_flag = ffi.cast("volatile int32_t*", ffi.cast("uintptr_t", tonumber(cancel_addr)))
@@ -210,6 +212,7 @@ end
 
 ---Run every statement of `sql`; the last one that returns columns gives the result (or the
 ---number of rows the last one changed). Returns the result or nil and an error.
+---@return table? result, table? err
 local function run_all(r, sql, limit)
   local lib = r.lib
   local out =
@@ -263,11 +266,11 @@ function M.run(path, sql, max_rows, timeout_ms, libs, readonly, create, cancel_a
   if err then
     return vim.json.encode(err)
   end
-  local timeout = tonumber(timeout_ms)
+  local timeout = tonumber(timeout_ms) or 0
   lib.sqlite3_busy_timeout(r.db, math.min(timeout, 5000))
   local progress = guard(r, timeout, cancel_addr)
   local out
-  out, err = run_all(r, sql, tonumber(max_rows))
+  out, err = run_all(r, sql, tonumber(max_rows) or 0)
   lib.sqlite3_progress_handler(r.db, 0, nil, nil)
   progress:free()
   lib.sqlite3_close_v2(r.db)

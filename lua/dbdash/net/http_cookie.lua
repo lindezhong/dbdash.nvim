@@ -83,6 +83,7 @@ end
 ---@field secure boolean
 ---@field expires number? epoch seconds; nil: a session cookie
 ---@field http_only boolean?
+---@field seq integer? creation order in the jar (a replaced cookie keeps it)
 
 ---@class dbdash.http.Jar
 ---@field cookies table<string, dbdash.http.Cookie>

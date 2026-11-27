@@ -8,20 +8,24 @@ local dialect = require("dbdash.template.dialect")
 
 local M = {}
 
+---@class dbdash.RunLife
+---@field n integer dbdash.run() calls so far
+---@field runs table[] the run records (meta.runs)
+---@field version integer bumped when a record changes
+---@field cancel dbdash.db.CancelToken
+
 ---@class dbdash.Run one run of a panel's pipeline: a refresh (depth 0) or a callback
 ---@field panel dbdash.Panel
 ---@field values table<string, any> the arguments by name
 ---@field args table what Lua code sees as `args`
 ---@field depth integer 0 for a refresh, n for a callback n levels deep (meta.run.depth)
----@field counter { n: integer, runs: table[], cancel: dbdash.db.CancelToken } the refresh's
----  life: dbdash.run() calls so far, the run records (meta.runs) and the token that cancels
----  the refresh, shared by its callbacks (= run.life)
+---@field counter dbdash.RunLife the refresh's life: dbdash.run() calls so far, the run
+---  records (meta.runs) and the token that cancels the refresh, shared by its callbacks
 ---@field record table this run's record (meta.run): id, kind, depth, parent_id, refresh_id,
 ---  args, started_at, finished_at, elapsed_ms, ok, error, sql, query, result
 ---@field lua { store: table, helpers: table } globals of all Lua code of the run
 ---@field meta table? the metadata of this run
----@field life { n: integer, runs: table[], version: integer, cancel: dbdash.db.CancelToken }
----  the same as counter
+---@field life dbdash.RunLife the same as counter
 ---@field code string? the rendered query.transform
 ---@field item { value: any, vars: table }? the item of a source that sends data
 ---@field maps table[] the template `args` mappings of this run
@@ -262,6 +266,8 @@ end
 ---@field timeout integer?
 ---@field cancel dbdash.db.CancelToken?
 ---@field on_allow fun()?
+---@field run dbdash.Run? the run whose `args` mapping this is
+---@field set_arg fun(name: string, v: any)? {% set args.x = v %}
 
 ---Render template `text` (at `line` of the config) of dashboard `d`. Templates see exactly
 ---two names: args.<name> (o.specs with o.values) and meta.<name> (o.meta); imported

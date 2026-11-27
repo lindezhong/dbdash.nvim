@@ -305,13 +305,21 @@ end
 ---@field c_secret string
 ---@field cert dbdash.x509.Cert
 ---@field fingerprint string
+---@field version integer 0x0304 (TLS 1.3) or 0x0303 (TLS 1.2)
+---@field suite_name string
+---@field leftover string? handshake bytes read past the handshake (post-handshake messages)
+---@field etm boolean? TLS 1.2: encrypt-then-MAC
+---@field ems boolean? TLS 1.2: extended master secret
 
 ---@class dbdash.net.tls.handshake.RunOpts
 ---@field host string
----@field mode "require"|"pin"|"verify-ca"|"verify-full"
+---@field mode "disable"|"require"|"pin"|"verify-ca"|"verify-full"|string
 ---@field fingerprint string?
 ---@field ca string?
 ---@field base_dir string?
+---@field alpn string[]?
+---@field tls12 boolean? offer TLS 1.2 (default: yes)
+---@field tls13 boolean? offer TLS 1.3 (default: yes)
 
 ---@class dbdash.net.tls.handshake.State
 ---@field sock dbdash.net.Socket
@@ -384,7 +392,7 @@ local function check_verify(h, cert, body)
   local alg = rd16(body, 1)
   local slen = rd16(body, 3)
   local sig = body:sub(5, 4 + slen)
-  local ok, err = false, "certificate key could not be parsed"
+  local ok, err = false, "certificate key could not be parsed" ---@type boolean, string?
   if cert.key_type then
     ok, err = M.check_signature(cert, alg, sig, sha256.digest(h.transcript))
   end

@@ -22,6 +22,7 @@ M.SYSTEM_FILES = {
 
 local cache = {}
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg, ...)
   require("dbdash.util.error").raise("tls", msg:format(...))
 end
@@ -54,10 +55,7 @@ end
 
 ---Load a PEM bundle file (cached by mtime).
 function M.from_file(path)
-  local stat = vim.uv.fs_stat(path)
-  if not stat then
-    fail("CA file not found: %s", path)
-  end
+  local stat = vim.uv.fs_stat(path) or fail("CA file not found: %s", path)
   local mtime = stat.mtime.sec * 1e9 + stat.mtime.nsec
   local c = cache[path]
   if c and c.mtime == mtime then

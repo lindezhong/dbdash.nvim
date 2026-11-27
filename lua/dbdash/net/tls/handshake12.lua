@@ -314,7 +314,7 @@ local function read_key_exchange(h, cert, body)
   local alg = rd16(body, 5 + plen)
   local slen = rd16(body, 7 + plen)
   local sig = body:sub(9 + plen, 8 + plen + slen)
-  local ok, err = false, "no certificate"
+  local ok, err = false, "no certificate" ---@type boolean, string?
   if cert then
     ok, err = M.check_signature(cert, alg, sig, ctx.client_random .. ctx.server_random .. params)
   end

@@ -198,7 +198,8 @@ end
 local function ip_bytes(host)
   local a, b, c, d = host:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
   if a then
-    return string.char(tonumber(a), tonumber(b), tonumber(c), tonumber(d))
+    -- (the four parts are digits)
+    return string.char(tonumber(a) or 0, tonumber(b) or 0, tonumber(c) or 0, tonumber(d) or 0)
   end
   if host:find(":", 1, true) then
     local head, tail = host:match("^(.-)::(.*)$")

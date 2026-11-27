@@ -54,6 +54,7 @@ local KNOWN = {
   ["1.3.6.1.4.1.11129.2.4.2"] = true, -- embedded SCTs
 }
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg)
   require("dbdash.util.error").raise("tls", "certificate: " .. msg)
 end
@@ -197,6 +198,7 @@ end
 
 ---@class dbdash.x509.Cert
 ---@field der string
+---@field fingerprint string? SHA-256 of der (set when authenticated)
 ---@field tbs string DER of tbsCertificate (the signed bytes)
 ---@field subject string common name (for messages)
 ---@field subject_der string

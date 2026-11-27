@@ -24,6 +24,10 @@ local DEFAULTS = setmetatable({}, {
 ---@field show boolean
 ---@field description string?
 ---@field choices any[]?
+---@field key string? the key of its value: the name, or <panel id>.<name>
+---@field panel integer? the panel of a local argument
+---@field panel_id string?
+---@field path string? where it is written (while the config loads)
 
 ---@class dbdash.ConfigDatabase
 ---@field type string
@@ -58,13 +62,17 @@ local DEFAULTS = setmetatable({}, {
 ---@field countdown_format string
 ---@field shared_args dbdash.ArgSpec[] top-level args
 ---@field args dbdash.ArgSpec[] shared and local arguments, each with its `key`
----@field panels dbdash.PanelConfig[]
+---@field style_rules dbdash.css.Rule[]? the dashboard's style sheet
 
 local nn = require("dbdash.util.null").nn
 
 ---Parse a duration such as 30, "30s", "5m", "1h", "500ms" into milliseconds.
 M.parse_duration = require("dbdash.util.duration").parse
 
+---The reading of one config: its file and the line of every path (dbdash.config.Ctx).
+---@class dbdash.config.Ctx
+---@field file string
+---@field pos table<string, { line: integer, col: integer }>
 local Ctx = {}
 Ctx.__index = Ctx
 
@@ -91,6 +99,9 @@ function Ctx:document(cfg)
   return require("dbdash.dashboard.document").from_config(cfg)
 end
 
+---Raise a config error at the line of `path` (or of its nearest parent with one). It never
+---returns (`return ctx:fail(...)` and `x or ctx:fail(...)` keep their code's types).
+---@return any
 function Ctx:fail(path, msg, ...)
   -- Keys inside a flow mapping ({ a: 1 }) have no position: use the nearest parent's.
   local p, at = self.pos[path], path
@@ -112,6 +123,11 @@ function Ctx:fail(path, msg, ...)
   )
 end
 
+---The value at `path` when it is a `kind` ("map", "list", "integer" or a Lua type); nil
+---when it is missing and optional, else an error.
+---@param kind string
+---@param optional boolean?
+---@return any
 function Ctx:expect(path, v, kind, optional)
   v = nn(v)
   if v == nil then
@@ -284,8 +300,8 @@ end
 ---@class dbdash.PanelConfig
 ---@field index integer
 ---@field id string `id:` or the index; local arguments are given as <id>.<name>
----@field database { type: string, url: string, options: table }
----@field query table
+---@field database { type: string, url: string, options: table, password_cmd: (string|string[])? }
+---@field query dbdash.ConfigQuery
 ---@field show table
 ---@field args dbdash.ArgSpec[] local arguments (query.args), only for this panel
 ---@field visible_args dbdash.ArgSpec[] what `args` holds in this panel: the shared arguments,
@@ -293,6 +309,7 @@ end
 ---@field shown_args dbdash.ArgSpec[] the arguments on this panel's args_show line
 ---@field follows_global boolean no timer of its own: the global refresh (cfg.refresh_all)
 ---  comes as often or more often than show.interval
+---@field style_rules dbdash.css.Rule[]? the panel's style sheet (inline, scoped)
 
 -- Appearance moved into style sheets (:help dbdash-css): where each old field went.
 M.MOVED = {
@@ -422,18 +439,6 @@ end
 
 ---Validate parsed YAML data.
 ---
----One-chart configs (database/query/show at the top level) and multi-panel configs
----(`panels:`) are one model. Top-level bare fields are dashboard-wide: `interval` (a refresh
----of every panel, cfg.refresh_all), `args` (shared arguments), `layout`. The top-level
----`database`, `query` and `show` sections are the panels' defaults: without `panels:` they
----are the only panel; with `panels:` each panel is merged over them (the database is
----replaced as a whole) and fields describing one chart may not be top-level. Every panel
----is then validated the same way (Ctx:panel). `cfg.database`, `cfg.query` and `cfg.show`
----are the single panel's in one-chart configs.
----@param data any
----@param file string used in error messages
----@param positions table<string, {line: integer, col: integer}>?
----@return dbdash.Config
 ---With panels, the top-level query and show are defaults: fields of one chart are not.
 function Ctx:check_defaults(top_query, top_show)
   for section, m in pairs({ query = top_query, show = top_show }) do
@@ -531,6 +536,18 @@ function Ctx:dashboard_fields(cfg, data)
   cfg.style_rules = self:style(data.style, "style")
 end
 
+---One-chart configs (database/query/show at the top level) and multi-panel configs
+---(`panels:`) are one model. Top-level bare fields are dashboard-wide: `interval` (a refresh
+---of every panel, cfg.refresh_all), `args` (shared arguments), `layout`. The top-level
+---`database`, `query` and `show` sections are the panels' defaults: without `panels:` they
+---are the only panel; with `panels:` each panel is merged over them (the database is
+---replaced as a whole) and fields describing one chart may not be top-level. Every panel
+---is then validated the same way (Ctx:panel). `cfg.database`, `cfg.query` and `cfg.show`
+---are the single panel's in one-chart configs.
+---@param data any
+---@param file string used in error messages
+---@param positions table<string, {line: integer, col: integer}>?
+---@return dbdash.Config
 function M.validate(data, file, positions)
   local ctx = setmetatable({ file = file, pos = positions or {} }, Ctx)
   if not map.is_map(data) then
@@ -681,7 +698,8 @@ function M.load(path)
   end
   local ok, res = pcall(M.validate, data, path, pos)
   if not ok then
-    if type(res) == "table" and res.phase then
+    local e = res ---@type any (the error)
+    if type(e) == "table" and e.phase then
       return nil, res
     end
     error(res, 0)

@@ -88,7 +88,7 @@ function M.driver(scheme)
     end
     error(res, 0)
   end
-  dberr.raise("config", ("no driver for scheme '%s'"):format(scheme))
+  return dberr.raise("config", ("no driver for scheme '%s'"):format(scheme))
 end
 
 ---Driver for a URL string (used by the template engine to pick a dialect).
@@ -274,11 +274,11 @@ function M.run(raw_url, query, opts, on_result, on_end)
   local ok, prep = pcall(function()
     local expanded, env_err = require("dbdash.db.credentials").expand_env(raw_url)
     if not expanded then
-      dberr.raise("config", env_err)
+      return dberr.raise("config", env_err or "invalid URL")
     end
     local d = M.validate(expanded, opts.options)
     driver_name = d.name
-    local i = url.parse(expanded)
+    local i = url.parse(expanded) --[[@as dbdash.db.ConnInfo]]
     i.options = opts.options or {}
     i.base_dir = opts.base_dir
     if d.parse_url then
@@ -402,7 +402,11 @@ function M.run(raw_url, query, opts, on_result, on_end)
   }
   async.run(function()
     if prep.driver and prep.driver.produce then
-      prep.driver.produce(prep.info, type(query) == "function" and query() or query, ctx)
+      local text = query ---@type any
+      if type(query) == "function" then
+        text = query() -- (rendered once: a source that sends data runs its query once)
+      end
+      prep.driver.produce(prep.info, text, ctx)
     else
       local producer = require("dbdash.db.driver").producer(prep.driver)
       producer(prep.driver and prep.info or nil, query, ctx)
@@ -458,7 +462,7 @@ M.validators = {
     validate = function(db, ctx, path)
       local expanded, env_err = require("dbdash.db.credentials").expand_env(db.url)
       if not expanded then
-        ctx:fail(path .. ".url", "%s", env_err)
+        return ctx:fail(path .. ".url", "%s", env_err)
       end
       local cmd = db.password_cmd
       if cmd ~= nil then

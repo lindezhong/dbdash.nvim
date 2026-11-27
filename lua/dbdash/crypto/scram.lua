@@ -7,6 +7,12 @@ local dberr = require("dbdash.util.error")
 local M = {}
 
 ---@class dbdash.scram.Client
+---@field hash table the hash (crypto/sha256.lua, sha512.lua)
+---@field password string
+---@field nonce string
+---@field first_bare string client-first-message-bare
+---@field auth_message string?
+---@field server_key string?
 local Client = {}
 Client.__index = Client
 
@@ -42,8 +48,8 @@ function Client:final(server_first)
   if not attrs.r or attrs.r:sub(1, #self.nonce) ~= self.nonce then
     dberr.raise("auth", "SCRAM server nonce does not extend the client nonce")
   end
-  local iterations = tonumber(attrs.i)
-  if not attrs.s or not iterations or iterations < 1 then
+  local iterations = tonumber(attrs.i) or 0
+  if not attrs.s or iterations < 1 then
     dberr.raise("auth", "invalid SCRAM server-first message")
   end
   local h = self.hash

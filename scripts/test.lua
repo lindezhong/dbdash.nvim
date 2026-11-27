@@ -11,7 +11,7 @@ for _, a in ipairs(arg) do
   end
 end
 
-local root = vim.fs.normalize(vim.uv.cwd())
+local root = vim.fs.normalize(assert(vim.uv.cwd()))
 local env = {
   XDG_DATA_HOME = root .. "/deps/xdg/data",
   XDG_STATE_HOME = root .. "/deps/xdg/state",

@@ -17,6 +17,7 @@ local NULL = resultset.NULL
 
 local HINT = "; add query.transform to reshape it (:help dbdash-transform)"
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(o, msg, ...)
   dberr.raise(o.phase or "query", msg:format(...) .. (o.hint and HINT or ""))
 end

@@ -98,6 +98,13 @@ local function digits_of(x, isf, typ, prec, alt)
     end
     return s, ""
   end
+  return raise(
+    "value",
+    "Unknown format code '%s' for object of type '%s'",
+    typ,
+    isf and "float" or "int"
+  ),
+    ""
 end
 
 ---Format a number per a parsed spec { typ, prec, sign, alt, zero, width, align, fill, grouping }.

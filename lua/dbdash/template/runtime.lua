@@ -1438,7 +1438,7 @@ end
 
 ---Python's sorted(): stable, by `key(item)` (default: the item), raising on values that
 ---cannot be compared.
----@param key fun(v: any): any?
+---@param key (fun(v: any): any)?
 function M.sorted(seq, key, reverse)
   local items = {}
   for i, v in ipairs(seq) do

@@ -587,6 +587,7 @@ function M.connect(info)
 end
 
 ---Run one QUERY page. Returns kind and parsed result.
+---@return integer kind, table? result (rows: kind 2)
 function Conn:query(cql, page_size, paging_state)
   local flags = 0x04
   local extra = i32(page_size)
@@ -656,6 +657,7 @@ function Conn:execute(query, opts)
   if kind ~= 2 then
     return resultset.new({}, {})
   end
+  ---@cast res -nil (rows: kind 2)
   local cols, rows = res.cols, res.rows
   while res.paging_state and #rows <= max do
     res = select(2, self:query(cql, page, res.paging_state))

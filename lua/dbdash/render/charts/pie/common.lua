@@ -7,7 +7,7 @@ local fmt = require("dbdash.render.format")
 local M = {}
 
 ---Positive slices from label_column / value_column, with colors.
----@return { label: string, value: number, group: string }[] items, number sum
+---@return { label: string, value: number, group: string, other: boolean? }[] items, number sum
 function M.items(rs, show, ctx)
   local li = C.col(rs, nn(show.label_column), "label_column")
   local vi = C.col(rs, nn(show.value_column), "value_column")

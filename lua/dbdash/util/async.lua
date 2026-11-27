@@ -70,7 +70,8 @@ function M.await(fn, ...)
   local resume = co and resumers[co]
   assert(resume, "async.await must be called inside async.run")
   local args = pack(...)
-  local done, sync, results = false, true, nil
+  local done, sync = false, true
+  local results = { n = 0 } -- (filled by the callback before this returns)
   args.n = args.n + 1
   args[args.n] = function(...)
     if done then

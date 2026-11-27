@@ -35,6 +35,7 @@ local ALERTS = {
 }
 M.ALERTS = ALERTS
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg, ...)
   require("dbdash.util.error").raise("tls", msg:format(...))
 end
@@ -83,9 +84,7 @@ end
 ---Unprotect a record body (with its 5-byte header as AAD). Returns content type, content.
 function Cipher:open(hdr, body)
   local inner = self.aead:open(self:nonce(), body, hdr)
-  if not inner then
-    fail("record authentication failed (bad_record_mac)")
-  end
+    or fail("record authentication failed (bad_record_mac)")
   local i = #inner
   while i > 0 and inner:byte(i) == 0 do
     i = i - 1

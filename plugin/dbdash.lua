@@ -184,8 +184,9 @@ vim.api.nvim_create_autocmd({ "BufWinEnter", "BufWinLeave", "WinClosed", "TabEnt
 vim.api.nvim_create_autocmd("WinClosed", {
   group = group,
   callback = function(ev)
-    if package.loaded["dbdash.dashboard"] then
-      require("dbdash.view.dashboard").on_win_closed(tonumber(ev.match))
+    local win = tonumber(ev.match)
+    if win and package.loaded["dbdash.dashboard"] then
+      require("dbdash.view.dashboard").on_win_closed(win)
     end
   end,
 })

@@ -112,7 +112,7 @@ end
 local function value_lines(ctx, stat, out, text, unit, vstyle, group)
   local rows = vstyle["font-size"] ~= "normal" and big(text) or nil
   local fits = rows and W.width(rows[1]) + (unit and (W.width(unit) + 1) or 0) <= ctx.width
-  if not fits then
+  if not (rows and fits) then
     local s = W.truncate(text .. (unit and (" " .. unit) or ""), ctx.width)
     out:add(s, { { 0, math.min(#s, #text), group } })
     return

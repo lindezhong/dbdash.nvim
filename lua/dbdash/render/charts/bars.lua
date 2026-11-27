@@ -55,7 +55,7 @@ end
 local function bar_group(ctx, k, series_group)
   local node = bar_node(ctx, k)
   local own = node and require("dbdash.css.style").get(node).color
-  if own then
+  if node and own then
     return require("dbdash.css").hl_of(node)
   end
   return series_group
@@ -515,15 +515,16 @@ function M.from_show(rs, show, ctx)
   else
     local xi = C.col(rs, nn(show.x_column), "x_column")
     local series = C.series(rs, show)
+    local entries = {} -- (several series: their legend)
     if #series > 1 then
-      legend = {}
       for i, s in ipairs(series) do
-        legend[i] = {
+        entries[i] = {
           label = s.label,
           group = C.color(ctx, show, i, nil, s.label),
           label_group = C.item_hl(ctx, "legend", i, "legend"),
         }
       end
+      legend = entries
     end
     for _, row in ipairs(rs.rows) do
       local label = C.text(row[xi])
@@ -544,7 +545,7 @@ function M.from_show(rs, show, ctx)
         for i, s in ipairs(series) do
           segs[i] = {
             value = C.num(row[s.index]) or 0,
-            group = bar_group(ctx, base + i, legend[i].group),
+            group = bar_group(ctx, base + i, entries[i].group),
             series = s.label,
             item = base + i,
           }

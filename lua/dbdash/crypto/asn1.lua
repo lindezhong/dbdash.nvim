@@ -19,6 +19,7 @@ M.TAG = {
 ---@field raw string the whole TLV (for hashing signed parts)
 ---@field children dbdash.asn1.Node[]? for constructed types
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg)
   require("dbdash.util.error").raise("tls", "ASN.1: " .. msg)
 end

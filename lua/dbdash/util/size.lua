@@ -36,7 +36,7 @@ function M.resolve(v, total)
   if type(v) == "number" then
     return v
   end
-  local pct = tonumber(vim.trim(v):match("^(%d+%.?%d*)"))
+  local pct = tonumber(vim.trim(tostring(v)):match("^(%d+%.?%d*)"))
   return math.max(1, math.floor(total * pct / 100))
 end
 

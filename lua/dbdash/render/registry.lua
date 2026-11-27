@@ -33,6 +33,7 @@ M.DEFAULTS = {
 }
 
 -- Built-in names, for completion and documentation.
+---@type table<string, any> chart: type -> names; the others: names
 M.BUILTIN = {
   chart = {
     table = { "box" },
@@ -200,7 +201,7 @@ M.validators = {
               "unknown %s '%s' (known: %s)",
               kind,
               name,
-              table.concat(vim.fn.uniq(names), ", ")
+              table.concat(vim.fn.uniq(names) --[[@as string[] ]], ", ")
             )
           end
         end

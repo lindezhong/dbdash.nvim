@@ -69,6 +69,9 @@ function M.render(rs, show, ctx)
   if not order then
     return { lines = { "(no data to plot)" }, hl = {} }
   end
+  ---@cast stats -nil
+  ---@cast lo -nil
+  ---@cast hi -nil
   lo, hi = C.limits(ctx, lo, hi, axes.ymin, axes.ymax)
   local spec = { xlabel = axes.xlabel, ylabel = axes.ylabel, height = ctx.plot_height }
   local _, labels = C.y_ticks(ctx, lo, hi, 15, axes.yformat)

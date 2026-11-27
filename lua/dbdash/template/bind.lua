@@ -2,14 +2,14 @@
 local R = require("dbdash.template.runtime")
 local raise = require("dbdash.template.errors").raise
 
+local M = {}
+
 ---Bind positional and keyword arguments to a Python-like signature.
 ---@param fname string
 ---@param args any[]
 ---@param kwargs table<string, any>
 ---@param params { [1]: string, [2]: any }[] name and default (nil = required)
 ---@return any ...
-local M = {}
-
 function M.bind(fname, args, kwargs, params)
   local out = {}
   if #args > #params then

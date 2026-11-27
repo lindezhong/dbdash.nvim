@@ -17,12 +17,17 @@ local M = {}
 
 local NULL = vim.NIL
 
+---@class dbdash.yaml.Error a YAML error with its line and column
+---@field message string
+---@field line integer
+---@field col integer
 local Error = {}
 Error.__index = Error
 Error.__tostring = function(e)
   return ("line %d, col %d: %s"):format(e.line, e.col, e.message)
 end
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(line, col, msg, ...)
   error(setmetatable({ message = msg:format(...), line = line, col = col }, Error), 0)
 end
@@ -145,7 +150,7 @@ local HEX_LEN = { x = 2, u = 4, U = 8 }
 
 ---Scan a quoted scalar starting at s[i] (the quote). Returns value and index after it.
 ---Returns nil when the closing quote is missing.
----@return string?, integer?
+---@return string? value, integer after (set with the value)
 local function scan_quoted(s, i, line, col)
   local q = s:sub(i, i)
   local out, j = {}, i + 1
@@ -178,7 +183,7 @@ local function scan_quoted(s, i, line, col)
       j = j + 1
     end
   end
-  return nil
+  return nil, j
 end
 
 ---Remove a trailing comment (" #...") from a plain fragment, then trim.
@@ -217,6 +222,9 @@ end
 -- Parser ---------------------------------------------------------------------------------
 
 ---@class dbdash.yaml.Parser
+---@field recs dbdash.yaml.Rec[] the lines
+---@field i integer the current line
+---@field pos table<string, { line: integer, col: integer }> the position of every path
 local P = {}
 P.__index = P
 
@@ -420,7 +428,7 @@ function F:mapping()
       return t
     end
     local k = self:scalar(true)
-    local v = NULL
+    local v = NULL ---@type any
     if self:next() == ":" then
       self.i = self.i + 1
       local d = self:next()
@@ -694,6 +702,7 @@ function M.parse(text)
     if getmetatable(res) ~= Error then
       error(res, 0)
     end
+    ---@cast res dbdash.yaml.Error
     return nil, res
   end
   return res, p.pos

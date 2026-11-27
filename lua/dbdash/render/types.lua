@@ -41,22 +41,29 @@
 ---@field strwidth fun(s: string): integer
 ---@field canvas fun(cols: integer, rows: integer, xlim: number[], ylim: number[]):
 ---  dbdash.render.Canvas a canvas of cols x rows characters over xlim x ylim
----@field canvas_type table the canvas module (px_per_char)
+---@field canvas_type dbdash.render.CanvasType the canvas's type (px_per_char)
 ---@field ticks fun(lo: number, hi: number, count: integer): number[], string[]
 ---@field limits fun(lo: number, hi: number, count: integer): number, number, number
----@field frame table
+---@field frame dbdash.render.Frame
 ---@field palette fun(i: integer): string
 ---@field history number[]? recent values of this panel, oldest first (stat charts)
+---@field css dbdash.css.Scope style queries on the chart's element and its parts
+---@field plot_height integer? the plot's rows: plot { height } (or the whole cell)
+---@field min_plot_height integer? at least plot { min-height }
 
 ---@class dbdash.render.Highlight
 ---@field row integer
 ---@field col_s integer
 ---@field col_e integer
 ---@field group string
+---@field priority integer?
 
 ---@class dbdash.render.Output
 ---@field lines string[]
 ---@field hl dbdash.render.Highlight[] 0-based rows, byte columns
+---@field hits { row_s: integer, row_e: integer, x: integer?, width: integer?, node: table }[]?
+---  where elements inside are (hit testing)
+---@field full boolean? keeps its full width (a background or border)
 
 local M = {}
 

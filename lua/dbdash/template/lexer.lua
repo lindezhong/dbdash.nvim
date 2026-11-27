@@ -338,7 +338,7 @@ function M.tokenize(src)
       break
     end
     local kind = src:sub(s + 1, s + 1)
-    local mod = src:sub(s + 2, s + 2)
+    local mod = src:sub(s + 2, s + 2) ---@type string?
     local inner = s + 2
     if mod == "-" or (mod == "+" and kind ~= "{") then
       inner = inner + 1

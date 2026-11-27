@@ -11,6 +11,7 @@ local M = {}
 
 M.TYPE = { A = 1, CNAME = 5, TXT = 16, SRV = 33 }
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg, ...)
   dberr.raise("connect", "DNS: " .. msg:format(...))
 end
@@ -164,9 +165,9 @@ end
 
 local function udp_query(server, packet, timeout)
   return async.await(function(cb)
-    local udp = vim.uv.new_udp()
+    local udp = assert(vim.uv.new_udp())
     local done = false
-    local timer = vim.uv.new_timer()
+    local timer = assert(vim.uv.new_timer())
     local function finish(err, data)
       if done then
         return
@@ -314,13 +315,14 @@ function M.query(name, qtype, opts)
           end
           return out
         end
-        last = ok and "mismatched response id" or res.message
+        local e = res ---@type any (the response, or the error)
+        last = ok and "mismatched response id" or (type(e) == "table" and e.message or tostring(e))
       else
         last = tostring(err)
       end
     end
   end
-  fail("lookup of %s failed: %s", name, tostring(last))
+  return fail("lookup of %s failed: %s", name, tostring(last))
 end
 
 ---SRV records sorted by priority, then weight (higher first).

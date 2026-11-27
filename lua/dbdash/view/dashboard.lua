@@ -45,10 +45,13 @@ local function scope(node)
   return require("dbdash.css").scope(node, nil)
 end
 
----Rendering update (Servo's "update the rendering"): bring the DOM up to date with the
----dashboard's state, lay it out (layout/view.lua), paint it (paint/) and composite the
----layers into lines (compositor/).
----@return string[] lines, table[] hl, table[]? regions
+---Rendering update (Servo's "update the rendering"): restyle the document, lay it out
+---(layout/view.lua), paint it (paint/) and composite the layers into lines (compositor/).
+---@return string[] lines the header's
+---@return table[] hl
+---@return dbdash.render.Output|dbdash.compositor.Frame body
+---@return integer offset the header's rows
+---@return table[]? regions the panels' (multi-panel)
 function M.render_view(d, width, height)
   d.doc.updating = true -- parts created while laying out need no frame of their own
   -- style phase: restyle from the dirty root before layout reads computed styles and
@@ -58,9 +61,11 @@ function M.render_view(d, width, height)
   local list = require("dbdash.paint").view(tree)
   local lines, hl = vim.deepcopy(list.header.lines), vim.deepcopy(list.header.hl)
   local offset = #lines
-  local body, regions
-  if list.body then
-    body = list.body
+  local body ---@type dbdash.render.Output|dbdash.compositor.Frame
+  local regions
+  local single = list.body
+  if single then
+    body = single
   else
     local cells, outs = {}, {}
     for i, l in ipairs(list.layers) do
@@ -189,7 +194,7 @@ function M.update_status(d)
         text = data.state
       end
       marks[#marks + 1] =
-        { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text), text = text }
+        { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text or ""), text = text }
     end
   end
   buffer.set_status(
@@ -357,6 +362,7 @@ function M.start(path, o)
     end
     return
   end
+  ---@cast state dbdash.ArgState (it started)
   local function launch()
     if dashboards.get(path) then -- started meanwhile (e.g. twice from the sidebar)
       return

@@ -15,15 +15,8 @@ function M.connect(info)
   return setmetatable({ info = info }, Conn)
 end
 
----@class dbdash.db.drivers.lua.ExecuteOpts
----@field max_rows integer
----@field timeout integer
----@field args table?
----@field source string?
----@field line integer?
-
 ---@param code string
----@param opts dbdash.db.drivers.lua.ExecuteOpts
+---@param opts dbdash.db.ExecuteOpts
 function Conn:execute(code, opts)
   local value = require("dbdash.db.lua_env").run(code, {
     phase = "query",

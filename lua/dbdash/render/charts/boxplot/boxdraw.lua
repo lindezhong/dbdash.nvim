@@ -61,7 +61,7 @@ end
 
 ---The values of each category (category_column, else one box of value_column), in the
 ---order they come, with their statistics and the range of all values (nil: no data).
----@return string[]? order, table[] stats, number lo, number hi
+---@return string[]? order, table[]? stats, number? lo, number? hi
 function M.groups(rs, show)
   local vi = C.col(rs, nn(show.value_column), "value_column")
   local ci = nn(show.category_column) and C.col(rs, show.category_column, "category_column")
@@ -69,7 +69,7 @@ function M.groups(rs, show)
   for _, row in ipairs(rs.rows) do
     local v = C.num(row[vi])
     if v then
-      local cat = ci and C.text(row[ci]) or nn(show.value_column)
+      local cat = ci and C.text(row[ci]) or tostring(nn(show.value_column))
       if not groups[cat] then
         groups[cat] = {}
         order[#order + 1] = cat
@@ -147,6 +147,9 @@ function M.render(rs, show, ctx)
   if not order then
     return { lines = { "(no data to plot)" }, hl = {} }
   end
+  ---@cast stats -nil
+  ---@cast lo -nil
+  ---@cast hi -nil
   lo, hi = C.limits(ctx, lo, hi, axes.xmin or axes.ymin, axes.xmax or axes.ymax)
   -- each box's value, outlier and mean elements (render/content/chart.lua); the values take
   -- a line under the boxes when any box shows them (hidden by the UA sheet)

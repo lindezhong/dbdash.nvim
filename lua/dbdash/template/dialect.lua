@@ -16,6 +16,7 @@ local function numstr(v)
   return require("dbdash.util.number").numstr(v)
 end
 
+---@return any (it raises: `x or fail(...)` keeps x's type)
 local function fail(msg, ...)
   require("dbdash.util.error").raise("template", msg:format(...), { kind = "value" })
 end

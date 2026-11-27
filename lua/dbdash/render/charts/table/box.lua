@@ -115,7 +115,7 @@ local function measure(t, row_nodes)
       local cn = rn.children[c]
       local d = cell_settings(per_style, style.get(cn))
       local text = cn.text or d.content
-      local multi = text:find("\n", 1, true)
+      local multi = text:find("\n", 1, true) ~= nil
       if multi and d.nowrap then
         text = text:gsub("\n", "↵")
         multi = false
@@ -327,6 +327,7 @@ function M.render(rs, show, ctx)
   -- the table's DOM (render/content/table.lua): built from the result before styles, here
   -- only brought up to date when rendering outside a dashboard
   local tnode = content.build(css.node, rs, show)
+  ---@cast tnode -nil (a table's content has a root)
   local tbl = style.get(tnode)
   local row_nodes = content.list(tnode, "row")
   -- table-wide cell settings: the first cell's (a cell part when there are no rows)

@@ -95,7 +95,8 @@ local function parse_request(text, info)
   end
   local ok, req = pcall(require("dbdash.net.curl").parse, t, info.base_dir)
   if not ok then
-    dberr.raise("query", type(req) == "table" and req.message or tostring(req))
+    local e = req ---@type any (the error)
+    dberr.raise("query", type(e) == "table" and e.message or tostring(e))
   end
   return req
 end
@@ -249,19 +250,20 @@ function Conn:execute(text, opts)
     -- as curl: redirects are followed with -L only (at most --max-redirs, default 50)
     redirects = req.follow and (req.max_redirs or 50) or 0,
   })
-  if jar_file then
+  if jar and jar_file then
     -- written whether the request succeeded or not, as curl does
     local wok, werr = jar:write(jar_file)
     if not wok then
-      dberr.raise("query", werr)
+      dberr.raise("query", werr or "cannot write the cookie file")
     end
   end
   if not ok then
     -- Name the URL that failed (the URL and the request's path joined).
-    if type(res) == "table" and res.message then
-      res.message = ("%s (%s)"):format(res.message, http.format_url(url))
+    local e = res ---@type any (the error)
+    if type(e) == "table" and e.message then
+      e.message = ("%s (%s)"):format(e.message, http.format_url(url))
     end
-    error(res, 0)
+    error(e, 0)
   end
   check_status(res)
   local response = {

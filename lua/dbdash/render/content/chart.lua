@@ -147,7 +147,7 @@ function MODELS.boxplot(rs, show)
   local seen, order = {}, {}
   for _, row in ipairs(rs.rows) do
     if C.num(row[vi]) then
-      local cat = ci and C.text(row[ci]) or nn(show.value_column)
+      local cat = ci and C.text(row[ci]) or tostring(nn(show.value_column))
       if not seen[cat] then
         seen[cat] = true
         order[#order + 1] = cat

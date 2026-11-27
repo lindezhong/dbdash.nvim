@@ -21,6 +21,12 @@ local M = {}
 ---@field handlers table<string, fun(ev: table)[]>?
 ---@field data table<string, any>? values no selector reads (a browser's dataset), e.g. the
 ---  status a view shows next to the element
+---@field css_parts table<string, dbdash.dom.Node>? parts of a chart created when first
+---  styled (css.scope)
+---@field content table? what render/content built from the result (its kind and data)
+---@field content_items table? the chart's items by kind (render/content)
+---@field content_sigs table? signatures of the built items, to update only what changed
+---@field items table? the argument line's items (dashboard/commit.lua)
 ---@field scope boolean? the root of an inline style sheet's scope (a panel)
 ---@field version integer bumped when the node or a descendant changes (Servo's
 ---  inclusive_descendants_version): caches of a subtree's layout and paint key on it
