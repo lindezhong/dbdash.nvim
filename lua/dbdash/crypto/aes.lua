@@ -3,7 +3,8 @@
 local bit = require("bit")
 local util = require("dbdash.crypto.util")
 
-local band, bor, bxor, lshift, rshift, ror, tobit = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift, bit.ror, bit.tobit
+local band, bor, bxor, lshift, rshift, ror, tobit =
+  bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift, bit.ror, bit.tobit
 
 local M = {}
 
@@ -79,11 +80,21 @@ local function expand(key)
   for i = nk, 4 * (rounds + 1) - 1 do
     local t = w[i - 1]
     if i % nk == 0 then
-      t = bor(lshift(SBOX[band(rshift(t, 16), 255)], 24), lshift(SBOX[band(rshift(t, 8), 255)], 16), lshift(SBOX[band(t, 255)], 8), SBOX[band(rshift(t, 24), 255)])
+      t = bor(
+        lshift(SBOX[band(rshift(t, 16), 255)], 24),
+        lshift(SBOX[band(rshift(t, 8), 255)], 16),
+        lshift(SBOX[band(t, 255)], 8),
+        SBOX[band(rshift(t, 24), 255)]
+      )
       t = bxor(t, lshift(rcon, 24))
       rcon = xtime(rcon)
     elseif nk > 6 and i % nk == 4 then
-      t = bor(lshift(SBOX[band(rshift(t, 24), 255)], 24), lshift(SBOX[band(rshift(t, 16), 255)], 16), lshift(SBOX[band(rshift(t, 8), 255)], 8), SBOX[band(t, 255)])
+      t = bor(
+        lshift(SBOX[band(rshift(t, 24), 255)], 24),
+        lshift(SBOX[band(rshift(t, 16), 255)], 16),
+        lshift(SBOX[band(rshift(t, 8), 255)], 8),
+        SBOX[band(t, 255)]
+      )
     end
     w[i] = tobit(bxor(w[i - nk], t))
   end
@@ -96,23 +107,61 @@ local function encrypt_words(ks, s0, s1, s2, s3)
   s0, s1, s2, s3 = bxor(s0, w[0]), bxor(s1, w[1]), bxor(s2, w[2]), bxor(s3, w[3])
   local k = 4
   for _ = 1, ks.rounds - 1 do
-    local t0 = bxor(TE0[rshift(s0, 24)], TE1[band(rshift(s1, 16), 255)], TE2[band(rshift(s2, 8), 255)], TE3[band(s3, 255)], w[k])
-    local t1 = bxor(TE0[rshift(s1, 24)], TE1[band(rshift(s2, 16), 255)], TE2[band(rshift(s3, 8), 255)], TE3[band(s0, 255)], w[k + 1])
-    local t2 = bxor(TE0[rshift(s2, 24)], TE1[band(rshift(s3, 16), 255)], TE2[band(rshift(s0, 8), 255)], TE3[band(s1, 255)], w[k + 2])
-    local t3 = bxor(TE0[rshift(s3, 24)], TE1[band(rshift(s0, 16), 255)], TE2[band(rshift(s1, 8), 255)], TE3[band(s2, 255)], w[k + 3])
+    local t0 = bxor(
+      TE0[rshift(s0, 24)],
+      TE1[band(rshift(s1, 16), 255)],
+      TE2[band(rshift(s2, 8), 255)],
+      TE3[band(s3, 255)],
+      w[k]
+    )
+    local t1 = bxor(
+      TE0[rshift(s1, 24)],
+      TE1[band(rshift(s2, 16), 255)],
+      TE2[band(rshift(s3, 8), 255)],
+      TE3[band(s0, 255)],
+      w[k + 1]
+    )
+    local t2 = bxor(
+      TE0[rshift(s2, 24)],
+      TE1[band(rshift(s3, 16), 255)],
+      TE2[band(rshift(s0, 8), 255)],
+      TE3[band(s1, 255)],
+      w[k + 2]
+    )
+    local t3 = bxor(
+      TE0[rshift(s3, 24)],
+      TE1[band(rshift(s0, 16), 255)],
+      TE2[band(rshift(s1, 8), 255)],
+      TE3[band(s2, 255)],
+      w[k + 3]
+    )
     s0, s1, s2, s3 = t0, t1, t2, t3
     k = k + 4
   end
   local function last(a, b, c, d, rk)
-    return tobit(bxor(bor(lshift(SBOX[rshift(a, 24)], 24), lshift(SBOX[band(rshift(b, 16), 255)], 16), lshift(SBOX[band(rshift(c, 8), 255)], 8), SBOX[band(d, 255)]), rk))
+    return tobit(
+      bxor(
+        bor(
+          lshift(SBOX[rshift(a, 24)], 24),
+          lshift(SBOX[band(rshift(b, 16), 255)], 16),
+          lshift(SBOX[band(rshift(c, 8), 255)], 8),
+          SBOX[band(d, 255)]
+        ),
+        rk
+      )
+    )
   end
-  return last(s0, s1, s2, s3, w[k]), last(s1, s2, s3, s0, w[k + 1]), last(s2, s3, s0, s1, w[k + 2]), last(s3, s0, s1, s2, w[k + 3])
+  return last(s0, s1, s2, s3, w[k]),
+    last(s1, s2, s3, s0, w[k + 1]),
+    last(s2, s3, s0, s1, w[k + 2]),
+    last(s3, s0, s1, s2, w[k + 3])
 end
 
 ---AES block encryption (16-byte string).
 function M.encrypt_block(key, block)
   local ks = type(key) == "table" and key or expand(key)
-  local a, b, c, d = encrypt_words(ks, word(block, 1), word(block, 5), word(block, 9), word(block, 13))
+  local a, b, c, d =
+    encrypt_words(ks, word(block, 1), word(block, 5), word(block, 9), word(block, 13))
   return util.be32(a) .. util.be32(b) .. util.be32(c) .. util.be32(d)
 end
 
@@ -142,7 +191,9 @@ end
 local TD0, TD1, TD2, TD3 = {}, {}, {}, {}
 for x = 0, 255 do
   local s = INV_SBOX[x]
-  local w = tobit(bor(lshift(gmul8(s, 14), 24), lshift(gmul8(s, 9), 16), lshift(gmul8(s, 13), 8), gmul8(s, 11)))
+  local w = tobit(
+    bor(lshift(gmul8(s, 14), 24), lshift(gmul8(s, 9), 16), lshift(gmul8(s, 13), 8), gmul8(s, 11))
+  )
   TD0[x], TD1[x], TD2[x], TD3[x] = w, ror(w, 8), ror(w, 16), ror(w, 24)
 end
 
@@ -182,23 +233,61 @@ function M.decrypt_words(ks, s0, s1, s2, s3)
   s0, s1, s2, s3 = bxor(s0, w[0]), bxor(s1, w[1]), bxor(s2, w[2]), bxor(s3, w[3])
   local k = 4
   for _ = 1, ks.rounds - 1 do
-    local t0 = bxor(TD0[rshift(s0, 24)], TD1[band(rshift(s3, 16), 255)], TD2[band(rshift(s2, 8), 255)], TD3[band(s1, 255)], w[k])
-    local t1 = bxor(TD0[rshift(s1, 24)], TD1[band(rshift(s0, 16), 255)], TD2[band(rshift(s3, 8), 255)], TD3[band(s2, 255)], w[k + 1])
-    local t2 = bxor(TD0[rshift(s2, 24)], TD1[band(rshift(s1, 16), 255)], TD2[band(rshift(s0, 8), 255)], TD3[band(s3, 255)], w[k + 2])
-    local t3 = bxor(TD0[rshift(s3, 24)], TD1[band(rshift(s2, 16), 255)], TD2[band(rshift(s1, 8), 255)], TD3[band(s0, 255)], w[k + 3])
+    local t0 = bxor(
+      TD0[rshift(s0, 24)],
+      TD1[band(rshift(s3, 16), 255)],
+      TD2[band(rshift(s2, 8), 255)],
+      TD3[band(s1, 255)],
+      w[k]
+    )
+    local t1 = bxor(
+      TD0[rshift(s1, 24)],
+      TD1[band(rshift(s0, 16), 255)],
+      TD2[band(rshift(s3, 8), 255)],
+      TD3[band(s2, 255)],
+      w[k + 1]
+    )
+    local t2 = bxor(
+      TD0[rshift(s2, 24)],
+      TD1[band(rshift(s1, 16), 255)],
+      TD2[band(rshift(s0, 8), 255)],
+      TD3[band(s3, 255)],
+      w[k + 2]
+    )
+    local t3 = bxor(
+      TD0[rshift(s3, 24)],
+      TD1[band(rshift(s2, 16), 255)],
+      TD2[band(rshift(s1, 8), 255)],
+      TD3[band(s0, 255)],
+      w[k + 3]
+    )
     s0, s1, s2, s3 = t0, t1, t2, t3
     k = k + 4
   end
   local function last(a, b, c, d, rk)
-    return tobit(bxor(bor(lshift(INV_SBOX[rshift(a, 24)], 24), lshift(INV_SBOX[band(rshift(b, 16), 255)], 16), lshift(INV_SBOX[band(rshift(c, 8), 255)], 8), INV_SBOX[band(d, 255)]), rk))
+    return tobit(
+      bxor(
+        bor(
+          lshift(INV_SBOX[rshift(a, 24)], 24),
+          lshift(INV_SBOX[band(rshift(b, 16), 255)], 16),
+          lshift(INV_SBOX[band(rshift(c, 8), 255)], 8),
+          INV_SBOX[band(d, 255)]
+        ),
+        rk
+      )
+    )
   end
-  return last(s0, s3, s2, s1, w[k]), last(s1, s0, s3, s2, w[k + 1]), last(s2, s1, s0, s3, w[k + 2]), last(s3, s2, s1, s0, w[k + 3])
+  return last(s0, s3, s2, s1, w[k]),
+    last(s1, s0, s3, s2, w[k + 1]),
+    last(s2, s1, s0, s3, w[k + 2]),
+    last(s3, s2, s1, s0, w[k + 3])
 end
 
 ---AES block decryption (16-byte string).
 function M.decrypt_block(key, block)
   local ks = type(key) == "table" and key or expand(key)
-  local a, b, c, d = M.decrypt_words(ks, word(block, 1), word(block, 5), word(block, 9), word(block, 13))
+  local a, b, c, d =
+    M.decrypt_words(ks, word(block, 1), word(block, 5), word(block, 9), word(block, 13))
   return util.be32(a) .. util.be32(b) .. util.be32(c) .. util.be32(d)
 end
 
@@ -210,7 +299,13 @@ function M.cbc_encrypt(key, iv, data)
   local p0, p1, p2, p3 = word(iv, 1), word(iv, 5), word(iv, 9), word(iv, 13)
   local out = {}
   for off = 1, #data, 16 do
-    p0, p1, p2, p3 = encrypt_words(ks, bxor(p0, word(data, off)), bxor(p1, word(data, off + 4)), bxor(p2, word(data, off + 8)), bxor(p3, word(data, off + 12)))
+    p0, p1, p2, p3 = encrypt_words(
+      ks,
+      bxor(p0, word(data, off)),
+      bxor(p1, word(data, off + 4)),
+      bxor(p2, word(data, off + 8)),
+      bxor(p3, word(data, off + 12))
+    )
     out[#out + 1] = util.be32(p0) .. util.be32(p1) .. util.be32(p2) .. util.be32(p3)
   end
   return table.concat(out)
@@ -222,9 +317,13 @@ function M.cbc_decrypt(key, iv, data)
   local c0, c1, c2, c3 = word(iv, 1), word(iv, 5), word(iv, 9), word(iv, 13)
   local out = {}
   for off = 1, #data, 16 do
-    local n0, n1, n2, n3 = word(data, off), word(data, off + 4), word(data, off + 8), word(data, off + 12)
+    local n0, n1, n2, n3 =
+      word(data, off), word(data, off + 4), word(data, off + 8), word(data, off + 12)
     local a, b, c, d = M.decrypt_words(ks, n0, n1, n2, n3)
-    out[#out + 1] = util.be32(bxor(a, c0)) .. util.be32(bxor(b, c1)) .. util.be32(bxor(c, c2)) .. util.be32(bxor(d, c3))
+    out[#out + 1] = util.be32(bxor(a, c0))
+      .. util.be32(bxor(b, c1))
+      .. util.be32(bxor(c, c2))
+      .. util.be32(bxor(d, c3))
     c0, c1, c2, c3 = n0, n1, n2, n3
   end
   return table.concat(out)

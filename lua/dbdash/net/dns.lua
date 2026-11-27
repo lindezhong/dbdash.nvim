@@ -37,7 +37,15 @@ end
 
 ---Build a query message.
 function M.build_query(id, name, qtype)
-  return u16(id) .. u16(0x0100) .. u16(1) .. u16(0) .. u16(0) .. u16(0) .. encode_name(name) .. u16(qtype) .. u16(1)
+  return u16(id)
+    .. u16(0x0100)
+    .. u16(1)
+    .. u16(0)
+    .. u16(0)
+    .. u16(0)
+    .. encode_name(name)
+    .. u16(qtype)
+    .. u16(1)
 end
 
 ---Read a (possibly compressed) name at p. Returns name and the position after it.
@@ -108,7 +116,12 @@ function M.parse_response(msg)
     local a = { type = typ, name = name, ttl = ttl }
     if typ == M.TYPE.SRV then
       local target = read_name(msg, rd + 6)
-      a.srv = { priority = rd16(msg, rd), weight = rd16(msg, rd + 2), port = rd16(msg, rd + 4), target = target }
+      a.srv = {
+        priority = rd16(msg, rd),
+        weight = rd16(msg, rd + 2),
+        port = rd16(msg, rd + 4),
+        target = target,
+      }
     elseif typ == M.TYPE.TXT then
       a.txt = {}
       local q = rd
@@ -184,7 +197,11 @@ local function udp_query(server, packet, timeout)
 end
 
 local function tcp_query(server, packet, timeout)
-  local sock = require("dbdash.net.socket").connect(server.host, server.port, { connect_timeout = timeout, timeout = timeout })
+  local sock = require("dbdash.net.socket").connect(
+    server.host,
+    server.port,
+    { connect_timeout = timeout, timeout = timeout }
+  )
   local ok, res = pcall(function()
     sock:write(u16(#packet) .. packet)
     local len = rd16(sock:read_exact(2), 1)
@@ -200,7 +217,9 @@ end
 ---Windows: DnsQuery_UTF8 through dnsapi (UTF-8 names in and out).
 local function windows_query(name, qtype)
   local ffi = require("ffi")
-  pcall(ffi.cdef, [[
+  pcall(
+    ffi.cdef,
+    [[
     typedef struct DBDASH_DNS_RECORDA {
       struct DBDASH_DNS_RECORDA *pNext; char *pName; uint16_t wType; uint16_t wDataLength;
       uint32_t Flags; uint32_t dwTtl; uint32_t dwReserved;
@@ -212,7 +231,8 @@ local function windows_query(name, qtype)
     long DnsQuery_UTF8(const char *name, uint16_t type, uint32_t options, void *extra,
                        DBDASH_DNS_RECORDA **results, void *reserved);
     void DnsRecordListFree(DBDASH_DNS_RECORDA *list, int freetype);
-  ]])
+  ]]
+  )
   local dnsapi = ffi.load("dnsapi")
   local res = ffi.new("DBDASH_DNS_RECORDA*[1]")
   local rc = tonumber(dnsapi.DnsQuery_UTF8(name, qtype, 0, nil, res, nil))
@@ -230,7 +250,12 @@ local function windows_query(name, qtype)
       local a = { type = qtype, name = ffi.string(r.pName), ttl = r.dwTtl }
       if qtype == M.TYPE.SRV then
         local d = r.Data.SRV
-        a.srv = { priority = d.wPriority, weight = d.wWeight, port = d.wPort, target = ffi.string(d.pNameTarget) }
+        a.srv = {
+          priority = d.wPriority,
+          weight = d.wWeight,
+          port = d.wPort,
+          target = ffi.string(d.pNameTarget),
+        }
       else
         a.txt = {}
         for k = 0, r.Data.TXT.dwStringCount - 1 do

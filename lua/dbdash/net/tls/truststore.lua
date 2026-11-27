@@ -44,7 +44,9 @@ end
 ---All PEM "CERTIFICATE" blocks of a text as DER strings.
 function M.pem_certs(text)
   local out = {}
-  for body in text:gmatch("%-%-%-%-%-BEGIN CERTIFICATE%-%-%-%-%-(.-)%-%-%-%-%-END CERTIFICATE%-%-%-%-%-") do
+  for body in
+    text:gmatch("%-%-%-%-%-BEGIN CERTIFICATE%-%-%-%-%-(.-)%-%-%-%-%-END CERTIFICATE%-%-%-%-%-")
+  do
     out[#out + 1] = vim.base64.decode((body:gsub("%s", "")))
   end
   return out
@@ -82,14 +84,17 @@ end
 ---Windows ROOT store through crypt32 (a system DLL).
 local function windows_store()
   local ffi = require("ffi")
-  pcall(ffi.cdef, [[
+  pcall(
+    ffi.cdef,
+    [[
     typedef struct { unsigned long dwCertEncodingType; unsigned char *pbCertEncoded;
                      unsigned long cbCertEncoded; void *pCertInfo; void *hCertStore; } DBDASH_CERT_CONTEXT;
     void *CertOpenStore(const char *lpszStoreProvider, unsigned long dwEncodingType, void *hCryptProv,
                         unsigned long dwFlags, const void *pvPara);
     const DBDASH_CERT_CONTEXT *CertEnumCertificatesInStore(void *hCertStore, const DBDASH_CERT_CONTEXT *pPrev);
     int CertCloseStore(void *hCertStore, unsigned long dwFlags);
-  ]])
+  ]]
+  )
   local crypt32 = ffi.load("crypt32")
   local PROV_SYSTEM_A = ffi.cast("const char *", 9) -- CERT_STORE_PROV_SYSTEM_A
   local READONLY = 0x8000
@@ -142,7 +147,10 @@ function M.system()
       return M.from_file(path)
     end
   end
-  fail("no system CA bundle found (looked in %s); pass ?ca=/path/to/ca.pem", table.concat(M.SYSTEM_FILES, ", "))
+  fail(
+    "no system CA bundle found (looked in %s); pass ?ca=/path/to/ca.pem",
+    table.concat(M.SYSTEM_FILES, ", ")
+  )
 end
 
 ---Store for a connection: the ?ca= file (relative to base_dir) or the system store.

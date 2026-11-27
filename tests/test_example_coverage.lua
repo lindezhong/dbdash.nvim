@@ -78,20 +78,67 @@ end
 
 T["every template statement and loop attribute"] = function()
   local statements = {
-    "if", "elif", "else", "endif", "for", "endfor", "break", "continue",
-    "set", "endset", "with", "endwith", "do", "filter", "endfilter", "raw", "endraw",
-    "autoescape", "endautoescape", "macro", "endmacro", "call", "endcall", "block",
-    "endblock", "extends", "include", "import", "from", "lua", "endlua",
+    "if",
+    "elif",
+    "else",
+    "endif",
+    "for",
+    "endfor",
+    "break",
+    "continue",
+    "set",
+    "endset",
+    "with",
+    "endwith",
+    "do",
+    "filter",
+    "endfilter",
+    "raw",
+    "endraw",
+    "autoescape",
+    "endautoescape",
+    "macro",
+    "endmacro",
+    "call",
+    "endcall",
+    "block",
+    "endblock",
+    "extends",
+    "include",
+    "import",
+    "from",
+    "lua",
+    "endlua",
   }
   eq(missing(statements, { "{%%%%[-+]?%%s*%s%%f[^%%w_]" }), {})
   local loop = {
-    "index", "index0", "revindex", "revindex0", "first", "last", "length", "cycle",
-    "changed", "previtem", "nextitem", "depth", "depth0",
+    "index",
+    "index0",
+    "revindex",
+    "revindex0",
+    "first",
+    "last",
+    "length",
+    "cycle",
+    "changed",
+    "previtem",
+    "nextitem",
+    "depth",
+    "depth0",
   }
   eq(missing(loop, { "loop%%.%s%%f[^%%w_]" }), {})
   local forms = {
-    "recursive", "super()", "caller(", "varargs", "kwargs", "scoped", "required", "self.",
-    "ignore missing", "with context", "without context",
+    "recursive",
+    "super()",
+    "caller(",
+    "varargs",
+    "kwargs",
+    "scoped",
+    "required",
+    "self.",
+    "ignore missing",
+    "with context",
+    "without context",
   }
   eq(missing(forms, { "%s" }), {})
 end
@@ -128,9 +175,25 @@ end
 T["every database scheme"] = function()
   -- The built-in drivers' schemes (sqlite3 and the others are aliases).
   local schemes = {
-    "sqlite", "sqlite3", "postgres", "postgresql", "mysql", "mariadb", "redis", "rediss",
-    "mongodb", "cassandra", "cql", "mssql", "sqlserver", "lua", "luastream", "exec",
-    "webhook", "http", "https",
+    "sqlite",
+    "sqlite3",
+    "postgres",
+    "postgresql",
+    "mysql",
+    "mariadb",
+    "redis",
+    "rediss",
+    "mongodb",
+    "cassandra",
+    "cql",
+    "mssql",
+    "sqlserver",
+    "lua",
+    "luastream",
+    "exec",
+    "webhook",
+    "http",
+    "https",
   }
   eq(missing(schemes, { '"%s://', "type:%%s*%s%%f[^%%w_]" }), {})
 end
@@ -148,7 +211,8 @@ T["every chart type's example shows all of its renderers (and canvases)"] = func
       local seen = {}
       local d = require("dbdash.dom.build").from_config(cfg)
       for _, p in ipairs(d.panels) do
-        local r, canvas = registry.resolve(p.cfg.show.type, require("dbdash.css.style").get(p.chart_node))
+        local r, canvas =
+          registry.resolve(p.cfg.show.type, require("dbdash.css.style").get(p.chart_node))
         seen[r] = true
         if r == "canvas" then
           seen["canvas/" .. canvas] = true

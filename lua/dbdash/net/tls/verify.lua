@@ -48,7 +48,8 @@ function M.check_signature(cert, issuer)
     if issuer.key_type ~= "ec" then
       return false, "issuer key type does not match the signature"
     end
-    local curve = require("dbdash.crypto.ecdsa").curves[issuer.ec.curve == "P-384" and "p384" or "p256"]
+    local curve =
+      require("dbdash.crypto.ecdsa").curves[issuer.ec.curve == "P-384" and "p384" or "p256"]
     return curve:verify(issuer.ec, hash.digest(cert.tbs), cert.signature), "bad signature"
   end
   return false, "unsupported signature algorithm"
@@ -60,16 +61,28 @@ end
 
 local function check_validity(cert, now)
   if now < cert.not_before then
-    return false, ("certificate %s is not valid yet (from %s)"):format(describe(cert), os.date("!%Y-%m-%d", cert.not_before))
+    return false,
+      ("certificate %s is not valid yet (from %s)"):format(
+        describe(cert),
+        os.date("!%Y-%m-%d", cert.not_before)
+      )
   elseif now > cert.not_after then
-    return false, ("certificate %s has expired (on %s)"):format(describe(cert), os.date("!%Y-%m-%d", cert.not_after))
+    return false,
+      ("certificate %s has expired (on %s)"):format(
+        describe(cert),
+        os.date("!%Y-%m-%d", cert.not_after)
+      )
   end
   return true
 end
 
 local function check_critical(cert)
   if #cert.unknown_critical > 0 then
-    return false, ("certificate %s has unsupported critical extension(s): %s"):format(describe(cert), table.concat(cert.unknown_critical, ", "))
+    return false,
+      ("certificate %s has unsupported critical extension(s): %s"):format(
+        describe(cert),
+        table.concat(cert.unknown_critical, ", ")
+      )
   end
   return true
 end
@@ -109,7 +122,10 @@ function M.chain(leaf, intermediates, store, now)
   if not ok then
     return false, why
   end
-  if leaf.ext_key_usage and not (leaf.ext_key_usage[x509.OID.server_auth] or leaf.ext_key_usage[x509.OID.any_eku]) then
+  if
+    leaf.ext_key_usage
+    and not (leaf.ext_key_usage[x509.OID.server_auth] or leaf.ext_key_usage[x509.OID.any_eku])
+  then
     return false, ("certificate %s is not valid for server authentication"):format(describe(leaf))
   end
   local inter_index = {}
@@ -164,7 +180,11 @@ function M.chain(leaf, intermediates, store, now)
         end
       end
     end
-    last_reason = last_reason or ("unable to find a trusted issuer for %s (trust store: %s)"):format(describe(cert), store.source)
+    last_reason = last_reason
+      or ("unable to find a trusted issuer for %s (trust store: %s)"):format(
+        describe(cert),
+        store.source
+      )
     return false
   end
 
@@ -255,10 +275,11 @@ function M.host(cert, host)
     end
     names = { cert.subject_cn .. " (common name)" }
   end
-  return false, ("host name mismatch: the certificate is for %s, not %s"):format(
-    #names > 0 and table.concat(names, ", ") or "no names",
-    host
-  )
+  return false,
+    ("host name mismatch: the certificate is for %s, not %s"):format(
+      #names > 0 and table.concat(names, ", ") or "no names",
+      host
+    )
 end
 
 return M

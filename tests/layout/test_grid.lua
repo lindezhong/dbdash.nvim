@@ -6,7 +6,8 @@ local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()
 
 local function box(title, n, group)
-  local lines, hl = { title }, { { row = 0, col_s = 0, col_e = #title, group = group or "DbDashTitle" } }
+  local lines, hl =
+    { title }, { { row = 0, col_s = 0, col_e = #title, group = group or "DbDashTitle" } }
   for i = 1, n do
     lines[#lines + 1] = ("%s line %d"):format(title, i)
   end
@@ -15,16 +16,20 @@ end
 
 T["plan: flow, wrap and span"] = function()
   local cells = layout.plan({ 1, 1, 2, 1 }, 82, 2, 2)
-  eq(vim.tbl_map(function(c)
-    return { c.row, c.col, c.width, c.x }
-  end, cells), { { 1, 0, 40, 0 }, { 1, 1, 40, 42 }, { 2, 0, 82, 0 }, { 3, 0, 40, 0 } })
+  eq(
+    vim.tbl_map(function(c)
+      return { c.row, c.col, c.width, c.x }
+    end, cells),
+    { { 1, 0, 40, 0 }, { 1, 1, 40, 42 }, { 2, 0, 82, 0 }, { 3, 0, 40, 0 } }
+  )
   -- span wider than the grid is clamped
   eq(layout.plan({ 5 }, 50, 2, 2)[1].width, 50)
 end
 
 T["compose: side by side, uneven heights, blank line between rows"] = function()
   local cells = layout.plan({ 1, 1, 2 }, 42, 2, 2)
-  local out = compositor.compose(cells, { box("中文 A", 1), box("B", 3, "DbDashSeries1"), box("Wide", 0) })
+  local out =
+    compositor.compose(cells, { box("中文 A", 1), box("B", 3, "DbDashSeries1"), box("Wide", 0) })
   helpers.golden("layout/grid", out)
   for _, l in ipairs(out.lines) do
     eq(W.width(l) <= 42, true)
@@ -37,7 +42,8 @@ end
 
 T["compose: long lines are cut and highlights clipped"] = function()
   local cells = layout.plan({ 1, 1 }, 22, 2, 2)
-  local long = { lines = { string.rep("x", 30) }, hl = { { row = 0, col_s = 5, col_e = 30, group = "G" } } }
+  local long =
+    { lines = { string.rep("x", 30) }, hl = { { row = 0, col_s = 5, col_e = 30, group = "G" } } }
   local out = compositor.compose(cells, { long, box("R", 0) })
   eq(out.lines[1], string.rep("x", 10) .. "  R")
   eq(out.hl[1], { row = 0, col_s = 5, col_e = 10, group = "G" })
@@ -76,7 +82,8 @@ end
 
 T["place: areas, explicit, row or column only, auto flow, errors"] = function()
   local areas = layout.parse_areas({ "a a b", "c . b" })
-  local p = assert(layout.place({ { area = "b" }, {}, { row = 2, column = 1 }, { span = 2 } }, 3, areas))
+  local p =
+    assert(layout.place({ { area = "b" }, {}, { row = 2, column = 1 }, { span = 2 } }, 3, areas))
   eq(p[1], { row = 1, col = 3, span = 1, row_span = 2 })
   eq(p[3], { row = 2, col = 1, span = 1, row_span = 1 })
   eq(p[2], { row = 1, col = 1, span = 1, row_span = 1 }) -- auto: the first free cell
@@ -93,9 +100,12 @@ end
 
 T["columns: fixed, percent and fr share the width"] = function()
   local cols = layout.columns(T_({ 20, "25%", "1fr", "2fr" }, "columns"), 106, 2)
-  eq(vim.tbl_map(function(c)
-    return c.width
-  end, cols), { 20, 25, 18, 37 })
+  eq(
+    vim.tbl_map(function(c)
+      return c.width
+    end, cols),
+    { 20, 25, 18, 37 }
+  )
   eq(cols[2].x, 22)
   -- fr columns keep their minimum width (MIN_COL) on a narrow window
   cols = layout.columns(T_({ "1fr", "1fr" }, "columns"), 12, 2)
@@ -103,7 +113,10 @@ T["columns: fixed, percent and fr share the width"] = function()
 end
 
 T["rows: min-content first, auto grows to max-content, fr takes the rest, no squeeze"] = function()
-  local items = { { row = 1, row_span = 1, hmin = 10, hmax = 20 }, { row = 2, row_span = 1, hmin = 5, hmax = 5 } }
+  local items = {
+    { row = 1, row_span = 1, hmin = 10, hmax = 20 },
+    { row = 2, row_span = 1, hmin = 5, hmax = 5 },
+  }
   local auto = T_({ "auto", "auto" })
   eq(layout.rows(auto, items, 15), { 10, 5 }) -- just fits
   eq(layout.rows(auto, items, 8), { 10, 5 }) -- too small: scrolls, nothing below min
@@ -138,7 +151,10 @@ T["compose: cells at their lines, a panel across rows"] = function()
     { x = 0, width = 6, y = 3, height = 2 },
   }
   local out = compositor.compose(cells, { box("A", 1), box("B", 4), box("C", 1) })
-  eq(out.lines, { "A       B", "A line  B line", "        B line", "C       B line", "C line  B line" })
+  eq(
+    out.lines,
+    { "A       B", "A line  B line", "        B line", "C       B line", "C line  B line" }
+  )
   eq(out.regions[2], { row_s = 0, row_e = 4, x = 8, width = 6 })
 end
 

@@ -14,9 +14,17 @@ local function url_err(raw)
 end
 
 T["url: full form with percent-decoding"] = function()
-  local u = url.parse("postgres://us%40er:p%3Ass@db.example.com:6543/my%20db?tls=require&timeout=5s&sslrootcert=x")
-  eq({ u.scheme, u.user, u.password, u.host, u.port, u.database }, { "postgres", "us@er", "p:ss", "db.example.com", 6543, "my db" })
-  eq({ u.tls, u.timeout, u.connect_timeout, u.application_name }, { "require", 5000, 10000, "dbdash.nvim" })
+  local u = url.parse(
+    "postgres://us%40er:p%3Ass@db.example.com:6543/my%20db?tls=require&timeout=5s&sslrootcert=x"
+  )
+  eq(
+    { u.scheme, u.user, u.password, u.host, u.port, u.database },
+    { "postgres", "us@er", "p:ss", "db.example.com", 6543, "my db" }
+  )
+  eq(
+    { u.tls, u.timeout, u.connect_timeout, u.application_name },
+    { "require", 5000, 10000, "dbdash.nvim" }
+  )
   eq(u.params.sslrootcert, "x")
 end
 
@@ -43,7 +51,11 @@ T["url: tls pin requires a valid fingerprint"] = function()
   eq(url_err("postgres://h?tls=pin"):find("requires fingerprint") ~= nil, true)
   eq(url_err("postgres://h?tls=pin&fingerprint=sha256:AB"):find("32 bytes") ~= nil, true)
   eq(url.parse("postgres://h?tls=verify-full&ca=root.pem").tls, "verify-full")
-  eq(url_err("postgres://h?tls=maybe"):find("disable, require, pin, verify%-ca or verify%-full") ~= nil, true)
+  eq(
+    url_err("postgres://h?tls=maybe"):find("disable, require, pin, verify%-ca or verify%-full")
+      ~= nil,
+    true
+  )
 end
 
 T["url: invalid input"] = function()
@@ -73,16 +85,19 @@ T["dialect: literals"] = function()
   eq(pg.literal(1.5), "1.5")
   eq(pg.literal({ 1, "a", vim.NIL }), "(1, 'a', NULL)")
   eq(pg.literal({}), "(NULL)")
-  eq(mongo.literal("x\"y"), '"x\\"y"')
+  eq(mongo.literal('x"y'), '"x\\"y"')
   eq(mongo.literal(map.from_pairs({ { "a", 1 } })), '{"a": 1}')
   eq(pcall(pg.literal, map.new()), false)
 end
 
 T["resultset helpers"] = function()
-  local rs = resultset.new({ { name = "id", type = "integer" }, { name = "name", type = "string" } }, {
-    { 1, "Alice" },
-    { 2, db.NULL },
-  })
+  local rs = resultset.new(
+    { { name = "id", type = "integer" }, { name = "name", type = "string" } },
+    {
+      { 1, "Alice" },
+      { 2, db.NULL },
+    }
+  )
   eq(rs.row_count, 2)
   eq(rs:col_index("name"), 2)
   eq(rs:get(1, "name"), "Alice")
@@ -172,7 +187,14 @@ end
 T["manager: url and scheme errors"] = function()
   eq(run("oracle://h/x", "q").err.message:find("Oracle") ~= nil, true)
   eq(run("nosuch://h", "q").err.message:find("no driver") ~= nil, true)
-  eq(run("mongodb+srv://cluster.example.com:27017/db", "{}").err.message:find("exactly one host name and no port", 1, true) ~= nil, true)
+  eq(
+    run("mongodb+srv://cluster.example.com:27017/db", "{}").err.message:find(
+      "exactly one host name and no port",
+      1,
+      true
+    ) ~= nil,
+    true
+  )
   eq(run("garbage", "q").err.phase, "config")
 end
 

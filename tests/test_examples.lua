@@ -45,7 +45,9 @@ for _, f in ipairs(files) do
     local d = assert(sched.get(sched.normalize(f)), "dashboard did not start")
     ---A webhook panel waits for requests: listening is enough.
     local function waiting(p)
-      return p.cfg.database.type == "webhook" and not p.error and (p:push_state() or ""):match("^listening") ~= nil
+      return p.cfg.database.type == "webhook"
+        and not p.error
+        and (p:push_state() or ""):match("^listening") ~= nil
     end
     vim.wait(30000, function()
       for _, p in ipairs(d.panels) do
@@ -98,14 +100,19 @@ for _, name in ipairs({ "statements", "filters", "tests_functions", "methods", "
       return true
     end, 10)
     local tpl = require("dbdash.template")
-    local env = tpl.env(require("dbdash.db.dialect").get("sqlite"), false, vim.fn.fnamemodify(f, ":h"))
+    local env =
+      tpl.env(require("dbdash.db.dialect").get("sqlite"), false, vim.fn.fnamemodify(f, ":h"))
     local checked = 0
     for _, p in ipairs(d.panels) do
       eq(p.error, nil)
       local ti, ri = p.rs:col_index("template"), p.rs:col_index("result")
       if ti and ri then
         for _, row in ipairs(p.rs.rows) do
-          local out, err = tpl.render(row[ti], { args = args, meta = map.new() }, { env = vim.deepcopy(env) })
+          local out, err = tpl.render(
+            row[ti],
+            { args = args, meta = map.new() },
+            { env = vim.deepcopy(env) }
+          )
           eq({ row[ti], err and err.message or out }, { row[ti], row[ri] })
           checked = checked + 1
         end
@@ -120,14 +127,18 @@ T["every example dashboard and panel has a description that renders"] = function
     local cfg = assert(config.load(f))
     eq({ f, type(cfg.description) == "string" and cfg.description ~= "" }, { f, true })
     for i, p in ipairs(cfg.panels) do
-      eq({ f, i, type(p.show.description) == "string" and p.show.description ~= "" }, { f, i, true })
+      eq(
+        { f, i, type(p.show.description) == "string" and p.show.description ~= "" },
+        { f, i, true }
+      )
     end
     sched.start(f, { no_show = true })
     local d = assert(sched.get(sched.normalize(f)))
     local results = {}
     local function collect(key)
       return function(err, text)
-        results[key] = err and ("ERROR " .. tostring(type(err) == "table" and err.message or err)) or text
+        results[key] = err and ("ERROR " .. tostring(type(err) == "table" and err.message or err))
+          or text
       end
     end
     d:describe_async(collect("dashboard"))
@@ -138,7 +149,10 @@ T["every example dashboard and panel has a description that renders"] = function
       return vim.tbl_count(results) == #d.panels + 1
     end, 10)
     for key, text in pairs(results) do
-      eq({ f, key, text:match("^ERROR") == nil and text or text }, { f, key, text:match("^ERROR") and "(no error)" or text })
+      eq(
+        { f, key, text:match("^ERROR") == nil and text or text },
+        { f, key, text:match("^ERROR") and "(no error)" or text }
+      )
     end
     sched.stop(d.path)
   end
@@ -172,7 +186,9 @@ local function have_python()
   python_cmd = false
   for _, cmd in ipairs({ { "python3" }, { "python" }, { "py", "-3" } }) do
     local ok, r = pcall(function()
-      return vim.system(vim.list_extend(vim.deepcopy(cmd), { "-I", "-c", "import jsonschema, yaml" })):wait()
+      return vim
+        .system(vim.list_extend(vim.deepcopy(cmd), { "-I", "-c", "import jsonschema, yaml" }))
+        :wait()
     end)
     if ok and r.code == 0 then
       python_cmd = cmd
@@ -183,7 +199,8 @@ local function have_python()
 end
 
 local function schema_check(...)
-  local argv = vim.list_extend(vim.deepcopy(have_python()), { "-I", "tests/examples_schema.py", ... })
+  local argv =
+    vim.list_extend(vim.deepcopy(have_python()), { "-I", "tests/examples_schema.py", ... })
   return vim.system(argv, { text = true }):wait()
 end
 
@@ -222,7 +239,12 @@ T["files the examples write are hidden"] = function()
   if vim.fn.isdirectory(".git") == 0 then
     MiniTest.skip("not a git checkout")
   end
-  local r = vim.system({ "git", "ls-files", "--others", "--ignored", "--exclude-standard", "example" }, { text = true }):wait()
+  local r = vim
+    .system(
+      { "git", "ls-files", "--others", "--ignored", "--exclude-standard", "example" },
+      { text = true }
+    )
+    :wait()
   local visible = {}
   for _, f in ipairs(vim.split(r.stdout or "", "\n", { trimempty = true })) do
     if not vim.fs.basename(f):match("^%.") then

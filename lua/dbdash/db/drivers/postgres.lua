@@ -18,7 +18,12 @@ local NULL = vim.NIL
 -- Wire helpers ---------------------------------------------------------------------------
 
 local function i32(n)
-  return string.char(bit.band(bit.rshift(n, 24), 255), bit.band(bit.rshift(n, 16), 255), bit.band(bit.rshift(n, 8), 255), bit.band(n, 255))
+  return string.char(
+    bit.band(bit.rshift(n, 24), 255),
+    bit.band(bit.rshift(n, 16), 255),
+    bit.band(bit.rshift(n, 8), 255),
+    bit.band(n, 255)
+  )
 end
 
 local function i16(n)
@@ -84,7 +89,11 @@ local function raise_pg(phase, body)
   if f.C == "28P01" or f.C == "28000" then
     phase = "auth"
   end
-  dberr.raise(phase, f.M or "unknown error", { code = f.C, detail = detail, position = tonumber(f.P) })
+  dberr.raise(
+    phase,
+    f.M or "unknown error",
+    { code = f.C, detail = detail, position = tonumber(f.P) }
+  )
 end
 
 -- Type mapping ----------------------------------------------------------------------------
@@ -117,18 +126,53 @@ local TYPES = {
 
 -- Array type OID -> element type OID.
 local ARRAYS = {
-  [1000] = 16, [1001] = 17, [1002] = 18, [1003] = 19, [1005] = 21, [1007] = 23, [1009] = 25,
-  [1014] = 1042, [1015] = 1043, [1016] = 20, [1021] = 700, [1022] = 701, [1231] = 1700,
-  [1182] = 1082, [1183] = 1083, [1115] = 1114, [1185] = 1184, [199] = 114, [3807] = 3802,
-  [2951] = 2950, [1028] = 26,
+  [1000] = 16,
+  [1001] = 17,
+  [1002] = 18,
+  [1003] = 19,
+  [1005] = 21,
+  [1007] = 23,
+  [1009] = 25,
+  [1014] = 1042,
+  [1015] = 1043,
+  [1016] = 20,
+  [1021] = 700,
+  [1022] = 701,
+  [1231] = 1700,
+  [1182] = 1082,
+  [1183] = 1083,
+  [1115] = 1114,
+  [1185] = 1184,
+  [199] = 114,
+  [3807] = 3802,
+  [2951] = 2950,
+  [1028] = 26,
 }
 
 local TYPE_NAMES = {
-  [16] = "bool", [17] = "bytea", [18] = "char", [19] = "name", [25] = "text", [1042] = "bpchar",
-  [1043] = "varchar", [20] = "int8", [21] = "int2", [23] = "int4", [26] = "oid", [700] = "float4",
-  [701] = "float8", [1700] = "numeric", [790] = "money", [1082] = "date", [1083] = "time",
-  [1266] = "timetz", [1114] = "timestamp", [1184] = "timestamptz", [114] = "json",
-  [3802] = "jsonb", [2950] = "uuid",
+  [16] = "bool",
+  [17] = "bytea",
+  [18] = "char",
+  [19] = "name",
+  [25] = "text",
+  [1042] = "bpchar",
+  [1043] = "varchar",
+  [20] = "int8",
+  [21] = "int2",
+  [23] = "int4",
+  [26] = "oid",
+  [700] = "float4",
+  [701] = "float8",
+  [1700] = "numeric",
+  [790] = "money",
+  [1082] = "date",
+  [1083] = "time",
+  [1266] = "timetz",
+  [1114] = "timestamp",
+  [1184] = "timestamptz",
+  [114] = "json",
+  [3802] = "jsonb",
+  [2950] = "uuid",
 }
 
 local function logical(oid)
@@ -146,9 +190,11 @@ local function decode_bytea(s)
     end))
   end
   -- escape format: \\ and \ooo
-  return (s:gsub("\\(%d%d%d)", function(o)
-    return string.char(tonumber(o, 8))
-  end):gsub("\\\\", "\\"))
+  return (
+    s:gsub("\\(%d%d%d)", function(o)
+      return string.char(tonumber(o, 8))
+    end):gsub("\\\\", "\\")
+  )
 end
 
 local decode_value
@@ -284,7 +330,11 @@ function M.parse_url(info)
 end
 
 function M.connect(info)
-  local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
+  local sock = socket.connect(
+    info.host,
+    info.port,
+    { connect_timeout = info.connect_timeout, timeout = info.timeout }
+  )
   local c = setmetatable({ sock = sock, params = {} }, Conn)
   local ok, err = pcall(function()
     if info.tls ~= "disable" then
@@ -308,10 +358,14 @@ end
 function Conn:startup(info)
   local sock = self.sock
   local params = {
-    "user", info.user,
-    "database", info.database,
-    "application_name", info.application_name,
-    "client_encoding", "UTF8",
+    "user",
+    info.user,
+    "database",
+    info.database,
+    "application_name",
+    info.application_name,
+    "client_encoding",
+    "UTF8",
   }
   if info.params.options then
     vim.list_extend(params, { "options", info.params.options })
@@ -339,7 +393,10 @@ function Conn:startup(info)
       elseif code == 10 then
         local mechs = b:sub(5)
         if not mechs:find("SCRAM-SHA-256\0", 1, true) then
-          dberr.raise("auth", "no supported SASL mechanism (server offers: " .. mechs:gsub("\0", " ") .. ")")
+          dberr.raise(
+            "auth",
+            "no supported SASL mechanism (server offers: " .. mechs:gsub("\0", " ") .. ")"
+          )
         end
         M.scram(need_password(), function(mech, data)
           sock:write(message("p", mech .. "\0" .. i32(#data) .. data))
@@ -390,7 +447,12 @@ function Conn:execute(query, opts)
         _, pos = read_i16(b, pos) -- attribute number
         oid, pos = read_i32(b, pos)
         pos = pos + 2 + 4 + 2 -- typlen, typmod, format
-        fields[i] = { name = name, type = logical(oid), db_type = TYPE_NAMES[oid] or ("oid " .. oid), oid = oid }
+        fields[i] = {
+          name = name,
+          type = logical(oid),
+          db_type = TYPE_NAMES[oid] or ("oid " .. oid),
+          oid = oid,
+        }
       end
       current = { columns = fields, rows = {}, truncated = false }
     elseif t == "D" then
@@ -444,7 +506,11 @@ function Conn:execute(query, opts)
   for _, c in ipairs(result.columns) do
     c.oid = nil
   end
-  return resultset.new(result.columns, result.rows, { truncated = result.truncated, affected = result.affected, warnings = warnings })
+  return resultset.new(
+    result.columns,
+    result.rows,
+    { truncated = result.truncated, affected = result.affected, warnings = warnings }
+  )
 end
 
 function Conn:close()
@@ -464,7 +530,11 @@ function M.cancel(conn, info)
   if not conn.backend_key then
     return
   end
-  local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.connect_timeout })
+  local sock = socket.connect(
+    info.host,
+    info.port,
+    { connect_timeout = info.connect_timeout, timeout = info.connect_timeout }
+  )
   pcall(function()
     sock:write(i32(8 + #conn.backend_key) .. i32(80877102) .. conn.backend_key)
     sock:read_to_eof(1024) -- the server closes the connection once it has the request

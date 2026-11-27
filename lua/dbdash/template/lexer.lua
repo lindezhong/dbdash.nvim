@@ -11,7 +11,8 @@ local M = {}
 ---@field line integer
 ---@field col integer
 
-local OPS2 = { ["**"] = true, ["//"] = true, ["=="] = true, ["!="] = true, ["<="] = true, [">="] = true }
+local OPS2 =
+  { ["**"] = true, ["//"] = true, ["=="] = true, ["!="] = true, ["<="] = true, [">="] = true }
 local OPS1 = {}
 for c in ("+-*/%~|.,:()[]{}<>="):gmatch(".") do
   OPS1[c] = true
@@ -20,8 +21,17 @@ local OPEN = { ["("] = true, ["["] = true, ["{"] = true }
 local CLOSE = { [")"] = true, ["]"] = true, ["}"] = true }
 
 local SIMPLE_ESC = {
-  n = "\n", t = "\t", r = "\r", a = "\a", b = "\b", f = "\f", v = "\v",
-  ["\\"] = "\\", ["'"] = "'", ['"'] = '"', ["\n"] = "",
+  n = "\n",
+  t = "\t",
+  r = "\r",
+  a = "\a",
+  b = "\b",
+  f = "\f",
+  v = "\v",
+  ["\\"] = "\\",
+  ["'"] = "'",
+  ['"'] = '"',
+  ["\n"] = "",
 }
 
 local function utf8_char(cp)
@@ -30,7 +40,11 @@ local function utf8_char(cp)
   elseif cp < 0x800 then
     return string.char(0xC0 + math.floor(cp / 0x40), 0x80 + cp % 0x40)
   elseif cp < 0x10000 then
-    return string.char(0xE0 + math.floor(cp / 0x1000), 0x80 + math.floor(cp / 0x40) % 0x40, 0x80 + cp % 0x40)
+    return string.char(
+      0xE0 + math.floor(cp / 0x1000),
+      0x80 + math.floor(cp / 0x40) % 0x40,
+      0x80 + cp % 0x40
+    )
   end
   return string.char(
     0xF0 + math.floor(cp / 0x40000),
@@ -150,12 +164,19 @@ function M.tokenize(src)
     while true do
       p = src:match("^%s*()", p)
       if p > #src then
-        fail(p - 1, "unexpected end of template, expected '%s'.", kind == "%" and "end of statement block" or "end of print statement")
+        fail(
+          p - 1,
+          "unexpected end of template, expected '%s'.",
+          kind == "%" and "end of statement block" or "end of print statement"
+        )
       end
       if depth == 0 then
         if src:sub(p, p + 1) == close then
           return p + 2, nil
-        elseif src:sub(p + 1, p + 2) == close and (src:sub(p, p) == "-" or (kind == "%" and src:sub(p, p) == "+")) then
+        elseif
+          src:sub(p + 1, p + 2) == close
+          and (src:sub(p, p) == "-" or (kind == "%" and src:sub(p, p) == "+"))
+        then
           return p + 3, src:sub(p, p)
         end
       end
@@ -164,9 +185,15 @@ function M.tokenize(src)
       if name then
         push("name", name, p)
         p = p + #name
-      elseif src:match("^0[xXoObB]", p) and src:match("^0[xX][%x_]+", p) or src:match("^0[oO][0-7_]+", p) or src:match("^0[bB][01_]+", p) then
+      elseif
+        src:match("^0[xXoObB]", p) and src:match("^0[xX][%x_]+", p)
+        or src:match("^0[oO][0-7_]+", p)
+        or src:match("^0[bB][01_]+", p)
+      then
         -- 0x1f, 0o17, 0b101 (underscores allowed, like Python)
-        local lit = src:match("^0[xX][%x_]+", p) or src:match("^0[oO][0-7_]+", p) or src:match("^0[bB][01_]+", p)
+        local lit = src:match("^0[xX][%x_]+", p)
+          or src:match("^0[oO][0-7_]+", p)
+          or src:match("^0[bB][01_]+", p)
         local base = ({ x = 16, o = 8, b = 2 })[lit:sub(2, 2):lower()]
         push("int", tonumber((lit:sub(3):gsub("_", "")), base), p)
         p = p + #lit

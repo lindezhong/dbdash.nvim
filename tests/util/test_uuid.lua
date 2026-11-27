@@ -7,7 +7,11 @@ T["format: version 7, variant 10, 36 characters"] = function()
   for _ = 1, 200 do
     local id = uuid.v7()
     eq({ id, #id }, { id, 36 })
-    eq(id:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-7%x%x%x%-[89ab]%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") ~= nil, true)
+    eq(
+      id:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-7%x%x%x%-[89ab]%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$")
+        ~= nil,
+      true
+    )
   end
 end
 

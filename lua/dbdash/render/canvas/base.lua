@@ -136,7 +136,11 @@ function Canvas:circle(x, y, r, color)
   local steps = math.max(8, math.ceil(2 * math.pi * r))
   for i = 0, steps - 1 do
     local a = 2 * math.pi * i / steps
-    self:pixel(math.floor(cx + r * math.cos(a) + 0.5), math.floor(cy + r * math.sin(a) * self.px_y / self.px_x * 0.5 + 0.5), color)
+    self:pixel(
+      math.floor(cx + r * math.cos(a) + 0.5),
+      math.floor(cy + r * math.sin(a) * self.px_y / self.px_x * 0.5 + 0.5),
+      color
+    )
   end
 end
 

@@ -130,7 +130,6 @@ function M.forget(cmd, info)
   cmd_cache[cmd_key(cmd, info)] = nil
 end
 
-
 ---Run password_cmd inside a util.async task; the first line of its output is the password.
 ---@param cmd string|string[]
 ---@param info dbdash.db.Url
@@ -141,9 +140,13 @@ function M.from_cmd(cmd, info)
     return cmd_cache[key]
   end
   local ok, res = pcall(async.await, function(cb)
-    vim.system(require("dbdash.util.shell").argv(cmd), { text = true, timeout = info.connect_timeout }, function(r)
-      cb(r)
-    end)
+    vim.system(
+      require("dbdash.util.shell").argv(cmd),
+      { text = true, timeout = info.connect_timeout },
+      function(r)
+        cb(r)
+      end
+    )
   end)
   if not ok then
     dberr.raise("connect", "password_cmd could not run: " .. tostring(res))

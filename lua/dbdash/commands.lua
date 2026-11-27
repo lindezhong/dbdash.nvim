@@ -32,7 +32,10 @@ function M.start(fargs, bang)
     return err("usage: DbDashStart <config.yaml> [name=value ...]")
   end
   local path = table.remove(fargs, 1)
-  sched.start(path, { tokens = fargs, ask_all = bang, open = require("dbdash").options.dashboard.open })
+  sched.start(
+    path,
+    { tokens = fargs, ask_all = bang, open = require("dbdash").options.dashboard.open }
+  )
 end
 
 function M.restart()
@@ -66,10 +69,12 @@ function M.trust(fargs)
   local trust = require("dbdash.trust")
   local files = trust.collect(path, cfg)
   trust.record(path, action, files)
-  vim.notify(("dbdash: %s %s"):format(
-    vim.fn.fnamemodify(path, ":~:."),
-    ({ allow = "trusted", deny = "denied", remove = "will be asked about again" })[action]
-  ))
+  vim.notify(
+    ("dbdash: %s %s"):format(
+      vim.fn.fnamemodify(path, ":~:."),
+      ({ allow = "trusted", deny = "denied", remove = "will be asked about again" })[action]
+    )
+  )
 end
 
 function M.stop(path)
@@ -120,7 +125,8 @@ function M.list()
   end
   local chunks = { { "Running dashboards:\n", "Title" } }
   for _, d in ipairs(all) do
-    chunks[#chunks + 1] = { ("  %s - %s, next refresh in %ds\n"):format(short(d.path), d:status_word(), d:remaining()) }
+    chunks[#chunks + 1] =
+      { ("  %s - %s, next refresh in %ds\n"):format(short(d.path), d:status_word(), d:remaining()) }
   end
   vim.api.nvim_echo(chunks, false, {})
 end
@@ -150,14 +156,28 @@ function M.status()
     if d.cfg.grid then
       lines[#lines + 1] = ("Panel %d: %s"):format(p.index, p:title())
     end
-    lines[#lines + 1] = "Database:  " .. p.cfg.database.type .. "  " .. url.redact(p.cfg.database.url)
+    lines[#lines + 1] = "Database:  "
+      .. p.cfg.database.type
+      .. "  "
+      .. url.redact(p.cfg.database.url)
     if p.push then
       local st = p.stream or { received = 0, processed = 0, dropped = 0, queue = {} }
-      lines[#lines + 1] = ("Interval:  drawn every %ds, next in %ds"):format(p.cfg.show.interval / 1000, p:remaining())
-      lines[#lines + 1] = ("Push:      %s; %d received, %d processed, %d queued, %d dropped"):format(p:push_state(), st.received, st.processed, #st.queue, st.dropped)
+      lines[#lines + 1] = ("Interval:  drawn every %ds, next in %ds"):format(
+        p.cfg.show.interval / 1000,
+        p:remaining()
+      )
+      lines[#lines + 1] = ("Push:      %s; %d received, %d processed, %d queued, %d dropped"):format(
+        p:push_state(),
+        st.received,
+        st.processed,
+        #st.queue,
+        st.dropped
+      )
       local h = st.handle
       if h and h.stats.truncated > 0 then
-        lines[#lines + 1] = ("           %d item(s) cut at push.max_record"):format(h.stats.truncated)
+        lines[#lines + 1] = ("           %d item(s) cut at push.max_record"):format(
+          h.stats.truncated
+        )
       end
       local rejected = {}
       for code, n in pairs(h and h.stats.rejected or {}) do
@@ -168,7 +188,10 @@ function M.status()
         lines[#lines + 1] = "Rejected:  " .. table.concat(rejected, ", ")
       end
     else
-      lines[#lines + 1] = ("Interval:  %ds, next refresh in %ds"):format(p.cfg.show.interval / 1000, p:remaining())
+      lines[#lines + 1] = ("Interval:  %ds, next refresh in %ds"):format(
+        p.cfg.show.interval / 1000,
+        p:remaining()
+      )
     end
     if p.error then
       lines[#lines + 1] = "Error:     " .. sched.format_error(p.error):gsub("\n", " ")
@@ -224,7 +247,12 @@ function M.show_variables()
     local key = s.key or s.name
     local line = ("%s = %s"):format(key, v == nil and "(unset)" or args.format_value(v))
     local css = require("dbdash.css").scope(d.doc and d.doc.root or nil)
-    hl[#hl + 1] = { row = #lines, col_s = 0, col_e = #key, group = css:hl("arg-name", { classes = s.panel and { "local" } or nil }) }
+    hl[#hl + 1] = {
+      row = #lines,
+      col_s = 0,
+      col_e = #key,
+      group = css:hl("arg-name", { classes = s.panel and { "local" } or nil }),
+    }
     local extra = { s.type }
     if s.default ~= nil and not vim.deep_equal(s.default, v) then
       extra[#extra + 1] = "default " .. args.format_value(s.default)
@@ -311,11 +339,15 @@ function M.export(fargs, bang, reg)
   local export = require("dbdash.export")
   local function run(fmt)
     if not vim.tbl_contains(export.FORMATS, fmt) then
-      return err(("unknown export format %q (use %s)"):format(fmt, table.concat(export.FORMATS, ", ")))
+      return err(
+        ("unknown export format %q (use %s)"):format(fmt, table.concat(export.FORMATS, ", "))
+      )
     end
     with_panel(d, function(p)
       if not p.rs then
-        return err("nothing to export yet: " .. (p.error and sched.format_error(p.error) or "no result"))
+        return err(
+          "nothing to export yet: " .. (p.error and sched.format_error(p.error) or "no result")
+        )
       end
       local out = export.format(p.rs, fmt)
       local what = ("%d rows as %s"):format(p.rs.row_count, fmt)
@@ -408,7 +440,8 @@ function M.describe()
       i = i + 1
       local part = parts[i]
       if not part then
-        local title = #parts == 1 and parts[1].name or (cfg.title or vim.fn.fnamemodify(d.path, ":t"))
+        local title = #parts == 1 and parts[1].name
+          or (cfg.title or vim.fn.fnamemodify(d.path, ":t"))
         local text = table.concat(texts, "\n\n")
         return require("dbdash.view.popup").open(vim.split(text, "\n", { plain = true }), {
           title = "DbDash: " .. title,
@@ -486,7 +519,9 @@ end
 
 ---:DbDashMksession[!] [file] / :Mksession: sessions record dbdash:// buffers by name.
 function M.mksession(bang, file)
-  vim.cmd("mksession" .. (bang and "!" or "") .. (file ~= "" and (" " .. vim.fn.fnameescape(file)) or ""))
+  vim.cmd(
+    "mksession" .. (bang and "!" or "") .. (file ~= "" and (" " .. vim.fn.fnameescape(file)) or "")
+  )
 end
 
 ---A :DbDashStyle value: JSON (numbers, true / false, lists, quoted strings), else the
@@ -566,7 +601,9 @@ function M.style(fargs)
     if perr then
       d.runtime_style = saved
       apply_runtime(d)
-      return err(("%s%s: %s"):format(perr.key, perr.property and (" " .. perr.property) or "", perr.message))
+      return err(
+        ("%s%s: %s"):format(perr.key, perr.property and (" " .. perr.property) or "", perr.message)
+      )
     end
     return d:redraw()
   end
@@ -585,13 +622,23 @@ function M.style(fargs)
     if not a then
       local chart = require("dbdash.css.style").get(p.chart_node)
       local renderer, canvas = registry.resolve(p:show_config().type, chart)
-      vim.api.nvim_echo({ { ("%s: renderer=%s canvas=%s"):format(p:show_config().type, renderer, canvas) } }, false, {})
+      vim.api.nvim_echo(
+        { { ("%s: renderer=%s canvas=%s"):format(p:show_config().type, renderer, canvas) } },
+        false,
+        {}
+      )
       return
     end
     p.runtime_style = p.runtime_style or new_sheet()
     if a == "canvas" then
       if not b or not registry.get("canvas/" .. b) then
-        return err("unknown canvas '" .. tostring(b) .. "' (available: " .. table.concat(registry.names("canvas/"), ", ") .. ")")
+        return err(
+          "unknown canvas '"
+            .. tostring(b)
+            .. "' (available: "
+            .. table.concat(registry.names("canvas/"), ", ")
+            .. ")"
+        )
       end
       declare(p.runtime_style, "chart", "canvas", b)
     else
@@ -606,11 +653,16 @@ function M.style(fargs)
           declare(p.runtime_style, "chart", "renderer", "canvas")
           declare(p.runtime_style, "chart", "canvas", b)
         else
-          return err(("unknown style '%s' for %s (available: %s)"):format(
-            b,
-            a,
-            table.concat(vim.list_extend(registry.names("chart/" .. a .. "/"), registry.names("canvas/")), ", ")
-          ))
+          return err(
+            ("unknown style '%s' for %s (available: %s)"):format(
+              b,
+              a,
+              table.concat(
+                vim.list_extend(registry.names("chart/" .. a .. "/"), registry.names("canvas/")),
+                ", "
+              )
+            )
+          )
         end
       elseif p.runtime_style.rules.chart then
         p.runtime_style.rules.chart.renderer = nil
@@ -645,7 +697,9 @@ function M.complete_style(arglead, cmdline)
     out = vim.tbl_keys(registry.DEFAULTS)
     vim.list_extend(out, { "canvas", "reset", "set" })
   elseif words[1] == "set" then
-    out = (#words == 2 and arglead == "" or #words == 3 and arglead ~= "") and require("dbdash.css.properties").names() or {}
+    out = (#words == 2 and arglead == "" or #words == 3 and arglead ~= "")
+        and require("dbdash.css.properties").names()
+      or {}
   elseif words[1] == "canvas" then
     out = registry.names("canvas/")
   else

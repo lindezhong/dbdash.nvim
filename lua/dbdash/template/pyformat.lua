@@ -104,13 +104,25 @@ end
 local function format_number(v, o)
   local x, isf = R.num(v)
   local typ = o.typ or ""
-  if (typ == "d" or typ == "b" or typ == "o" or typ == "x" or typ == "X" or typ == "c") and isf and not o.percent then
+  if
+    (typ == "d" or typ == "b" or typ == "o" or typ == "x" or typ == "X" or typ == "c")
+    and isf
+    and not o.percent
+  then
     raise("value", "Unknown format code '%s' for object of type 'float'", typ)
   end
   if typ == "c" then
-    return pad(require("dbdash.template.lexer").utf8_char(math.floor(x)), o.width, o.align or (o.percent and ">" or "<"), o.fill or " ", 0)
+    return pad(
+      require("dbdash.template.lexer").utf8_char(math.floor(x)),
+      o.width,
+      o.align or (o.percent and ">" or "<"),
+      o.fill or " ",
+      0
+    )
   end
-  if o.percent and (typ == "d" or typ == "i" or typ == "u" or typ == "x" or typ == "X" or typ == "o") then
+  if
+    o.percent and (typ == "d" or typ == "i" or typ == "u" or typ == "x" or typ == "X" or typ == "o")
+  then
     x = x >= 0 and math.floor(x) or math.ceil(x) -- '%d' % 3.7 -> 3
   end
   local neg = x < 0 or (x == 0 and 1 / x < 0 and isf)
@@ -130,7 +142,10 @@ end
 ---Format any value per a spec (the format() mini-language).
 local function format_value(v, o)
   R.check(v)
-  if R.num(v) and type(v) ~= "boolean" or (type(v) == "boolean" and o.typ and o.typ ~= "" and o.typ ~= "s") then
+  if
+    R.num(v) and type(v) ~= "boolean"
+    or (type(v) == "boolean" and o.typ and o.typ ~= "" and o.typ ~= "s")
+  then
     if o.typ == "s" then
       raise("value", "Unknown format code 's' for object of type '%s'", R.typename(v))
     end
@@ -160,7 +175,8 @@ local function parse_spec(spec)
     o.align, i = cs[1], 2
   end
   local rest = table.concat(cs, "", i)
-  local sign, alt, zero, width, grouping, prec, typ = rest:match("^([-+ ]?)(#?)(0?)(%d*)([,_]?)(%.?%d*)([%a%%]?)$")
+  local sign, alt, zero, width, grouping, prec, typ =
+    rest:match("^([-+ ]?)(#?)(0?)(%d*)([,_]?)(%.?%d*)([%a%%]?)$")
   if not sign or prec == "." then
     raise("value", "Invalid format specifier '%s'", spec)
   end

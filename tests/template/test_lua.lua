@@ -6,7 +6,11 @@ local T = MiniTest.new_set()
 
 local function render(src, opts)
   opts = opts or {}
-  return template.render(src, opts.vars or {}, { env = opts.env, source = "b.yaml", line_offset = opts.offset })
+  return template.render(
+    src,
+    opts.vars or {},
+    { env = opts.env, source = "b.yaml", line_offset = opts.offset }
+  )
 end
 
 local function pg_env()
@@ -26,24 +30,41 @@ T["Lua code is not template syntax"] = function()
 end
 
 T["vars: the template variables visible at the block, read-only"] = function()
-  eq(render("{% set x = 5 %}{% for i in [1, 2] %}{% lua %}return vars.x * vars.i{% endlua %},{% endfor %}"), "5,10,")
+  eq(
+    render(
+      "{% set x = 5 %}{% for i in [1, 2] %}{% lua %}return vars.x * vars.i{% endlua %},{% endfor %}"
+    ),
+    "5,10,"
+  )
   eq(
     render("{% macro m(a) %}{% lua %}return vars.a .. '!'{% endlua %}{% endmacro %}{{ m('hi') }}"),
     "hi!"
   )
-  eq(render("{% set l = [1, none] %}{% lua %}return #vars.l .. tostring(vars.l[2]){% endlua %}"), "1nil")
+  eq(
+    render("{% set l = [1, none] %}{% lua %}return #vars.l .. tostring(vars.l[2]){% endlua %}"),
+    "1nil"
+  )
   local _, err = render("{% lua %}vars.y = 1{% endlua %}")
   eq(err.message, "vars is read-only (vars.y)")
 end
 
 T["autoescape applies to returned values; dbdash.safe opts out"] = function()
-  eq(render([[{% lua %}return "it's"{% endlua %} {% lua %}return dbdash.safe("x = 'y'"){% endlua %}]], { env = pg_env() }), "'it''s' x = 'y'")
+  eq(
+    render(
+      [[{% lua %}return "it's"{% endlua %} {% lua %}return dbdash.safe("x = 'y'"){% endlua %}]],
+      { env = pg_env() }
+    ),
+    "'it''s' x = 'y'"
+  )
   eq(render([[{% lua %}return "it's"{% endlua %}]]), "it's")
 end
 
 T["errors carry the config file and line"] = function()
   local _, err = render("x\n{% lua %}\nlocal a = nil\nreturn a.b\n{% endlua %}", { offset = 10 })
-  eq({ err.source, err.line, err.message }, { "b.yaml", 14, "attempt to index local 'a' (a nil value)" })
+  eq(
+    { err.source, err.line, err.message },
+    { "b.yaml", 14, "attempt to index local 'a' (a nil value)" }
+  )
   _, err = render("{% lua %}return 'oops{% endlua %}", { offset = 2 })
   eq({ err.line, err.message:find("^syntax error: unfinished string") ~= nil }, { 3, true })
   _, err = render("{% lua %}return 1")
@@ -84,7 +105,8 @@ T["dbdash helpers wait without blocking; the query timeout stops loops"] = funct
 end
 
 T["args and meta come from env.lua"] = function()
-  local env = { lua = { args = { n = 3 }, meta = require("dbdash.metadata").for_lua({ os = "linux" }) } }
+  local env =
+    { lua = { args = { n = 3 }, meta = require("dbdash.metadata").for_lua({ os = "linux" }) } }
   eq(render("{% lua %}return args.n .. meta.os{% endlua %}", { env = env }), "3linux")
 end
 
@@ -108,12 +130,36 @@ return M
 
 T["import a .lua module and call its functions"] = function()
   local files = { ["h.lua"] = HELPERS }
-  eq(with_files("{% import 'h.lua' as h %}{{ h.twice(21) }} {{ h.answer }} {{ h.items | join('-') }}", files), "42 42 x-y")
-  eq(with_files("{% from 'h.lua' import twice, join %}{{ twice(2) }} {{ join(['a', 'b'], '+') }}", files), "4 a+b")
+  eq(
+    with_files(
+      "{% import 'h.lua' as h %}{{ h.twice(21) }} {{ h.answer }} {{ h.items | join('-') }}",
+      files
+    ),
+    "42 42 x-y"
+  )
+  eq(
+    with_files(
+      "{% from 'h.lua' import twice, join %}{{ twice(2) }} {{ join(['a', 'b'], '+') }}",
+      files
+    ),
+    "4 a+b"
+  )
   -- Lua tables come back as lists / mappings (keys sorted); nil as none
-  eq(with_files("{% import 'h.lua' as h %}{{ h.pair().keys() | join(',') }} {{ h.nothing() is none }}", files), "a,b True")
+  eq(
+    with_files(
+      "{% import 'h.lua' as h %}{{ h.pair().keys() | join(',') }} {{ h.nothing() is none }}",
+      files
+    ),
+    "a,b True"
+  )
   -- in a {% lua %} block the module is its own table
-  eq(with_files("{% import 'h.lua' as h %}{% lua %}return vars.h.twice(5) + #vars.h.items{% endlua %}", files), "12")
+  eq(
+    with_files(
+      "{% import 'h.lua' as h %}{% lua %}return vars.h.twice(5) + #vars.h.items{% endlua %}",
+      files
+    ),
+    "12"
+  )
 end
 
 T["module errors name the .lua file and line"] = function()
@@ -123,7 +169,10 @@ T["module errors name the .lua file and line"] = function()
     ["syntax.lua"] = "return {",
   }
   local _, err = with_files("{% import 'bad.lua' as b %}\n{{ b.f(none) }}", files)
-  eq({ err.source, err.line, err.message }, { "bad.lua", 3, "attempt to index local 'x' (a nil value)" })
+  eq(
+    { err.source, err.line, err.message },
+    { "bad.lua", 3, "attempt to index local 'x' (a nil value)" }
+  )
   _, err = with_files("{% import 'bad.lua' as b %}{{ b.f(x=1) }}", files)
   eq(err.message, "bad.lua.f() takes no keyword arguments (a Lua function)")
   _, err = with_files("{% import 'notable.lua' as n %}", files)
@@ -133,12 +182,23 @@ T["module errors name the .lua file and line"] = function()
 end
 
 T["a module runs once per render and sees that render's args and meta"] = function()
-  local files = { ["c.lua"] = "_G.dbdash_test_runs = (_G.dbdash_test_runs or 0) + 1\nreturn { n = function() return args.n .. meta.os end }" }
+  local files = {
+    ["c.lua"] = "_G.dbdash_test_runs = (_G.dbdash_test_runs or 0) + 1\nreturn { n = function() return args.n .. meta.os end }",
+  }
   _G.dbdash_test_runs = 0
   local env = function(n)
-    return { lua = { args = { n = n }, meta = require("dbdash.metadata").for_lua({ os = "linux" }) } }
+    return {
+      lua = { args = { n = n }, meta = require("dbdash.metadata").for_lua({ os = "linux" }) },
+    }
   end
-  eq(with_files("{% import 'c.lua' as a %}{% import 'c.lua' as b %}{{ a.n() }}{{ b.n() }}", files, env(1)), "1linux1linux")
+  eq(
+    with_files(
+      "{% import 'c.lua' as a %}{% import 'c.lua' as b %}{{ a.n() }}{{ b.n() }}",
+      files,
+      env(1)
+    ),
+    "1linux1linux"
+  )
   eq(with_files("{% import 'c.lua' as a %}{{ a.n() }}", files, env(2)), "2linux")
   eq(_G.dbdash_test_runs, 2)
 end

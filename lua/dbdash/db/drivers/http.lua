@@ -110,11 +110,17 @@ local function cookie_jar_path(name, info, opts)
     )
   end
   if name:match("^/") or name:match("^%a:[/\\]") or name:match("^\\\\") or name:match("^~") then
-    dberr.raise("query", ("curl -c %s: the cookie file must be a relative path in the config's directory"):format(name))
+    dberr.raise(
+      "query",
+      ("curl -c %s: the cookie file must be a relative path in the config's directory"):format(name)
+    )
   end
   for part in name:gmatch("[^/\\]+") do
     if part == ".." then
-      dberr.raise("query", ("curl -c %s: the cookie file must stay in the config's directory (no ..)"):format(name))
+      dberr.raise(
+        "query",
+        ("curl -c %s: the cookie file must stay in the config's directory (no ..)"):format(name)
+      )
     end
   end
   if not info.base_dir then
@@ -127,13 +133,17 @@ end
 ---given) becomes Lua data, null becoming NULL; anything else stays a string.
 function M.decode_body(res)
   local ctype = (res.headers["content-type"] or ""):lower()
-  local json = ctype:find("json", 1, true) ~= nil or (ctype == "" and res.body:match("^%s*[%[{]") ~= nil)
+  local json = ctype:find("json", 1, true) ~= nil
+    or (ctype == "" and res.body:match("^%s*[%[{]") ~= nil)
   if not json then
     return res.body
   end
   local ok, v = pcall(vim.json.decode, res.body, { luanil = { object = true } })
   if not ok then
-    dberr.raise("query", ("the response is not valid JSON (%s)"):format(tostring(v):gsub("^.-:%d+: ", "")))
+    dberr.raise(
+      "query",
+      ("the response is not valid JSON (%s)"):format(tostring(v):gsub("^.-:%d+: ", ""))
+    )
   end
   return v
 end
@@ -225,10 +235,21 @@ function Conn:execute(text, opts)
     local excerpt = vim.trim(res.body:sub(1, 300):gsub("%s+", " "))
     dberr.raise(
       (res.status == 401 or res.status == 403) and "auth" or "query",
-      ("HTTP %d %s from %s%s"):format(res.status, res.reason, res.url, excerpt ~= "" and (": " .. excerpt) or "")
+      ("HTTP %d %s from %s%s"):format(
+        res.status,
+        res.reason,
+        res.url,
+        excerpt ~= "" and (": " .. excerpt) or ""
+      )
     )
   end
-  local response = { status = res.status, reason = res.reason, headers = res.headers, body = res.body, url = res.url }
+  local response = {
+    status = res.status,
+    reason = res.reason,
+    headers = res.headers,
+    body = res.body,
+    url = res.url,
+  }
   return require("dbdash.db.lua_result").raw(M.decode_body(res), { response = response })
 end
 

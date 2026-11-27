@@ -43,7 +43,12 @@ function Panel:stream_start()
     local run = self:new_run(nil, nil, "render")
     local o = self:template_opts(run)
     o.cancel = st.token
-    local sql = M.render_text(self.d, q.sql, q.sql_line, vim.tbl_extend("force", o, { autoescape = q.autoescape }))
+    local sql = M.render_text(
+      self.d,
+      q.sql,
+      q.sql_line,
+      vim.tbl_extend("force", o, { autoescape = q.autoescape })
+    )
     return sql, run
   end, function(err, sql, run)
     vim.schedule(function()
@@ -256,14 +261,22 @@ function Panel:push_pipeline(run)
     if type(value) == "string" then
       local ok, decoded = pcall(vim.json.decode, value)
       if not ok then
-        require("dbdash.db.error").raise("query", ("the item is not JSON rows (%s); add query.transform to read it (:help dbdash-push)"):format(vim.trim(value):sub(1, 60)))
+        require("dbdash.db.error").raise(
+          "query",
+          ("the item is not JSON rows (%s); add query.transform to read it (:help dbdash-push)"):format(
+            vim.trim(value):sub(1, 60)
+          )
+        )
       end
       value = require("dbdash.db.json").decode(value)
     end
     if require("dbdash.util.map").is_map(value) and value.rows == nil then
       value = { value } -- one record (a form, the parameters of a request)
     end
-    rs = lua_result.normalize(value, { max_rows = q.max_rows or opts().defaults.max_rows, phase = "query", hint = true })
+    rs = lua_result.normalize(
+      value,
+      { max_rows = q.max_rows or opts().defaults.max_rows, phase = "query", hint = true }
+    )
   end
   rs.elapsed_ms = (vim.uv.hrtime() - started) / 1e6
   run.record.result = lua_result.to_lua(rs)

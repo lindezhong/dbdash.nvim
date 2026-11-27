@@ -7,14 +7,30 @@ M.TYPE = { change_cipher_spec = 20, alert = 21, handshake = 22, application_data
 M.MAX_PLAINTEXT = 16384
 
 local ALERTS = {
-  [0] = "close_notify", [10] = "unexpected_message", [20] = "bad_record_mac",
-  [22] = "record_overflow", [40] = "handshake_failure", [42] = "bad_certificate",
-  [43] = "unsupported_certificate", [44] = "certificate_revoked", [45] = "certificate_expired",
-  [46] = "certificate_unknown", [47] = "illegal_parameter", [48] = "unknown_ca",
-  [49] = "access_denied", [50] = "decode_error", [51] = "decrypt_error",
-  [70] = "protocol_version", [71] = "insufficient_security", [80] = "internal_error",
-  [86] = "inappropriate_fallback", [90] = "user_canceled", [109] = "missing_extension",
-  [110] = "unsupported_extension", [112] = "unrecognized_name", [116] = "certificate_required",
+  [0] = "close_notify",
+  [10] = "unexpected_message",
+  [20] = "bad_record_mac",
+  [22] = "record_overflow",
+  [40] = "handshake_failure",
+  [42] = "bad_certificate",
+  [43] = "unsupported_certificate",
+  [44] = "certificate_revoked",
+  [45] = "certificate_expired",
+  [46] = "certificate_unknown",
+  [47] = "illegal_parameter",
+  [48] = "unknown_ca",
+  [49] = "access_denied",
+  [50] = "decode_error",
+  [51] = "decrypt_error",
+  [70] = "protocol_version",
+  [71] = "insufficient_security",
+  [80] = "internal_error",
+  [86] = "inappropriate_fallback",
+  [90] = "user_canceled",
+  [109] = "missing_extension",
+  [110] = "unsupported_extension",
+  [112] = "unrecognized_name",
+  [116] = "certificate_required",
   [120] = "no_application_protocol",
 }
 M.ALERTS = ALERTS
@@ -254,7 +270,11 @@ function M.alert(content)
   local level, desc = content:byte(1), content:byte(2)
   local name = ALERTS[desc] or ("alert " .. tostring(desc))
   if desc == 0 then
-    error({ phase = "connect", message = "connection closed by the server (close_notify)", tls_closed = true }, 0)
+    error({
+      phase = "connect",
+      message = "connection closed by the server (close_notify)",
+      tls_closed = true,
+    }, 0)
   end
   fail("server sent %s alert: %s", level == 2 and "fatal" or "warning", name)
 end

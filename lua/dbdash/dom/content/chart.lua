@@ -109,7 +109,12 @@ function MODELS.bar(rs, show)
       bars[#bars + 1] = { category = c, series = s }
     end
   end
-  return { series = names, legend = #names > 1 and names or {}, bars = bars, marks = nn(show.mark_lines) or {} }
+  return {
+    series = names,
+    legend = #names > 1 and names or {},
+    bars = bars,
+    marks = nn(show.mark_lines) or {},
+  }
 end
 
 function MODELS.histogram(rs, show)
@@ -118,7 +123,12 @@ function MODELS.histogram(rs, show)
   for i, b in ipairs(bins) do
     bars[i] = { category = b.label, series = nn(show.value_column) }
   end
-  return { series = { nn(show.value_column) }, legend = {}, bars = bars, marks = nn(show.mark_lines) or {} }
+  return {
+    series = { nn(show.value_column) },
+    legend = {},
+    bars = bars,
+    marks = nn(show.mark_lines) or {},
+  }
 end
 
 function MODELS.pie(rs, show)
@@ -164,7 +174,10 @@ function MODELS.stat(rs, show)
   local stats = {}
   for i, sub in ipairs(big.values(show)) do
     local v = common.value(rs, sub)
-    stats[i] = { name = tostring(nn(sub.value_column) or ""), classes = v ~= nil and big.classes(v, sub) or {} }
+    stats[i] = {
+      name = tostring(nn(sub.value_column) or ""),
+      classes = v ~= nil and big.classes(v, sub) or {},
+    }
   end
   return { series = {}, legend = {}, stats = stats }
 end
@@ -194,7 +207,9 @@ local GROUPS = {
       return named(name, model.other and model.other[i] and { "other" } or nil)
     end,
     parts = function(model)
-      return parts(model.boxes and { "value", "outlier", "mean" } or (model.pie and {} or { "point" }))
+      return parts(
+        model.boxes and { "value", "outlier", "mean" } or (model.pie and {} or { "point" })
+      )
     end,
     sig = function(name, i, model)
       return tostring(name) .. (model.other and model.other[i] and "\2o" or "")
@@ -216,7 +231,10 @@ local GROUPS = {
     kind = "marks",
     tag = "mark",
     fields = function(m)
-      return { classes = nn(m.class) and { m.class } or {}, attrs = { label = tostring(nn(m.label) or nn(m.value) or "") } }
+      return {
+        classes = nn(m.class) and { m.class } or {},
+        attrs = { label = tostring(nn(m.label) or nn(m.value) or "") },
+      }
     end,
     sig = function(m)
       return tostring(nn(m.class)) .. "\2" .. tostring(nn(m.label) or nn(m.value))
@@ -255,7 +273,8 @@ local GROUPS = {
     end,
     parts = function()
       return function(node, st, i)
-        local tags = i == 1 and { "value", "unit", "label", "delta", "sparkline" } or { "value", "unit", "label" }
+        local tags = i == 1 and { "value", "unit", "label", "delta", "sparkline" }
+          or { "value", "unit", "label" }
         for _, tag in ipairs(tags) do
           -- the value carries its threshold class
           content.children(node, tag, { 1 }, function()

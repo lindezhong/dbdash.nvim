@@ -57,7 +57,8 @@ function M.render(rs, show, ctx)
   end
   if root.data.total == 0 then
     lines[#lines + 1] = "(no rows)"
-    hls[#hls + 1] = { row = #lines - 1, col_s = 0, col_e = #"(no rows)", group = ctx.css:hl("note") }
+    hls[#hls + 1] =
+      { row = #lines - 1, col_s = 0, col_e = #"(no rows)", group = ctx.css:hl("note") }
     return { lines = lines, hl = hls }
   end
   -- After Bootstrap's text utilities and log viewers: line { text-align, white-space,
@@ -87,7 +88,8 @@ function M.render(rs, show, ctx)
         pieces = { W.truncate(line, width, require("dbdash.render").ellipsis(ls)) }
       end
       for _, piece in ipairs(pieces) do
-        body[#body + 1] = { text = piece, group = group, n = first and n or nil, align = align, node = ln }
+        body[#body + 1] =
+          { text = piece, group = group, n = first and n or nil, align = align, node = ln }
         first = false
       end
     end
@@ -109,14 +111,16 @@ function M.render(rs, show, ctx)
     end
     local prefix = ""
     if numbers then
-      prefix = b.n and (string.rep(" ", nw - 1 - #tostring(b.n)) .. b.n .. " ") or string.rep(" ", nw)
+      prefix = b.n and (string.rep(" ", nw - 1 - #tostring(b.n)) .. b.n .. " ")
+        or string.rep(" ", nw)
     end
     local gap = width - W.width(b.text)
     local lead = b.align == "center" and math.floor(gap / 2) or (b.align == "right" and gap or 0)
     local line = prefix .. string.rep(" ", math.max(lead, 0)) .. b.text
     lines[#lines + 1] = line
     if numbers and b.n then
-      hls[#hls + 1] = { row = #lines - 1, col_s = 0, col_e = #prefix, group = ctx.css:hl("line-number") }
+      hls[#hls + 1] =
+        { row = #lines - 1, col_s = 0, col_e = #prefix, group = ctx.css:hl("line-number") }
     end
     if b.text ~= "" then
       hls[#hls + 1] = { row = #lines - 1, col_s = #line - #b.text, col_e = #line, group = b.group }

@@ -30,7 +30,9 @@ function M.format_error(err)
   local phase = err.phase or "error"
   local msg = getmetatable(err) and getmetatable(err).__tostring and tostring(err) or err.message
   if err.phase == "template" and err.message then
-    msg = (err.source and (err.source .. ":") or "") .. (err.line and (err.line .. ": ") or "") .. err.message
+    msg = (err.source and (err.source .. ":") or "")
+      .. (err.line and (err.line .. ": ") or "")
+      .. err.message
   end
   if msg:find("^" .. vim.pesc(phase)) or msg:find("^%w+ " .. vim.pesc(phase)) then
     return msg

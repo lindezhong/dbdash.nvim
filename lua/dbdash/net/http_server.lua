@@ -19,11 +19,23 @@ local M = {}
 local MAX_HEAD = 65536
 
 local REASONS = {
-  [200] = "OK", [201] = "Created", [202] = "Accepted", [204] = "No Content", [400] = "Bad Request",
-  [401] = "Unauthorized", [403] = "Forbidden", [404] = "Not Found", [405] = "Method Not Allowed",
-  [408] = "Request Timeout", [411] = "Length Required", [413] = "Content Too Large",
-  [415] = "Unsupported Media Type", [431] = "Request Header Fields Too Large",
-  [500] = "Internal Server Error", [501] = "Not Implemented", [503] = "Service Unavailable",
+  [200] = "OK",
+  [201] = "Created",
+  [202] = "Accepted",
+  [204] = "No Content",
+  [400] = "Bad Request",
+  [401] = "Unauthorized",
+  [403] = "Forbidden",
+  [404] = "Not Found",
+  [405] = "Method Not Allowed",
+  [408] = "Request Timeout",
+  [411] = "Length Required",
+  [413] = "Content Too Large",
+  [415] = "Unsupported Media Type",
+  [431] = "Request Header Fields Too Large",
+  [500] = "Internal Server Error",
+  [501] = "Not Implemented",
+  [503] = "Service Unavailable",
 }
 M.REASONS = REASONS
 
@@ -229,7 +241,12 @@ function M.serve(client, opts, handler)
         status = 500
         out = { detail = "internal error" }
       end
-      res = opts.on_error and opts.on_error(status, out.detail) or { status = status, headers = { ["Content-Type"] = "text/plain" }, body = (out.detail or "") .. "\n" }
+      res = opts.on_error and opts.on_error(status, out.detail)
+        or {
+          status = status,
+          headers = { ["Content-Type"] = "text/plain" },
+          body = (out.detail or "") .. "\n",
+        }
     end
     pcall(sock.write, sock, response(res))
   end, function()

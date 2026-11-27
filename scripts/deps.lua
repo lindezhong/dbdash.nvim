@@ -49,7 +49,8 @@ local function install(tool)
   local tmp = dir .. ".tmp"
   vim.fn.delete(tmp, "rf")
   if tool.git then
-    local ok, out = run({ "git", "clone", "-q", "--depth", "1", "--branch", tool.version, tool.git, tmp })
+    local ok, out =
+      run({ "git", "clone", "-q", "--depth", "1", "--branch", tool.version, tool.git, tmp })
     if not ok then
       fail(("cannot clone %s %s: %s"):format(tool.git, tool.version, out))
     end

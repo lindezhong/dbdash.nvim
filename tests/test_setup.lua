@@ -22,9 +22,16 @@ local T = MiniTest.new_set({
 T["defaults keep the previous behavior"] = function()
   dbdash.setup()
   local o = dbdash.options
-  eq({ o.sidebar.width, o.sidebar.position, o.dashboard.open, o.popup.border }, { 30, "left", "current", "rounded" })
+  eq(
+    { o.sidebar.width, o.sidebar.position, o.dashboard.open, o.popup.border },
+    { 30, "left", "current", "rounded" }
+  )
   eq(o.sidebar.keys, { select = "<CR>", stop = "t", refresh = "r", close = "q" })
-  eq({ dbdash.default_ms("interval"), dbdash.default_ms("timeout"), dbdash.default_ms("connect_timeout") }, { 30000, 30000, 10000 })
+  eq({
+    dbdash.default_ms("interval"),
+    dbdash.default_ms("timeout"),
+    dbdash.default_ms("connect_timeout"),
+  }, { 30000, 30000, 10000 })
   eq(#notes, 0)
 end
 
@@ -54,7 +61,7 @@ T["invalid values are reported with their path and fall back to the default"] = 
   for _, part in ipairs({
     "sidebar.width: invalid size",
     "sidebar.position: must be one of",
-    "sidebar.keys: unknown key \"open\"",
+    'sidebar.keys: unknown key "open"',
     "dashboard: must be a table",
     "defaults.interval: invalid duration",
     "defaults.history: must be an integer >= 1",
@@ -63,7 +70,10 @@ T["invalid values are reported with their path and fall back to the default"] = 
     eq({ part, notes[1].msg:find(part, 1, true) ~= nil }, { part, true })
   end
   local o = dbdash.options
-  eq({ o.sidebar.width, o.sidebar.position, o.dashboard.open, o.defaults.history }, { 30, "left", "current", 20 })
+  eq(
+    { o.sidebar.width, o.sidebar.position, o.dashboard.open, o.defaults.history },
+    { 30, "left", "current", 20 }
+  )
   eq(o.colour, nil)
 end
 
@@ -79,7 +89,10 @@ T["mappings: true, false, or per name"] = function()
   dbdash.setup({ mappings = true })
   eq(lhs_of("Open the sidebar"), leader .. "dd")
   dbdash.setup({ mappings = { sidebar = "<F5>", stop = false } })
-  eq({ lhs_of("Open the sidebar"), lhs_of("Stop the dashboard"), lhs_of("List dashboards") }, { "<F5>", nil, leader .. "dl" })
+  eq(
+    { lhs_of("Open the sidebar"), lhs_of("Stop the dashboard"), lhs_of("List dashboards") },
+    { "<F5>", nil, leader .. "dl" }
+  )
   eq(vim.fn.maparg(leader .. "dd", "n"), "") -- the previous key is gone
   dbdash.setup({ mappings = false })
   eq(lhs_of("Start a dashboard"), nil)
@@ -91,7 +104,11 @@ T["defaults apply where a config or URL sets nothing"] = function()
     style = { plot = { height = 6 } },
   })
   local f = vim.fn.tempname() .. ".yaml"
-  vim.fn.writefile({ "database: { url: 'sqlite:///:memory:' }", "query: { sql: SELECT 1 }", "show: { type: table }" }, f)
+  vim.fn.writefile({
+    "database: { url: 'sqlite:///:memory:' }",
+    "query: { sql: SELECT 1 }",
+    "show: { type: table }",
+  }, f)
   local cfg = assert(require("dbdash.config").load(f))
   eq({ cfg.show.interval, cfg.query.max_rows }, { 120000, 5 })
   local u = require("dbdash.db.url").parse("postgres://h/db")
@@ -101,7 +118,8 @@ T["defaults apply where a config or URL sets nothing"] = function()
 
   -- plot height: a line chart is shorter with the user rule plot { height: 6 } than with
   -- its own 15
-  local rs = require("tests.helpers").ok("sqlite:///:memory:", "SELECT 1 AS x, 2 AS y UNION ALL SELECT 2, 5")
+  local rs =
+    require("tests.helpers").ok("sqlite:///:memory:", "SELECT 1 AS x, 2 AS y UNION ALL SELECT 2, 5")
   local show = { type = "line", x_column = "x", y_column = "y", title = "" }
   local short = #require("dbdash.render").render(rs, show, { width = 60, height = 40 }).lines
   dbdash.setup({})

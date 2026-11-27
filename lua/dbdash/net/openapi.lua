@@ -54,7 +54,9 @@ end
 ---The document of an external reference (relative to the document's file), cached.
 function Api:external(file, from)
   local dir = self.paths[from] and vim.fs.dirname(self.paths[from]) or self.base_dir
-  local path = vim.fs.normalize((file:sub(1, 1) == "/" or file:match("^%a:[/\\]")) and file or vim.fs.joinpath(dir, file))
+  local path = vim.fs.normalize(
+    (file:sub(1, 1) == "/" or file:match("^%a:[/\\]")) and file or vim.fs.joinpath(dir, file)
+  )
   if self.docs[path] then
     return self.docs[path]
   end
@@ -143,7 +145,10 @@ function M.load(text, o)
   elseif version:match("^3%.0") then
     self.v30 = true
   else
-    cfg_error("unsupported version %s (openapi: 3.1.x or 3.0.x)", version ~= "" and version or "(none)")
+    cfg_error(
+      "unsupported version %s (openapi: 3.1.x or 3.0.x)",
+      version ~= "" and version or "(none)"
+    )
   end
   local schemes = doc.components and doc.components.securitySchemes or map.new()
   self.schemes = {}
@@ -171,7 +176,14 @@ function M.load(text, o)
       names[#names + 1] = name
       pos = b + 1
     end
-    local route = { key = key, path = full, pattern = "^" .. table.concat(pat) .. "$", names = names, literal = literal, ops = {} }
+    local route = {
+      key = key,
+      path = full,
+      pattern = "^" .. table.concat(pat) .. "$",
+      names = names,
+      literal = literal,
+      ops = {},
+    }
     for _, m in ipairs(METHODS) do
       if pi[m] ~= nil then
         local op = pi[m]
@@ -199,12 +211,19 @@ function Api:check_scheme(name, s)
     end
   elseif t == "apiKey" then
     if s["in"] == "query" then
-      cfg_error("security scheme %s: an apiKey in the query string is refused: credentials must not be in URLs (MCP / OAuth 2.1); use a header or a cookie", name)
+      cfg_error(
+        "security scheme %s: an apiKey in the query string is refused: credentials must not be in URLs (MCP / OAuth 2.1); use a header or a cookie",
+        name
+      )
     elseif s["in"] ~= "header" and s["in"] ~= "cookie" then
       cfg_error("security scheme %s: apiKey must be in header or cookie", name)
     end
   elseif t == "oauth2" or t == "openIdConnect" or t == "mutualTLS" then
-    cfg_error("security scheme %s: %s is not supported (it needs an authorization server or TLS client certificates); use http bearer, http basic or apiKey", name, t)
+    cfg_error(
+      "security scheme %s: %s is not supported (it needs an authorization server or TLS client certificates); use http bearer, http basic or apiKey",
+      name,
+      t
+    )
   else
     cfg_error("security scheme %s: unknown type %s", name, tostring(t))
   end
@@ -224,12 +243,22 @@ function Api:operation(op, item, doc, method, key)
       params[id] = { p = pr, doc = pdoc }
     end
   end
-  local out = { id = op.operationId or (method .. " " .. key), method = method:upper(), params = {}, doc = doc }
+  local out = {
+    id = op.operationId or (method .. " " .. key),
+    method = method:upper(),
+    params = {},
+    doc = doc,
+  }
   for _, id in ipairs(order) do
     local pr = params[id]
     local where = pr.p["in"]
     if where ~= "query" and where ~= "path" and where ~= "header" and where ~= "cookie" then
-      cfg_error("%s: parameter %s: unknown location %s", out.id, tostring(pr.p.name), tostring(where))
+      cfg_error(
+        "%s: parameter %s: unknown location %s",
+        out.id,
+        tostring(pr.p.name),
+        tostring(where)
+      )
     end
     out.params[#out.params + 1] = pr
   end
@@ -247,7 +276,12 @@ function Api:operation(op, item, doc, method, key)
         cfg_error("%s: security requirement %s is not in components.securitySchemes", out.id, name)
       end
       if self.tokens[name] == nil then
-        cfg_error("%s: no credentials for security scheme %s (database.options.tokens.%s)", out.id, name, name)
+        cfg_error(
+          "%s: no credentials for security scheme %s (database.options.tokens.%s)",
+          out.id,
+          name,
+          name
+        )
       end
     end
   end
@@ -626,7 +660,13 @@ function Api:parameters(op, req, path_raw)
     local name, where = p.name, p["in"]
     local style = p.style or DEFAULT_STYLE[where]
     if not VALID_STYLES[where][style] then
-      cfg_error("%s: parameter %s: style %s is not allowed in %s", op.id, name, tostring(style), where)
+      cfg_error(
+        "%s: parameter %s: style %s is not allowed in %s",
+        op.id,
+        name,
+        tostring(style),
+        where
+      )
     end
     local explode = p.explode
     if explode == nil then
@@ -669,7 +709,17 @@ function Api:parameters(op, req, path_raw)
     else
       local t = self:schema_type(schema, doc)
       if where == "query" then
-        value = self:query_value(qpairs, name, style, explode, schema, doc, t, p.allowEmptyValue == true, used)
+        value = self:query_value(
+          qpairs,
+          name,
+          style,
+          explode,
+          schema,
+          doc,
+          t,
+          p.allowEmptyValue == true,
+          used
+        )
       elseif where == "path" then
         if path_raw[name] ~= nil then
           value = self:path_value(path_raw[name], style, explode, schema, doc, t, name)
@@ -685,7 +735,8 @@ function Api:parameters(op, req, path_raw)
           if t == "array" then
             value = self:list_of(type(c) == "table" and c or split(c, ","), schema, doc)
           elseif t == "object" then
-            value = self:object_of(flat_pairs(split(type(c) == "table" and c[1] or c, ",")), schema, doc)
+            value =
+              self:object_of(flat_pairs(split(type(c) == "table" and c[1] or c, ",")), schema, doc)
           else
             value = self:coerce(type(c) == "table" and c[1] or c, schema, doc)
           end
@@ -756,7 +807,8 @@ function Api:scheme_ok(name, headers, cookies)
     end
     return any_token(tokens, vim.trim(cred))
   end
-  local given = s["in"] == "header" and headers[tostring(s.name):lower()] or cookies[tostring(s.name)]
+  local given = s["in"] == "header" and headers[tostring(s.name):lower()]
+    or cookies[tostring(s.name)]
   return type(given) == "string" and any_token(tokens, given)
 end
 
@@ -776,7 +828,8 @@ function Api:authorize(op, headers)
       end
       local s = self.schemes[name]
       if not challenge and s.type == "http" then
-        challenge = (tostring(s.scheme):lower() == "basic" and "Basic" or "Bearer") .. ' realm="dbdash"'
+        challenge = (tostring(s.scheme):lower() == "basic" and "Basic" or "Bearer")
+          .. ' realm="dbdash"'
       end
     end
     if all then
@@ -889,7 +942,8 @@ end
 
 ---Parse a multipart/form-data body: a mapping of field values (files as their content).
 function Api:multipart(text, content_type, media, doc)
-  local boundary = content_type:match('boundary="([^"]+)"') or content_type:match("boundary=([^;%s]+)")
+  local boundary = content_type:match('boundary="([^"]+)"')
+    or content_type:match("boundary=([^;%s]+)")
   if not boundary then
     bad(400, "multipart body without a boundary")
   end

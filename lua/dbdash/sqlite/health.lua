@@ -32,7 +32,10 @@ function M.check()
       and "Put sqlite3.dll (from https://sqlite.org/download.html) next to nvim.exe or on PATH, or set database.options.lib_path"
     or "Install the SQLite library (e.g. libsqlite3-0 / sqlite-libs), or set database.options.lib_path in the config"
   health.error(
-    "cannot load the SQLite library (tried " .. table.concat(candidates, ", ") .. "): " .. table.concat(errors, "; "),
+    "cannot load the SQLite library (tried "
+      .. table.concat(candidates, ", ")
+      .. "): "
+      .. table.concat(errors, "; "),
     advice
   )
 end

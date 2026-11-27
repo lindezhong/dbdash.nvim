@@ -46,7 +46,15 @@ function M.header(d)
   if not (d.cfg.title or countdown or icon) then
     return { lines = {}, hl = {} }
   end
-  local line, hl = title, { { row = 0, col_s = 0, col_e = #title, group = css.hl_of(child(d.header_node, "header-title")) } }
+  local line, hl =
+    title, {
+      {
+        row = 0,
+        col_s = 0,
+        col_e = #title,
+        group = css.hl_of(child(d.header_node, "header-title")),
+      },
+    }
   if icon then
     line = title ~= "" and (title .. " ") or ""
     hl[#hl + 1] = { row = 0, col_s = #line, col_e = #line + #icon, group = css.hl_of(icon_node) }
@@ -93,7 +101,8 @@ end
 ---when at least 6 cells are left (an inline formatting context whose first item shrinks).
 ---@return string line, table[] spans
 local function title_line(p, st, iw)
-  local title_node, icon_node, err_node = child(p.node, "panel-title"), child(p.node, "description-icon"), child(p.node, "error")
+  local title_node, icon_node, err_node =
+    child(p.node, "panel-title"), child(p.node, "description-icon"), child(p.node, "error")
   local name, icon = text(title_node) or "", text(icon_node)
   local room = math.max(iw - (icon and (W.width(icon) + 1) or 0), 1)
   local head, s0, e0 = box.title_line(name, room, st.title_align or "left", st.ellipsis)
@@ -152,7 +161,8 @@ local function cached(p, kind, width, height, fill, exact, build)
     cache.entries, cache.n = {}, 0
   end
   -- keyed on the version after layout: styling parts the first time bumps it
-  cache.entries[kind .. "|" .. panel_key(p, width, height, fill, exact)] = { rs = p.rs, frag = frag }
+  cache.entries[kind .. "|" .. panel_key(p, width, height, fill, exact)] =
+    { rs = p.rs, frag = frag }
   cache.n = cache.n + 1
   return frag
 end
@@ -173,7 +183,15 @@ layout_panel = function(p, width, height, fill, exact)
   show.title = nil -- in the title line (or the box's top border) instead
   local iw, ih = box.inner(st, width, height)
   local head, spans = title_line(p, st, iw)
-  local frag = { node = p.node, x = 0, y = 0, width = width, height = exact and height or nil, box = st, rows = {} }
+  local frag = {
+    node = p.node,
+    x = 0,
+    y = 0,
+    width = width,
+    height = exact and height or nil,
+    box = st,
+    rows = {},
+  }
   local header = { lines = { head }, hl = {} }
   for _, sp in ipairs(spans) do
     header.hl[#header.hl + 1] = { row = 0, col_s = sp[1], col_e = sp[2], group = sp[3] }
@@ -247,7 +265,12 @@ end
 function M.measure(p, width)
   local paint = require("dbdash.paint")
   local show = p:show_config()
-  local key = vim.json.encode({ width, show, p.error and true or false, p.node and p.node.layout_version or 0 })
+  local key = vim.json.encode({
+    width,
+    show,
+    p.error and true or false,
+    p.node and p.node.layout_version or 0,
+  })
   local m = p.measured
   if not (m and m.rs == p.rs and m.key == key) then
     m = {
@@ -274,7 +297,11 @@ function M.grid(d, width, avail)
   local lay, err = L.from_styles(style.get(d.doc.root), items)
   if not lay then
     -- a runtime rule broke the grid: say so instead of drawing (config rules were checked)
-    local msg = ("style: %s%s: %s"):format(err.index and ("panel %d "):format(err.index) or "", err.field, err.message)
+    local msg = ("style: %s%s: %s"):format(
+      err.index and ("panel %d "):format(err.index) or "",
+      err.field,
+      err.message
+    )
     return { fragments = {}, error = msg }
   end
   local cols = L.columns(lay.columns, width, lay.gap)
@@ -295,7 +322,8 @@ function M.grid(d, width, avail)
     cells[i] = { x = first.x, width = w }
     items[i] = { row = pl.row, row_span = pl.row_span, hmin = hmin, hmax = hmax }
   end
-  local heights, fill = L.rows(tracks, items, avail - lay.row_gap * math.max(nrows - 1, 0), lay.row_gap)
+  local heights, fill =
+    L.rows(tracks, items, avail - lay.row_gap * math.max(nrows - 1, 0), lay.row_gap)
   local top, y = {}, 0
   for r = 1, nrows do
     top[r] = y

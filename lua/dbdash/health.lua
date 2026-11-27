@@ -56,16 +56,12 @@ function M.check()
   health.start("Dashboards")
   local running = require("dbdash.scheduler").list()
   health.info(("%d running"):format(#running))
-  health.info(
-    "Database requirements: :checkhealth "
-      .. table.concat(
-        vim.tbl_map(function(d)
-          return "dbdash." .. d
-        end, DATABASES),
-        " "
-      )
-      .. " (or :checkhealth dbdash* for all)"
-  )
+  health.info("Database requirements: :checkhealth " .. table.concat(
+    vim.tbl_map(function(d)
+      return "dbdash." .. d
+    end, DATABASES),
+    " "
+  ) .. " (or :checkhealth dbdash* for all)")
 end
 
 return M

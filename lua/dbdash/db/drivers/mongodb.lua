@@ -37,7 +37,10 @@ Conn.__index = Conn
 function Conn:command(cmd, phase)
   self.request_id = (self.request_id or 0) + 1
   local body = "\0\0\0\0" .. "\0" .. bson.encode(cmd)
-  local header = bson.i32(16 + #body) .. bson.i32(self.request_id) .. bson.i32(0) .. bson.i32(OP_MSG)
+  local header = bson.i32(16 + #body)
+    .. bson.i32(self.request_id)
+    .. bson.i32(0)
+    .. bson.i32(OP_MSG)
   self.sock:write(header .. body)
   local h = self.sock:read_exact(16)
   local len = bson.rd_i32(h, 1)
@@ -78,34 +81,48 @@ function Conn:auth(info)
   elseif mech == "SCRAM-SHA-1" then
     local util = require("dbdash.crypto.util")
     hash = require("dbdash.crypto.sha1")
-    password = util.hex(require("dbdash.crypto.md5").digest(info.user .. ":mongo:" .. info.password))
+    password =
+      util.hex(require("dbdash.crypto.md5").digest(info.user .. ":mongo:" .. info.password))
   else
-    dberr.raise("config", "unsupported authMechanism " .. mech .. " (use SCRAM-SHA-256 or SCRAM-SHA-1)")
+    dberr.raise(
+      "config",
+      "unsupported authMechanism " .. mech .. " (use SCRAM-SHA-256 or SCRAM-SHA-1)"
+    )
   end
-  local client = require("dbdash.crypto.scram").new({ hash = hash, user = info.user, password = password })
-  local reply = self:command(doc({
-    { "saslStart", 1 },
-    { "mechanism", mech },
-    { "payload", M.bin(client:first()) },
-    { "autoAuthorize", 1 },
-    { "options", doc({ { "skipEmptyExchange", true } }) },
-    { "$db", source },
-  }), "auth")
+  local client =
+    require("dbdash.crypto.scram").new({ hash = hash, user = info.user, password = password })
+  local reply = self:command(
+    doc({
+      { "saslStart", 1 },
+      { "mechanism", mech },
+      { "payload", M.bin(client:first()) },
+      { "autoAuthorize", 1 },
+      { "options", doc({ { "skipEmptyExchange", true } }) },
+      { "$db", source },
+    }),
+    "auth"
+  )
   local final = client:final(payload_of(reply))
-  reply = self:command(doc({
-    { "saslContinue", 1 },
-    { "conversationId", reply.conversationId },
-    { "payload", M.bin(final) },
-    { "$db", source },
-  }), "auth")
-  client:verify(payload_of(reply))
-  if reply.done ~= true then
-    reply = self:command(doc({
+  reply = self:command(
+    doc({
       { "saslContinue", 1 },
       { "conversationId", reply.conversationId },
-      { "payload", M.bin("") },
+      { "payload", M.bin(final) },
       { "$db", source },
-    }), "auth")
+    }),
+    "auth"
+  )
+  client:verify(payload_of(reply))
+  if reply.done ~= true then
+    reply = self:command(
+      doc({
+        { "saslContinue", 1 },
+        { "conversationId", reply.conversationId },
+        { "payload", M.bin("") },
+        { "$db", source },
+      }),
+      "auth"
+    )
   end
 end
 
@@ -147,7 +164,13 @@ function M.parse_url(info)
     info.tls = "require"
   end
   info.read_preference = info.params.readPreference or "primary"
-  local rp = { primary = true, primaryPreferred = true, secondary = true, secondaryPreferred = true, nearest = true }
+  local rp = {
+    primary = true,
+    primaryPreferred = true,
+    secondary = true,
+    secondaryPreferred = true,
+    nearest = true,
+  }
   if not rp[info.read_preference] then
     dberr.raise("config", "unknown readPreference " .. info.read_preference)
   end
@@ -189,7 +212,8 @@ end
 
 ---Connect to one host (TLS as configured) and send hello.
 local function open(info, host, port)
-  local sock = socket.connect(host, port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
+  local sock =
+    socket.connect(host, port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
   local c = setmetatable({ sock = sock, db = info.database }, Conn)
   local ok, res = pcall(function()
     if info.tls ~= "disable" then
@@ -242,7 +266,11 @@ function M.connect(info)
         fallback:close()
       end
       return finish(c)
-    elseif info.read_preference == "secondary" or info.read_preference == "secondaryPreferred" or info.read_preference == "nearest" then
+    elseif
+      info.read_preference == "secondary"
+      or info.read_preference == "secondaryPreferred"
+      or info.read_preference == "nearest"
+    then
       return finish(c)
     else
       local primary = type(hello.primary) == "string" and hello.primary or nil
@@ -409,11 +437,15 @@ function Conn:cursor(cmd, coll, max_rows)
     id = r.cursor.id
   end
   if id ~= 0 and id ~= "0" then
-    pcall(self.command, self, doc({
-      { "killCursors", coll == 1 and "$cmd.aggregate" or coll },
-      { "cursors", { json.int64(tostring(id)) } },
-      { "$db", self.db },
-    }))
+    pcall(
+      self.command,
+      self,
+      doc({
+        { "killCursors", coll == 1 and "$cmd.aggregate" or coll },
+        { "cursors", { json.int64(tostring(id)) } },
+        { "$db", self.db },
+      })
+    )
   end
   local truncated = #docs > max_rows
   while #docs > max_rows do
@@ -477,11 +509,15 @@ function Conn:execute(query, opts)
     return M.to_resultset(docs, levels, max, truncated)
   elseif op == "aggregate" then
     local pipeline = opt(q, "pipeline") or {}
-    local docs, truncated = self:cursor(command({
-      { "aggregate", coll },
-      { "pipeline", pipeline },
-      { "cursor", doc({ { "batchSize", math.min(max + 1, 10000) } }) },
-    }), coll, max)
+    local docs, truncated = self:cursor(
+      command({
+        { "aggregate", coll },
+        { "pipeline", pipeline },
+        { "cursor", doc({ { "batchSize", math.min(max + 1, 10000) } }) },
+      }),
+      coll,
+      max
+    )
     return M.to_resultset(docs, levels, max, truncated)
   elseif op == "count" then
     local r = self:command(command({ { "count", coll }, { "query", filter } }))
@@ -518,7 +554,10 @@ function Conn:execute(query, opts)
     end
     return M.to_resultset({ row }, levels, max, false)
   end
-  dberr.raise("query", ("unknown operation %q (use find, aggregate, count, distinct or command)"):format(op))
+  dberr.raise(
+    "query",
+    ("unknown operation %q (use find, aggregate, count, distinct or command)"):format(op)
+  )
 end
 
 function Conn:close()

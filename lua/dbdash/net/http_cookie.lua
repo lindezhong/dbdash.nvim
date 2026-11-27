@@ -6,7 +6,20 @@
 -- strings are only sent; when the jar has a cookie of the same name, the jar's wins.
 local M = {}
 
-local MONTHS = { jan = 1, feb = 2, mar = 3, apr = 4, may = 5, jun = 6, jul = 7, aug = 8, sep = 9, oct = 10, nov = 11, dec = 12 }
+local MONTHS = {
+  jan = 1,
+  feb = 2,
+  mar = 3,
+  apr = 4,
+  may = 5,
+  jun = 6,
+  jul = 7,
+  aug = 8,
+  sep = 9,
+  oct = 10,
+  nov = 11,
+  dec = 12,
+}
 
 ---Seconds since the epoch for a UTC date (days-from-civil, independent of the local zone).
 local function utc_time(y, mo, d, h, mi, s)
@@ -22,7 +35,8 @@ end
 ---Parse an HTTP date ("Wed, 21 Oct 2015 07:28:00 GMT" and the usual variants).
 ---@return integer? epoch seconds
 function M.parse_date(s)
-  local d, mon, y, h, mi, sec = s:match("(%d%d?)[ %-](%a%a%a)%a*[ %-](%d%d%d?%d?) (%d%d?):(%d%d):(%d%d)")
+  local d, mon, y, h, mi, sec =
+    s:match("(%d%d?)[ %-](%a%a%a)%a*[ %-](%d%d%d?%d?) (%d%d?):(%d%d):(%d%d)")
   if not d then
     return nil
   end
@@ -91,7 +105,14 @@ function M.parse_set_cookie(header, host, path, now)
   if not name or name == "" then
     return nil
   end
-  local c = { name = name, value = value, domain = host:lower(), host_only = true, path = default_path(path), secure = false }
+  local c = {
+    name = name,
+    value = value,
+    domain = host:lower(),
+    host_only = true,
+    path = default_path(path),
+    secure = false,
+  }
   local max_age
   for i = 2, #parts do
     local k, v = parts[i]:match("^%s*([^=]-)%s*=%s*(.-)%s*$")
@@ -149,7 +170,8 @@ local function matching(list, url, now)
   local out = {}
   for i, c in ipairs(list) do
     c.seq = c.seq or i
-    local host_ok = c.host_only and c.domain == url.host:lower() or (not c.host_only and domain_match(url.host, c.domain))
+    local host_ok = c.host_only and c.domain == url.host:lower()
+      or (not c.host_only and domain_match(url.host, c.domain))
     if
       host_ok
       and path_match(url.path, c.path)
@@ -206,7 +228,8 @@ function M.from_string(spec, host)
   for pair in spec:gmatch("[^;]+") do
     local n, v = pair:match("^%s*([^=]-)%s*=%s*(.-)%s*$")
     if n and n ~= "" then
-      out[#out + 1] = { name = n, value = v, domain = host:lower(), host_only = true, path = "/", secure = false }
+      out[#out + 1] =
+        { name = n, value = v, domain = host:lower(), host_only = true, path = "/", secure = false }
     end
   end
   return out

@@ -66,7 +66,10 @@ T["cascade: origins, specificity, order; inheritance; inline scope"] = function(
   local doc, n = tree()
   doc:set_sheet("ua", sheet({ ["*"] = { color = "ua" }, axis = { color = "Comment" } }))
   doc:set_sheet("user", sheet({ panel = { color = "#111111" } }))
-  doc:set_sheet("author", sheet({ ["series.EU"] = { color = "#222222" }, series = { color = "#333333" } }))
+  doc:set_sheet(
+    "author",
+    sheet({ ["series.EU"] = { color = "#222222" }, series = { color = "#333333" } })
+  )
   local c = style.get(n.eu)
   eq(c.color, "#222222") -- the class wins over the tag (same origin)
   eq(style.get(n.us).color, "#333333")
@@ -117,10 +120,13 @@ end
 
 T["appending one by one restyles the new node and its previous sibling only"] = function()
   local doc = document.new("dashboard")
-  doc:set_sheet("author", sheet({
-    ["row:nth-child(even)"] = { color = "#222222" },
-    ["row:last-child"] = { ["font-weight"] = "bold" },
-  }))
+  doc:set_sheet(
+    "author",
+    sheet({
+      ["row:nth-child(even)"] = { color = "#222222" },
+      ["row:last-child"] = { ["font-weight"] = "bold" },
+    })
+  )
   local t = doc.root:append(dom.new("table"))
   style.restyle(doc)
   local restyled, rows = 0, {}
@@ -133,17 +139,28 @@ T["appending one by one restyles the new node and its previous sibling only"] = 
   eq({ restyled <= 2 * 300 + 2, restyled }, { true, restyled }) -- linear, not quadratic
   -- positions kept on insertion: :nth-child and :last-child stay right
   eq({ style.get(rows[2]).color, style.get(rows[3]).color }, { "#222222", nil })
-  eq({ style.get(rows[299])["font-weight"], style.get(rows[300])["font-weight"] }, { "normal", "bold" })
+  eq(
+    { style.get(rows[299])["font-weight"], style.get(rows[300])["font-weight"] },
+    { "normal", "bold" }
+  )
   eq({ rows[300]:position() }, { 300, 300 })
 end
 
 T["highlight groups: a group as is, generated groups, refresh"] = function()
   vim.api.nvim_set_hl(0, "TestCssGroup", { fg = "#112233", bold = true })
-  eq(hl.group({ color = "TestCssGroup", ["font-weight"] = "normal", ["text-decoration"] = "none" }), "TestCssGroup")
-  local g = hl.group({ color = "TestCssGroup", ["font-style"] = "italic", ["text-decoration"] = "none" })
+  eq(
+    hl.group({ color = "TestCssGroup", ["font-weight"] = "normal", ["text-decoration"] = "none" }),
+    "TestCssGroup"
+  )
+  local g =
+    hl.group({ color = "TestCssGroup", ["font-style"] = "italic", ["text-decoration"] = "none" })
   local a = vim.api.nvim_get_hl(0, { name = g })
   eq({ a.fg, a.bold, a.italic }, { 0x112233, true, true })
-  g = hl.group({ color = "#ff0000", ["background-color"] = "#000010", ["text-decoration"] = "underline" })
+  g = hl.group({
+    color = "#ff0000",
+    ["background-color"] = "#000010",
+    ["text-decoration"] = "underline",
+  })
   a = vim.api.nvim_get_hl(0, { name = g })
   eq({ a.fg, a.bg, a.underline }, { 0xff0000, 0x10, true })
   eq(hl.group({ ["text-decoration"] = "none" }), nil)

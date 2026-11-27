@@ -72,7 +72,12 @@ local function server(args)
 end
 
 local function fingerprint(cert)
-  local out = vim.system({ "openssl", "x509", "-in", FIX .. cert, "-noout", "-fingerprint", "-sha256" }, { text = true }):wait()
+  local out = vim
+    .system(
+      { "openssl", "x509", "-in", FIX .. cert, "-noout", "-fingerprint", "-sha256" },
+      { text = true }
+    )
+    :wait()
   return "sha256:" .. out.stdout:match("=(%S+)")
 end
 
@@ -91,14 +96,16 @@ local EC = { "-cert", FIX .. "ec_cert.pem", "-key", FIX .. "ec.key", "-tls1_3" }
 local RSA = { "-cert", FIX .. "rsa_cert.pem", "-key", FIX .. "rsa2048.pem", "-tls1_3" }
 
 T["EC certificate, AES-128-GCM, require mode"] = function()
-  local port = server(vim.list_extend({ "-ciphersuites", "TLS_AES_128_GCM_SHA256" }, vim.deepcopy(EC)))
+  local port =
+    server(vim.list_extend({ "-ciphersuites", "TLS_AES_128_GCM_SHA256" }, vim.deepcopy(EC)))
   local r = echo(port, { mode = "require" }, "hello world")
   eq(r.err, nil)
   eq({ r[1], r[2], r[3] }, { "dlrow olleh\n", "TLS_AES_128_GCM_SHA256", "dbdash-test-ec" })
 end
 
 T["RSA certificate (PSS), ChaCha20-Poly1305, pin mode"] = function()
-  local port = server(vim.list_extend({ "-ciphersuites", "TLS_CHACHA20_POLY1305_SHA256" }, vim.deepcopy(RSA)))
+  local port =
+    server(vim.list_extend({ "-ciphersuites", "TLS_CHACHA20_POLY1305_SHA256" }, vim.deepcopy(RSA)))
   local url = require("dbdash.db.url")
   local fp = url.parse_fingerprint(fingerprint("rsa_cert.pem"))
   local r = echo(port, { mode = "pin", fingerprint = fp }, "abc")
@@ -109,9 +116,20 @@ end
 T["pin mode rejects another certificate"] = function()
   local port = server(vim.deepcopy(EC))
   local url = require("dbdash.db.url")
-  local r = echo(port, { mode = "pin", fingerprint = url.parse_fingerprint(fingerprint("rsa_cert.pem")) }, "x")
+  local r = echo(
+    port,
+    { mode = "pin", fingerprint = url.parse_fingerprint(fingerprint("rsa_cert.pem")) },
+    "x"
+  )
   eq(r.err.phase, "tls")
-  eq(r.err.message:find("certificate fingerprint mismatch: the server presented " .. fingerprint("ec_cert.pem"), 1, true) ~= nil, true)
+  eq(
+    r.err.message:find(
+      "certificate fingerprint mismatch: the server presented " .. fingerprint("ec_cert.pem"),
+      1,
+      true
+    ) ~= nil,
+    true
+  )
 end
 
 -- TLS 1.2: every suite we offer, with encrypt-then-MAC and extended master secret on and off.
@@ -156,14 +174,52 @@ end
 
 T["TLS 1.2 with pin and verify-full"] = function()
   local url = require("dbdash.db.url")
-  local port = server({ "-cert", FIX .. "rsa_cert.pem", "-key", FIX .. "rsa2048.pem", "-tls1_2", "-cipher", "ECDHE-RSA-AES128-GCM-SHA256" })
-  local r = echo(port, { mode = "pin", fingerprint = url.parse_fingerprint(fingerprint("rsa_cert.pem")) }, "pin")
+  local port = server({
+    "-cert",
+    FIX .. "rsa_cert.pem",
+    "-key",
+    FIX .. "rsa2048.pem",
+    "-tls1_2",
+    "-cipher",
+    "ECDHE-RSA-AES128-GCM-SHA256",
+  })
+  local r = echo(
+    port,
+    { mode = "pin", fingerprint = url.parse_fingerprint(fingerprint("rsa_cert.pem")) },
+    "pin"
+  )
   eq({ r.err, r[1] }, { nil, "nip\n" })
-  port = server({ "-cert", PKI .. "leaf.pem", "-key", PKI .. "leaf.key", "-cert_chain", PKI .. "inter.pem", "-tls1_2" })
-  r = echo(port, { mode = "verify-full", ca = PKI .. "root.pem", host = "localhost" }, "full", "localhost")
+  port = server({
+    "-cert",
+    PKI .. "leaf.pem",
+    "-key",
+    PKI .. "leaf.key",
+    "-cert_chain",
+    PKI .. "inter.pem",
+    "-tls1_2",
+  })
+  r = echo(
+    port,
+    { mode = "verify-full", ca = PKI .. "root.pem", host = "localhost" },
+    "full",
+    "localhost"
+  )
   eq({ r.err, r[1] }, { nil, "lluf\n" })
-  port = server({ "-cert", PKI .. "leaf_wronghost.pem", "-key", PKI .. "leaf.key", "-cert_chain", PKI .. "inter.pem", "-tls1_2" })
-  r = echo(port, { mode = "verify-full", ca = PKI .. "root.pem", host = "localhost" }, "x", "localhost")
+  port = server({
+    "-cert",
+    PKI .. "leaf_wronghost.pem",
+    "-key",
+    PKI .. "leaf.key",
+    "-cert_chain",
+    PKI .. "inter.pem",
+    "-tls1_2",
+  })
+  r = echo(
+    port,
+    { mode = "verify-full", ca = PKI .. "root.pem", host = "localhost" },
+    "x",
+    "localhost"
+  )
   eq(r.err.message:find("host name mismatch") ~= nil, true)
 end
 
@@ -237,9 +293,26 @@ T["verify-full: failures"] = function()
     eq(r.err.phase, "tls")
     return r.err.message
   end
-  eq(err_for("leaf_wronghost.pem", "leaf.key", "inter.pem"):find("host name mismatch: the certificate is for example.com, not localhost") ~= nil, true)
-  eq(err_for("leaf.pem", "leaf.key", "inter.pem", { host = "localhost", ca = PKI .. "other_root.pem" }):find("unable to find a trusted issuer") ~= nil, true)
-  eq(err_for("leaf.pem", "leaf.key", nil):find("unable to find a trusted issuer for \"dbdash leaf\"") ~= nil, true)
+  eq(
+    err_for("leaf_wronghost.pem", "leaf.key", "inter.pem"):find(
+      "host name mismatch: the certificate is for example.com, not localhost"
+    ) ~= nil,
+    true
+  )
+  eq(
+    err_for(
+      "leaf.pem",
+      "leaf.key",
+      "inter.pem",
+      { host = "localhost", ca = PKI .. "other_root.pem" }
+    ):find("unable to find a trusted issuer") ~= nil,
+    true
+  )
+  eq(
+    err_for("leaf.pem", "leaf.key", nil):find('unable to find a trusted issuer for "dbdash leaf"')
+      ~= nil,
+    true
+  )
   eq(err_for("leaf_expired.pem", "leaf.key", "inter.pem"):find("has expired") ~= nil, true)
 end
 
@@ -275,10 +348,15 @@ T["tampered CertificateVerify is rejected"] = function()
   local cf = assert(io.open(content_file, "wb"))
   cf:write(hs.verify_content(th))
   cf:close()
-  local sig = vim.system({ "openssl", "dgst", "-sha256", "-sign", FIX .. "ec.key", content_file }):wait().stdout
+  local sig = vim
+    .system({ "openssl", "dgst", "-sha256", "-sign", FIX .. "ec.key", content_file })
+    :wait().stdout
   eq(hs.check_signature(cert, 0x0403, sig, th), true)
   eq(hs.check_signature(cert, 0x0403, sig, string.rep("\8", 32)), false)
-  eq(select(2, hs.check_signature(cert, 0x0804, sig, th)), "signature algorithm does not match the certificate key")
+  eq(
+    select(2, hs.check_signature(cert, 0x0804, sig, th)),
+    "signature algorithm does not match the certificate key"
+  )
 end
 
 return T

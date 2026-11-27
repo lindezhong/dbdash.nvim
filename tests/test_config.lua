@@ -90,9 +90,21 @@ T["key: in args is rejected with a hint"] = function()
 end
 
 T["validation errors name the field and position"] = function()
-  eq(err_of("database:\n  url: oracle://h/x\nquery:\n  sql: x\n"):find("Oracle is not supported") ~= nil, true)
-  eq(err_of("database:\n  url: foo://h\nquery:\n  sql: x\n"):find("unsupported database type 'foo'") ~= nil, true)
-  eq(err_of(MINIMAL .. "show:\n  type: radar\n"):find(":7:9: unknown chart type 'radar'", 1, true) ~= nil, true)
+  eq(
+    err_of("database:\n  url: oracle://h/x\nquery:\n  sql: x\n"):find("Oracle is not supported")
+      ~= nil,
+    true
+  )
+  eq(
+    err_of("database:\n  url: foo://h\nquery:\n  sql: x\n"):find("unsupported database type 'foo'")
+      ~= nil,
+    true
+  )
+  eq(
+    err_of(MINIMAL .. "show:\n  type: radar\n"):find(":7:9: unknown chart type 'radar'", 1, true)
+      ~= nil,
+    true
+  )
   eq(err_of(MINIMAL .. "show:\n  interval: soon\n"):find("invalid duration") ~= nil, true)
   eq(err_of("database:\n  url: x\n"):find("missing required field 'database.url'") == nil, true)
   eq(err_of("query:\n  sql: x\n"):find("missing required field 'database'") ~= nil, true)
@@ -107,9 +119,12 @@ end
 T["single-chart configs become one panel"] = function()
   local cfg = assert(load(MINIMAL .. "args:\n  - name: top\n"))
   eq({ cfg.grid, #cfg.panels, cfg.panels[1].query == cfg.query }, { false, 1, true })
-  eq(vim.tbl_map(function(a)
-    return a.key
-  end, cfg.args), { "top" })
+  eq(
+    vim.tbl_map(function(a)
+      return a.key
+    end, cfg.args),
+    { "top" }
+  )
 end
 
 local MULTI = [[
@@ -144,12 +159,23 @@ T["multi-panel configs"] = function()
   local cfg = assert(load(MULTI))
   eq({ cfg.grid, #cfg.panels, #cfg.style_rules, cfg.refresh_all }, { true, 2, 1, 300000 })
   -- Shared arguments, then each panel's local ones (keyed <panel id>.<name>).
-  eq(vim.tbl_map(function(a)
-    return a.key
-  end, cfg.args), { "region", "1.region", "n" })
+  eq(
+    vim.tbl_map(function(a)
+      return a.key
+    end, cfg.args),
+    { "region", "1.region", "n" }
+  )
   local p1, p2 = cfg.panels[1], cfg.panels[2]
-  eq({ p1.show.interval, p1.follows_global, p1.style_rules[1].decls["grid-column"], p1.database.type }, { 30000, false, "span 2", "sqlite" })
-  eq({ p2.show.interval, p2.follows_global, p2.database.type, p2.query.sql_line, p2.style_rules }, { 300000, true, "redis", 25, nil })
+  eq({
+    p1.show.interval,
+    p1.follows_global,
+    p1.style_rules[1].decls["grid-column"],
+    p1.database.type,
+  }, { 30000, false, "span 2", "sqlite" })
+  eq(
+    { p2.show.interval, p2.follows_global, p2.database.type, p2.query.sql_line, p2.style_rules },
+    { 300000, true, "redis", 25, nil }
+  )
 end
 
 T["the top-level database is only a default: a panel's own wins, either is enough"] = function()
@@ -161,21 +187,43 @@ panels:
   - database: { url: "lua://" }
     query: { sql: "return {}" }
 ]]))
-  eq({ cfg.database, cfg.panels[1].database.type, cfg.panels[2].database.type }, { nil, "sqlite", "lua" })
+  eq(
+    { cfg.database, cfg.panels[1].database.type, cfg.panels[2].database.type },
+    { nil, "sqlite", "lua" }
+  )
   -- Panels without one use the top-level default; cfg.database is that default.
   cfg = assert(load(MULTI))
-  eq({ cfg.database.type, cfg.panels[1].database == cfg.database, cfg.panels[2].database.type }, { "sqlite", true, "redis" })
+  eq(
+    { cfg.database.type, cfg.panels[1].database == cfg.database, cfg.panels[2].database.type },
+    { "sqlite", true, "redis" }
+  )
   -- Single-chart configs: the top-level database is the panel's.
   cfg = assert(load(MINIMAL))
   eq(cfg.panels[1].database == cfg.database, true)
   -- Only a panel with neither is an error, pointing at that panel.
-  local msg = err_of("panels:\n  - database: { url: 'lua://' }\n    query: { sql: x }\n  - query: { sql: y }\n")
-  eq(msg:find("missing required field 'panels%[2%]%.database' %(set it in the panel or at the top level%)") ~= nil, true)
+  local msg = err_of(
+    "panels:\n  - database: { url: 'lua://' }\n    query: { sql: x }\n  - query: { sql: y }\n"
+  )
+  eq(
+    msg:find(
+      "missing required field 'panels%[2%]%.database' %(set it in the panel or at the top level%)"
+    ) ~= nil,
+    true
+  )
 end
 
 T["multi-panel errors point at the panel"] = function()
-  eq(err_of("panels:\n  - query:\n      sql: x\n"):find("missing required field 'panels%[1%]%.database'") ~= nil, true)
-  eq(err_of(MULTI .. "    show:\n      type: radar\n"):find(":%d+:%d+: unknown chart type 'radar'") ~= nil, true)
+  eq(
+    err_of("panels:\n  - query:\n      sql: x\n"):find(
+      "missing required field 'panels%[1%]%.database'"
+    ) ~= nil,
+    true
+  )
+  eq(
+    err_of(MULTI .. "    show:\n      type: radar\n"):find(":%d+:%d+: unknown chart type 'radar'")
+      ~= nil,
+    true
+  )
 end
 
 -- One panel as a one-chart config and as panels[1]: same result, same errors.
@@ -192,11 +240,28 @@ T["a one-chart config and panels[1] are validated the same way"] = function()
   local single = assert(load(PANEL:gsub("\n  ", "\n"):gsub("^  ", "")))
   local multi = assert(load("panels:\n  -" .. PANEL:sub(2):gsub("\n  ", "\n    ")))
   local a, b = single.panels[1], multi.panels[1]
-  eq({ a.database, a.query.sql, a.query.timeout, a.query.args, a.show.type, a.show.interval, a.show.args_show },
-     { b.database, b.query.sql, b.query.timeout, b.query.args, b.show.type, b.show.interval, b.show.args_show })
+  eq({
+    a.database,
+    a.query.sql,
+    a.query.timeout,
+    a.query.args,
+    a.show.type,
+    a.show.interval,
+    a.show.args_show,
+  }, {
+    b.database,
+    b.query.sql,
+    b.query.timeout,
+    b.query.args,
+    b.show.type,
+    b.show.interval,
+    b.show.args_show,
+  })
   -- The same mistake gives the same message, with the panel's path.
   local e1 = err_of("database: { url: 'sqlite:///:memory:' }\nquery: { sql: x, max_rows: many }\n")
-  local e2 = err_of("database: { url: 'sqlite:///:memory:' }\npanels:\n  - query: { sql: x, max_rows: many }\n")
+  local e2 = err_of(
+    "database: { url: 'sqlite:///:memory:' }\npanels:\n  - query: { sql: x, max_rows: many }\n"
+  )
   eq(e1:match(": (.*)$"), "'query.max_rows' must be a integer")
   eq(e2:match(": (.*)$"), "'panels[1].query.max_rows' must be a integer")
 end
@@ -215,22 +280,43 @@ panels:
   local p1, p2 = cfg.panels[1], cfg.panels[2]
   eq({ p1.query.timeout, p1.query.max_rows, p1.show.axes.x_axis.title }, { 5000, 10, "t" })
   -- Mappings merge key by key: format is kept, title overridden.
-  eq({ p2.query.max_rows, p2.show.axes.x_axis.title, p2.show.axes.x_axis.format }, { 20, "u", "{}" })
+  eq(
+    { p2.query.max_rows, p2.show.axes.x_axis.title, p2.show.axes.x_axis.format },
+    { 20, "u", "{}" }
+  )
   -- An inherited invalid value is reported at the top-level line.
-  local msg = err_of("database: { url: 'sqlite:///:memory:' }\nshow:\n  interval: soon\npanels:\n  - query: { sql: x }\n")
+  local msg = err_of(
+    "database: { url: 'sqlite:///:memory:' }\nshow:\n  interval: soon\npanels:\n  - query: { sql: x }\n"
+  )
   eq(msg:find(":3:13: 'panels%[1%]%.show%.interval'") ~= nil, true)
 end
 
 T["fields of one chart cannot be top-level defaults"] = function()
   local base = "database: { url: 'sqlite:///:memory:' }\npanels:\n  - query: { sql: x }\n"
-  for _, f in ipairs({ "show:\n  type: bar\n", "show:\n  title: T\n", "show:\n  x_column: a\n",
-                       "show:\n  column_list: []\n", "query:\n  sql: y\n", "query:\n  transform: y\n" }) do
+  for _, f in ipairs({
+    "show:\n  type: bar\n",
+    "show:\n  title: T\n",
+    "show:\n  x_column: a\n",
+    "show:\n  column_list: []\n",
+    "query:\n  sql: y\n",
+    "query:\n  transform: y\n",
+  }) do
     local msg = err_of(base .. f)
-    eq({ f, msg:find("belongs to one panel; with panels, set it in each panel") ~= nil }, { f, true })
+    eq(
+      { f, msg:find("belongs to one panel; with panels, set it in each panel") ~= nil },
+      { f, true }
+    )
   end
-  eq(err_of(base .. "query:\n  args: []\n"):find("shared arguments go in the top%-level args") ~= nil, true)
+  eq(
+    err_of(base .. "query:\n  args: []\n"):find("shared arguments go in the top%-level args") ~= nil,
+    true
+  )
   -- Without panels the top level is the panel: all of them are fine there.
-  assert(load("database: { url: 'sqlite:///:memory:' }\nquery: { sql: x }\nshow: { type: bar, title: T }\n"))
+  assert(
+    load(
+      "database: { url: 'sqlite:///:memory:' }\nquery: { sql: x }\nshow: { type: bar, title: T }\n"
+    )
+  )
 end
 
 T["the database of a panel replaces the default as a whole"] = function()
@@ -244,7 +330,10 @@ panels:
   - database: { url: "sqlite:///:memory:" }
     query: { sql: SELECT 2 }
 ]]))
-  eq({ cfg.panels[1].database.password_cmd, cfg.panels[1].database.options.readonly }, { "pass show db", true })
+  eq(
+    { cfg.panels[1].database.password_cmd, cfg.panels[1].database.options.readonly },
+    { "pass show db", true }
+  )
   eq({ cfg.panels[2].database.password_cmd, cfg.panels[2].database.options.readonly }, { nil, nil })
 end
 
@@ -253,17 +342,24 @@ T["interval: show.interval, top-level show.interval, top-level interval, setup d
     local cfg = assert(load(text))
     return vim.tbl_map(function(p)
       return { p.show.interval, p.follows_global }
-    end, cfg.panels), cfg.refresh_all
+    end, cfg.panels),
+      cfg.refresh_all
   end
   local db = "database: { url: 'sqlite:///:memory:' }\n"
   -- Global refresh and a panel's own interval: both apply; the panel without one follows.
-  local iv, all = intervals(db .. "interval: 10m\npanels:\n  - { query: { sql: x }, show: { interval: 30s } }\n  - { query: { sql: y } }\n")
+  local iv, all = intervals(
+    db
+      .. "interval: 10m\npanels:\n  - { query: { sql: x }, show: { interval: 30s } }\n  - { query: { sql: y } }\n"
+  )
   eq({ iv, all }, { { { 30000, false }, { 600000, true } }, 600000 })
   -- The top-level show.interval comes before the top-level interval.
-  iv = intervals(db .. "interval: 10m\nshow: { interval: 1m }\npanels:\n  - { query: { sql: x } }\n")
+  iv =
+    intervals(db .. "interval: 10m\nshow: { interval: 1m }\npanels:\n  - { query: { sql: x } }\n")
   eq(iv, { { 60000, false } })
   -- No global refresh: the panel's interval, else setup's default.
-  iv, all = intervals(db .. "panels:\n  - { query: { sql: x }, show: { interval: 30s } }\n  - { query: { sql: y } }\n")
+  iv, all = intervals(
+    db .. "panels:\n  - { query: { sql: x }, show: { interval: 30s } }\n  - { query: { sql: y } }\n"
+  )
   eq({ iv, all }, { { { 30000, false }, { 30000, false } }, nil })
   -- One-chart configs are the same: the top-level interval refreshes as well.
   iv, all = intervals(db .. "interval: 2m\nquery: { sql: x }\nshow: { interval: 30s }\n")
@@ -295,12 +391,29 @@ panels:
   eq(visible(cfg.panels[2]), { "region", "hours", "2.limit" })
   local state = require("dbdash.args").new_state()
   local a = require("dbdash.args")
-  eq({ a.resolve_panel(cfg.panels[1], state).region, a.resolve_panel(cfg.panels[2], state).region }, { "US", "EU" })
+  eq(
+    { a.resolve_panel(cfg.panels[1], state).region, a.resolve_panel(cfg.panels[2], state).region },
+    { "US", "EU" }
+  )
   -- Duplicates within one scope and bad panel ids are errors.
   local db = "database: { url: 'sqlite:///:memory:' }\n"
-  eq(err_of(db .. "args: [{ name: a }, { name: a }]\nquery: { sql: x }\n"):find("duplicate argument 'a'") ~= nil, true)
-  eq(err_of(db .. "panels:\n  - { id: x, query: { sql: x } }\n  - { id: x, query: { sql: y } }\n"):find("duplicate panel id 'x'") ~= nil, true)
-  eq(err_of(db .. "panels:\n  - { id: 'a b', query: { sql: x } }\n"):find("must be an identifier") ~= nil, true)
+  eq(
+    err_of(db .. "args: [{ name: a }, { name: a }]\nquery: { sql: x }\n"):find(
+      "duplicate argument 'a'"
+    ) ~= nil,
+    true
+  )
+  eq(
+    err_of(db .. "panels:\n  - { id: x, query: { sql: x } }\n  - { id: x, query: { sql: y } }\n"):find(
+      "duplicate panel id 'x'"
+    ) ~= nil,
+    true
+  )
+  eq(
+    err_of(db .. "panels:\n  - { id: 'a b', query: { sql: x } }\n"):find("must be an identifier")
+      ~= nil,
+    true
+  )
 end
 
 T["args_show: show.args_show lists the arguments the panel reads"] = function()
@@ -308,7 +421,9 @@ T["args_show: show.args_show lists the arguments the panel reads"] = function()
   vim.fn.mkdir(dir, "p")
   vim.fn.writefile({ "{% macro f() %}{{ args.days }}{% endmacro %}" }, dir .. "/m.sql")
   local path = dir .. "/c.yaml"
-  vim.fn.writefile(vim.split([[
+  vim.fn.writefile(
+    vim.split(
+      [[
 database: { url: "sqlite:///:memory:" }
 args:
   - { name: region }
@@ -324,7 +439,11 @@ panels:
     show: { args_show: [unused, own] }
   - query: { sql: "SELECT {{ args.region }}" }
     show: { args_show: false }
-]], "\n"), path)
+]],
+      "\n"
+    ),
+    path
+  )
   local cfg = assert(config.load(path))
   local function shown(i)
     return vim.tbl_map(function(a)
@@ -335,10 +454,21 @@ panels:
   eq(shown(2), { "region", "days", "unused" }) -- args as a whole
   eq(shown(3), { "unused", "own" })
   eq(shown(4), {})
-  eq(err_of("database: { url: 'sqlite:///:memory:' }\nquery: { sql: x }\nshow: { args_show: [nope] }\n"):find("unknown argument 'nope'") ~= nil, true)
+  eq(
+    err_of(
+      "database: { url: 'sqlite:///:memory:' }\nquery: { sql: x }\nshow: { args_show: [nope] }\n"
+    ):find("unknown argument 'nope'") ~= nil,
+    true
+  )
   -- The old places are errors.
-  eq(err_of(MINIMAL .. "  args_show: true\n"):find("'args_show' moved to show.args_show") ~= nil, true)
-  eq(err_of(MINIMAL .. "args_show: true\n"):find("'args_show' moved to show.args_show") ~= nil, true)
+  eq(
+    err_of(MINIMAL .. "  args_show: true\n"):find("'args_show' moved to show.args_show") ~= nil,
+    true
+  )
+  eq(
+    err_of(MINIMAL .. "args_show: true\n"):find("'args_show' moved to show.args_show") ~= nil,
+    true
+  )
 end
 
 T["arg_refs finds the argument names a template or Lua code reads"] = function()
@@ -348,7 +478,10 @@ T["arg_refs finds the argument names a template or Lua code reads"] = function()
     table.sort(names)
     return { names, all }
   end
-  eq(refs("{{ args.a }} {{ args [ 'b' ] }} {{ args[\"c\"] }} meta.args.x"), { { "a", "b", "c" }, false })
+  eq(
+    refs("{{ args.a }} {{ args [ 'b' ] }} {{ args[\"c\"] }} meta.args.x"),
+    { { "a", "b", "c" }, false }
+  )
   eq(refs("-- args: values as Lua numbers\nlocal x = args.n"), { { "n" }, false })
   eq(refs("{% for k in args %}"), { {}, true })
   eq(refs("f(args)"), { {}, true })
@@ -357,8 +490,17 @@ T["arg_refs finds the argument names a template or Lua code reads"] = function()
 end
 
 T["show.refresh_hidden is a boolean, with a top-level default"] = function()
-  eq(err_of(MINIMAL .. "show: { refresh_hidden: 1 }\n"):find("'show.refresh_hidden' must be a boolean") ~= nil, true)
-  local cfg = assert(load("database: { url: 'sqlite:///:memory:' }\nshow: { refresh_hidden: true }\npanels:\n  - query: { sql: x }\n  - query: { sql: y }\n    show: { refresh_hidden: false }\n"))
+  eq(
+    err_of(MINIMAL .. "show: { refresh_hidden: 1 }\n"):find(
+      "'show.refresh_hidden' must be a boolean"
+    ) ~= nil,
+    true
+  )
+  local cfg = assert(
+    load(
+      "database: { url: 'sqlite:///:memory:' }\nshow: { refresh_hidden: true }\npanels:\n  - query: { sql: x }\n  - query: { sql: y }\n    show: { refresh_hidden: false }\n"
+    )
+  )
   eq({ cfg.panels[1].show.refresh_hidden, cfg.panels[2].show.refresh_hidden }, { true, false })
 end
 
@@ -367,18 +509,28 @@ T["appearance fields moved into style sheets say where"] = function()
     local msg = err_of(yaml)
     eq({ yaml, msg:find(want, 1, true) ~= nil }, { yaml, true })
   end
-  moved(MINIMAL .. "layout: { columns: 3 }\n", "'layout' is appearance and moved to style: dashboard {")
+  moved(
+    MINIMAL .. "layout: { columns: 3 }\n",
+    "'layout' is appearance and moved to style: dashboard {"
+  )
   moved(MINIMAL .. "show_countdown: true\n", "header countdown { display: block }")
   moved(MINIMAL .. "show: { style: { border: true } }\n", "'show.style' is appearance")
   moved(MINIMAL .. "show: { height: 5 }\n", "plot { height: N }")
   moved(MINIMAL .. "show: { colors: [red] }\n", "series")
-  moved("database: { url: 'sqlite:///:memory:' }\npanels:\n  - query: { sql: x }\n    show: { span: 2 }\n", "'panels[1].show.span' is appearance")
-  moved(MINIMAL .. "show: { axes: { x_axis: { grid: true } } }\n", 'grid.x\" { display: block }')
+  moved(
+    "database: { url: 'sqlite:///:memory:' }\npanels:\n  - query: { sql: x }\n    show: { span: 2 }\n",
+    "'panels[1].show.span' is appearance"
+  )
+  moved(MINIMAL .. "show: { axes: { x_axis: { grid: true } } }\n", 'grid.x" { display: block }')
 end
 
 T["style sheets: parsed in order, errors name the declaration's line"] = function()
-  local cfg = assert(load(MINIMAL .. "style:\n  title: { color: Error }\n  chart:\n    renderer: x\n"))
-  eq({ #cfg.style_rules, cfg.style_rules[1].selector.text, cfg.style_rules[2].decls.renderer }, { 2, "title", "x" })
+  local cfg =
+    assert(load(MINIMAL .. "style:\n  title: { color: Error }\n  chart:\n    renderer: x\n"))
+  eq(
+    { #cfg.style_rules, cfg.style_rules[1].selector.text, cfg.style_rules[2].decls.renderer },
+    { 2, "title", "x" }
+  )
   local msg = err_of(MINIMAL .. "style:\n  title:\n    colour: red\n")
   eq(msg:find(":%d+:%d+: .*unknown property 'colour'") ~= nil, true)
   msg = err_of(MINIMAL .. "style:\n  'a >> b': { color: red }\n")
@@ -423,21 +575,52 @@ panels:
   eq(lay.places[3], { row = 3, col = 2, span = 2, row_span = 1 })
   eq(lay.places[4], { row = 2, col = 1, span = 1, row_span = 1 }) -- the first free cell
   -- columns from the areas when not given
-  lay = grid_of(GRID .. "style:\n  dashboard: { grid-template-areas: ['x y'] }\npanels:\n  - query: { sql: x }\n")
+  lay = grid_of(
+    GRID
+      .. "style:\n  dashboard: { grid-template-areas: ['x y'] }\npanels:\n  - query: { sql: x }\n"
+  )
   eq(#lay.columns, 2)
 end
 
 T["grid: errors name the declaration's line"] = function()
   local function grid_err(dashboard, panel)
-    return err_of(GRID .. "style:\n  dashboard: " .. dashboard .. "\npanels:\n  - query: { sql: x }\n    style:\n      panel: " .. (panel or "{}") .. "\n  - query: { sql: y }\n    style:\n      panel: { grid-row: 1, grid-column: 1 }\n")
+    return err_of(
+      GRID
+        .. "style:\n  dashboard: "
+        .. dashboard
+        .. "\npanels:\n  - query: { sql: x }\n    style:\n      panel: "
+        .. (panel or "{}")
+        .. "\n  - query: { sql: y }\n    style:\n      panel: { grid-row: 1, grid-column: 1 }\n"
+    )
   end
-  eq(grid_err("{ grid-template-columns: [1fr, '10%%x'] }"):find(':3:.*invalid track') ~= nil, true)
+  eq(grid_err("{ grid-template-columns: [1fr, '10%%x'] }"):find(":3:.*invalid track") ~= nil, true)
   eq(grid_err("{ grid-template-rows: [max-content, '5%'] }"):find("invalid track") ~= nil, true)
-  eq(grid_err("{ grid-template-areas: ['a b', 'b b'] }"):find('area "b" is not a rectangle') ~= nil, true)
-  eq(grid_err("{ grid-template-columns: 3, grid-template-areas: ['a b'] }"):find("3 columns, but grid%-template%-areas has 2") ~= nil, true)
-  eq(grid_err("{ grid-template-columns: 2 }", "{ grid-row: 1, grid-column: 1 }"):find(":10:.*overlaps panel 1") ~= nil, true)
-  eq(grid_err("{ grid-template-columns: 2, grid-template-areas: ['a b'] }", "{ grid-area: zz }"):find(":7:.*no area named") ~= nil, true)
-  eq(grid_err("{ grid-template-columns: 2 }", "{ grid-row: '1 / span 0' }"):find("grid%-row") ~= nil, true)
+  eq(
+    grid_err("{ grid-template-areas: ['a b', 'b b'] }"):find('area "b" is not a rectangle') ~= nil,
+    true
+  )
+  eq(
+    grid_err("{ grid-template-columns: 3, grid-template-areas: ['a b'] }"):find(
+      "3 columns, but grid%-template%-areas has 2"
+    ) ~= nil,
+    true
+  )
+  eq(
+    grid_err("{ grid-template-columns: 2 }", "{ grid-row: 1, grid-column: 1 }"):find(
+      ":10:.*overlaps panel 1"
+    ) ~= nil,
+    true
+  )
+  eq(
+    grid_err("{ grid-template-columns: 2, grid-template-areas: ['a b'] }", "{ grid-area: zz }"):find(
+      ":7:.*no area named"
+    ) ~= nil,
+    true
+  )
+  eq(
+    grid_err("{ grid-template-columns: 2 }", "{ grid-row: '1 / span 0' }"):find("grid%-row") ~= nil,
+    true
+  )
   eq(grid_err("{ row-gap: -1 }"):find("at least 0") ~= nil, true)
 end
 

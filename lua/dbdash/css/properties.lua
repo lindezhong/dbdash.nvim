@@ -120,7 +120,9 @@ local function grid_line(v)
     local a = v:match("^(%d+)$")
     local span = v:match("^span%s+(%d+)$")
     local b, c = v:match("^(%d+)%s*/%s*span%s+(%d+)$")
-    local ok = (a and tonumber(a) >= 1) or (span and tonumber(span) >= 1) or (b and tonumber(b) >= 1 and tonumber(c) >= 1)
+    local ok = (a and tonumber(a) >= 1)
+      or (span and tonumber(span) >= 1)
+      or (b and tonumber(b) >= 1 and tonumber(c) >= 1)
     if ok then
       return v
     end
@@ -151,8 +153,18 @@ M.list = {
   -- colors and glyphs
   ["color"] = { inherited = true, initial = nil, parse = color, damage = "repaint" },
   ["background-color"] = { inherited = false, initial = nil, parse = color, damage = "repaint" },
-  ["font-weight"] = { inherited = true, initial = "normal", parse = enum("normal", "bold"), damage = "repaint" },
-  ["font-style"] = { inherited = true, initial = "normal", parse = enum("normal", "italic"), damage = "repaint" },
+  ["font-weight"] = {
+    inherited = true,
+    initial = "normal",
+    parse = enum("normal", "bold"),
+    damage = "repaint",
+  },
+  ["font-style"] = {
+    inherited = true,
+    initial = "normal",
+    parse = enum("normal", "italic"),
+    damage = "repaint",
+  },
   ["text-decoration"] = {
     inherited = false,
     initial = "none",
@@ -161,17 +173,57 @@ M.list = {
   },
   ["palette"] = { inherited = true, initial = "theme", parse = string_value, damage = "repaint" },
   -- display and generated content
-  ["display"] = { inherited = false, initial = "block", parse = enum("block", "none"), damage = "rebuild" },
+  ["display"] = {
+    inherited = false,
+    initial = "block",
+    parse = enum("block", "none"),
+    damage = "rebuild",
+  },
   ["content"] = { inherited = false, initial = nil, parse = string_value, damage = "relayout" },
   -- text
-  ["text-align"] = { inherited = true, initial = "start", parse = enum("start", "left", "center", "right"), damage = "relayout" },
-  ["vertical-align"] = { inherited = false, initial = "top", parse = enum("top", "middle", "bottom"), damage = "relayout" },
-  ["white-space"] = { inherited = true, initial = "normal", parse = enum("normal", "nowrap"), damage = "relayout" },
-  ["word-break"] = { inherited = true, initial = "normal", parse = enum("normal", "break-all"), damage = "relayout" },
-  ["text-overflow"] = { inherited = false, initial = "ellipsis", parse = string_value, damage = "relayout" },
+  ["text-align"] = {
+    inherited = true,
+    initial = "start",
+    parse = enum("start", "left", "center", "right"),
+    damage = "relayout",
+  },
+  ["vertical-align"] = {
+    inherited = false,
+    initial = "top",
+    parse = enum("top", "middle", "bottom"),
+    damage = "relayout",
+  },
+  ["white-space"] = {
+    inherited = true,
+    initial = "normal",
+    parse = enum("normal", "nowrap"),
+    damage = "relayout",
+  },
+  ["word-break"] = {
+    inherited = true,
+    initial = "normal",
+    parse = enum("normal", "break-all"),
+    damage = "relayout",
+  },
+  ["text-overflow"] = {
+    inherited = false,
+    initial = "ellipsis",
+    parse = string_value,
+    damage = "relayout",
+  },
   ["line-clamp"] = { inherited = false, initial = nil, parse = int(1), damage = "relayout" },
-  ["font-size"] = { inherited = true, initial = "normal", parse = enum("normal", "big"), damage = "relayout" },
-  ["caption-side"] = { inherited = false, initial = "top", parse = enum("top", "bottom"), damage = "relayout" },
+  ["font-size"] = {
+    inherited = true,
+    initial = "normal",
+    parse = enum("normal", "big"),
+    damage = "relayout",
+  },
+  ["caption-side"] = {
+    inherited = false,
+    initial = "top",
+    parse = enum("top", "bottom"),
+    damage = "relayout",
+  },
   -- boxes
   ["border"] = { inherited = false, initial = "none", parse = border, damage = "relayout" },
   ["border-color"] = { inherited = false, initial = nil, parse = color, damage = "repaint" },
@@ -181,17 +233,37 @@ M.list = {
   ["height"] = { inherited = false, initial = nil, parse = int(1), damage = "relayout" },
   ["min-height"] = { inherited = false, initial = nil, parse = int(1), damage = "relayout" },
   -- grid container and items
-  ["grid-template-columns"] = { inherited = false, initial = 1, parse = tracks, damage = "relayout" },
+  ["grid-template-columns"] = {
+    inherited = false,
+    initial = 1,
+    parse = tracks,
+    damage = "relayout",
+  },
   ["grid-template-rows"] = { inherited = false, initial = nil, parse = tracks, damage = "relayout" },
   ["grid-auto-rows"] = { inherited = false, initial = "auto", parse = tracks, damage = "relayout" },
-  ["grid-template-areas"] = { inherited = false, initial = nil, parse = list_of_strings, damage = "relayout" },
+  ["grid-template-areas"] = {
+    inherited = false,
+    initial = nil,
+    parse = list_of_strings,
+    damage = "relayout",
+  },
   ["column-gap"] = { inherited = false, initial = 2, parse = int(0), damage = "relayout" },
   ["row-gap"] = { inherited = false, initial = 1, parse = int(0), damage = "relayout" },
   ["grid-area"] = { inherited = false, initial = nil, parse = string_value, damage = "relayout" },
   ["grid-row"] = { inherited = false, initial = nil, parse = grid_line, damage = "relayout" },
   ["grid-column"] = { inherited = false, initial = nil, parse = grid_line, damage = "relayout" },
-  ["justify-self"] = { inherited = false, initial = "stretch", parse = enum("start", "center", "end", "stretch"), damage = "relayout" },
-  ["align-self"] = { inherited = false, initial = "start", parse = enum("start", "center", "end", "stretch"), damage = "relayout" },
+  ["justify-self"] = {
+    inherited = false,
+    initial = "stretch",
+    parse = enum("start", "center", "end", "stretch"),
+    damage = "relayout",
+  },
+  ["align-self"] = {
+    inherited = false,
+    initial = "start",
+    parse = enum("start", "center", "end", "stretch"),
+    damage = "relayout",
+  },
   -- charts
   ["renderer"] = { inherited = true, initial = nil, parse = string_value, damage = "rebuild" },
   ["canvas"] = { inherited = true, initial = nil, parse = string_value, damage = "rebuild" },
@@ -215,8 +287,18 @@ M.list = {
     damage = "relayout",
   },
   ["gap"] = { inherited = false, initial = nil, parse = int(0), damage = "relayout" },
-  ["position"] = { inherited = false, initial = nil, parse = enum("right", "bottom", "end", "inside"), damage = "relayout" },
-  ["color-scale"] = { inherited = false, initial = nil, parse = list_of_strings, damage = "repaint" },
+  ["position"] = {
+    inherited = false,
+    initial = nil,
+    parse = enum("right", "bottom", "end", "inside"),
+    damage = "relayout",
+  },
+  ["color-scale"] = {
+    inherited = false,
+    initial = nil,
+    parse = list_of_strings,
+    damage = "repaint",
+  },
   ["color-steps"] = {
     inherited = false,
     initial = nil,
@@ -225,7 +307,11 @@ M.list = {
         return nil, "expected a list of { value, color }"
       end
       for i, st in ipairs(v) do
-        if type(st) ~= "table" or type(nn(st.value)) ~= "number" or type(nn(st.color)) ~= "string" then
+        if
+          type(st) ~= "table"
+          or type(nn(st.value)) ~= "number"
+          or type(nn(st.color)) ~= "string"
+        then
           return nil, ("step %d: expected { value: number, color: string }"):format(i)
         end
       end

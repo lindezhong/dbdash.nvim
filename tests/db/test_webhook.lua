@@ -153,11 +153,29 @@ end
 T["items by media type, with params and request"] = function()
   local st = start("webhook://127.0.0.1:0/api")
   eq(st.status:match("^listening 127%.0%.0%.1:%d+$") ~= nil, true)
-  local r = request(st, "POST", "/api/orders/bj?limit=5", '{"id": 1}\n{"id": 2, "amt": 3.5}\n', with(AUTH, { ["Content-Type"] = "application/x-ndjson", ["X-Source"] = "erp" }))
+  local r = request(
+    st,
+    "POST",
+    "/api/orders/bj?limit=5",
+    '{"id": 1}\n{"id": 2, "amt": 3.5}\n',
+    with(AUTH, { ["Content-Type"] = "application/x-ndjson", ["X-Source"] = "erp" })
+  )
   eq({ r.status, r.json.queued }, { 202, 2 })
-  r = request(st, "POST", "/api/orders/sh", '[{"id": 3}, {"id": 4}]', with(AUTH, { ["Content-Type"] = "application/json" }))
+  r = request(
+    st,
+    "POST",
+    "/api/orders/sh",
+    '[{"id": 3}, {"id": 4}]',
+    with(AUTH, { ["Content-Type"] = "application/json" })
+  )
   eq({ r.status, r.json.queued }, { 202, 1 }) -- a JSON body is one item
-  r = request(st, "POST", "/api/orders/sh", "id=5", with(AUTH, { ["Content-Type"] = "application/x-www-form-urlencoded" }))
+  r = request(
+    st,
+    "POST",
+    "/api/orders/sh",
+    "id=5",
+    with(AUTH, { ["Content-Type"] = "application/x-www-form-urlencoded" })
+  )
   eq(r.status, 202)
   r = request(st, "GET", "/api/ping?n=7")
   eq({ r.status, r.json }, { 200, { pong = true } }) -- the documented response and example
@@ -169,34 +187,78 @@ T["items by media type, with params and request"] = function()
   end, st.items)
   eq(v, { { id = 1 }, { id = 2, amt = 3.5 }, { { id = 3 }, { id = 4 } }, { id = 5 }, { n = 7 } })
   local vars = st.items[1].vars
-  eq(plain(vars.params), { path = { shop = "bj" }, query = { limit = 5 }, header = { ["X-Source"] = "erp" }, cookie = {} })
-  eq({ vars.request.method, vars.request.path, vars.request.operation_id, vars.request.content_type }, { "POST", "/api/orders/bj", "push_orders", "application/x-ndjson" })
+  eq(plain(vars.params), {
+    path = { shop = "bj" },
+    query = { limit = 5 },
+    header = { ["X-Source"] = "erp" },
+    cookie = {},
+  })
+  eq(
+    { vars.request.method, vars.request.path, vars.request.operation_id, vars.request.content_type },
+    { "POST", "/api/orders/bj", "push_orders", "application/x-ndjson" }
+  )
   eq(vars.request.headers.authorization, nil) -- credentials are not passed on
   eq(vars.request.headers["x-source"], "erp")
 end
 
 T["rejections are problem+json: 400 401 404 405 413 415"] = function()
-  local st = start("webhook://127.0.0.1:0/api", nil, { tokens = { bearer = "s3cret" }, max_body = 100 })
+  local st =
+    start("webhook://127.0.0.1:0/api", nil, { tokens = { bearer = "s3cret" }, max_body = 100 })
   local nd = with(AUTH, { ["Content-Type"] = "application/x-ndjson" })
   local function status(r)
     eq(r.headers["content-type"], "application/problem+json")
     eq(r.json.status, r.status)
     return r.status, r.json.detail
   end
-  eq({ status(request(st, "POST", "/api/orders/bj", '{"id": 1}', with(nd, { Authorization = "Bearer wrong" }))) }, { 401, "authentication required" })
-  eq(request(st, "POST", "/api/orders/bj", '{"id": 1}', { ["Content-Type"] = "application/x-ndjson" }).headers["www-authenticate"], 'Bearer realm="dbdash"')
+  eq({
+    status(
+      request(
+        st,
+        "POST",
+        "/api/orders/bj",
+        '{"id": 1}',
+        with(nd, { Authorization = "Bearer wrong" })
+      )
+    ),
+  }, { 401, "authentication required" })
+  eq(
+    request(
+      st,
+      "POST",
+      "/api/orders/bj",
+      '{"id": 1}',
+      { ["Content-Type"] = "application/x-ndjson" }
+    ).headers["www-authenticate"],
+    'Bearer realm="dbdash"'
+  )
   eq({ status(request(st, "POST", "/api/nope", "", AUTH)) }, { 404, "no such path" })
   local r = request(st, "DELETE", "/api/orders/bj", nil, AUTH)
   eq({ status(r) }, { 405, "method not allowed" })
   eq(r.headers.allow, "POST")
-  eq({ status(request(st, "POST", "/api/orders/xx", '{"id": 1}', nd)) }, { 400, 'path parameter shop: must be one of ["bj","sh"]' })
-  eq({ status(request(st, "POST", "/api/orders/bj", "<x/>", with(AUTH, { ["Content-Type"] = "text/xml" }))) }, { 415, "unsupported media type text/xml" })
-  eq({ status(request(st, "POST", "/api/orders/bj", nil, nd)) }, { 400, "a request body is required" })
+  eq(
+    { status(request(st, "POST", "/api/orders/xx", '{"id": 1}', nd)) },
+    { 400, 'path parameter shop: must be one of ["bj","sh"]' }
+  )
+  eq({
+    status(
+      request(st, "POST", "/api/orders/bj", "<x/>", with(AUTH, { ["Content-Type"] = "text/xml" }))
+    ),
+  }, { 415, "unsupported media type text/xml" })
+  eq(
+    { status(request(st, "POST", "/api/orders/bj", nil, nd)) },
+    { 400, "a request body is required" }
+  )
   eq((status(request(st, "POST", "/api/orders/bj", ("x"):rep(200), nd))), 413)
-  eq({ status(request(st, "POST", "/api/orders/bj", "{bad", nd)) }, { 400, "item 1: invalid JSON (Expected object key string but found invalid token at character 2)" })
+  eq({ status(request(st, "POST", "/api/orders/bj", "{bad", nd)) }, {
+    400,
+    "item 1: invalid JSON (Expected object key string but found invalid token at character 2)",
+  })
   -- A stream with a bad item: the ones before it are taken.
   r = request(st, "POST", "/api/orders/bj", '{"id": 1}\n{"amt": -1}\n{"id": 3}\n', nd)
-  eq({ status(r) }, { 400, 'item 2: missing required property "id" (1 item(s) before it were accepted)' })
+  eq(
+    { status(r) },
+    { 400, 'item 2: missing required property "id" (1 item(s) before it were accepted)' }
+  )
   vim.wait(100)
   eq(#st.items, 1)
   eq(st.handle.stats.rejected[400] >= 3, true)
@@ -215,7 +277,11 @@ T["Host and Origin are checked (DNS rebinding)"] = function()
   eq(send({ Host = "localhost" }).status, 202)
   eq(send({ Host = "evil.example" }).status, 403)
   eq(send({ Host = "127.0.0.1", Origin = "http://evil.example" }).status, 403)
-  local st2 = start("webhook://127.0.0.1:0", "", { allowed_origins = { "http://app.local" }, allowed_hosts = { "dash.local" } })
+  local st2 = start(
+    "webhook://127.0.0.1:0",
+    "",
+    { allowed_origins = { "http://app.local" }, allowed_hosts = { "dash.local" } }
+  )
   st = st2
   eq(send({ Host = "dash.local", Origin = "http://app.local" }).status, 202)
 end
@@ -223,19 +289,39 @@ end
 T["without a document: POST or PUT of anything at the URL's path"] = function()
   local st = start("webhook://127.0.0.1:0/in", "", {})
   eq(request(st, "POST", "/in", "a\nb\n", { ["Content-Type"] = "text/plain" }).json.queued, 2)
-  eq(request(st, "PUT", "/in", '{"x": 1}', { ["Content-Type"] = "application/json" }).json.queued, 1)
+  eq(
+    request(st, "PUT", "/in", '{"x": 1}', { ["Content-Type"] = "application/json" }).json.queued,
+    1
+  )
   eq(request(st, "POST", "/other", "x", {}).status, 404)
   vim.wait(100)
-  eq(plain(vim.tbl_map(function(it)
-    return it.value
-  end, st.items)), { "a", "b", { x = 1 } })
+  eq(
+    plain(vim.tbl_map(function(it)
+      return it.value
+    end, st.items)),
+    { "a", "b", { x = 1 } }
+  )
 end
 
 T["chunked bodies, slow requests and the connection limit"] = function()
   local st = start("webhook://127.0.0.1:0", "", { timeout = "300ms", max_connections = 1 })
-  local r = raw(st.port, table.concat({
-    "POST / HTTP/1.1", "Host: 127.0.0.1", "Content-Type: text/plain", "Transfer-Encoding: chunked", "", "4", "a\nb\n", "2", "c\n", "0", "", "",
-  }, "\r\n"))
+  local r = raw(
+    st.port,
+    table.concat({
+      "POST / HTTP/1.1",
+      "Host: 127.0.0.1",
+      "Content-Type: text/plain",
+      "Transfer-Encoding: chunked",
+      "",
+      "4",
+      "a\nb\n",
+      "2",
+      "c\n",
+      "0",
+      "",
+      "",
+    }, "\r\n")
+  )
   eq({ r.status, r.json.queued }, { 202, 3 })
   -- A request that stops half way gets 408 after the timeout.
   eq(raw(st.port, "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\n", { slow = true }).status, 408)
@@ -245,7 +331,8 @@ T["chunked bodies, slow requests and the connection limit"] = function()
     held:write("POST / HTTP/1.1\r\n")
   end)
   vim.wait(100)
-  local r2 = raw(st.port, "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 1\r\n\r\nx", { wait = 250 })
+  local r2 =
+    raw(st.port, "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 1\r\n\r\nx", { wait = 250 })
   eq(r2.status, nil) -- closed without a response
   held:close()
 end
@@ -254,7 +341,11 @@ T["config: non-local addresses need security; credentials never in the URL"] = f
   local st = start("webhook://0.0.0.0:0", "", {})
   eq(st.err.phase, "config")
   eq(st.err.message:find("needs a security requirement on every operation", 1, true) ~= nil, true)
-  st = start("webhook://127.0.0.1:0", "openapi: 3.1.0\ninfo: {title: t, version: '1'}\npaths:\n  /a: {get: {security: [{k: []}]}}\ncomponents:\n  securitySchemes:\n    k: {type: apiKey, in: query, name: key}\n", { tokens = { k = "x" } })
+  st = start(
+    "webhook://127.0.0.1:0",
+    "openapi: 3.1.0\ninfo: {title: t, version: '1'}\npaths:\n  /a: {get: {security: [{k: []}]}}\ncomponents:\n  securitySchemes:\n    k: {type: apiKey, in: query, name: key}\n",
+    { tokens = { k = "x" } }
+  )
   eq(st.err.message:find("must not be in URLs", 1, true) ~= nil, true)
   st = start("webhook://127.0.0.1", "", {})
   eq(st.err.message:find("needs a port", 1, true) ~= nil, true)
@@ -262,14 +353,36 @@ end
 
 T["tokens: ${NAME} reads the environment; an unset one is a config error"] = function()
   vim.env.DBDASH_TEST_TOKEN = "from-env"
-  local st = start("webhook://127.0.0.1:0/api", nil, { tokens = { bearer = "${DBDASH_TEST_TOKEN}" } })
+  local st =
+    start("webhook://127.0.0.1:0/api", nil, { tokens = { bearer = "${DBDASH_TEST_TOKEN}" } })
   eq(request(st, "GET", "/api/ping").status, 200)
   local nd = { ["Content-Type"] = "application/x-ndjson" }
-  eq(request(st, "POST", "/api/orders/bj", '{"id": 1}', with(nd, { Authorization = "Bearer from-env" })).status, 202)
-  eq(request(st, "POST", "/api/orders/bj", '{"id": 1}', with(nd, { Authorization = "Bearer ${DBDASH_TEST_TOKEN}" })).status, 401)
+  eq(
+    request(
+      st,
+      "POST",
+      "/api/orders/bj",
+      '{"id": 1}',
+      with(nd, { Authorization = "Bearer from-env" })
+    ).status,
+    202
+  )
+  eq(
+    request(
+      st,
+      "POST",
+      "/api/orders/bj",
+      '{"id": 1}',
+      with(nd, { Authorization = "Bearer ${DBDASH_TEST_TOKEN}" })
+    ).status,
+    401
+  )
   vim.env.DBDASH_TEST_TOKEN = nil
   st = start("webhook://127.0.0.1:0/api", nil, { tokens = { bearer = "${DBDASH_TEST_TOKEN}" } })
-  eq(st.err.message, "database.options.tokens.bearer: environment variable DBDASH_TEST_TOKEN is not set")
+  eq(
+    st.err.message,
+    "database.options.tokens.bearer: environment variable DBDASH_TEST_TOKEN is not set"
+  )
 end
 
 T["a busy port is an error; stopping frees the port"] = function()

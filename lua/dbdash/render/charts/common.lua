@@ -24,7 +24,12 @@ function M.col(rs, name, field)
   end
   local i = rs:col_index(name)
   if not i then
-    M.fail("column '%s' (show.%s) not found; available: %s", name, field, table.concat(rs:column_names(), ", "))
+    M.fail(
+      "column '%s' (show.%s) not found; available: %s",
+      name,
+      field,
+      table.concat(rs:column_names(), ", ")
+    )
   end
   return i
 end

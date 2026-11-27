@@ -228,7 +228,12 @@ local function prefix_test(s, arg, start, stop, at_end)
   local w = window(s, start, stop)
   local list = R.is_tuple(check(arg)) and arg or { arg }
   if not R.is_tuple(arg) and type(arg) ~= "string" and not R.is_safe(arg) then
-    raise("type", "%s arg must be str or a tuple of str, not %s", at_end and "endswith" or "startswith", R.typename(arg))
+    raise(
+      "type",
+      "%s arg must be str or a tuple of str, not %s",
+      at_end and "endswith" or "startswith",
+      R.typename(arg)
+    )
   end
   for _, p in ipairs(list) do
     p = str_arg(p, "prefix")
@@ -291,7 +296,8 @@ STR.zfill = function(s, args, kw)
   return sign .. ("0"):rep(width - n) .. rest
 end
 STR.count = function(s, args, kw)
-  local sub, start, stop = bind("count", args, kw, { { "sub" }, { "start", NONE }, { "end", NONE } })
+  local sub, start, stop =
+    bind("count", args, kw, { { "sub" }, { "start", NONE }, { "end", NONE } })
   sub = str_arg(sub, "count() argument")
   local w = window(s, start, stop)
   if sub == "" then
@@ -317,11 +323,13 @@ for name, last in pairs({ find = false, rfind = true, index = false, rindex = tr
   end
 end
 STR.startswith = function(s, args, kw)
-  local p, start, stop = bind("startswith", args, kw, { { "prefix" }, { "start", NONE }, { "end", NONE } })
+  local p, start, stop =
+    bind("startswith", args, kw, { { "prefix" }, { "start", NONE }, { "end", NONE } })
   return prefix_test(s, p, start, stop, false)
 end
 STR.endswith = function(s, args, kw)
-  local p, start, stop = bind("endswith", args, kw, { { "suffix" }, { "start", NONE }, { "end", NONE } })
+  local p, start, stop =
+    bind("endswith", args, kw, { { "suffix" }, { "start", NONE }, { "end", NONE } })
   return prefix_test(s, p, start, stop, true)
 end
 STR.expandtabs = function(s, args, kw)
@@ -412,7 +420,12 @@ end
 for name, side in pairs({ strip = "lr", lstrip = "l", rstrip = "r" }) do
   STR[name] = function(s, args, kw)
     local cs = bind(name, args, kw, { { "chars", NONE } })
-    return R.strip_chars(s, cs ~= NONE and str_arg(cs, name .. " arg") or nil, side:find("l") ~= nil, side:find("r") ~= nil)
+    return R.strip_chars(
+      s,
+      cs ~= NONE and str_arg(cs, name .. " arg") or nil,
+      side:find("l") ~= nil,
+      side:find("r") ~= nil
+    )
   end
 end
 STR.partition = function(s, args, kw)
@@ -450,12 +463,21 @@ end
 STR.replace = function(s, args, kw)
   local old, new, count = bind("replace", args, kw, { { "old" }, { "new" }, { "count", -1 } })
   local n = int_arg(count, "replace")
-  return R.filters.replace({}, s, { str_arg(old, "replace() argument 1"), str_arg(new, "replace() argument 2"), n >= 0 and n or NONE }, {})
+  return R.filters.replace({}, s, {
+    str_arg(old, "replace() argument 1"),
+    str_arg(new, "replace() argument 2"),
+    n >= 0 and n or NONE,
+  }, {})
 end
 for name, right in pairs({ split = false, rsplit = true }) do
   STR[name] = function(s, args, kw)
     local sep, maxsplit = bind(name, args, kw, { { "sep", NONE }, { "maxsplit", -1 } })
-    return split(s, sep ~= NONE and str_arg(sep, "separator") or nil, int_arg(maxsplit, name), right)
+    return split(
+      s,
+      sep ~= NONE and str_arg(sep, "separator") or nil,
+      int_arg(maxsplit, name),
+      right
+    )
   end
 end
 STR.splitlines = function(s, args, kw)
@@ -482,7 +504,12 @@ end
 local function writable(v)
   local name = R.frozen[v]
   if name then
-    raise("value", "'%s' is read-only (dashboard %s)", name, name == "args" and "arguments; use {% set args.x = ... %}" or "metadata")
+    raise(
+      "value",
+      "'%s' is read-only (dashboard %s)",
+      name,
+      name == "args" and "arguments; use {% set args.x = ... %}" or "metadata"
+    )
   end
 end
 

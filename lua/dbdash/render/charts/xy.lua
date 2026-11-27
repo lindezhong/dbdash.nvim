@@ -92,7 +92,8 @@ local function collect(rs, show, ctx, kind)
           return a.x < b.x
         end)
       end
-      series[i] = { label = s.label, group = C.color(ctx, show, i, nil, s.label), points = s.points }
+      series[i] =
+        { label = s.label, group = C.color(ctx, show, i, nil, s.label), points = s.points }
     end
     return series, xaxis
   end
@@ -246,7 +247,10 @@ function M.render(rs, show, ctx, kind)
     end
   end
   if not xlo then
-    return { lines = { "(no data to plot)" }, hl = { { row = 0, col_s = 0, col_e = 17, group = ctx.css:hl("note") } } }
+    return {
+      lines = { "(no data to plot)" },
+      hl = { { row = 0, col_s = 0, col_e = 17, group = ctx.css:hl("note") } },
+    }
   end
   if kind == "area" and not ylog then
     ylo, yhi = math.min(ylo, 0), math.max(yhi, 0)
@@ -277,7 +281,8 @@ function M.render(rs, show, ctx, kind)
   local legend_pos = C.legend_position(ctx, #series)
   local legend = {}
   for i, s in ipairs(series) do
-    legend[i] = { label = s.label, group = s.group, label_group = C.item_hl(ctx, "legend", i, "legend") }
+    legend[i] =
+      { label = s.label, group = s.group, label_group = C.item_hl(ctx, "legend", i, "legend") }
   end
   local spec = {
     xlabel = axes.xlabel,
@@ -326,7 +331,12 @@ function M.render(rs, show, ctx, kind)
   -- bubble always draw them
   local show_points, marker
   local size_range = nn(show.size_range)
-  local CURVE = { step = "before", ["step-before"] = "before", ["step-after"] = "after", ["step-middle"] = "middle" }
+  local CURVE = {
+    step = "before",
+    ["step-before"] = "before",
+    ["step-after"] = "after",
+    ["step-middle"] = "middle",
+  }
 
   local function mark(p, group)
     local row, col = canvas:cell_of(p.x, p.y)
@@ -445,7 +455,8 @@ function M.render(rs, show, ctx, kind)
     end
   end
   for k, m in ipairs(nn(show.mark_lines) or {}) do
-    local group = C.item_hl(ctx, "marks", k, "mark") or ctx.css:hl("mark", { classes = nn(m.class) and { m.class } or nil })
+    local group = C.item_hl(ctx, "marks", k, "mark")
+      or ctx.css:hl("mark", { classes = nn(m.class) and { m.class } or nil })
     local axis = nn(m.axis) or "y"
     local v = nn(m.value)
     if axis == "x" then
@@ -474,7 +485,9 @@ function M.render(rs, show, ctx, kind)
       local y = real and (ylog and log10(real) or real)
       if y then
         canvas:line(xlo, y, xhi, y, group, 2)
-        local text = nn(m.label) or (type(v) == "string" and ("%s %s"):format(v, fmt.number(real))) or nil
+        local text = nn(m.label)
+          or (type(v) == "string" and ("%s %s"):format(v, fmt.number(real)))
+          or nil
         if text then
           local row = canvas:cell_of(xhi, y)
           label_at(canvas, math.max(row - 1, 0), canvas.cols, text, group)
@@ -487,7 +500,11 @@ function M.render(rs, show, ctx, kind)
     for _, s in ipairs(series) do
       local best
       for _, p in ipairs(s.points) do
-        if not best or (what == "max" and p.real > best.real) or (what == "min" and p.real < best.real) then
+        if
+          not best
+          or (what == "max" and p.real > best.real)
+          or (what == "min" and p.real < best.real)
+        then
           best = p
         end
       end

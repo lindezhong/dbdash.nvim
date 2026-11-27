@@ -20,9 +20,14 @@ local function cps(s)
     elseif len == 2 then
       cp = (b % 0x20) * 0x40 + (s:byte(i + 1) or 0x80) % 0x40
     elseif len == 3 then
-      cp = (b % 0x10) * 0x1000 + ((s:byte(i + 1) or 0x80) % 0x40) * 0x40 + (s:byte(i + 2) or 0x80) % 0x40
+      cp = (b % 0x10) * 0x1000
+        + ((s:byte(i + 1) or 0x80) % 0x40) * 0x40
+        + (s:byte(i + 2) or 0x80) % 0x40
     else
-      cp = (b % 0x08) * 0x40000 + ((s:byte(i + 1) or 0x80) % 0x40) * 0x1000 + ((s:byte(i + 2) or 0x80) % 0x40) * 0x40 + (s:byte(i + 3) or 0x80) % 0x40
+      cp = (b % 0x08) * 0x40000
+        + ((s:byte(i + 1) or 0x80) % 0x40) * 0x1000
+        + ((s:byte(i + 2) or 0x80) % 0x40) * 0x40
+        + (s:byte(i + 3) or 0x80) % 0x40
     end
     out[#out + 1] = cp
     i = i + len
@@ -43,9 +48,20 @@ local function is_word(c)
 end
 -- ECMAScript WhiteSpace and LineTerminator.
 local SPACE = {
-  [9] = true, [10] = true, [11] = true, [12] = true, [13] = true, [32] = true, [0xA0] = true,
-  [0x1680] = true, [0x2028] = true, [0x2029] = true, [0x202F] = true, [0x205F] = true,
-  [0x3000] = true, [0xFEFF] = true,
+  [9] = true,
+  [10] = true,
+  [11] = true,
+  [12] = true,
+  [13] = true,
+  [32] = true,
+  [0xA0] = true,
+  [0x1680] = true,
+  [0x2028] = true,
+  [0x2029] = true,
+  [0x202F] = true,
+  [0x205F] = true,
+  [0x3000] = true,
+  [0xFEFF] = true,
 }
 for c = 0x2000, 0x200A do
   SPACE[c] = true
@@ -80,22 +96,56 @@ end
 -- Unicode general categories (\p{...}) --------------------------------------------------------
 
 local LONG = {
-  Letter = "L", Cased_Letter = "LC", Uppercase_Letter = "Lu", Lowercase_Letter = "Ll",
-  Titlecase_Letter = "Lt", Modifier_Letter = "Lm", Other_Letter = "Lo", Mark = "M",
-  Nonspacing_Mark = "Mn", Spacing_Mark = "Mc", Enclosing_Mark = "Me", Number = "N",
-  Decimal_Number = "Nd", Letter_Number = "Nl", Other_Number = "No", Punctuation = "P",
-  Connector_Punctuation = "Pc", Dash_Punctuation = "Pd", Open_Punctuation = "Ps",
-  Close_Punctuation = "Pe", Initial_Punctuation = "Pi", Final_Punctuation = "Pf",
-  Other_Punctuation = "Po", Symbol = "S", Math_Symbol = "Sm", Currency_Symbol = "Sc",
-  Modifier_Symbol = "Sk", Other_Symbol = "So", Separator = "Z", Space_Separator = "Zs",
-  Line_Separator = "Zl", Paragraph_Separator = "Zp", Other = "C", Control = "Cc",
-  Format = "Cf", Surrogate = "Cs", Private_Use = "Co", Unassigned = "Cn", digit = "Nd",
+  Letter = "L",
+  Cased_Letter = "LC",
+  Uppercase_Letter = "Lu",
+  Lowercase_Letter = "Ll",
+  Titlecase_Letter = "Lt",
+  Modifier_Letter = "Lm",
+  Other_Letter = "Lo",
+  Mark = "M",
+  Nonspacing_Mark = "Mn",
+  Spacing_Mark = "Mc",
+  Enclosing_Mark = "Me",
+  Number = "N",
+  Decimal_Number = "Nd",
+  Letter_Number = "Nl",
+  Other_Number = "No",
+  Punctuation = "P",
+  Connector_Punctuation = "Pc",
+  Dash_Punctuation = "Pd",
+  Open_Punctuation = "Ps",
+  Close_Punctuation = "Pe",
+  Initial_Punctuation = "Pi",
+  Final_Punctuation = "Pf",
+  Other_Punctuation = "Po",
+  Symbol = "S",
+  Math_Symbol = "Sm",
+  Currency_Symbol = "Sc",
+  Modifier_Symbol = "Sk",
+  Other_Symbol = "So",
+  Separator = "Z",
+  Space_Separator = "Zs",
+  Line_Separator = "Zl",
+  Paragraph_Separator = "Zp",
+  Other = "C",
+  Control = "Cc",
+  Format = "Cf",
+  Surrogate = "Cs",
+  Private_Use = "Co",
+  Unassigned = "Cn",
+  digit = "Nd",
   punct = "P",
 }
 local GROUPS = {
-  L = { "Lu", "Ll", "Lt", "Lm", "Lo" }, LC = { "Lu", "Ll", "Lt" }, M = { "Mn", "Mc", "Me" },
-  N = { "Nd", "Nl", "No" }, P = { "Pc", "Pd", "Ps", "Pe", "Pi", "Pf", "Po" },
-  S = { "Sm", "Sc", "Sk", "So" }, Z = { "Zs", "Zl", "Zp" }, C = { "Cc", "Cf", "Cs", "Co", "Cn" },
+  L = { "Lu", "Ll", "Lt", "Lm", "Lo" },
+  LC = { "Lu", "Ll", "Lt" },
+  M = { "Mn", "Mc", "Me" },
+  N = { "Nd", "Nl", "No" },
+  P = { "Pc", "Pd", "Ps", "Pe", "Pi", "Pf", "Po" },
+  S = { "Sm", "Sc", "Sk", "So" },
+  Z = { "Zs", "Zl", "Zp" },
+  C = { "Cc", "Cf", "Cs", "Co", "Cn" },
 }
 
 local categories

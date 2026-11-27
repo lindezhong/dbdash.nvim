@@ -254,7 +254,11 @@ function M.query(raw_url, query, opts, callback)
   end
   driver, info = prep.driver, prep.info
   if driver.produce then
-    finish(dberr.new({ driver = driver_name, phase = "config", message = driver.name .. ":// is a push source: it runs as a stream (:help dbdash-push)" }))
+    finish(dberr.new({
+      driver = driver_name,
+      phase = "config",
+      message = driver.name .. ":// is a push source: it runs as a stream (:help dbdash-push)",
+    }))
     return handle
   end
   local q_timeout = opts.timeout or info.timeout
@@ -273,7 +277,10 @@ function M.query(raw_url, query, opts, callback)
   timer = vim.uv.new_timer()
   timer:start(info.connect_timeout + q_timeout, 0, function()
     vim.schedule(function()
-      abort("timeout", ("query did not finish within %.1fs"):format((info.connect_timeout + q_timeout) / 1000))
+      abort(
+        "timeout",
+        ("query did not finish within %.1fs"):format((info.connect_timeout + q_timeout) / 1000)
+      )
     end)
   end)
 
@@ -414,7 +421,11 @@ function M.stream(raw_url, query, opts, on_item, on_end)
     end)
   end
   token:on_cancel(function(reason)
-    finish(dberr.new({ driver = driver_name, phase = "cancelled", message = "stream stopped: " .. reason }))
+    finish(dberr.new({
+      driver = driver_name,
+      phase = "cancelled",
+      message = "stream stopped: " .. reason,
+    }))
   end)
   local ok, prep = pcall(function()
     local expanded, env_err = require("dbdash.db.credentials").expand_env(raw_url)
@@ -438,7 +449,8 @@ function M.stream(raw_url, query, opts, on_item, on_end)
     finish(prep)
     return handle
   end
-  local max = require("dbdash.util.bytes").parse(require("dbdash").options.push.max_record) or 1048576
+  local max = require("dbdash.util.bytes").parse(require("dbdash").options.push.max_record)
+    or 1048576
   local function emit(value, vars)
     if done then
       return

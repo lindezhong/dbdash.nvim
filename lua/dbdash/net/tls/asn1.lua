@@ -108,7 +108,8 @@ end
 
 ---Decode PEM text to DER for the first block with `label` (or any label).
 function M.pem(text, label)
-  local pat = label and ("%-%-%-%-%-BEGIN " .. label:gsub("%-", "%%-") .. "%-%-%-%-%-(.-)%-%-%-%-%-END")
+  local pat = label
+      and ("%-%-%-%-%-BEGIN " .. label:gsub("%-", "%%-") .. "%-%-%-%-%-(.-)%-%-%-%-%-END")
     or "%-%-%-%-%-BEGIN [^%-]+%-%-%-%-%-(.-)%-%-%-%-%-END"
   local body = text:match(pat)
   if not body then

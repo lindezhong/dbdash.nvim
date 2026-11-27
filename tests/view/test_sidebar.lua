@@ -9,8 +9,15 @@ local T = MiniTest.new_set({
     pre_case = function()
       dir = vim.fs.normalize(vim.fn.tempname())
       for _, f in ipairs({
-        "a.yaml", "b.yml", "c.schema.yaml", "notes.txt", "d.dash.yaml",
-        "sub/e.yaml", "sub/deeper/f.yaml", ".hidden/g.yaml", "node_modules/h.yaml",
+        "a.yaml",
+        "b.yml",
+        "c.schema.yaml",
+        "notes.txt",
+        "d.dash.yaml",
+        "sub/e.yaml",
+        "sub/deeper/f.yaml",
+        ".hidden/g.yaml",
+        "node_modules/h.yaml",
       }) do
         vim.fn.mkdir(vim.fs.dirname(dir .. "/" .. f), "p")
         vim.fn.writefile({}, dir .. "/" .. f)
@@ -25,7 +32,10 @@ local T = MiniTest.new_set({
 
 T["entries: config files and all non-hidden directories of one level"] = function()
   dbdash.setup({})
-  eq(sidebar.entries(dir), { files = { "a.yaml", "b.yml", "d.dash.yaml" }, dirs = { "empty", "node_modules", "sub" } })
+  eq(
+    sidebar.entries(dir),
+    { files = { "a.yaml", "b.yml", "d.dash.yaml" }, dirs = { "empty", "node_modules", "sub" } }
+  )
   eq(sidebar.entries(dir .. "/sub"), { files = { "e.yaml" }, dirs = { "deeper" } })
 end
 
@@ -37,9 +47,11 @@ end
 T["dir: path, relative path, function, default cwd"] = function()
   dbdash.setup({ sidebar = { dir = dir .. "/sub" } })
   eq(sidebar.dir(), vim.fs.normalize(dir .. "/sub"))
-  dbdash.setup({ sidebar = { dir = function()
-    return dir
-  end } })
+  dbdash.setup({ sidebar = {
+    dir = function()
+      return dir
+    end,
+  } })
   eq(sidebar.dir(), dir)
   local cwd = vim.fn.getcwd()
   vim.cmd.cd(vim.fn.fnameescape(dir))
@@ -55,7 +67,17 @@ local function render()
   sidebar.render(buf)
   local lines = vim.api.nvim_buf_get_lines(buf, sidebar.HEADER_LINES, -1, false)
   local marks = {}
-  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(buf, require("dbdash.view.buffer").ns, 0, -1, { details = true })) do
+  for _, m in
+    ipairs(
+      vim.api.nvim_buf_get_extmarks(
+        buf,
+        require("dbdash.view.buffer").ns,
+        0,
+        -1,
+        { details = true }
+      )
+    )
+  do
     local line = vim.api.nvim_buf_get_lines(buf, m[2], m[2] + 1, false)[1]
     marks[#marks + 1] = { m[4].hl_group, line:sub(m[3] + 1, m[4].end_col) }
   end
@@ -64,13 +86,18 @@ end
 
 T["tree: files first, then directories; expanded ones show their content indented"] = function()
   dbdash.setup({ sidebar = { dir = dir } })
-  eq((render()), { "○ a.yaml", "○ b.yml", "○ d.dash.yaml", "▸ empty/", "▸ node_modules/", "▸ sub/" })
+  eq(
+    (render()),
+    { "○ a.yaml", "○ b.yml", "○ d.dash.yaml", "▸ empty/", "▸ node_modules/", "▸ sub/" }
+  )
   sidebar.toggle(dir, dir .. "/sub")
   sidebar.toggle(dir, dir .. "/sub/deeper")
   sidebar.toggle(dir, dir .. "/empty")
   local lines, _, buf = render()
   eq(lines, {
-    "○ a.yaml", "○ b.yml", "○ d.dash.yaml",
+    "○ a.yaml",
+    "○ b.yml",
+    "○ d.dash.yaml",
     "▾ empty/",
     "▸ node_modules/",
     "▾ sub/",
@@ -81,8 +108,14 @@ T["tree: files first, then directories; expanded ones show their content indente
   -- line -> node mapping
   local nodes = vim.b[buf].dbdash_sidebar_nodes
   -- name_col: where the name starts (after the indent and the ●/◐/○ marker)
-  eq(nodes[tostring(sidebar.HEADER_LINES + 7)], { path = dir .. "/sub/e.yaml", name_col = 2 + #"○" + 1 })
-  eq(nodes[tostring(sidebar.HEADER_LINES + 8)], { path = dir .. "/sub/deeper", dir = true, name_col = 2 })
+  eq(
+    nodes[tostring(sidebar.HEADER_LINES + 7)],
+    { path = dir .. "/sub/e.yaml", name_col = 2 + #"○" + 1 }
+  )
+  eq(
+    nodes[tostring(sidebar.HEADER_LINES + 8)],
+    { path = dir .. "/sub/deeper", dir = true, name_col = 2 }
+  )
   sidebar.toggle(dir, dir .. "/sub") -- collapse: its children are hidden, state kept
   eq(#render(), 6)
   sidebar.toggle(dir, dir .. "/sub")
@@ -100,7 +133,12 @@ T["highlights: directories with their arrow, running and idle markers"] = functi
     { "DbDashSidebarDir", "▸ deeper/" },
   })
   local links = {}
-  for _, g in ipairs({ "DbDashSidebarDir", "DbDashSidebarRunning", "DbDashSidebarPaused", "DbDashSidebarIdle" }) do
+  for _, g in ipairs({
+    "DbDashSidebarDir",
+    "DbDashSidebarRunning",
+    "DbDashSidebarPaused",
+    "DbDashSidebarIdle",
+  }) do
     links[g] = vim.api.nvim_get_hl(0, { name = g }).link
   end
   eq(links, {

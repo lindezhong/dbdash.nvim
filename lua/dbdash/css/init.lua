@@ -89,7 +89,8 @@ function M.scope(node, chart_type, sheet)
       end
       doc:set_sheet("author", rules)
     end
-    node = doc.root:append(dom.new("chart", { classes = { chart_type }, attrs = { type = chart_type } }))
+    node =
+      doc.root:append(dom.new("chart", { classes = { chart_type }, attrs = { type = chart_type } }))
   end
   -- the parts live on the node, so every render of the same chart reuses them
   node.css_parts = node.css_parts or {}

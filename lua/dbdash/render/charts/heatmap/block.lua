@@ -8,7 +8,8 @@ local M = { name = "block" }
 
 ---Black or white text, whichever contrasts with the background.
 local function text_color(hex)
-  local r, g, b = tonumber(hex:sub(2, 3), 16), tonumber(hex:sub(4, 5), 16), tonumber(hex:sub(6, 7), 16)
+  local r, g, b =
+    tonumber(hex:sub(2, 3), 16), tonumber(hex:sub(4, 5), 16), tonumber(hex:sub(6, 7), 16)
   return (0.299 * r + 0.587 * g + 0.114 * b) > 140 and "#000000" or "#ffffff"
 end
 
@@ -16,7 +17,14 @@ function M.render(rs, show, ctx)
   local g = H.grid(rs, show)
   local scale = H.colors(show, g, ctx)
   local axes = C.axes(show)
-  local spec = { title = C.nn(show.title), xlabel = axes.xlabel, ylabel = axes.ylabel, ylabels = g.ys, height = #g.ys, min_rows = #g.ys }
+  local spec = {
+    title = C.nn(show.title),
+    xlabel = axes.xlabel,
+    ylabel = axes.ylabel,
+    ylabels = g.ys,
+    height = #g.ys,
+    min_rows = #g.ys,
+  }
   local cols = ctx.frame.plot_size(ctx, spec)
   local vw = 0
   if ctx.css:get("value").display ~= "none" then -- hidden by the UA sheet
@@ -36,7 +44,8 @@ function M.render(rs, show, ctx)
         local hex = scale.color(v)
         if show_values then
           s = W.pad(fmt.value(v, axes.yformat), cw, "center")
-          group = hex:match("^#%x%x%x%x%x%x$") and ctx.color(text_color(hex) .. " on " .. hex) or ctx.color("reverse " .. hex)
+          group = hex:match("^#%x%x%x%x%x%x$") and ctx.color(text_color(hex) .. " on " .. hex)
+            or ctx.color("reverse " .. hex)
         else
           s = string.rep("█", cw)
           group = ctx.color(hex)

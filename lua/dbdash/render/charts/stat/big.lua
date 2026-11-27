@@ -137,7 +137,8 @@ local function one(rs, show, ctx, history, i)
   local vstyle, group = part("value")
   if not chart.child(stat, "value") then
     local classes = M.classes(v, show)
-    vstyle, group = ctx.css:get("value", { classes = classes }), ctx.css:hl("value", { classes = classes })
+    vstyle, group =
+      ctx.css:get("value", { classes = classes }), ctx.css:hl("value", { classes = classes })
   end
 
   local size = vstyle["font-size"]
@@ -186,7 +187,8 @@ local function one(rs, show, ctx, history, i)
     end
   end
   if part("sparkline").display ~= "none" then
-    local len = tonumber(show.sparkline_length ~= vim.NIL and show.sparkline_length or nil) or C.HISTORY
+    local len = tonumber(show.sparkline_length ~= vim.NIL and show.sparkline_length or nil)
+      or C.HISTORY
     local room = ctx.width - (pos > 0 and (W.width(table.concat(parts)) + 2) or 0)
     local spark = C.sparkline(history, math.min(len, room))
     if spark then

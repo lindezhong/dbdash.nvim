@@ -97,7 +97,9 @@ function M.encode_pairs(t)
     local values = (type(v) == "table" and vim.islist(v)) and v or { v }
     for _, x in ipairs(values) do
       if x ~= vim.NIL then
-        out[#out + 1] = M.encode(n) .. "=" .. M.encode(type(x) == "table" and vim.json.encode(x) or tostring(x))
+        out[#out + 1] = M.encode(n)
+          .. "="
+          .. M.encode(type(x) == "table" and vim.json.encode(x) or tostring(x))
       end
     end
   end
@@ -200,7 +202,8 @@ end
 ---Send one request on a new connection.
 local function send_once(req, url, o)
   local first = origin(url) == o.first_origin
-  local sock = socket.connect(url.host, url.port, { connect_timeout = o.connect_timeout, timeout = o.timeout })
+  local sock =
+    socket.connect(url.host, url.port, { connect_timeout = o.connect_timeout, timeout = o.timeout })
   local ok, res = pcall(function()
     if url.scheme == "https" then
       local tls = o.tls or {}
@@ -213,7 +216,8 @@ local function send_once(req, url, o)
         alpn = { "http/1.1" },
       })
     end
-    local lines = { ("%s %s%s HTTP/1.1"):format(req.method, url.path, url.query and ("?" .. url.query) or "") }
+    local lines =
+      { ("%s %s%s HTTP/1.1"):format(req.method, url.path, url.query and ("?" .. url.query) or "") }
     local have = {}
     for name, value in pairs(req.headers) do
       have[name:lower()] = true
@@ -249,10 +253,19 @@ local function send_once(req, url, o)
       o.jar:store(set_cookie, url)
     end
     if (headers["content-encoding"] or "identity"):lower() ~= "identity" then
-      dberr.raise("query", ("compressed responses (%s) are not supported"):format(headers["content-encoding"]))
+      dberr.raise(
+        "query",
+        ("compressed responses (%s) are not supported"):format(headers["content-encoding"])
+      )
     end
     local body = read_body(sock, req.method, status, headers, o.max_body or M.MAX_BODY)
-    return { status = status, reason = reason, headers = headers, body = body, url = M.format_url(url) }
+    return {
+      status = status,
+      reason = reason,
+      headers = headers,
+      body = body,
+      url = M.format_url(url),
+    }
   end)
   sock:close()
   if not ok then
@@ -280,7 +293,11 @@ function M.request(req, o)
     end
     url = M.resolve(url, loc)
     if res.status == 303 or ((res.status == 301 or res.status == 302) and req.method == "POST") then
-      req = vim.tbl_extend("force", req, { method = req.method == "HEAD" and "HEAD" or "GET", body = false })
+      req = vim.tbl_extend(
+        "force",
+        req,
+        { method = req.method == "HEAD" and "HEAD" or "GET", body = false }
+      )
       req.body = nil
       local headers = {}
       for k, v in pairs(req.headers) do

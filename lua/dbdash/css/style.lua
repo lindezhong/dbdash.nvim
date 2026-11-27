@@ -159,11 +159,21 @@ local function used_pseudos(doc)
       end
     end
   end
-  doc.pseudo_cache = { key = key, n = #key, list = list, attrs = attrs, classes = classes, ids = ids }
+  doc.pseudo_cache =
+    { key = key, n = #key, list = list, attrs = attrs, classes = classes, ids = ids }
   return list, attrs, classes, ids
 end
 
-local function sharing_key(doc, n, parent_computed, pseudos, scoped, used_attrs, used_classes, used_ids)
+local function sharing_key(
+  doc,
+  n,
+  parent_computed,
+  pseudos,
+  scoped,
+  used_attrs,
+  used_classes,
+  used_ids
+)
   -- only ids, classes and attributes some selector tests can tell elements apart
   local key = tostring(parent_computed) .. "\0" .. n.tag
   if n.id and used_ids[n.id] then
@@ -227,10 +237,26 @@ local function restyle_subtree(doc, n, parent_computed, stats)
       end
     end
     local pseudos, attrs, classes, ids = used_pseudos(doc)
-    share = { cache = {}, pseudos = pseudos, attrs = attrs, classes = classes, ids = ids, scoped = scoped }
+    share = {
+      cache = {},
+      pseudos = pseudos,
+      attrs = attrs,
+      classes = classes,
+      ids = ids,
+      scoped = scoped,
+    }
     stats.share = share
   end
-  local key = sharing_key(doc, n, parent_computed, share.pseudos, share.scoped, share.attrs, share.classes, share.ids)
+  local key = sharing_key(
+    doc,
+    n,
+    parent_computed,
+    share.pseudos,
+    share.scoped,
+    share.attrs,
+    share.classes,
+    share.ids
+  )
   local hit = share.cache[key]
   local computed, matched
   if hit then

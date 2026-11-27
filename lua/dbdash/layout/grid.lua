@@ -74,7 +74,8 @@ function M.parse_track(v, axis)
     end
     local a, b = s:match("^minmax%(%s*([^,]-)%s*,%s*([^,]-)%s*%)$")
     if a then
-      local lo = a == "auto" and (axis == "rows" and "min" or { "len", M.MIN_COL }) or parse_size(a, axis)
+      local lo = a == "auto" and (axis == "rows" and "min" or { "len", M.MIN_COL })
+        or parse_size(a, axis)
       local hi = b == "auto" and (axis == "rows" and "max" or { "fr", 1 }) or parse_size(b, axis)
       if not lo or not hi or (type(lo) == "table" and lo[1] == "fr") then
         return nil, ("invalid track %q (minmax(min, max): the min cannot be fr)"):format(v)
@@ -208,7 +209,8 @@ function M.parse_areas(rows)
         end
       end
     end
-    areas[n] = { row = a.row, col = a.col, row_span = a.last_row - a.row + 1, span = a.last_col - a.col + 1 }
+    areas[n] =
+      { row = a.row, col = a.col, row_span = a.last_row - a.row + 1, span = a.last_col - a.col + 1 }
   end
   return areas, width
 end
@@ -273,7 +275,14 @@ function M.place(items, ncols, areas)
     end
     if p then
       if p.col + p.span - 1 > ncols then
-        return fail(i, it.area and "area" or "column", "column %d + span %d is past the %d columns", p.col, p.span, ncols)
+        return fail(
+          i,
+          it.area and "area" or "column",
+          "column %d + span %d is past the %d columns",
+          p.col,
+          p.span,
+          ncols
+        )
       end
       if not free(p.row, p.col, p.row_span, p.span) then
         local other = used[p.row] and used[p.row][p.col]
@@ -293,7 +302,14 @@ function M.place(items, ncols, areas)
         local p
         if it.column then
           if it.column + cs - 1 > ncols then
-            return fail(i, "column", "column %d + span %d is past the %d columns", it.column, cs, ncols)
+            return fail(
+              i,
+              "column",
+              "column %d + span %d is past the %d columns",
+              it.column,
+              cs,
+              ncols
+            )
           end
           local r = 1
           while not free(r, it.column, rs, cs) do
@@ -570,7 +586,11 @@ function M.from_styles(container, items)
     return nil, { field = "grid-template-columns", message = err }
   end
   if area_cols and #columns ~= area_cols then
-    return nil, { field = "grid-template-columns", message = ("%d columns, but grid-template-areas has %d"):format(#columns, area_cols) }
+    return nil,
+      {
+        field = "grid-template-columns",
+        message = ("%d columns, but grid-template-areas has %d"):format(#columns, area_cols),
+      }
   end
   local rows = {}
   if container["grid-template-rows"] then
@@ -587,14 +607,21 @@ function M.from_styles(container, items)
   for i, c in ipairs(items) do
     local row, row_span = grid_line(c["grid-row"])
     local column, span = grid_line(c["grid-column"])
-    list[i] = { area = c["grid-area"], row = row, row_span = row_span, column = column, span = span }
+    list[i] =
+      { area = c["grid-area"], row = row, row_span = row_span, column = column, span = span }
     if list[i].area and (row or column) then
-      return nil, { index = i, field = "grid-area", message = "grid-area and grid-row / grid-column cannot be used together" }
+      return nil,
+        {
+          index = i,
+          field = "grid-area",
+          message = "grid-area and grid-row / grid-column cannot be used together",
+        }
     end
   end
   local places, perr = M.place(list, #columns, areas)
   if not places then
-    local field = ({ area = "grid-area", row = "grid-row", column = "grid-column" })[perr.field] or perr.field
+    local field = ({ area = "grid-area", row = "grid-row", column = "grid-column" })[perr.field]
+      or perr.field
     return nil, { index = perr.index, field = field, message = perr.message }
   end
   return {

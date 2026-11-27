@@ -37,7 +37,10 @@ T["filter and global outputs"] = function()
     { "{{ n|sql_limit }}", "10" },
     { "{{ '25'|sql_limit }}", "25" },
     { "[{{ nothing|sql_limit }}]", "[]" },
-    { "{{ sql_case(conds, \"'junior'\") }}", "CASE WHEN age > 30 THEN 'senior' WHEN age > 20 THEN 'mid' ELSE 'junior' END" },
+    {
+      "{{ sql_case(conds, \"'junior'\") }}",
+      "CASE WHEN age > 30 THEN 'senior' WHEN age > 20 THEN 'mid' ELSE 'junior' END",
+    },
     { "{{ sql_case({}, 'x') }}", "x" },
     { "{{ sql_case({}) }}", "NULL" },
   }
@@ -73,15 +76,24 @@ end
 
 T["autoescape renders dialect literals"] = function()
   local src = "WHERE name = {{ name }} AND id IN {{ ids }} AND x = {{ nothing }} AND n = {{ n }}"
-  eq(render(src, ctx, "postgres", true), "WHERE name = 'it''s' AND id IN (1, 2, 3) AND x = NULL AND n = 10")
+  eq(
+    render(src, ctx, "postgres", true),
+    "WHERE name = 'it''s' AND id IN (1, 2, 3) AND x = NULL AND n = 10"
+  )
   eq(render("{{ 'col'|safe }} {{ ids|join(',')|safe }}", ctx, "postgres", true), "col 1,2,3")
   eq(render("{{ name }}", ctx, "postgres", false), "it's")
   -- SQL filter output is SQL: not quoted again
-  eq(render("x IN {{ ids|sql_in }} AND y = {{ name|sql_quote }}", ctx, "postgres", true), "x IN (1, 2, 3) AND y = 'it''s'")
+  eq(
+    render("x IN {{ ids|sql_in }} AND y = {{ name|sql_quote }}", ctx, "postgres", true),
+    "x IN (1, 2, 3) AND y = 'it''s'"
+  )
 end
 
 T["floats: 2.0 stays 2.0 in SQL; sql_limit takes an integral float"] = function()
-  eq(render("{{ (4 / 2) | sql_quote }} {{ 2.5 | sql_quote }} {{ [1.0, 2] | sql_in }}"), "2.0 2.5 (1.0, 2)")
+  eq(
+    render("{{ (4 / 2) | sql_quote }} {{ 2.5 | sql_quote }} {{ [1.0, 2] | sql_in }}"),
+    "2.0 2.5 (1.0, 2)"
+  )
   eq(render("{{ 4 / 2 }}", nil, "sqlite", true), "2.0")
   eq(render("{{ (8 / 2) | sql_limit }}"), "4")
   eq(render("{{ 2.5 | sql_limit }}"):find("Invalid LIMIT") ~= nil, true)
@@ -96,16 +108,25 @@ T["autoescape with blocks: template text stays SQL, values are literals"] = func
     " {% filter upper %}and x = {{ name }}{% endfilter %}",
     " {% autoescape false %}{{ name }}{% endautoescape %} {{ name }}",
   })
-  eq(render(src, ctx, "postgres", true), [[SELECT "t"."a" FROM t WHERE name = 10 AND X = 'IT''S' it's 'it''s']])
+  eq(
+    render(src, ctx, "postgres", true),
+    [[SELECT "t"."a" FROM t WHERE name = 10 AND X = 'IT''S' it's 'it''s']]
+  )
 end
 
 T["escape in SQL is the dialect's literal; HTML filters stay under SQL autoescape"] = function()
-  eq(render("{{ name | e }} {{ name | escape }} {{ 'x' | safe | forceescape }}", ctx, "postgres"), "'it''s' 'it''s' 'x'")
+  eq(
+    render("{{ name | e }} {{ name | escape }} {{ 'x' | safe | forceescape }}", ctx, "postgres"),
+    "'it''s' 'it''s' 'x'"
+  )
   eq(render("{{ 'é' | e }}", ctx, "mssql"), "N'é'")
   -- The output of escape is not escaped again by autoescape.
   eq(render("{{ name | e }}", ctx, "postgres", true), "'it''s'")
   eq(render("{{ {'k': name} | xmlattr }}", ctx, "postgres", true), [[' k="it&#39;s"']])
-  eq(render("{{ 'see www.example.com' | urlize }}", ctx, "postgres", true), [['see <a href="https://www.example.com" rel="noopener">www.example.com</a>']])
+  eq(
+    render("{{ 'see www.example.com' | urlize }}", ctx, "postgres", true),
+    [['see <a href="https://www.example.com" rel="noopener">www.example.com</a>']]
+  )
   -- Outside SQL (no dialect) escape is HTML, as in Jinja.
   eq(template.render("{{ '<a>' | e }}", {}), "&lt;a&gt;")
 end
@@ -113,11 +134,15 @@ end
 T["shell_quote and the http dialect: values as shell words of a curl command"] = function()
   local curl = require("dbdash.net.curl")
   local vars = { q = "it's a test", n = 5, ids = { 1, "a b" } }
-  eq(render("curl /s -G --data-urlencode q={{ q | shell_quote }}", vars, "sqlite"), [[curl /s -G --data-urlencode q='it'\''s a test']])
+  eq(
+    render("curl /s -G --data-urlencode q={{ q | shell_quote }}", vars, "sqlite"),
+    [[curl /s -G --data-urlencode q='it'\''s a test']]
+  )
   eq(render("{{ ids | shell_quote }}", vars, "postgres"), [['1' 'a b']])
   eq(render("{{ none | shell_quote }}", { none = vim.NIL }, "sqlite"), "''")
   -- autoescape of an http(s):// query: every {{ }} is one word; numbers stay numbers
-  local out = render("curl /s -d n={{ n }} --data-urlencode q={{ q }} {{ ids }}", vars, "http", true)
+  local out =
+    render("curl /s -d n={{ n }} --data-urlencode q={{ q }} {{ ids }}", vars, "http", true)
   eq(out, [[curl /s -d n=5 --data-urlencode q='it'\''s a test' 1 'a b']])
   out = render("curl /s -d n={{ n }} --data-urlencode q={{ q }}", vars, "http", true)
   eq(curl.parse(out).body, "n=5&q=it%27s%20a%20test")

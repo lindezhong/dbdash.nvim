@@ -22,12 +22,16 @@ local function times(kind, size)
   local gen = H.SCENARIOS[kind]
   local r0, show = gen(size, 0)
   local chart
-  local first, mb = H.measure(function()
-    render_into(chart, r0, show)
-  end, 5, function()
-    local _
-    _, chart = H.chart(kind)
-  end)
+  local first, mb = H.measure(
+    function()
+      render_into(chart, r0, show)
+    end,
+    5,
+    function()
+      local _
+      _, chart = H.chart(kind)
+    end
+  )
   local doc
   doc, chart = H.chart(kind)
   render_into(chart, r0, show)
@@ -38,28 +42,62 @@ local function times(kind, size)
   local new = H.measure(function(i)
     render_into(chart, results[i], show)
   end, 5)
-  local rule = H.measure(function()
-    render_into(chart, results[5], show)
-  end, 5, function(i)
-    doc:set_sheet("runtime", assert(parser.sheet({ ["*"] = { ["font-style"] = i % 2 == 0 and "italic" or "normal" } })))
-  end)
+  local rule = H.measure(
+    function()
+      render_into(chart, results[5], show)
+    end,
+    5,
+    function(i)
+      doc:set_sheet(
+        "runtime",
+        assert(parser.sheet({ ["*"] = { ["font-style"] = i % 2 == 0 and "italic" or "normal" } }))
+      )
+    end
+  )
   return { first = first, new = new, rule = rule, mb = mb }
 end
 
 -- Medians measured before the charts' DOM (commit 4837abb), on the development machine:
 -- { first, new, rule } in ms per scenario and size. The budgets are BUDGET x these.
 local BASELINE = {
-  table = { [100] = { first = 4.1, new = 2.1, rule = 3.1 }, [1000] = { first = 52.8, new = 33.7, rule = 46.9 } },
-  text = { [100] = { first = 1.1, new = 0.9, rule = 0.9 }, [1000] = { first = 11.4, new = 8.7, rule = 8.7 } },
-  bar = { [12] = { first = 1.4, new = 0.9, rule = 1.1 }, [100] = { first = 7.1, new = 6.9, rule = 6.4 } },
-  line = { [200] = { first = 1.5, new = 1.1, rule = 1.2 }, [2000] = { first = 6.3, new = 6.0, rule = 5.7 } },
-  scatter = { [200] = { first = 2.1, new = 0.8, rule = 1.1 }, [2000] = { first = 2.1, new = 1.7, rule = 1.8 } },
-  pie = { [8] = { first = 0.7, new = 0.3, rule = 0.4 }, [50] = { first = 1.7, new = 1.0, rule = 1.2 } },
+  table = {
+    [100] = { first = 4.1, new = 2.1, rule = 3.1 },
+    [1000] = { first = 52.8, new = 33.7, rule = 46.9 },
+  },
+  text = {
+    [100] = { first = 1.1, new = 0.9, rule = 0.9 },
+    [1000] = { first = 11.4, new = 8.7, rule = 8.7 },
+  },
+  bar = {
+    [12] = { first = 1.4, new = 0.9, rule = 1.1 },
+    [100] = { first = 7.1, new = 6.9, rule = 6.4 },
+  },
+  line = {
+    [200] = { first = 1.5, new = 1.1, rule = 1.2 },
+    [2000] = { first = 6.3, new = 6.0, rule = 5.7 },
+  },
+  scatter = {
+    [200] = { first = 2.1, new = 0.8, rule = 1.1 },
+    [2000] = { first = 2.1, new = 1.7, rule = 1.8 },
+  },
+  pie = {
+    [8] = { first = 0.7, new = 0.3, rule = 0.4 },
+    [50] = { first = 1.7, new = 1.0, rule = 1.2 },
+  },
   -- boxplot 50: first measured 16.8 / 13.4 / 15.0, not reproducible: the same code (4837abb)
   -- measured 31.6 ms for a new result on later runs on this machine, so that is the baseline
-  boxplot = { [5] = { first = 1.4, new = 0.8, rule = 0.8 }, [50] = { first = 31.6, new = 31.6, rule = 31.6 } },
-  heatmap = { [24] = { first = 1.4, new = 0.9, rule = 1.0 }, [100] = { first = 9.9, new = 9.3, rule = 9.9 } },
-  stat = { [1] = { first = 0.1, new = 0.1, rule = 0.2 }, [6] = { first = 0.5, new = 0.2, rule = 0.4 } },
+  boxplot = {
+    [5] = { first = 1.4, new = 0.8, rule = 0.8 },
+    [50] = { first = 31.6, new = 31.6, rule = 31.6 },
+  },
+  heatmap = {
+    [24] = { first = 1.4, new = 0.9, rule = 1.0 },
+    [100] = { first = 9.9, new = 9.3, rule = 9.9 },
+  },
+  stat = {
+    [1] = { first = 0.1, new = 0.1, rule = 0.2 },
+    [6] = { first = 0.5, new = 0.2, rule = 0.4 },
+  },
 }
 -- no-change redraw of a one-chart dashboard with a 1000-row table, before: 21.2 ms
 local BUDGET = 3
@@ -73,8 +111,16 @@ for kind, sizes in pairs(H.SIZES) do
     for _, size in ipairs(sizes) do
       local t = times(kind, size)
       got[size] = t
-      MiniTest.add_note(("%s %d: first %.1f ms (%.1f MB), new result %.1f ms, after a rule %.1f ms"):format(
-        kind, size, t.first, t.mb, t.new, t.rule))
+      MiniTest.add_note(
+        ("%s %d: first %.1f ms (%.1f MB), new result %.1f ms, after a rule %.1f ms"):format(
+          kind,
+          size,
+          t.first,
+          t.mb,
+          t.new,
+          t.rule
+        )
+      )
       local base = (BASELINE[kind] or {})[size]
       if base then
         for _, op in ipairs({ "first", "new", "rule" }) do

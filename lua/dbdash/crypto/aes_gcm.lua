@@ -4,7 +4,8 @@ local bit = require("bit")
 local util = require("dbdash.crypto.util")
 local aes = require("dbdash.crypto.aes")
 
-local band, bor, bxor, lshift, rshift, tobit = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift, bit.tobit
+local band, bor, bxor, lshift, rshift, tobit =
+  bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift, bit.tobit
 local expand, encrypt_words, word = aes.expand, aes.encrypt_words, aes.word
 
 local M = {}
@@ -48,7 +49,16 @@ local function ghash(h, aad, ct)
       if #blk < 16 then
         blk = blk .. string.rep("\0", 16 - #blk)
       end
-      y0, y1, y2, y3 = gmul(bxor(y0, word(blk, 1)), bxor(y1, word(blk, 5)), bxor(y2, word(blk, 9)), bxor(y3, word(blk, 13)), h0, h1, h2, h3)
+      y0, y1, y2, y3 = gmul(
+        bxor(y0, word(blk, 1)),
+        bxor(y1, word(blk, 5)),
+        bxor(y2, word(blk, 9)),
+        bxor(y3, word(blk, 13)),
+        h0,
+        h1,
+        h2,
+        h3
+      )
     end
   end
   absorb(aad)
@@ -59,7 +69,10 @@ local function ghash(h, aad, ct)
     bxor(y1, tobit(la % 4294967296)),
     bxor(y2, tobit(math.floor(lc / 4294967296))),
     bxor(y3, tobit(lc % 4294967296)),
-    h0, h1, h2, h3
+    h0,
+    h1,
+    h2,
+    h3
   )
   return util.be32(y0) .. util.be32(y1) .. util.be32(y2) .. util.be32(y3)
 end

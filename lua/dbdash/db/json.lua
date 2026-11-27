@@ -49,7 +49,8 @@ function M.parse(s)
     i = s:match("^[ \t\r\n]*()", i)
   end
   local value
-  local ESC = { ['"'] = '"', ["\\"] = "\\", ["/"] = "/", b = "\b", f = "\f", n = "\n", r = "\r", t = "\t" }
+  local ESC =
+    { ['"'] = '"', ["\\"] = "\\", ["/"] = "/", b = "\b", f = "\f", n = "\n", r = "\r", t = "\t" }
   local function str()
     i = i + 1
     local out = {}
@@ -175,12 +176,16 @@ function M.parse(s)
 end
 
 -- Boxes that keep JSON number kinds for BSON encoding.
-local Double = { __tostring = function(d)
-  return tostring(d.v)
-end }
-local Int64 = { __tostring = function(d)
-  return d.s
-end }
+local Double = {
+  __tostring = function(d)
+    return tostring(d.v)
+  end,
+}
+local Int64 = {
+  __tostring = function(d)
+    return d.s
+  end,
+}
 
 function M.double(v)
   return setmetatable({ v = v }, Double)

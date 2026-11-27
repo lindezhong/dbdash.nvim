@@ -34,8 +34,14 @@ T["golden: narrow window shrinks widest columns"] = function()
 end
 
 T["golden: no border, row lines"] = function()
-  helpers.golden("table/box/no_border", out(fx.departments(), {}, nil, { table = { border = "none" } }))
-  helpers.golden("table/box/show_lines", out(fx.departments(), {}, nil, { rule = { display = "block" } }))
+  helpers.golden(
+    "table/box/no_border",
+    out(fx.departments(), {}, nil, { table = { border = "none" } })
+  )
+  helpers.golden(
+    "table/box/show_lines",
+    out(fx.departments(), {}, nil, { rule = { display = "block" } })
+  )
 end
 
 T["golden: empty and truncated results"] = function()
@@ -46,7 +52,10 @@ T["golden: empty and truncated results"] = function()
 end
 
 T["false is shown as false, not NULL"] = function()
-  local rs = resultset.new({ { name = "b", type = "boolean" } }, { { false }, { true }, { vim.NIL } })
+  local rs = resultset.new(
+    { { name = "b", type = "boolean" } },
+    { { false }, { true }, { vim.NIL } }
+  )
   local text = table.concat(out(rs, {}).lines, "\n")
   eq({ text:find("false", 1, true) ~= nil, text:find("true", 1, true) ~= nil }, { true, true })
   local _, nulls = text:gsub("NULL", "")
@@ -117,14 +126,28 @@ end
 T["cell width and height: column_list and cell { width, height }"] = function()
   local rs = resultset.new({ { name = "v", type = "string" } }, { { "one two three four five" } })
   local o = out(rs, { column_list = { { column = "v", width = 7, height = 2 } } })
-  eq({ o.lines[4], o.lines[5], o.lines[6] }, { "│ one two │", "│ three…  │", "└─────────┘" })
+  eq(
+    { o.lines[4], o.lines[5], o.lines[6] },
+    { "│ one two │", "│ three…  │", "└─────────┘" }
+  )
   o = out(rs, {}, nil, { cell = { width = 9, height = 1 } })
-  eq({ o.lines[4], o.lines[5] }, { "│ one two…  │", "└───────────┘" })
+  eq(
+    { o.lines[4], o.lines[5] },
+    { "│ one two…  │", "└───────────┘" }
+  )
 end
 
 T["a wrapped row keeps its colors on every line"] = function()
-  local rs = resultset.new({ { name = "n", type = "integer" }, { name = "t", type = "string" } }, { { 9, "aa bb" } })
-  local o = out(rs, { column_list = { { column = "n", thresholds = { { value = 5, class = "hot" } } }, { column = "t", width = 2 } } }, nil, { ["cell.hot"] = { color = "#ff0000" } })
+  local rs = resultset.new(
+    { { name = "n", type = "integer" }, { name = "t", type = "string" } },
+    { { 9, "aa bb" } }
+  )
+  local o = out(rs, {
+    column_list = {
+      { column = "n", thresholds = { { value = 5, class = "hot" } } },
+      { column = "t", width = 2 },
+    },
+  }, nil, { ["cell.hot"] = { color = "#ff0000" } })
   local rows = {}
   for _, h in ipairs(o.hl) do
     if h.group:match("^DbDashCss_") then
@@ -140,19 +163,44 @@ T["CSS: border styles, padding, align, vertical-align, stripes, text-overflow"] 
     { { "a", 1 }, { "bb", 22 } }
   )
   local o = out(rs, {}, nil, { table = { border = "rounded" } })
-  eq({ o.lines[1], o.lines[3], o.lines[6] }, { "╭────┬────╮", "├────┼────┤", "╰────┴────╯" })
+  eq({ o.lines[1], o.lines[3], o.lines[6] }, {
+    "╭────┬────╮",
+    "├────┼────┤",
+    "╰────┴────╯",
+  })
   o = out(rs, {}, nil, { table = { border = "ascii" }, cell = { padding = 0 } })
   eq({ o.lines[1], o.lines[2], o.lines[4] }, { "+--+--+", "|k | n|", "|a | 1|" })
   o = out(rs, {}, nil, { table = { border = "none" } })
   eq(o.lines[1], "k    n")
-  o = out(rs, { column_list = { { column = "k", align = "right" }, { column = "n", align = "center", width = 5 } } })
+  o = out(rs, {
+    column_list = {
+      { column = "k", align = "right" },
+      { column = "n", align = "center", width = 5 },
+    },
+  })
   eq(o.lines[4], "│  a │   1   │")
   -- vertical_align: the short cell sits in the middle of a three-line row
-  rs = resultset.new({ { name = "a", type = "string" }, { name = "b", type = "string" } }, { { "x", "one two three" } })
-  o = out(rs, { column_list = { "a", { column = "b", width = 5 } } }, nil, { cell = { ["vertical-align"] = "middle" } })
-  eq({ o.lines[4], o.lines[5], o.lines[6] }, { "│   │ one   │", "│ x │ two   │", "│   │ three │" })
+  rs = resultset.new(
+    { { name = "a", type = "string" }, { name = "b", type = "string" } },
+    { { "x", "one two three" } }
+  )
+  o = out(
+    rs,
+    { column_list = { "a", { column = "b", width = 5 } } },
+    nil,
+    { cell = { ["vertical-align"] = "middle" } }
+  )
+  eq(
+    { o.lines[4], o.lines[5], o.lines[6] },
+    { "│   │ one   │", "│ x │ two   │", "│   │ three │" }
+  )
   -- text-overflow
-  o = out(rs, { column_list = { "a", { column = "b", width = 6 } } }, nil, { cell = { ["white-space"] = "nowrap", ["text-overflow"] = "..." } })
+  o = out(
+    rs,
+    { column_list = { "a", { column = "b", width = 6 } } },
+    nil,
+    { cell = { ["white-space"] = "nowrap", ["text-overflow"] = "..." } }
+  )
   eq(o.lines[4], "│ x │ one... │")
   -- stripes: even rows get a background below the other colors
   rs = resultset.new({ { name = "a", type = "integer" } }, { { 1 }, { 2 } })
@@ -170,10 +218,18 @@ T["DataTables-like: sort, rows shown, column format and color, row thresholds, c
     { { "a", 1234.5 }, { "b", vim.NIL }, { "c", 99 } }
   )
   local o = out(rs, { sort = { column = "n", order = "desc" } })
-  eq({ o.lines[4]:sub(1, 6), o.lines[5]:sub(1, 6), o.lines[6]:sub(1, 6) }, { "│ a ", "│ c ", "│ b " })
+  eq(
+    { o.lines[4]:sub(1, 6), o.lines[5]:sub(1, 6), o.lines[6]:sub(1, 6) },
+    { "│ a ", "│ c ", "│ b " }
+  )
   o = out(rs, { sort = "k" }, nil, { table = { ["line-clamp"] = 1 } })
   eq(o.lines[#o.lines], "… 2 more rows (table line-clamp)")
-  o = out(rs, { column_list = { "k", { column = "n", format = "{:,.1f}" } } }, nil, { ["cell[column=n]"] = { color = "Special" } })
+  o = out(
+    rs,
+    { column_list = { "k", { column = "n", format = "{:,.1f}" } } },
+    nil,
+    { ["cell[column=n]"] = { color = "Special" } }
+  )
   eq(o.lines[4], "│ a │ 1,234.5 │")
   local special = vim.tbl_filter(function(h)
     return h.group == "Special"

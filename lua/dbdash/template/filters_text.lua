@@ -107,8 +107,10 @@ F.format = function(_, v, args, kw)
 end
 
 F.indent = function(_, v, args, kw)
-  local width, first, blank = bind("indent", args, kw, { { "width", 4 }, { "first", false }, { "blank", false } })
-  local ind = (type(width) == "string" or R.is_safe(width)) and R.str(width) or (" "):rep((R.num(width)))
+  local width, first, blank =
+    bind("indent", args, kw, { { "width", 4 }, { "first", false }, { "blank", false } })
+  local ind = (type(width) == "string" or R.is_safe(width)) and R.str(width)
+    or (" "):rep((R.num(width)))
   local s = R.str(v) .. "\n"
   local lines = str_method("splitlines", s, {}, {})
   local rv
@@ -210,18 +212,34 @@ end
 
 -- striptags ---------------------------------------------------------------------------------
 
-local ENTITIES = { amp = "&", lt = "<", gt = ">", quot = '"', apos = "'", nbsp = "\194\160", raquo = "»", laquo = "«", copy = "©", reg = "®", hellip = "…", mdash = "—", ndash = "–" }
+local ENTITIES = {
+  amp = "&",
+  lt = "<",
+  gt = ">",
+  quot = '"',
+  apos = "'",
+  nbsp = "\194\160",
+  raquo = "»",
+  laquo = "«",
+  copy = "©",
+  reg = "®",
+  hellip = "…",
+  mdash = "—",
+  ndash = "–",
+}
 
 local function unescape(s)
-  return (s:gsub("&(#?[xX]?)(%w+);", function(kind, body)
-    if kind == "" then
-      return ENTITIES[body]
-    end
-    local n = kind:lower() == "#x" and tonumber(body, 16) or tonumber(body)
-    if n then
-      return require("dbdash.template.lexer").utf8_char(n)
-    end
-  end))
+  return (
+    s:gsub("&(#?[xX]?)(%w+);", function(kind, body)
+      if kind == "" then
+        return ENTITIES[body]
+      end
+      local n = kind:lower() == "#x" and tonumber(body, 16) or tonumber(body)
+      if n then
+        return require("dbdash.template.lexer").utf8_char(n)
+      end
+    end)
+  )
 end
 
 F.striptags = function(_, v, args, kw)
@@ -267,7 +285,12 @@ F.title = function(_, v, args, kw)
 end
 
 F.truncate = function(_, v, args, kw)
-  local length, killwords, ending, leeway = bind("truncate", args, kw, { { "length", 255 }, { "killwords", false }, { "end", "..." }, { "leeway", NONE } })
+  local length, killwords, ending, leeway = bind(
+    "truncate",
+    args,
+    kw,
+    { { "length", 255 }, { "killwords", false }, { "end", "..." }, { "leeway", NONE } }
+  )
   local s = R.str(v)
   length = (R.num(length))
   ending = R.str(ending)
@@ -362,11 +385,17 @@ local function wrap(text, width, break_long, break_hyphens)
 end
 
 F.wordwrap = function(_, v, args, kw)
-  local width, break_long, wrapstring, break_hyphens = bind("wordwrap", args, kw, { { "width", 79 }, { "break_long_words", true }, { "wrapstring", NONE }, { "break_on_hyphens", true } })
+  local width, break_long, wrapstring, break_hyphens = bind("wordwrap", args, kw, {
+    { "width", 79 },
+    { "break_long_words", true },
+    { "wrapstring", NONE },
+    { "break_on_hyphens", true },
+  })
   local sep = wrapstring == NONE and "\n" or R.str(wrapstring)
   local paragraphs = {}
   for _, line in ipairs(str_method("splitlines", R.str(v), {}, {})) do
-    paragraphs[#paragraphs + 1] = table.concat(wrap(line, (R.num(width)), R.truthy(break_long), R.truthy(break_hyphens)), sep)
+    paragraphs[#paragraphs + 1] =
+      table.concat(wrap(line, (R.num(width)), R.truthy(break_long), R.truthy(break_hyphens)), sep)
   end
   return table.concat(paragraphs, sep)
 end
@@ -411,7 +440,16 @@ F.urlencode = function(_, v, args, kw)
   return table.concat(parts, "&")
 end
 
-local BASIC_TLD = { com = true, net = true, int = true, edu = true, gov = true, org = true, info = true, mil = true }
+local BASIC_TLD = {
+  com = true,
+  net = true,
+  int = true,
+  edu = true,
+  gov = true,
+  org = true,
+  info = true,
+  mil = true,
+}
 
 ---Jinja's _http_re: http(s)://host or www.host, or a bare domain with a basic TLD; then
 ---an optional port, path, query and fragment.
@@ -426,7 +464,11 @@ local function is_http(s)
   if scheme or s:sub(1, 4) == "www." then
     local h = scheme and host or host
     local tld = h:match("%.([^.]+)$") or (scheme and nil)
-    if tld and (tld:match("^%a%a+$") and #tld <= 63 or tld:match("^xn%-%-")) and h:match("^[%w%%%-%.]+$") then
+    if
+      tld
+      and (tld:match("^%a%a+$") and #tld <= 63 or tld:match("^xn%-%-"))
+      and h:match("^[%w%%%-%.]+$")
+    then
       ok = true
     elseif scheme and h:match("^%d+%.%d+%.%d+%.%d+$") then
       ok = true
@@ -450,7 +492,13 @@ local function is_email(s)
 end
 
 F.urlize = function(env, v, args, kw)
-  local limit, nofollow, target, rel, extra = bind("urlize", args, kw, { { "trim_url_limit", NONE }, { "nofollow", false }, { "target", NONE }, { "rel", NONE }, { "extra_schemes", NONE } })
+  local limit, nofollow, target, rel, extra = bind("urlize", args, kw, {
+    { "trim_url_limit", NONE },
+    { "nofollow", false },
+    { "target", NONE },
+    { "rel", NONE },
+    { "extra_schemes", NONE },
+  })
   local rels = {}
   for r in (rel ~= NONE and R.str(rel) or ""):gmatch("%S+") do
     rels[r] = true
@@ -516,7 +564,13 @@ F.urlize = function(env, v, args, kw)
         middle = ('<a href="%s"%s%s>%s</a>'):format(href, rel_attr, target_attr, trim(middle))
       elseif middle:sub(1, 7) == "mailto:" and is_email(middle:sub(8)) then
         middle = ('<a href="%s">%s</a>'):format(middle, middle:sub(8))
-      elseif middle:find("@", 1, true) and middle:sub(1, 4) ~= "www." and middle:sub(1, 1) ~= "@" and not middle:find(":", 1, true) and is_email(middle) then
+      elseif
+        middle:find("@", 1, true)
+        and middle:sub(1, 4) ~= "www."
+        and middle:sub(1, 1) ~= "@"
+        and not middle:find(":", 1, true)
+        and is_email(middle)
+      then
         middle = ('<a href="mailto:%s">%s</a>'):format(middle, middle)
       elseif extra ~= NONE then
         for _, scheme in ipairs(R.iter(extra)) do

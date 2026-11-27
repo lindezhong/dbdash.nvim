@@ -96,7 +96,8 @@ T["password_cmd: output is the password, cached, failures reported"] = function(
   end)
   eq(#vim.fn.readfile(count), 2)
   r = run(function()
-    local argv = WIN and { "cmd.exe", "/c", "echo nope 1>&2& exit /b 3" } or { "sh", "-c", "echo nope >&2; exit 3" }
+    local argv = WIN and { "cmd.exe", "/c", "echo nope 1>&2& exit /b 3" }
+      or { "sh", "-c", "echo nope >&2; exit 3" }
     return cred.from_cmd(argv, info)
   end)
   eq({ r.err.phase, vim.trim(r.err.message) }, { "connect", "password_cmd failed (exit 3): nope" })
@@ -125,16 +126,24 @@ end
 
 T["config: password_cmd is validated, unset ${ENV} reported with its line"] = function()
   local f = vim.fn.tempname() .. ".yaml"
-  vim.fn.writefile({ "database:", "  url: postgres://u:${DBDASH_T_UNSET}@h/db", "query: { sql: x }" }, f)
-  local _, err = require("dbdash.config").load(f)
-  eq(err.message:find(":2:%d+: environment variable DBDASH_T_UNSET is not set") ~= nil, true)
-  vim.fn.writefile({ "database:", "  url: postgres://u@h/db", "  password_cmd: 3", "query: { sql: x }" }, f)
-  _, err = require("dbdash.config").load(f)
-  eq(err.message:find("password_cmd must be a command string") ~= nil, true)
   vim.fn.writefile(
-    { "database:", "  url: postgres://u@h/db", "  password_cmd: [pass, show, db]", "query: { sql: x }" },
+    { "database:", "  url: postgres://u:${DBDASH_T_UNSET}@h/db", "query: { sql: x }" },
     f
   )
+  local _, err = require("dbdash.config").load(f)
+  eq(err.message:find(":2:%d+: environment variable DBDASH_T_UNSET is not set") ~= nil, true)
+  vim.fn.writefile(
+    { "database:", "  url: postgres://u@h/db", "  password_cmd: 3", "query: { sql: x }" },
+    f
+  )
+  _, err = require("dbdash.config").load(f)
+  eq(err.message:find("password_cmd must be a command string") ~= nil, true)
+  vim.fn.writefile({
+    "database:",
+    "  url: postgres://u@h/db",
+    "  password_cmd: [pass, show, db]",
+    "query: { sql: x }",
+  }, f)
   local cfg = assert(require("dbdash.config").load(f))
   eq(cfg.database.password_cmd, { "pass", "show", "db" })
 end
@@ -146,7 +155,10 @@ T["integration: password_cmd, passwords.json and ${ENV} against PostgreSQL"] = f
   eq(h.ok(raw, q, { password_cmd = "echo dbdash_pw" }).row_count, 1)
   local r = h.query(raw, q, { password_cmd = "echo wrong" })
   eq(r.err.phase, "auth")
-  vim.fn.writefile({ vim.json.encode({ ["postgres://dbdash@127.0.0.1:15432/dbdash_test"] = "dbdash_pw" }) }, file)
+  vim.fn.writefile(
+    { vim.json.encode({ ["postgres://dbdash@127.0.0.1:15432/dbdash_test"] = "dbdash_pw" }) },
+    file
+  )
   eq(h.ok(raw, q).row_count, 1)
   vim.uv.os_setenv("DBDASH_T_PW", "dbdash_pw")
   eq(h.ok("postgres://dbdash:${DBDASH_T_PW}@127.0.0.1:15432/dbdash_test", q).row_count, 1)

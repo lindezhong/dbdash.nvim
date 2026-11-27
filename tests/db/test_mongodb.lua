@@ -8,7 +8,9 @@ local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()
 
 T["ordered JSON parse"] = function()
-  local v = json.parse('{"b": 1, "a": [1.5, "x\\u00e9", null, true], "c": {"$oid": "x"}, "big": 9007199254740993}')
+  local v = json.parse(
+    '{"b": 1, "a": [1.5, "x\\u00e9", null, true], "c": {"$oid": "x"}, "big": 9007199254740993}'
+  )
   eq(map.keys(v), { "b", "a", "c", "big" })
   eq(json.is_double(v.a[1]), true)
   eq(v.a[2], "xé")
@@ -18,12 +20,19 @@ T["ordered JSON parse"] = function()
 end
 
 T["BSON encoding matches a reference"] = function()
-  local d = json.parse('{"find": "orders", "filter": {"status": "paid", "amt": 1.5}, "a": [1, true, null], "big": 9007199254740993}')
-  eq(u.hex(bson.encode(d)), "640000000266696e6400070000006f7264657273000366696c7465720023000000027374617475730005000000706169640001616d7400000000000000f83f000461001300000010300001000000083100010a3200001262696700010000000000200000")
+  local d = json.parse(
+    '{"find": "orders", "filter": {"status": "paid", "amt": 1.5}, "a": [1, true, null], "big": 9007199254740993}'
+  )
+  eq(
+    u.hex(bson.encode(d)),
+    "640000000266696e6400070000006f7264657273000366696c7465720023000000027374617475730005000000706169640001616d7400000000000000f83f000461001300000010300001000000083100010a3200001262696700010000000000200000"
+  )
 end
 
 T["BSON round trip and extended JSON"] = function()
-  local d = json.parse('{"id": {"$oid": "5f1d7a3b9c1e4a2b3c4d5e6f"}, "at": {"$date": "2026-11-20T10:00:00.250Z"}, "n": {"$numberLong": "42"}, "re": {"$regex": "^a", "$options": "i"}}')
+  local d = json.parse(
+    '{"id": {"$oid": "5f1d7a3b9c1e4a2b3c4d5e6f"}, "at": {"$date": "2026-11-20T10:00:00.250Z"}, "n": {"$numberLong": "42"}, "re": {"$regex": "^a", "$options": "i"}}'
+  )
   local back = bson.decode(bson.encode(d))
   eq(back.id.kind, "oid")
   eq(back.id.value, "5f1d7a3b9c1e4a2b3c4d5e6f")
@@ -111,8 +120,12 @@ local URL = "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/dbdash_test?authSource=a
 
 ---Initiate the single-node replica set once (the compose server starts uninitiated).
 local function ensure_rs()
-  local direct = "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin&readPreference=nearest"
-  local r = h.query(direct, [[{"operation": "command", "command": {"replSetInitiate": {"_id": "rs0", "members": [{"_id": 0, "host": "localhost:17017"}]}}}]])
+  local direct =
+    "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin&readPreference=nearest"
+  local r = h.query(
+    direct,
+    [[{"operation": "command", "command": {"replSetInitiate": {"_id": "rs0", "members": [{"_id": 0, "host": "localhost:17017"}]}}}]]
+  )
   if r.err and not tostring(r.err.code):find("AlreadyInitialized") then
     error(tostring(r.err))
   end
@@ -131,22 +144,34 @@ T["it: aggregate, find, count, distinct"] = function()
   h.require_it()
   ensure_rs()
   -- Seed with an aggregate $merge-free approach: $documents + $out.
-  h.ok(URL, [[{"operation": "aggregate", "database": "dbdash_test", "pipeline": [
+  h.ok(
+    URL,
+    [[{"operation": "aggregate", "database": "dbdash_test", "pipeline": [
     {"$documents": [
       {"_id": 1, "region": "Asia", "amount": 10, "customer": {"name": "Ann"}},
       {"_id": 2, "region": "EU", "amount": 25.5, "customer": {"name": "Bob"}},
       {"_id": 3, "region": "Asia", "amount": 7, "customer": {"name": "Cy"}}
     ]},
-    {"$out": "orders"}]}]])
-  local rs = h.ok(URL, [[{"collection": "orders", "filter": {"region": "Asia"}, "sort": {"amount": -1}, "flatten": 1}]])
+    {"$out": "orders"}]}]]
+  )
+  local rs = h.ok(
+    URL,
+    [[{"collection": "orders", "filter": {"region": "Asia"}, "sort": {"amount": -1}, "flatten": 1}]]
+  )
   eq(rs:column_names(), { "_id", "region", "amount", "customer.name" })
   eq(rs.rows, { { 1, "Asia", 10, "Ann" }, { 3, "Asia", 7, "Cy" } })
-  eq(h.ok(URL, [[{"collection": "orders", "operation": "count", "filter": {"amount": {"$gt": 8}}}]]).rows, { { 2 } })
+  eq(
+    h.ok(URL, [[{"collection": "orders", "operation": "count", "filter": {"amount": {"$gt": 8}}}]]).rows,
+    { { 2 } }
+  )
   local d = h.ok(URL, [[{"collection": "orders", "operation": "distinct", "field": "region"}]])
   eq({ d:column_names(), #d.rows }, { { "region" }, 2 })
-  local agg = h.ok(URL, [[{"collection": "orders", "operation": "aggregate", "pipeline": [
+  local agg = h.ok(
+    URL,
+    [[{"collection": "orders", "operation": "aggregate", "pipeline": [
     {"$group": {"_id": "$region", "total": {"$sum": "$amount"}}}, {"$sort": {"_id": 1}},
-    {"$addFields": {"at": {"$toDate": {"$numberLong": "0"}}, "dec": {"$toDecimal": "123.45"}, "oid": {"$toObjectId": "5f1d7a3b9c1e4a2b3c4d5e6f"}}}]}]])
+    {"$addFields": {"at": {"$toDate": {"$numberLong": "0"}}, "dec": {"$toDecimal": "123.45"}, "oid": {"$toObjectId": "5f1d7a3b9c1e4a2b3c4d5e6f"}}}]}]]
+  )
   eq(agg.rows[1][1], "Asia")
   eq(agg.rows[1][2], 17)
   eq(agg.rows[1][3], "1970-01-01T00:00:00.000Z")
@@ -161,7 +186,10 @@ T["it: cursors follow getMore and stop at max_rows"] = function()
   for i = 1, 250 do
     docs[i] = { _id = i }
   end
-  h.ok(URL, q({ operation = "aggregate", pipeline = { { ["$documents"] = docs }, { ["$out"] = "many" } } }))
+  h.ok(
+    URL,
+    q({ operation = "aggregate", pipeline = { { ["$documents"] = docs }, { ["$out"] = "many" } } })
+  )
   local rs = h.ok(URL, [[{"collection": "many", "sort": {"_id": 1}}]])
   eq(rs.row_count, 250)
   rs = h.ok(URL, [[{"collection": "many", "sort": {"_id": 1}}]], { max_rows = 120 })
@@ -170,7 +198,8 @@ end
 
 T["it: errors"] = function()
   h.require_it()
-  local r = h.query("mongodb://dbdash:wrong@127.0.0.1:17017/x?authSource=admin", [[{"collection": "a"}]])
+  local r =
+    h.query("mongodb://dbdash:wrong@127.0.0.1:17017/x?authSource=admin", [[{"collection": "a"}]])
   eq({ r.err.phase, r.err.code }, { "auth", "AuthenticationFailed" })
   r = h.query(URL, [[{"collection": "orders", "filter": {"$bad": 1}}]])
   eq(r.err.phase, "query")
@@ -188,15 +217,27 @@ T["it: mongodb+srv through a local DNS server and seed lists"] = function()
     { type = 33, priority = 1, weight = 0, port = 17017, target = "db1.rs.localhost" },
     { type = 16, parts = { "authSource=admin&replicaSet=rs0" } },
   })
-  local srv = "mongodb+srv://dbdash:dbdash_pw@rs.localhost/dbdash_test?tls=disable&dns=127.0.0.1:" .. port
+  local srv = "mongodb+srv://dbdash:dbdash_pw@rs.localhost/dbdash_test?tls=disable&dns=127.0.0.1:"
+    .. port
   local r = h.query(srv, [[{"operation": "command", "command": {"ping": 1}}]])
   eq(r.err, nil)
   -- verify-full is the default for +srv: plain-text servers fail the TLS handshake
-  r = h.query("mongodb+srv://dbdash:dbdash_pw@rs.localhost/x?dns=127.0.0.1:" .. port .. "&connect_timeout=2s&timeout=2s", [[{"collection": "a"}]])
+  r = h.query(
+    "mongodb+srv://dbdash:dbdash_pw@rs.localhost/x?dns=127.0.0.1:"
+      .. port
+      .. "&connect_timeout=2s&timeout=2s",
+    [[{"collection": "a"}]]
+  )
   eq(r.err ~= nil, true)
   udp:close()
   -- seed list with a dead first host
-  eq(h.ok("mongodb://dbdash:dbdash_pw@127.0.0.1:1,localhost:17017/dbdash_test?authSource=admin", [[{"operation": "command", "command": {"ping": 1}}]]).row_count, 1)
+  eq(
+    h.ok(
+      "mongodb://dbdash:dbdash_pw@127.0.0.1:1,localhost:17017/dbdash_test?authSource=admin",
+      [[{"operation": "command", "command": {"ping": 1}}]]
+    ).row_count,
+    1
+  )
 end
 
 return T

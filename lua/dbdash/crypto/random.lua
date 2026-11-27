@@ -6,9 +6,12 @@ local ffi = require("ffi")
 
 local win_ok, bcrypt
 if jit.os == "Windows" then
-  pcall(ffi.cdef, [[
+  pcall(
+    ffi.cdef,
+    [[
     long BCryptGenRandom(void *hAlgorithm, unsigned char *pbBuffer, unsigned long cbBuffer, unsigned long dwFlags);
-  ]])
+  ]]
+  )
   win_ok, bcrypt = pcall(ffi.load, "bcrypt")
 end
 
@@ -22,7 +25,10 @@ function M.bytes(n)
     assert(win_ok, "BCryptGenRandom is not available")
     local buf = ffi.new("unsigned char[?]", n)
     local BCRYPT_USE_SYSTEM_PREFERRED_RNG = 0x00000002
-    assert(bcrypt.BCryptGenRandom(nil, buf, n, BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0, "BCryptGenRandom failed")
+    assert(
+      bcrypt.BCryptGenRandom(nil, buf, n, BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0,
+      "BCryptGenRandom failed"
+    )
     return ffi.string(buf, n)
   end
   local f = assert(io.open("/dev/urandom", "rb"))

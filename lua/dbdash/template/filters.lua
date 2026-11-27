@@ -163,7 +163,10 @@ local function json_string(s)
       local cp = vim.fn.char2nr(ch)
       if cp >= 0x10000 then
         cp = cp - 0x10000
-        out[#out + 1] = ("\\u%04x\\u%04x"):format(0xD800 + math.floor(cp / 0x400), 0xDC00 + cp % 0x400)
+        out[#out + 1] = ("\\u%04x\\u%04x"):format(
+          0xD800 + math.floor(cp / 0x400),
+          0xDC00 + cp % 0x400
+        )
       else
         out[#out + 1] = ("\\u%04x"):format(cp)
       end
@@ -391,7 +394,8 @@ F.tojson = function(_, v, args, kw)
   if indent == NONE then
     return R.safe(to_json(v))
   end
-  local ind = (type(indent) == "string" or R.is_safe(indent)) and R.str(indent) or (" "):rep((R.num(indent)) or 0)
+  local ind = (type(indent) == "string" or R.is_safe(indent)) and R.str(indent)
+    or (" "):rep((R.num(indent)) or 0)
   return R.safe(to_json(v, ind))
 end
 
@@ -477,7 +481,8 @@ T.callable = function(_, v)
     return true
   end
   local mt = getmetatable(v)
-  return mt ~= nil and mt.__call ~= nil and (R.callable_types[mt] or R.typename(v) == "LoopContext") or false
+  return mt ~= nil and mt.__call ~= nil and (R.callable_types[mt] or R.typename(v) == "LoopContext")
+    or false
 end
 T.sameas = function(_, v, args)
   local o = R.check(args[1])
@@ -499,7 +504,14 @@ end
 T.test = function(_, v)
   return R.tests[R.str(v)] ~= nil
 end
-for names, op in pairs({ ["eq ==  equalto"] = "==", ["ne !="] = "!=", ["gt > greaterthan"] = ">", ["ge >="] = ">=", ["lt < lessthan"] = "<", ["le <="] = "<=" }) do
+for names, op in pairs({
+  ["eq ==  equalto"] = "==",
+  ["ne !="] = "!=",
+  ["gt > greaterthan"] = ">",
+  ["ge >="] = ">=",
+  ["lt < lessthan"] = "<",
+  ["le <="] = "<=",
+}) do
   for name in names:gmatch("%S+") do
     T[name] = function(_, v, args)
       return R.cmp(op, v, args[1])

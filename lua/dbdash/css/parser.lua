@@ -76,7 +76,9 @@ local function compound(s, i, text)
         return nil, ("selector %q: only ::part(name) is supported"):format(text)
       end
       -- ::part(x) is a descendant x of this element
-      return c, i + #("::part(" .. arg .. ")"), { tag = arg, classes = {}, attrs = {}, pseudos = {} }
+      return c,
+        i + #("::part(" .. arg .. ")"),
+        { tag = arg, classes = {}, attrs = {}, pseudos = {} }
     elseif ch == ":" then
       local name = s:match("^:(" .. IDENT .. ")", i)
       if not name then

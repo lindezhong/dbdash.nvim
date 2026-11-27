@@ -2,13 +2,74 @@
 local bit = require("bit")
 local md = require("dbdash.crypto.md")
 
-local band, bor, bxor, bnot, rol, tobit, lshift = bit.band, bit.bor, bit.bxor, bit.bnot, bit.rol, bit.tobit, bit.lshift
+local band, bor, bxor, bnot, rol, tobit, lshift =
+  bit.band, bit.bor, bit.bxor, bit.bnot, bit.rol, bit.tobit, bit.lshift
 
 local S = {
-  7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-  5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
-  4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-  6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+  7,
+  12,
+  17,
+  22,
+  7,
+  12,
+  17,
+  22,
+  7,
+  12,
+  17,
+  22,
+  7,
+  12,
+  17,
+  22,
+  5,
+  9,
+  14,
+  20,
+  5,
+  9,
+  14,
+  20,
+  5,
+  9,
+  14,
+  20,
+  5,
+  9,
+  14,
+  20,
+  4,
+  11,
+  16,
+  23,
+  4,
+  11,
+  16,
+  23,
+  4,
+  11,
+  16,
+  23,
+  4,
+  11,
+  16,
+  23,
+  6,
+  10,
+  15,
+  21,
+  6,
+  10,
+  15,
+  21,
+  6,
+  10,
+  15,
+  21,
+  6,
+  10,
+  15,
+  21,
 }
 local K = {}
 for i = 0, 63 do
@@ -44,7 +105,12 @@ local function compress(H, s, off)
 end
 
 local function le32(n)
-  return string.char(band(n, 255), band(bit.rshift(n, 8), 255), band(bit.rshift(n, 16), 255), band(bit.rshift(n, 24), 255))
+  return string.char(
+    band(n, 255),
+    band(bit.rshift(n, 8), 255),
+    band(bit.rshift(n, 16), 255),
+    band(bit.rshift(n, 24), 255)
+  )
 end
 
 local M = md.define({

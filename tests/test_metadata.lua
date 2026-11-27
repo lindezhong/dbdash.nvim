@@ -52,7 +52,24 @@ T["every name has a value of the right type"] = function()
     "show: { type: table, title: Board, interval: 7s }",
   })
   local v = p.meta
-  local strings = { "cwd", "config_file", "config_dir", "config_name", "db_type", "db_name", "db_url", "panel_title", "chart_type", "now", "today", "hostname", "user", "nvim_version", "os", "arch" }
+  local strings = {
+    "cwd",
+    "config_file",
+    "config_dir",
+    "config_name",
+    "db_type",
+    "db_name",
+    "db_url",
+    "panel_title",
+    "chart_type",
+    "now",
+    "today",
+    "hostname",
+    "user",
+    "nvim_version",
+    "os",
+    "arch",
+  }
   for _, n in ipairs(strings) do
     eq({ n, type(v[n]) }, { n, "string" })
   end
@@ -60,7 +77,10 @@ T["every name has a value of the right type"] = function()
     eq({ n, type(v[n]) }, { n, "number" })
   end
   eq({ v.config_file, v.config_dir, v.config_name }, { dir .. "/board.yaml", dir, "board" })
-  eq({ v.db_type, v.db_name, v.panel_index, v.panel_title, v.chart_type, v.interval }, { "sqlite", ":memory:", 1, "Board", "table", 7000 })
+  eq(
+    { v.db_type, v.db_name, v.panel_index, v.panel_title, v.chart_type, v.interval },
+    { "sqlite", ":memory:", 1, "Board", "table", 7000 }
+  )
   eq(v.today, os.date("%Y-%m-%d"))
   eq(v.now:match("^%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%d[+-]%d%d:%d%d$") ~= nil, true)
   eq(v.os, jit.os == "Windows" and "windows" or jit.os == "OSX" and "macos" or jit.os:lower())
@@ -77,7 +97,10 @@ T["db_*: from the URL as written, without the password or expanded ${NAME}"] = f
     "query: { sql: SELECT 1 }",
   })
   local v = p.meta
-  eq({ v.db_type, v.db_host, v.db_port, v.db_name, v.db_user }, { "postgres", "db.internal", 5432, "shop", "app" })
+  eq(
+    { v.db_type, v.db_host, v.db_port, v.db_name, v.db_user },
+    { "postgres", "db.internal", 5432, "shop", "app" }
+  )
   eq(v.db_url, "postgres://app:***@db.internal/shop?tls=require")
   local l = run("lua", { "database: { url: 'lua://' }", "query: { sql: 'return { { x = 1 } }' }" })
   eq({ l.meta.db_type, l.meta.db_host, l.meta.db_port }, { "lua", nil, nil })
@@ -166,7 +189,12 @@ T["{% lua %} blocks in query.sql and query.transform see the same args and meta"
     "    return nil + 1",
     "    {% endlua %}",
   })
-  eq(sched.format_error(p.error):find("blockerr.yaml:6: attempt to perform arithmetic on a nil value", 1, true) ~= nil, true)
+  eq(
+    sched
+      .format_error(p.error)
+      :find("blockerr.yaml:6: attempt to perform arithmetic on a nil value", 1, true) ~= nil,
+    true
+  )
 end
 
 T["meta.refresh_count and meta.now change per refresh"] = function()
@@ -191,7 +219,13 @@ T["bare argument names, assigning args/meta and writing meta are errors"] = func
     "    SELECT 1",
     "    WHERE {{ days }} > 0",
   })
-  eq(sched.format_error(p.error):find("bare.yaml:6: 'days' is undefined; arguments are written args.days", 1, true) ~= nil, true)
+  eq(
+    sched
+      .format_error(p.error)
+      :find("bare.yaml:6: 'days' is undefined; arguments are written args.days", 1, true)
+      ~= nil,
+    true
+  )
   local _, err = template.render("{% set args = 1 %}{{ args }}", {})
   eq(err.message, "'args' is reserved (dashboard arguments) and cannot be assigned")
   _, err = template.render("{% for meta in [1] %}{% endfor %}", {})

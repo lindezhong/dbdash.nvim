@@ -60,7 +60,13 @@ F.sql_quote = function(env, v, args, kw)
   filters.bind("sql_quote", args, kw, {})
   v = plain(v)
   local d = dialect_of(env)
-  if type(v) == "string" or v == NONE or type(v) == "boolean" or type(v) == "number" or R.is_float_box(v) then
+  if
+    type(v) == "string"
+    or v == NONE
+    or type(v) == "boolean"
+    or type(v) == "number"
+    or R.is_float_box(v)
+  then
     return call(d.literal, v)
   end
   return R.str(v)
@@ -139,7 +145,8 @@ local G = {}
 ---sql_case(conditions, default=None): CASE WHEN <cond> THEN <value> ... ELSE <default> END.
 ---Conditions and values are inserted verbatim.
 G.sql_case = function(args, kw)
-  local conditions, default = filters.bind("sql_case", args, kw, { { "conditions" }, { "default", NONE } })
+  local conditions, default =
+    filters.bind("sql_case", args, kw, { { "conditions" }, { "default", NONE } })
   if not map.is_map(conditions) or next(conditions) == nil then
     if conditions ~= NONE and not map.is_map(conditions) and R.truthy(conditions) then
       raise("type", "sql_case() conditions must be a mapping")

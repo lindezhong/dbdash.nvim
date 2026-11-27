@@ -68,7 +68,8 @@ function M.compose(cells, outputs)
         for _, h in ipairs(by_line[i][k - 1] or {}) do
           local s, e = math.min(h.col_s, #cut), math.min(h.col_e, #cut)
           if e > s then
-            hl[#hl + 1] = { row = L, col_s = pos + s, col_e = pos + e, group = h.group, priority = h.priority }
+            hl[#hl + 1] =
+              { row = L, col_s = pos + s, col_e = pos + e, group = h.group, priority = h.priority }
           end
         end
         local cell = W.pad(cut, c.width)

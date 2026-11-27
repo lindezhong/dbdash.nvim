@@ -138,7 +138,16 @@ function Conn:send(typ, payload)
     local chunk = payload:sub(1, max)
     payload = payload:sub(max + 1)
     local last = #payload == 0
-    out[#out + 1] = string.char(typ, last and 1 or 0, math.floor((#chunk + 8) / 256), (#chunk + 8) % 256, 0, 0, id % 256, 0) .. chunk
+    out[#out + 1] = string.char(
+      typ,
+      last and 1 or 0,
+      math.floor((#chunk + 8) / 256),
+      (#chunk + 8) % 256,
+      0,
+      0,
+      id % 256,
+      0
+    ) .. chunk
     id = id + 1
   until last
   self.sock:write(table.concat(out))
@@ -195,10 +204,14 @@ end
 
 ---TDS password obfuscation: swap nibbles, then XOR 0xA5 (on UTF-16LE bytes).
 function M.obfuscate(pw16)
-  return (pw16:gsub(".", function(c)
-    local b = c:byte()
-    return string.char(bit.bxor(bit.bor(bit.lshift(bit.band(b, 0x0F), 4), bit.rshift(b, 4)), 0xA5))
-  end))
+  return (
+    pw16:gsub(".", function(c)
+      local b = c:byte()
+      return string.char(
+        bit.bxor(bit.bor(bit.lshift(bit.band(b, 0x0F), 4), bit.rshift(b, 4)), 0xA5)
+      )
+    end)
+  )
 end
 
 function M.login7(info)
@@ -223,9 +236,12 @@ function M.login7(info)
   end
   local body_tail = table.concat(offsets)
     .. string.rep("\0", 6) -- ClientID
-    .. le(pos, 2) .. le(0, 2) -- SSPI
-    .. le(pos, 2) .. le(0, 2) -- AtchDBFile
-    .. le(pos, 2) .. le(0, 2) -- ChangePassword
+    .. le(pos, 2)
+    .. le(0, 2) -- SSPI
+    .. le(pos, 2)
+    .. le(0, 2) -- AtchDBFile
+    .. le(pos, 2)
+    .. le(0, 2) -- ChangePassword
     .. le(0, 4) -- cbSSPILong
   local head = le(0x74000004, 4) -- TDS 7.4
     .. le(PACKET_SIZE, 4)
@@ -242,27 +258,50 @@ end
 -- Type info and values --------------------------------------------------------------------
 
 local FIXED = {
-  [0x1F] = { 0, "null", "null" }, [0x30] = { 1, "integer", "tinyint" }, [0x32] = { 1, "boolean", "bit" },
-  [0x34] = { 2, "integer", "smallint" }, [0x38] = { 4, "integer", "int" }, [0x7F] = { 8, "integer", "bigint" },
-  [0x3B] = { 4, "number", "real" }, [0x3E] = { 8, "number", "float" }, [0x3A] = { 4, "datetime", "smalldatetime" },
-  [0x3D] = { 8, "datetime", "datetime" }, [0x3C] = { 8, "decimal", "money" }, [0x7A] = { 4, "decimal", "smallmoney" },
+  [0x1F] = { 0, "null", "null" },
+  [0x30] = { 1, "integer", "tinyint" },
+  [0x32] = { 1, "boolean", "bit" },
+  [0x34] = { 2, "integer", "smallint" },
+  [0x38] = { 4, "integer", "int" },
+  [0x7F] = { 8, "integer", "bigint" },
+  [0x3B] = { 4, "number", "real" },
+  [0x3E] = { 8, "number", "float" },
+  [0x3A] = { 4, "datetime", "smalldatetime" },
+  [0x3D] = { 8, "datetime", "datetime" },
+  [0x3C] = { 8, "decimal", "money" },
+  [0x7A] = { 4, "decimal", "smallmoney" },
 }
 
 local BYTELEN = {
-  [0x26] = { "integer", "int" }, [0x68] = { "boolean", "bit" }, [0x6D] = { "number", "float" },
-  [0x6E] = { "decimal", "money" }, [0x6F] = { "datetime", "datetime" }, [0x24] = { "uuid", "uniqueidentifier" },
-  [0x6A] = { "decimal", "decimal" }, [0x6C] = { "decimal", "numeric" }, [0x37] = { "decimal", "decimal" },
+  [0x26] = { "integer", "int" },
+  [0x68] = { "boolean", "bit" },
+  [0x6D] = { "number", "float" },
+  [0x6E] = { "decimal", "money" },
+  [0x6F] = { "datetime", "datetime" },
+  [0x24] = { "uuid", "uniqueidentifier" },
+  [0x6A] = { "decimal", "decimal" },
+  [0x6C] = { "decimal", "numeric" },
+  [0x37] = { "decimal", "decimal" },
   [0x3F] = { "decimal", "numeric" },
 }
 
-local SCALED = { [0x29] = { "time", "time" }, [0x2A] = { "datetime", "datetime2" }, [0x2B] = { "datetime", "datetimeoffset" } }
-
-local USHORT = {
-  [0xA7] = { "string", "varchar" }, [0xAF] = { "string", "char" }, [0xE7] = { "string", "nvarchar" },
-  [0xEF] = { "string", "nchar" }, [0xA5] = { "bytes", "varbinary" }, [0xAD] = { "bytes", "binary" },
+local SCALED = {
+  [0x29] = { "time", "time" },
+  [0x2A] = { "datetime", "datetime2" },
+  [0x2B] = { "datetime", "datetimeoffset" },
 }
 
-local LONGLEN = { [0x23] = { "string", "text" }, [0x63] = { "string", "ntext" }, [0x22] = { "bytes", "image" } }
+local USHORT = {
+  [0xA7] = { "string", "varchar" },
+  [0xAF] = { "string", "char" },
+  [0xE7] = { "string", "nvarchar" },
+  [0xEF] = { "string", "nchar" },
+  [0xA5] = { "bytes", "varbinary" },
+  [0xAD] = { "bytes", "binary" },
+}
+
+local LONGLEN =
+  { [0x23] = { "string", "text" }, [0x63] = { "string", "ntext" }, [0x22] = { "bytes", "image" } }
 
 ---Parse TYPE_INFO at p. Returns type descriptor and next position.
 local function type_info(s, p)
@@ -343,7 +382,11 @@ end
 local function clock(units, scale)
   local secs = math.floor(units / 10 ^ scale)
   local frac = units - secs * 10 ^ scale
-  local s = ("%02d:%02d:%02d"):format(math.floor(secs / 3600), math.floor(secs % 3600 / 60), secs % 60)
+  local s = ("%02d:%02d:%02d"):format(
+    math.floor(secs / 3600),
+    math.floor(secs % 3600 / 60),
+    secs % 60
+  )
   if scale > 0 then
     s = s .. "." .. ("%0" .. scale .. "d"):format(frac)
   end
@@ -402,7 +445,15 @@ local function guid(b)
       return ("%02X"):format(c:byte())
     end))
   end
-  return hx(b:sub(1, 4):reverse()) .. "-" .. hx(b:sub(5, 6):reverse()) .. "-" .. hx(b:sub(7, 8):reverse()) .. "-" .. hx(b:sub(9, 10)) .. "-" .. hx(b:sub(11, 16))
+  return hx(b:sub(1, 4):reverse())
+    .. "-"
+    .. hx(b:sub(5, 6):reverse())
+    .. "-"
+    .. hx(b:sub(7, 8):reverse())
+    .. "-"
+    .. hx(b:sub(9, 10))
+    .. "-"
+    .. hx(b:sub(11, 16))
 end
 
 ---Decode the data bytes `b` of a non-NULL value of type d.
@@ -431,10 +482,16 @@ local function value(d, b)
   elseif t == 0x3D or (t == 0x6F and #b == 8) then
     local days, ticks = rd_s(b, 1, 4), rd_u(b, 5, 4)
     local ms = math.floor(ticks * 10 / 3 + 0.5)
-    return require("dbdash.db.bson").ms_to_iso((EPOCH_1900 + days) * DAY_MS + ms):gsub("T", " "):gsub("Z$", "")
+    return require("dbdash.db.bson")
+      .ms_to_iso((EPOCH_1900 + days) * DAY_MS + ms)
+      :gsub("T", " ")
+      :gsub("Z$", "")
   elseif t == 0x3A or t == 0x6F then
     local days, mins = rd_u(b, 1, 2), rd_u(b, 3, 2)
-    return require("dbdash.db.bson").ms_to_iso((EPOCH_1900 + days) * DAY_MS + mins * 60000):sub(1, 16):gsub("T", " ")
+    return require("dbdash.db.bson")
+      .ms_to_iso((EPOCH_1900 + days) * DAY_MS + mins * 60000)
+      :sub(1, 16)
+      :gsub("T", " ")
   elseif t == 0x6A or t == 0x6C or t == 0x37 or t == 0x3F then
     return scaled(le_decimal(b:sub(2)), d.scale, b:byte(1) == 0)
   elseif t == 0x24 then
@@ -456,7 +513,13 @@ local function value(d, b)
     local day_units = 86400 * 10 ^ d.scale
     local ld = math.floor(total / day_units)
     local sign = off < 0 and "-" or "+"
-    return ("%s %s %s%02d:%02d"):format(iso_date(ld), clock(total - ld * day_units, d.scale), sign, math.floor(math.abs(off) / 60), math.abs(off) % 60)
+    return ("%s %s %s%02d:%02d"):format(
+      iso_date(ld),
+      clock(total - ld * day_units, d.scale),
+      sign,
+      math.floor(math.abs(off) / 60),
+      math.abs(off) % 60
+    )
   elseif t == 0xE7 or t == 0xEF or t == 0x63 or name == "xml" then
     return M.utf8(b)
   elseif t == 0xA7 or t == 0xAF or t == 0x23 then
@@ -470,9 +533,23 @@ M.value = value
 -- Token stream ----------------------------------------------------------------------------
 
 local TOKEN = {
-  ALTMETADATA = 0x88, COLMETADATA = 0x81, ROW = 0xD1, NBCROW = 0xD2, DONE = 0xFD, DONEPROC = 0xFE,
-  DONEINPROC = 0xFF, ENVCHANGE = 0xE3, ERROR = 0xAA, INFO = 0xAB, LOGINACK = 0xAD, ORDER = 0xA9,
-  RETURNSTATUS = 0x79, RETURNVALUE = 0xAC, COLINFO = 0xA5, TABNAME = 0xA4, FEATUREEXTACK = 0xAE,
+  ALTMETADATA = 0x88,
+  COLMETADATA = 0x81,
+  ROW = 0xD1,
+  NBCROW = 0xD2,
+  DONE = 0xFD,
+  DONEPROC = 0xFE,
+  DONEINPROC = 0xFF,
+  ENVCHANGE = 0xE3,
+  ERROR = 0xAA,
+  INFO = 0xAB,
+  LOGINACK = 0xAD,
+  ORDER = 0xA9,
+  RETURNSTATUS = 0x79,
+  RETURNVALUE = 0xAC,
+  COLINFO = 0xA5,
+  TABNAME = 0xA4,
+  FEATUREEXTACK = 0xAE,
   SSPI = 0xED,
 }
 
@@ -581,7 +658,10 @@ function M.parse_tokens(s, max_rows)
       end
       local row = {}
       for i, d in ipairs(cols) do
-        if nulls and bit.band(nulls:byte(math.floor((i - 1) / 8) + 1), bit.lshift(1, (i - 1) % 8)) ~= 0 then
+        if
+          nulls
+          and bit.band(nulls:byte(math.floor((i - 1) / 8) + 1), bit.lshift(1, (i - 1) % 8)) ~= 0
+        then
           row[i] = NULL
         else
           row[i], p = read_value(d, s, p)
@@ -624,7 +704,11 @@ function M.parse_tokens(s, max_rows)
       local len = rd_u(s, p, 2)
       local name, q = b_varchar(s, p + 2 + 1 + 4)
       env.server = name
-      env.version = ("%d.%d.%d"):format(s:byte(q), s:byte(q + 1), s:byte(q + 2) * 256 + s:byte(q + 3))
+      env.version = ("%d.%d.%d"):format(
+        s:byte(q),
+        s:byte(q + 1),
+        s:byte(q + 2) * 256 + s:byte(q + 3)
+      )
       env.logged_in = true
       p = p + 2 + len
     elseif t == TOKEN.ORDER or t == TOKEN.COLINFO or t == TOKEN.TABNAME or t == TOKEN.SSPI then
@@ -689,7 +773,11 @@ function M.connect(info)
   if strict and info.tls == "disable" then
     info.tls = "require"
   end
-  local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
+  local sock = socket.connect(
+    info.host,
+    info.port,
+    { connect_timeout = info.connect_timeout, timeout = info.timeout }
+  )
   local c = setmetatable({ sock = sock, packet_size = PACKET_SIZE }, Conn)
   local ok, err = pcall(function()
     local tls = require("dbdash.net.tls")
@@ -707,7 +795,10 @@ function M.connect(info)
         -- TLS inside TDS 7.x packets is TLS 1.2 at most.
         tls.from_info(sock, info, { io = tds_io(c), tls13 = false })
       elseif enc == ENCRYPT.REQ or enc == ENCRYPT.ON then
-        dberr.raise("tls", "the server requires encryption; connect with ?tls=require (or pin / verify-full)")
+        dberr.raise(
+          "tls",
+          "the server requires encryption; connect with ?tls=require (or pin / verify-full)"
+        )
       end
     end
     c:send(PKT.LOGIN7, M.login7(info))

@@ -324,7 +324,12 @@ end
 
 M.MAPPINGS = {
   { name = "start", lhs = "<leader>ds", rhs = ":DbDashStart ", desc = "Start a dashboard" },
-  { name = "refresh", lhs = "<leader>dr", rhs = "<Cmd>DbDashRestart<CR>", desc = "Refresh the dashboard" },
+  {
+    name = "refresh",
+    lhs = "<leader>dr",
+    rhs = "<Cmd>DbDashRestart<CR>",
+    desc = "Refresh the dashboard",
+  },
   { name = "stop", lhs = "<leader>dt", rhs = "<Cmd>DbDashStop<CR>", desc = "Stop the dashboard" },
   { name = "list", lhs = "<leader>dl", rhs = "<Cmd>DbDashList<CR>", desc = "List dashboards" },
   { name = "sidebar", lhs = "<leader>dd", rhs = "<Cmd>DbDash<CR>", desc = "Open the sidebar" },
@@ -377,7 +382,11 @@ function M.setup(opts)
   end
   -- Lists replace the default instead of merging by index.
   M.options = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts)
-  for _, path in ipairs({ { "sidebar", "pattern" }, { "sidebar", "exclude" }, { "lua", "trusted_dirs" } }) do
+  for _, path in ipairs({
+    { "sidebar", "pattern" },
+    { "sidebar", "exclude" },
+    { "lua", "trusted_dirs" },
+  }) do
     local v = opts[path[1]] and opts[path[1]][path[2]]
     if v then
       M.options[path[1]][path[2]] = v

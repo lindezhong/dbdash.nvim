@@ -22,7 +22,12 @@ end
 
 local function i32(n)
   n = n % 4294967296
-  return string.char(n % 256, math.floor(n / 256) % 256, math.floor(n / 65536) % 256, math.floor(n / 16777216) % 256)
+  return string.char(
+    n % 256,
+    math.floor(n / 256) % 256,
+    math.floor(n / 65536) % 256,
+    math.floor(n / 16777216) % 256
+  )
 end
 
 ---int64 from a Lua number (|n| < 2^53) or decimal string.
@@ -100,7 +105,8 @@ end
 
 ---Milliseconds since the epoch from an ISO-8601 date string (UTC or with offset).
 local function iso_to_ms(s)
-  local y, mo, d, h, mi, sec, frac, tz = s:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)[T ]?(%d?%d?):?(%d?%d?):?(%d?%d?)%.?(%d*)(.*)$")
+  local y, mo, d, h, mi, sec, frac, tz =
+    s:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)[T ]?(%d?%d?):?(%d?%d?):?(%d?%d?)%.?(%d*)(.*)$")
   if not y then
     fail("cannot parse date %q", s)
   end
@@ -113,7 +119,10 @@ local function iso_to_ms(s)
     return era * 146097 + doe - 719468
   end
   local days = days_from_civil(tonumber(y), tonumber(mo), tonumber(d))
-  local secs = days * 86400 + (tonumber(h) or 0) * 3600 + (tonumber(mi) or 0) * 60 + (tonumber(sec) or 0)
+  local secs = days * 86400
+    + (tonumber(h) or 0) * 3600
+    + (tonumber(mi) or 0) * 60
+    + (tonumber(sec) or 0)
   local ms = secs * 1000 + (frac ~= "" and math.floor(tonumber("0." .. frac) * 1000 + 0.5) or 0)
   if tz ~= "" and tz ~= "Z" then
     local sign, th, tm = tz:match("^([+-])(%d%d):?(%d%d)$")
@@ -233,7 +242,9 @@ function M.ms_to_iso(ms)
   local z = days + 719468
   local era = math.floor(z / 146097)
   local doe = z - era * 146097
-  local yoe = math.floor((doe - math.floor(doe / 1460) + math.floor(doe / 36524) - math.floor(doe / 146096)) / 365)
+  local yoe = math.floor(
+    (doe - math.floor(doe / 1460) + math.floor(doe / 36524) - math.floor(doe / 146096)) / 365
+  )
   local y = yoe + era * 400
   local doy = doe - (365 * yoe + math.floor(yoe / 4) - math.floor(yoe / 100))
   local mp = math.floor((5 * doy + 2) / 153)
@@ -242,7 +253,15 @@ function M.ms_to_iso(ms)
   if m <= 2 then
     y = y + 1
   end
-  return ("%04d-%02d-%02dT%02d:%02d:%02d.%03dZ"):format(y, m, d, math.floor(rem / 3600), math.floor(rem % 3600 / 60), rem % 60, msr)
+  return ("%04d-%02d-%02dT%02d:%02d:%02d.%03dZ"):format(
+    y,
+    m,
+    d,
+    math.floor(rem / 3600),
+    math.floor(rem % 3600 / 60),
+    rem % 60,
+    msr
+  )
 end
 
 ---Decode a Decimal128 (IEEE 754-2008 BID) to its string form.
@@ -324,7 +343,8 @@ local function decode_value(t, s, p)
   elseif t == 0x07 then
     return tagged("oid", (s:sub(p, p + 11):gsub(".", function(c)
       return ("%02x"):format(c:byte())
-    end))), p + 12
+    end))),
+      p + 12
   elseif t == 0x08 then
     return s:byte(p) == 1, p + 1
   elseif t == 0x09 then

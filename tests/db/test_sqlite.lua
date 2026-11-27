@@ -32,7 +32,8 @@ local function types(rs)
 end
 
 T["expressions infer types from storage classes"] = function()
-  local rs = ok("SELECT 1 AS i, 'Alice' AS s, NULL AS n, 1.5 AS r, x'00ff' AS b, 9223372036854775807 AS big")
+  local rs =
+    ok("SELECT 1 AS i, 'Alice' AS s, NULL AS n, 1.5 AS r, x'00ff' AS b, 9223372036854775807 AS big")
   eq(rs:column_names(), { "i", "s", "n", "r", "b", "big" })
   eq(types(rs), { "integer", "string", "null", "number", "bytes", "integer" })
   eq(rs.rows[1], { 1, "Alice", vim.NIL, 1.5, "\0\255", "9223372036854775807" })
@@ -47,9 +48,15 @@ T["declared types map to logical types"] = function()
     INSERT INTO t VALUES (2, NULL, 3, 0, NULL, NULL, '[]', NULL, NULL);
     SELECT * FROM t ORDER BY id;
   ]])
-  eq(types(rs), { "integer", "string", "decimal", "boolean", "datetime", "date", "json", "number", "bytes" })
+  eq(
+    types(rs),
+    { "integer", "string", "decimal", "boolean", "datetime", "date", "json", "number", "bytes" }
+  )
   local r1, r2 = rs.rows[1], rs.rows[2]
-  eq({ r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[8], r1[9] }, { 1, "中文", "9.5", true, "2026-11-20 10:00:00", "2026-11-20", 0.25, "\202\254" })
+  eq(
+    { r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[8], r1[9] },
+    { 1, "中文", "9.5", true, "2026-11-20 10:00:00", "2026-11-20", 0.25, "\202\254" }
+  )
   eq(map.keys(r1[7]), { "a", "b" })
   eq(r1[7].b, { 1, 2 })
   eq(r1[7].a, vim.NIL)
@@ -58,7 +65,10 @@ T["declared types map to logical types"] = function()
 end
 
 T["max_rows truncates"] = function()
-  local rs = ok("WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 50) SELECT x FROM c", { max_rows = 10 })
+  local rs = ok(
+    "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 50) SELECT x FROM c",
+    { max_rows = 10 }
+  )
   eq({ rs.row_count, rs.truncated, rs.rows[10][1] }, { 10, true, 10 })
   rs = ok("SELECT 1", { max_rows = 1 })
   eq(rs.truncated, false)
@@ -83,9 +93,17 @@ T["files: relative paths resolve against base_dir, readonly option"] = function(
   vim.fn.mkdir(dir, "p")
   local file = dir .. "/t.db"
   eq(run("sqlite://" .. file, "SELECT 1").err.phase, "connect") -- not created by default
-  ok("CREATE TABLE x(v); INSERT INTO x VALUES (42);", { options = { create = true } }, "sqlite://" .. file)
+  ok(
+    "CREATE TABLE x(v); INSERT INTO x VALUES (42);",
+    { options = { create = true } },
+    "sqlite://" .. file
+  )
   eq(ok("SELECT v FROM x", { base_dir = dir }, "sqlite://t.db").rows[1][1], 42)
-  local r = run("sqlite://t.db", "INSERT INTO x VALUES (1)", { base_dir = dir, options = { readonly = true } })
+  local r = run(
+    "sqlite://t.db",
+    "INSERT INTO x VALUES (1)",
+    { base_dir = dir, options = { readonly = true } }
+  )
   eq(r.err.message:find("readonly") ~= nil, true)
 end
 
@@ -98,7 +116,8 @@ T["the query timeout interrupts long statements"] = function()
 end
 
 T["bad lib_path is reported"] = function()
-  local r = run("sqlite:///:memory:", "SELECT 1", { options = { lib_path = "/nope/libsqlite3.so" } })
+  local r =
+    run("sqlite:///:memory:", "SELECT 1", { options = { lib_path = "/nope/libsqlite3.so" } })
   eq({ r.err.phase, r.err.message:find("lib_path") ~= nil }, { "connect", true })
 end
 

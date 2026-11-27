@@ -110,7 +110,8 @@ function M.sync(d, o)
       args.items = items
       local kids = {}
       for _, it in ipairs(items) do
-        kids[#kids + 1] = dom.new("arg-name", { classes = it["local"] and { "local" } or {}, text = it.name })
+        kids[#kids + 1] =
+          dom.new("arg-name", { classes = it["local"] and { "local" } or {}, text = it.name })
         kids[#kids + 1] = dom.new("arg-value", { text = it.value })
       end
       args:set_children(kids)

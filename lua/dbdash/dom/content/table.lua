@@ -47,14 +47,18 @@ function M.columns(rs, show)
           format = t and nn(spec.format) or nil,
           align = (t and nn(spec.align)) or ((ltype and NUMERIC[ltype]) and "right" or "left"),
           ltype = ltype,
-          thresholds = t and nn(spec.thresholds) and T.steps(spec.thresholds, nn(spec.thresholds_below) == true) or nil,
+          thresholds = t and nn(spec.thresholds) and T.steps(
+            spec.thresholds,
+            nn(spec.thresholds_below) == true
+          ) or nil,
           below = t and nn(spec.thresholds_below) == true,
         }
       end
     end
   else
     for i, c in ipairs(rs.columns) do
-      cols[i] = { index = i, label = c.name, align = NUMERIC[c.type] and "right" or "left", ltype = c.type }
+      cols[i] =
+        { index = i, label = c.name, align = NUMERIC[c.type] and "right" or "left", ltype = c.type }
     end
   end
   return cols

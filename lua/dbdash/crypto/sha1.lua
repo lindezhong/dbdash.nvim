@@ -3,7 +3,8 @@ local bit = require("bit")
 local md = require("dbdash.crypto.md")
 local u = require("dbdash.crypto.util")
 
-local band, bxor, bnot, bor, lshift, rol, tobit = bit.band, bit.bxor, bit.bnot, bit.bor, bit.lshift, bit.rol, bit.tobit
+local band, bxor, bnot, bor, lshift, rol, tobit =
+  bit.band, bit.bxor, bit.bnot, bit.bor, bit.lshift, bit.rol, bit.tobit
 
 local W = {}
 
@@ -30,13 +31,20 @@ local function compress(H, s, off)
     local t = tobit(rol(a, 5) + f + e + k + W[i])
     e, d, c, b, a = d, c, rol(b, 30), a, t
   end
-  H[1], H[2], H[3], H[4], H[5] = tobit(H[1] + a), tobit(H[2] + b), tobit(H[3] + c), tobit(H[4] + d), tobit(H[5] + e)
+  H[1], H[2], H[3], H[4], H[5] =
+    tobit(H[1] + a), tobit(H[2] + b), tobit(H[3] + c), tobit(H[4] + d), tobit(H[5] + e)
 end
 
 local M = md.define({
   block = 64,
   init = function()
-    return { tobit(0x67452301), tobit(0xefcdab89), tobit(0x98badcfe), tobit(0x10325476), tobit(0xc3d2e1f0) }
+    return {
+      tobit(0x67452301),
+      tobit(0xefcdab89),
+      tobit(0x98badcfe),
+      tobit(0x10325476),
+      tobit(0xc3d2e1f0),
+    }
   end,
   compress = compress,
   digest = function(H)

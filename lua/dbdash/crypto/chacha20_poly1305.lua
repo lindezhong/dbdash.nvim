@@ -2,7 +2,8 @@
 local bit = require("bit")
 local util = require("dbdash.crypto.util")
 
-local band, bor, bxor, lshift, rshift, rol, tobit = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift, bit.rol, bit.tobit
+local band, bor, bxor, lshift, rshift, rol, tobit =
+  bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift, bit.rol, bit.tobit
 
 local M = {}
 
@@ -12,7 +13,12 @@ local function le32(s, i)
 end
 
 local function le32s(n)
-  return string.char(band(n, 255), band(rshift(n, 8), 255), band(rshift(n, 16), 255), band(rshift(n, 24), 255))
+  return string.char(
+    band(n, 255),
+    band(rshift(n, 8), 255),
+    band(rshift(n, 16), 255),
+    band(rshift(n, 24), 255)
+  )
 end
 
 local x = {}
@@ -20,23 +26,45 @@ local x = {}
 ---One 64-byte ChaCha20 block.
 function M.block(key, counter, nonce)
   local s = {
-    tobit(0x61707865), tobit(0x3320646e), tobit(0x79622d32), tobit(0x6b206574),
-    le32(key, 1), le32(key, 5), le32(key, 9), le32(key, 13),
-    le32(key, 17), le32(key, 21), le32(key, 25), le32(key, 29),
-    tobit(counter), le32(nonce, 1), le32(nonce, 5), le32(nonce, 9),
+    tobit(0x61707865),
+    tobit(0x3320646e),
+    tobit(0x79622d32),
+    tobit(0x6b206574),
+    le32(key, 1),
+    le32(key, 5),
+    le32(key, 9),
+    le32(key, 13),
+    le32(key, 17),
+    le32(key, 21),
+    le32(key, 25),
+    le32(key, 29),
+    tobit(counter),
+    le32(nonce, 1),
+    le32(nonce, 5),
+    le32(nonce, 9),
   }
   for i = 1, 16 do
     x[i] = s[i]
   end
   local function qr(a, b, c, d)
-    x[a] = tobit(x[a] + x[b]); x[d] = rol(bxor(x[d], x[a]), 16)
-    x[c] = tobit(x[c] + x[d]); x[b] = rol(bxor(x[b], x[c]), 12)
-    x[a] = tobit(x[a] + x[b]); x[d] = rol(bxor(x[d], x[a]), 8)
-    x[c] = tobit(x[c] + x[d]); x[b] = rol(bxor(x[b], x[c]), 7)
+    x[a] = tobit(x[a] + x[b])
+    x[d] = rol(bxor(x[d], x[a]), 16)
+    x[c] = tobit(x[c] + x[d])
+    x[b] = rol(bxor(x[b], x[c]), 12)
+    x[a] = tobit(x[a] + x[b])
+    x[d] = rol(bxor(x[d], x[a]), 8)
+    x[c] = tobit(x[c] + x[d])
+    x[b] = rol(bxor(x[b], x[c]), 7)
   end
   for _ = 1, 10 do
-    qr(1, 5, 9, 13); qr(2, 6, 10, 14); qr(3, 7, 11, 15); qr(4, 8, 12, 16)
-    qr(1, 6, 11, 16); qr(2, 7, 12, 13); qr(3, 8, 9, 14); qr(4, 5, 10, 15)
+    qr(1, 5, 9, 13)
+    qr(2, 6, 10, 14)
+    qr(3, 7, 11, 15)
+    qr(4, 8, 12, 16)
+    qr(1, 6, 11, 16)
+    qr(2, 7, 12, 13)
+    qr(3, 8, 9, 14)
+    qr(4, 5, 10, 15)
   end
   local out = {}
   for i = 1, 16 do
@@ -78,8 +106,13 @@ function M.poly1305(m, key)
   for j = 1, 16 do
     r[j] = key:byte(j)
   end
-  r[4] = band(r[4], 15); r[5] = band(r[5], 252); r[8] = band(r[8], 15); r[9] = band(r[9], 252)
-  r[12] = band(r[12], 15); r[13] = band(r[13], 252); r[16] = band(r[16], 15)
+  r[4] = band(r[4], 15)
+  r[5] = band(r[5], 252)
+  r[8] = band(r[8], 15)
+  r[9] = band(r[9], 252)
+  r[12] = band(r[12], 15)
+  r[13] = band(r[13], 252)
+  r[16] = band(r[16], 15)
   local pos, n = 1, #m
   while n > 0 do
     local take = math.min(16, n)

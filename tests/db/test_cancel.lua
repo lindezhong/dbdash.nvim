@@ -194,7 +194,8 @@ end
 
 T["lua://: cancelling the script cancels the query it waits for"] = function()
   log = {}
-  local handle, wait = start("lua://", "return dbdash.query('cancelfake://h', 'slow')", { timeout = 60000 })
+  local handle, wait =
+    start("lua://", "return dbdash.query('cancelfake://h', 'slow')", { timeout = 60000 })
   vim.wait(300, function()
     return log[2] == "execute"
   end, 5)
@@ -276,11 +277,22 @@ T["it: postgres: CancelRequest stops the query"] = function()
   for _, url in ipairs({ PG, PG .. "?tls=require" }) do
     local m = marker()
     local function running()
-      return h.ok(PG, ("SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%%%s%%' AND pid <> pg_backend_pid()"):format(m)).rows[1][1]
+      return h.ok(
+        PG,
+        ("SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%%%s%%' AND pid <> pg_backend_pid()"):format(
+          m
+        )
+      ).rows[1][1]
     end
-    local err = server_stops(url, ("SELECT pg_sleep(30) /* %s */"):format(m), running, {}, function(hd)
-      hd:cancel("test")
-    end)
+    local err = server_stops(
+      url,
+      ("SELECT pg_sleep(30) /* %s */"):format(m),
+      running,
+      {},
+      function(hd)
+        hd:cancel("test")
+      end
+    )
     eq(err.phase, "cancelled")
   end
 end
@@ -289,10 +301,20 @@ T["it: postgres: a timeout stops the query on the server too"] = function()
   h.require_it()
   local m = marker()
   local function running()
-    return h.ok(PG, ("SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%%%s%%' AND pid <> pg_backend_pid()"):format(m)).rows[1][1]
+    return h.ok(
+      PG,
+      ("SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%%%s%%' AND pid <> pg_backend_pid()"):format(
+        m
+      )
+    ).rows[1][1]
   end
   -- The whole query may take connect_timeout + timeout.
-  local err = server_stops(PG .. "?connect_timeout=1s", ("SELECT pg_sleep(30) /* %s */"):format(m), running, { timeout = 1500 })
+  local err = server_stops(
+    PG .. "?connect_timeout=1s",
+    ("SELECT pg_sleep(30) /* %s */"):format(m),
+    running,
+    { timeout = 1500 }
+  )
   eq(err.phase, "timeout")
 end
 
@@ -300,7 +322,12 @@ T["it: mysql: KILL QUERY stops the query"] = function()
   h.require_it()
   local m = marker()
   local function running()
-    return h.ok(MY, ("SELECT count(*) FROM information_schema.processlist WHERE info LIKE '%%%s%%' AND id <> CONNECTION_ID()"):format(m)).rows[1][1]
+    return h.ok(
+      MY,
+      ("SELECT count(*) FROM information_schema.processlist WHERE info LIKE '%%%s%%' AND id <> CONNECTION_ID()"):format(
+        m
+      )
+    ).rows[1][1]
   end
   local err = server_stops(MY, ("SELECT SLEEP(30) /* %s */"):format(m), running, {}, function(hd)
     hd:cancel("test")
@@ -312,12 +339,21 @@ T["it: mssql: attention stops the batch"] = function()
   h.require_it()
   local m = marker()
   local function running()
-    return h.ok(MS, ([[SELECT count(*) FROM sys.dm_exec_requests r CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
-      WHERE t.text LIKE '%%%s%%' AND r.session_id <> @@SPID]]):format(m)).rows[1][1]
+    return h.ok(
+      MS,
+      ([[SELECT count(*) FROM sys.dm_exec_requests r CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
+      WHERE t.text LIKE '%%%s%%' AND r.session_id <> @@SPID]]):format(m)
+    ).rows[1][1]
   end
-  local err = server_stops(MS, ("WAITFOR DELAY '00:00:30' /* %s */"):format(m), running, {}, function(hd)
-    hd:cancel("test")
-  end)
+  local err = server_stops(
+    MS,
+    ("WAITFOR DELAY '00:00:30' /* %s */"):format(m),
+    running,
+    {},
+    function(hd)
+      hd:cancel("test")
+    end
+  )
   eq(err.phase, "cancelled")
 end
 
@@ -325,13 +361,22 @@ T["it: mongodb: killOp stops the operation"] = function()
   h.require_it()
   local coll = marker()
   -- (JSON text: the command name must come first)
-  h.ok(MG, ('{"operation": "command", "command": {"insert": "%s", "documents": [{"x": 1}]}}'):format(coll))
+  h.ok(
+    MG,
+    ('{"operation": "command", "command": {"insert": "%s", "documents": [{"x": 1}]}}'):format(coll)
+  )
   local function running()
-    local rs = h.ok(MG, vim.json.encode({
-      database = "admin",
-      operation = "aggregate",
-      pipeline = { { ["$currentOp"] = vim.empty_dict() }, { ["$match"] = { ["command.find"] = coll } } },
-    }))
+    local rs = h.ok(
+      MG,
+      vim.json.encode({
+        database = "admin",
+        operation = "aggregate",
+        pipeline = {
+          { ["$currentOp"] = vim.empty_dict() },
+          { ["$match"] = { ["command.find"] = coll } },
+        },
+      })
+    )
     return rs.row_count
   end
   local q = vim.json.encode({ collection = coll, filter = { ["$where"] = "sleep(30000) || true" } })
@@ -385,8 +430,14 @@ T["it: driver.cancel alone stops the query (postgres, mysql, mssql, mongodb)"] =
   driver_cancel_ends_query(MY, "SELECT SLEEP(30)")
   driver_cancel_ends_query(MS, "WAITFOR DELAY '00:00:30'")
   local coll = marker()
-  h.ok(MG, ('{"operation": "command", "command": {"insert": "%s", "documents": [{"x": 1}]}}'):format(coll))
-  local err = driver_cancel_ends_query(MG, vim.json.encode({ collection = coll, filter = { ["$where"] = "sleep(30000) || true" } }))
+  h.ok(
+    MG,
+    ('{"operation": "command", "command": {"insert": "%s", "documents": [{"x": 1}]}}'):format(coll)
+  )
+  local err = driver_cancel_ends_query(
+    MG,
+    vim.json.encode({ collection = coll, filter = { ["$where"] = "sleep(30000) || true" } })
+  )
   eq(err ~= nil and tostring(err.message or err):find("interrupt") ~= nil, true)
   h.ok(MG, ('{"operation": "command", "command": {"drop": "%s"}}'):format(coll))
 end

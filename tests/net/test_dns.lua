@@ -36,13 +36,17 @@ T["queries over UDP against a local server"] = function()
     { type = 16, parts = { "authSource=", "admin&replicaSet=rs0" } },
   })
   local r = run(function()
-    return dns.srv("_mongodb._tcp.example.com", { server = "127.0.0.1:" .. port }), dns.txt("example.com", { server = "127.0.0.1:" .. port })
+    return dns.srv("_mongodb._tcp.example.com", { server = "127.0.0.1:" .. port }),
+      dns.txt("example.com", { server = "127.0.0.1:" .. port })
   end)
   udp:close()
   eq(r.err, nil)
-  eq(vim.tbl_map(function(x)
-    return x.target
-  end, r[1]), { "a.example.com", "b.example.com" })
+  eq(
+    vim.tbl_map(function(x)
+      return x.target
+    end, r[1]),
+    { "a.example.com", "b.example.com" }
+  )
   eq(r[2], { "authSource=admin&replicaSet=rs0" })
 end
 

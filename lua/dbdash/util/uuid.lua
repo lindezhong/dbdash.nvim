@@ -63,7 +63,15 @@ function M.v7()
   local r1, r2 = bit.tohex(next32(), 8), bit.tohex(next32(), 8)
   -- variant 10xx: the first hex digit of the fourth group is 8, 9, a or b
   local variant = ("%x"):format(8 + tonumber(r1:sub(1, 1), 16) % 4)
-  return ("%s-%s-7%03x-%s%s-%s%s"):format(ts:sub(1, 8), ts:sub(9, 12), counter, variant, r1:sub(2, 4), r1:sub(5, 8), r2)
+  return ("%s-%s-7%03x-%s%s-%s%s"):format(
+    ts:sub(1, 8),
+    ts:sub(9, 12),
+    counter,
+    variant,
+    r1:sub(2, 4),
+    r1:sub(5, 8),
+    r2
+  )
 end
 
 return M

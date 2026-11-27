@@ -2,7 +2,19 @@
 -- powers of 1024; "KiB" and "KB" mean the same).
 local M = {}
 
-local UNITS = { [""] = 1, b = 1, k = 1024, kb = 1024, kib = 1024, m = 1024 ^ 2, mb = 1024 ^ 2, mib = 1024 ^ 2, g = 1024 ^ 3, gb = 1024 ^ 3, gib = 1024 ^ 3 }
+local UNITS = {
+  [""] = 1,
+  b = 1,
+  k = 1024,
+  kb = 1024,
+  kib = 1024,
+  m = 1024 ^ 2,
+  mb = 1024 ^ 2,
+  mib = 1024 ^ 2,
+  g = 1024 ^ 3,
+  gb = 1024 ^ 3,
+  gib = 1024 ^ 3,
+}
 
 ---Bytes of a size, or nil and an error message.
 ---@param v any
@@ -18,7 +30,7 @@ function M.parse(v)
       return math.floor(tonumber(n) * mult)
     end
   end
-  return nil, ("invalid size %s (use bytes or a size like \"10MB\")"):format(vim.inspect(v))
+  return nil, ('invalid size %s (use bytes or a size like "10MB")'):format(vim.inspect(v))
 end
 
 ---Check a size option: an error message for invalid values.

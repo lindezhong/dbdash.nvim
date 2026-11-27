@@ -25,7 +25,10 @@ end
 T["wrap: padding and a border with the title in its top line"] = function()
   local s = settings({ panel = { border = "rounded", padding = { 0, 1 } } })
   local out = box.wrap(content("ab"), s, 12, nil, { text = "T", spans = { { 0, 1, "Title" } } })
-  eq(out.lines, { "╭─ T ──────╮", "│ ab       │", "╰──────────╯" })
+  eq(
+    out.lines,
+    { "╭─ T ──────╮", "│ ab       │", "╰──────────╯" }
+  )
   -- the content's highlight moved by the border and the padding
   local g = vim.tbl_filter(function(h)
     return h.group == "G"
@@ -33,7 +36,10 @@ T["wrap: padding and a border with the title in its top line"] = function()
   eq({ g.row, g.col_s, g.col_e }, { 1, #"│ ", #"│ " + 1 })
   -- panel-title { text-align: right }
   s = settings({ panel = { border = true }, ["panel-title"] = { ["text-align"] = "right" } })
-  eq(box.wrap(content("x"), s, 12, nil, { text = "T", spans = {} }).lines[1], "┌────── T ─┐")
+  eq(
+    box.wrap(content("x"), s, 12, nil, { text = "T", spans = {} }).lines[1],
+    "┌────── T ─┐"
+  )
 end
 
 T["wrap: an exact height pads the content; no box settings: unchanged"] = function()
@@ -60,7 +66,10 @@ T["position: justify-self and align-self"] = function()
 end
 
 T["part rules recolor values and labels; title text-align and display"] = function()
-  local rs = resultset.new({ { name = "k", type = "string" }, { name = "v", type = "integer" } }, { { "a", 1 }, { "b", 2 } })
+  local rs = resultset.new(
+    { { name = "k", type = "string" }, { name = "v", type = "integer" } },
+    { { "a", 1 }, { "b", 2 } }
+  )
   local out = render.render(rs, {
     type = "bar",
     title = "T",
@@ -68,7 +77,11 @@ T["part rules recolor values and labels; title text-align and display"] = functi
     y_column = "v",
   }, {
     width = 40,
-    style = { value = { color = "Special" }, label = { color = "Comment" }, title = { ["text-align"] = "left", color = "Error" } },
+    style = {
+      value = { color = "Special" },
+      label = { color = "Comment" },
+      title = { ["text-align"] = "left", color = "Error" },
+    },
   })
   local groups = {}
   for _, h in ipairs(out.hl) do
@@ -76,16 +89,28 @@ T["part rules recolor values and labels; title text-align and display"] = functi
   end
   eq({ groups.Special, groups.DbDashNumber, groups.Error }, { true, nil, true })
   eq(out.lines[1], "T")
-  out = render.render(rs, { type = "bar", title = "T", x_column = "k", y_column = "v" }, { width = 40, style = { title = { display = "none" } } })
+  out = render.render(
+    rs,
+    { type = "bar", title = "T", x_column = "k", y_column = "v" },
+    { width = 40, style = { title = { display = "none" } } }
+  )
   eq(out.lines[1]:find("T", 1, true), nil)
 end
 
 T["plot border styles and hidden axes"] = function()
-  local rs = resultset.new({ { name = "x", type = "integer" }, { name = "y", type = "integer" } }, { { 1, 1 }, { 2, 4 } })
+  local rs = resultset.new(
+    { { name = "x", type = "integer" }, { name = "y", type = "integer" } },
+    { { 1, 1 }, { 2, 4 } }
+  )
   local show = { type = "line", x_column = "x", y_column = "y" }
-  local out = render.render(rs, show, { width = 40, height = 12, style = { plot = { border = "double" } } })
+  local out =
+    render.render(rs, show, { width = 40, height = 12, style = { plot = { border = "double" } } })
   eq(out.lines[1]:find("╔", 1, true) ~= nil, true)
-  out = render.render(rs, show, { width = 40, height = 12, style = { plot = { border = "none" }, axis = { display = "none" } } })
+  out = render.render(
+    rs,
+    show,
+    { width = 40, height = 12, style = { plot = { border = "none" }, axis = { display = "none" } } }
+  )
   local text = table.concat(out.lines, "\n")
   eq({ text:find("┌", 1, true), text:find("4", 1, true) }, { nil, nil })
 end

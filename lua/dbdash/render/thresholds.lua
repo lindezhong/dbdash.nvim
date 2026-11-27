@@ -80,9 +80,13 @@ function M.check(list)
       return ("thresholds[%d]: value must be a number"):format(i - 1)
     end
     if nn(s.color) ~= nil then
-      return ("thresholds[%d]: color is appearance: give the step a class and color it in style (e.g. class: danger, or \"value.danger\": { color: ... })"):format(i - 1)
+      return ('thresholds[%d]: color is appearance: give the step a class and color it in style (e.g. class: danger, or "value.danger": { color: ... })'):format(
+        i - 1
+      )
     end
-    if nn(s.class) ~= nil and (type(s.class) ~= "string" or not s.class:match("^[%a_][%w_-]*$")) then
+    if
+      nn(s.class) ~= nil and (type(s.class) ~= "string" or not s.class:match("^[%a_][%w_-]*$"))
+    then
       return ("thresholds[%d]: class must be a class name"):format(i - 1)
     end
     if nn(s.notify) ~= nil and type(s.notify) ~= "boolean" then
@@ -112,7 +116,8 @@ function M.levels(rs, show)
         for _, row in ipairs(idx and rs.rows or {}) do
           local level, step = M.level(row[idx], steps, below)
           if level > best.level then
-            best = { level = level, step = step, value = row[idx], below = below, column = spec.column }
+            best =
+              { level = level, step = step, value = row[idx], below = below, column = spec.column }
           end
         end
         out[spec.column] = best

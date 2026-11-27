@@ -45,10 +45,26 @@ T["checkpoint: nothing outside a task, yields inside a long task"] = function()
 end
 
 local CASES = {
-  { "TLS handshake with verify-full", "postgres://dbdash:dbdash_pw@localhost:15432/dbdash_test?tls=verify-full&ca=tests/fixtures/pki/root.pem", "SELECT 1" },
-  { "SCRAM-SHA-256 (MongoDB, 15000 iterations)", "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin", '{"operation":"command","command":{"ping":1}}' },
-  { "50k rows (PostgreSQL)", "postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test", "SELECT g, md5(g::text) FROM generate_series(1, 50000) g" },
-  { "50k rows over TLS", "postgres://dbdash:dbdash_pw@localhost:15432/dbdash_test?tls=require", "SELECT g, md5(g::text) FROM generate_series(1, 50000) g" },
+  {
+    "TLS handshake with verify-full",
+    "postgres://dbdash:dbdash_pw@localhost:15432/dbdash_test?tls=verify-full&ca=tests/fixtures/pki/root.pem",
+    "SELECT 1",
+  },
+  {
+    "SCRAM-SHA-256 (MongoDB, 15000 iterations)",
+    "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin",
+    '{"operation":"command","command":{"ping":1}}',
+  },
+  {
+    "50k rows (PostgreSQL)",
+    "postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test",
+    "SELECT g, md5(g::text) FROM generate_series(1, 50000) g",
+  },
+  {
+    "50k rows over TLS",
+    "postgres://dbdash:dbdash_pw@localhost:15432/dbdash_test?tls=require",
+    "SELECT g, md5(g::text) FROM generate_series(1, 50000) g",
+  },
 }
 
 for _, c in ipairs(CASES) do

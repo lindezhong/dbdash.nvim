@@ -30,8 +30,17 @@ local OP = {
 }
 
 local CONSISTENCY = {
-  ANY = 0, ONE = 1, TWO = 2, THREE = 3, QUORUM = 4, ALL = 5, LOCAL_QUORUM = 6,
-  EACH_QUORUM = 7, SERIAL = 8, LOCAL_SERIAL = 9, LOCAL_ONE = 10,
+  ANY = 0,
+  ONE = 1,
+  TWO = 2,
+  THREE = 3,
+  QUORUM = 4,
+  ALL = 5,
+  LOCAL_QUORUM = 6,
+  EACH_QUORUM = 7,
+  SERIAL = 8,
+  LOCAL_SERIAL = 9,
+  LOCAL_ONE = 10,
 }
 
 -- Big-endian primitives ---------------------------------------------------------------------
@@ -42,7 +51,12 @@ end
 
 local function i32(n)
   n = n % 4294967296
-  return string.char(math.floor(n / 16777216) % 256, math.floor(n / 65536) % 256, math.floor(n / 256) % 256, n % 256)
+  return string.char(
+    math.floor(n / 16777216) % 256,
+    math.floor(n / 65536) % 256,
+    math.floor(n / 256) % 256,
+    n % 256
+  )
 end
 
 local function rd_u16(s, p)
@@ -150,7 +164,13 @@ local function uuid(b)
   local h = b:gsub(".", function(c)
     return ("%02x"):format(c:byte())
   end)
-  return ("%s-%s-%s-%s-%s"):format(h:sub(1, 8), h:sub(9, 12), h:sub(13, 16), h:sub(17, 20), h:sub(21, 32))
+  return ("%s-%s-%s-%s-%s"):format(
+    h:sub(1, 8),
+    h:sub(9, 12),
+    h:sub(13, 16),
+    h:sub(17, 20),
+    h:sub(21, 32)
+  )
 end
 
 local function inet(b)
@@ -193,19 +213,59 @@ end
 ---@field fields { name: string, type: dbdash.cql.Type }[]?
 
 local TYPE_NAMES = {
-  [0x01] = "ascii", [0x02] = "bigint", [0x03] = "blob", [0x04] = "boolean", [0x05] = "counter",
-  [0x06] = "decimal", [0x07] = "double", [0x08] = "float", [0x09] = "int", [0x0B] = "timestamp",
-  [0x0C] = "uuid", [0x0D] = "varchar", [0x0E] = "varint", [0x0F] = "timeuuid", [0x10] = "inet",
-  [0x11] = "date", [0x12] = "time", [0x13] = "smallint", [0x14] = "tinyint", [0x15] = "duration",
-  [0x20] = "list", [0x21] = "map", [0x22] = "set", [0x30] = "udt", [0x31] = "tuple",
+  [0x01] = "ascii",
+  [0x02] = "bigint",
+  [0x03] = "blob",
+  [0x04] = "boolean",
+  [0x05] = "counter",
+  [0x06] = "decimal",
+  [0x07] = "double",
+  [0x08] = "float",
+  [0x09] = "int",
+  [0x0B] = "timestamp",
+  [0x0C] = "uuid",
+  [0x0D] = "varchar",
+  [0x0E] = "varint",
+  [0x0F] = "timeuuid",
+  [0x10] = "inet",
+  [0x11] = "date",
+  [0x12] = "time",
+  [0x13] = "smallint",
+  [0x14] = "tinyint",
+  [0x15] = "duration",
+  [0x20] = "list",
+  [0x21] = "map",
+  [0x22] = "set",
+  [0x30] = "udt",
+  [0x31] = "tuple",
 }
 
 local LOGICAL = {
-  ascii = "string", varchar = "string", bigint = "integer", counter = "integer", int = "integer",
-  smallint = "integer", tinyint = "integer", varint = "integer", blob = "bytes", boolean = "boolean",
-  decimal = "decimal", double = "number", float = "number", timestamp = "datetime", date = "date",
-  time = "time", uuid = "uuid", timeuuid = "uuid", inet = "string", duration = "string",
-  list = "array", set = "array", tuple = "array", map = "json", udt = "json",
+  ascii = "string",
+  varchar = "string",
+  bigint = "integer",
+  counter = "integer",
+  int = "integer",
+  smallint = "integer",
+  tinyint = "integer",
+  varint = "integer",
+  blob = "bytes",
+  boolean = "boolean",
+  decimal = "decimal",
+  double = "number",
+  float = "number",
+  timestamp = "datetime",
+  date = "date",
+  time = "time",
+  uuid = "uuid",
+  timeuuid = "uuid",
+  inet = "string",
+  duration = "string",
+  list = "array",
+  set = "array",
+  tuple = "array",
+  map = "json",
+  udt = "json",
 }
 
 local function read_type(s, p)
@@ -247,7 +307,9 @@ end
 M.read_type = read_type
 
 local function type_name(t)
-  local n = TYPE_NAMES[t.id] or (t.custom and ("custom " .. t.custom)) or ("0x" .. ("%04x"):format(t.id))
+  local n = TYPE_NAMES[t.id]
+    or (t.custom and ("custom " .. t.custom))
+    or ("0x" .. ("%04x"):format(t.id))
   if t.sub then
     local subs = {}
     for i, st in ipairs(t.sub) do
@@ -266,7 +328,13 @@ local function decode(t, b)
   local name = TYPE_NAMES[t.id]
   if name == "ascii" or name == "varchar" then
     return b
-  elseif name == "bigint" or name == "counter" or name == "int" or name == "smallint" or name == "tinyint" then
+  elseif
+    name == "bigint"
+    or name == "counter"
+    or name == "int"
+    or name == "smallint"
+    or name == "tinyint"
+  then
     return be_int(b)
   elseif name == "varint" then
     return resultset.integer(M.varint(b))
@@ -302,7 +370,12 @@ local function decode(t, b)
     local ns = tonumber(be_int(b)) or 0
     local secs = math.floor(ns / 1e9)
     local frac = ns - secs * 1e9
-    return ("%02d:%02d:%02d.%09d"):format(math.floor(secs / 3600), math.floor(secs % 3600 / 60), secs % 60, frac)
+    return ("%02d:%02d:%02d.%09d"):format(
+      math.floor(secs / 3600),
+      math.floor(secs % 3600 / 60),
+      secs % 60,
+      frac
+    )
   elseif name == "uuid" or name == "timeuuid" then
     return uuid(b)
   elseif name == "inet" then
@@ -369,7 +442,11 @@ Conn.__index = Conn
 
 function Conn:send(opcode, body)
   self.stream = (self.stream + 1) % 32768
-  self.sock:write(string.char(0x04, 0, math.floor(self.stream / 256), self.stream % 256, opcode) .. i32(#body) .. body)
+  self.sock:write(
+    string.char(0x04, 0, math.floor(self.stream / 256), self.stream % 256, opcode)
+      .. i32(#body)
+      .. body
+  )
 end
 
 ---Read one response frame: opcode, body.
@@ -429,7 +506,11 @@ function M.parse_url(info)
 end
 
 function M.connect(info)
-  local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
+  local sock = socket.connect(
+    info.host,
+    info.port,
+    { connect_timeout = info.connect_timeout, timeout = info.timeout }
+  )
   local c = setmetatable({ sock = sock, stream = 0, consistency = info.consistency or 1 }, Conn)
   local ok, err = pcall(function()
     if info.tls ~= "disable" then

@@ -25,7 +25,10 @@ T["csv: RFC 4180 quoting, NULL as empty"] = function()
 end
 
 T["tsv: tabs, newlines and backslashes escaped"] = function()
-  eq(export.format(rs, "tsv"), 'id\tname\tnote\tscore\tok\tid\n1\tAlice\tsay "hi", ok\t2.5\ttrue\t10\n2\t王小明\ta|b\\nline2\\tx\t\tfalse\t20\n')
+  eq(
+    export.format(rs, "tsv"),
+    'id\tname\tnote\tscore\tok\tid\n1\tAlice\tsay "hi", ok\t2.5\ttrue\t10\n2\t王小明\ta|b\\nline2\\tx\t\tfalse\t20\n'
+  )
 end
 
 T["json: objects in column order, typed values, null, unique keys"] = function()
@@ -50,10 +53,11 @@ T["markdown: pipes escaped, newlines as <br>, numbers right-aligned"] = function
 end
 
 T["bytes, JSON values and 64-bit integers"] = function()
-  local r = resultset.new(
-    { { name = "b", type = "bytes" }, { name = "j", type = "json" }, { name = "n", type = "integer" } },
-    { { "\1\255", { a = 1 }, 9007199254740993LL } }
-  )
+  local r = resultset.new({
+    { name = "b", type = "bytes" },
+    { name = "j", type = "json" },
+    { name = "n", type = "integer" },
+  }, { { "\1\255", { a = 1 }, 9007199254740993LL } })
   eq(export.format(r, "csv"), 'b,j,n\n\\x01ff,"{""a"":1}",9007199254740993\n')
   eq(export.format(r, "json"), '[\n  {"b": "\\\\x01ff", "j": {"a":1}, "n": 9007199254740993}\n]\n')
 end

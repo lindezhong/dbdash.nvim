@@ -303,9 +303,11 @@ function M.from_hex(h)
 end
 
 function M.to_hex(a)
-  local s = M.to_bytes(a):gsub(".", function(c)
-    return ("%02x"):format(c:byte())
-  end):gsub("^0+", "")
+  local s = M.to_bytes(a)
+    :gsub(".", function(c)
+      return ("%02x"):format(c:byte())
+    end)
+    :gsub("^0+", "")
   return s == "" and "0" or s
 end
 

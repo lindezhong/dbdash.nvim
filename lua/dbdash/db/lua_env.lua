@@ -35,7 +35,12 @@ M.helpers = {
   ---   raw = true: the raw result of lua:// / http(s):// instead of rows (value, response)
   query = function(url, query, opts)
     -- Cancelling the code that runs this (its refresh) cancels the query too.
-    opts = vim.tbl_extend("force", {}, opts or {}, { cancel = (opts or {}).cancel or M.current_cancel() })
+    opts = vim.tbl_extend(
+      "force",
+      {},
+      opts or {},
+      { cancel = (opts or {}).cancel or M.current_cancel() }
+    )
     local rs = require("dbdash.db").query_async(url, query, opts)
     local lua_result = require("dbdash.db.lua_result")
     if lua_result.is_raw(rs) then
@@ -84,9 +89,17 @@ local function timeout_hook()
         if cancelled then
           error({ message = "query cancelled: " .. d.token.reason, cancelled = true }, 0)
         elseif stalled then
-          error({ message = ("script ran %.1fs without waiting (dbdash.sleep, dbdash.checkpoint, ...)"):format(d.slice / 1000), timeout = true }, 0)
+          error({
+            message = ("script ran %.1fs without waiting (dbdash.sleep, dbdash.checkpoint, ...)"):format(
+              d.slice / 1000
+            ),
+            timeout = true,
+          }, 0)
         end
-        error({ message = ("script did not finish within %.1fs"):format(d.timeout / 1000), timeout = true }, 0)
+        error({
+          message = ("script did not finish within %.1fs"):format(d.timeout / 1000),
+          timeout = true,
+        }, 0)
       end
     end
   end
@@ -111,7 +124,12 @@ function M.guard(fn, timeout, token, slice)
     list = {}
     deadlines[co] = list
   end
-  local entry = { at = timeout and vim.uv.hrtime() + timeout * 1e6 or math.huge, timeout = timeout, token = token, slice = slice }
+  local entry = {
+    at = timeout and vim.uv.hrtime() + timeout * 1e6 or math.huge,
+    timeout = timeout,
+    token = token,
+    slice = slice,
+  }
   list[#list + 1] = entry
   if debug.gethook() ~= timeout_hook then
     debug.sethook(timeout_hook, "", 10000)

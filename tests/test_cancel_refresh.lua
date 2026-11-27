@@ -91,7 +91,10 @@ T["a requested refresh cancels the running one and starts at once"] = function()
   end, 5), true)
   -- The new refresh runs already; the old one is closed as cancelled.
   eq({ p.running, p.current ~= first, p.refresh_count }, { true, true, 2 })
-  eq({ p.prev.id, p.prev.ok, p.prev.error }, { first.record.id, false, "query cancelled: replaced by a new refresh" })
+  eq(
+    { p.prev.id, p.prev.ok, p.prev.error },
+    { first.record.id, false, "query cancelled: replaced by a new refresh" }
+  )
   eq(p.history[1].cancelled, "replaced by a new refresh")
   eq(p.error, nil)
 end
@@ -209,7 +212,11 @@ T[":DbDashStatus lists a cancelled refresh"] = function()
   vim.api.nvim_set_current_buf(d.buf)
   pcall(require("dbdash.commands").status)
   popup.open = real
-  eq(lines ~= nil and table.concat(lines, "\n"):find("cancelled %(replaced by a new refresh%)") ~= nil, true)
+  eq(
+    lines ~= nil
+      and table.concat(lines, "\n"):find("cancelled %(replaced by a new refresh%)") ~= nil,
+    true
+  )
 end
 
 T["it: postgres: `r` and stopping the dashboard stop the query on the server"] = function()
@@ -218,7 +225,12 @@ T["it: postgres: `r` and stopping the dashboard stop the query on the server"] =
   local PG = "postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test"
   local m = ("dbdash_cancel_%d"):format(math.random(1e9))
   local function running()
-    return h.ok(PG, ("SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%%%s%%' AND pid <> pg_backend_pid()"):format(m)).rows[1][1]
+    return h.ok(
+      PG,
+      ("SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%%%s%%' AND pid <> pg_backend_pid()"):format(
+        m
+      )
+    ).rows[1][1]
   end
   local function wait_for(n)
     vim.wait(5000, function()

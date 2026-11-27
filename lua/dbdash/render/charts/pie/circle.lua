@@ -13,7 +13,12 @@ function M.render(rs, show, ctx)
   local function add(s, spans, shift)
     lines[#lines + 1] = s
     for _, sp in ipairs(spans or {}) do
-      hl[#hl + 1] = { row = #lines - 1, col_s = sp[1] + (shift or 0), col_e = sp[2] + (shift or 0), group = sp[3] }
+      hl[#hl + 1] = {
+        row = #lines - 1,
+        col_s = sp[1] + (shift or 0),
+        col_e = sp[2] + (shift or 0),
+        group = sp[3],
+      }
     end
   end
   if #items == 0 then
@@ -47,7 +52,10 @@ function M.render(rs, show, ctx)
   local beside = pos ~= "bottom" and #legend > 0 and cols_for(6) + 3 + lw <= ctx.width
   local room = beside and (ctx.width - 3 - lw) or ctx.width
   -- The height left (at least min_height), then as wide as the room allows.
-  local rows = math.min(ctx.plot_height or 12, (ctx.height - 1 - (beside and 0 or #legend)) * (half and 2 or 1))
+  local rows = math.min(
+    ctx.plot_height or 12,
+    (ctx.height - 1 - (beside and 0 or #legend)) * (half and 2 or 1)
+  )
   rows = math.max(rows, math.min(ctx.min_plot_height or 3, ctx.plot_height or 12))
   while rows > 3 and cols_for(rows) > room do
     rows = rows - 1
@@ -104,7 +112,8 @@ function M.render(rs, show, ctx)
     rows = keep
   end
   if donut >= 0.5 and not half then -- the total in the hole
-    local text = require("dbdash.render.format").value(sum, show.format ~= vim.NIL and show.format or nil)
+    local text =
+      require("dbdash.render.format").value(sum, show.format ~= vim.NIL and show.format or nil)
     local mid = math.floor(rows / 2) + 1
     local line = body[mid]
     local chars = {}
@@ -121,7 +130,8 @@ function M.render(rs, show, ctx)
       body_hl = vim.tbl_filter(function(h)
         return h.row ~= mid - 1
       end, body_hl)
-      body_hl[#body_hl + 1] = { row = mid - 1, col_s = byte, col_e = byte + #text, group = ctx.css:hl("value") }
+      body_hl[#body_hl + 1] =
+        { row = mid - 1, col_s = byte, col_e = byte + #text, group = ctx.css:hl("value") }
     end
   end
 

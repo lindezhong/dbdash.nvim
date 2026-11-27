@@ -27,7 +27,14 @@ function M.check(scheme, options, spec, defaults)
     if want == nil then
       local names = vim.tbl_keys(spec)
       table.sort(names)
-      dberr.raise("config", ("%s://: unknown option database.options.%s (known: %s)"):format(scheme, tostring(k), table.concat(names, ", ")))
+      dberr.raise(
+        "config",
+        ("%s://: unknown option database.options.%s (known: %s)"):format(
+          scheme,
+          tostring(k),
+          table.concat(names, ", ")
+        )
+      )
     end
     if v ~= vim.NIL then
       local err
@@ -73,16 +80,18 @@ function M.expand_env(value, what)
   if type(value) ~= "string" then
     return value
   end
-  return (value:gsub("(%$?)%${([%a_][%w_]*)}", function(escape, name)
-    if escape == "$" then
-      return "${" .. name .. "}"
-    end
-    local v = vim.uv.os_getenv(name)
-    if v == nil then
-      dberr.raise("config", ("%s: environment variable %s is not set"):format(what, name))
-    end
-    return v
-  end))
+  return (
+    value:gsub("(%$?)%${([%a_][%w_]*)}", function(escape, name)
+      if escape == "$" then
+        return "${" .. name .. "}"
+      end
+      local v = vim.uv.os_getenv(name)
+      if v == nil then
+        dberr.raise("config", ("%s: environment variable %s is not set"):format(what, name))
+      end
+      return v
+    end)
+  )
 end
 
 function M.delimiter(v)

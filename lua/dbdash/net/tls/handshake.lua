@@ -32,12 +32,20 @@ local HS = {
 M.HS = HS
 
 local SUITES = {
-  [0x1301] = { name = "TLS_AES_128_GCM_SHA256", key_len = 16, new = function(k)
-    return require("dbdash.crypto.aes_gcm").new(k)
-  end },
-  [0x1303] = { name = "TLS_CHACHA20_POLY1305_SHA256", key_len = 32, new = function(k)
-    return require("dbdash.crypto.chacha20_poly1305").new(k)
-  end },
+  [0x1301] = {
+    name = "TLS_AES_128_GCM_SHA256",
+    key_len = 16,
+    new = function(k)
+      return require("dbdash.crypto.aes_gcm").new(k)
+    end,
+  },
+  [0x1303] = {
+    name = "TLS_CHACHA20_POLY1305_SHA256",
+    key_len = 32,
+    new = function(k)
+      return require("dbdash.crypto.chacha20_poly1305").new(k)
+    end,
+  },
 }
 
 local SIG = {
@@ -108,7 +116,10 @@ function M.client_hello(host, shares, random, session_id, o)
   o = o or {}
   local tls12 = o.tls12 ~= false
   local tls13 = o.tls13 ~= false
-  local key_shares = u16(GROUP_X25519) .. vec16(shares.x25519) .. u16(GROUP_P256) .. vec16(shares.p256)
+  local key_shares = u16(GROUP_X25519)
+    .. vec16(shares.x25519)
+    .. u16(GROUP_P256)
+    .. vec16(shares.p256)
   local sig_algs = vim.list_extend(vim.deepcopy(SIG_ALGS), tls12 and SIG_ALGS_12 or {})
   local exts = {
     ext(10, vec16(list16({ GROUP_X25519, GROUP_P256 }))), -- supported_groups
@@ -116,7 +127,8 @@ function M.client_hello(host, shares, random, session_id, o)
     ext(50, vec16(list16(SIG_ALGS_CERT))), -- signature_algorithms_cert
   }
   if tls13 then
-    exts[#exts + 1] = ext(43, tls12 and (u8(4) .. u16(0x0304) .. u16(0x0303)) or (u8(2) .. u16(0x0304))) -- supported_versions
+    exts[#exts + 1] =
+      ext(43, tls12 and (u8(4) .. u16(0x0304) .. u16(0x0303)) or (u8(2) .. u16(0x0304))) -- supported_versions
     exts[#exts + 1] = ext(51, vec16(key_shares)) -- key_share
   end
   if tls12 then
@@ -142,9 +154,11 @@ function M.client_hello(host, shares, random, session_id, o)
   end
   local body = u16(0x0303)
     .. random
-    .. u8(#session_id) .. session_id
+    .. u8(#session_id)
+    .. session_id
     .. vec16(list16(suites))
-    .. u8(1) .. u8(0)
+    .. u8(1)
+    .. u8(0)
     .. vec16(table.concat(exts))
   return u8(HS.client_hello) .. u24(#body) .. body
 end
@@ -166,7 +180,9 @@ function M.parse_server_hello(body, offered13)
   local p = 3
   local random = body:sub(p, p + 31)
   if random == HRR_RANDOM then
-    fail("the server asked for a different key exchange group (HelloRetryRequest); only x25519 and secp256r1 are supported")
+    fail(
+      "the server asked for a different key exchange group (HelloRetryRequest); only x25519 and secp256r1 are supported"
+    )
   end
   p = p + 32
   local sid_len = body:byte(p)
@@ -220,7 +236,11 @@ function M.parse_server_hello(body, offered13)
     fail("server chose an unsupported cipher suite 0x%04x", suite)
   end
   local share, group = info.share, info.group
-  if not share or (group == GROUP_X25519 and #share ~= 32) or (group == GROUP_P256 and #share ~= 65) then
+  if
+    not share
+    or (group == GROUP_X25519 and #share ~= 32)
+    or (group == GROUP_P256 and #share ~= 65)
+  then
     fail("missing or invalid key share")
   end
   return info
@@ -340,11 +360,17 @@ function M.run(sock, opts)
   local ppriv, ppub = p256.ecdh_keypair()
   local rand = require("dbdash.crypto.random")
   local client_random = rand.bytes(32)
-  local ch = M.client_hello(opts.host, { x25519 = pub, p256 = ppub }, client_random, rand.bytes(32), {
-    alpn = opts.alpn,
-    tls12 = opts.tls12,
-    tls13 = opts.tls13,
-  })
+  local ch = M.client_hello(
+    opts.host,
+    { x25519 = pub, p256 = ppub },
+    client_random,
+    rand.bytes(32),
+    {
+      alpn = opts.alpn,
+      tls12 = opts.tls12,
+      tls13 = opts.tls13,
+    }
+  )
   sock:raw_write(record.header(TYPE.handshake, #ch) .. ch)
   local transcript = ch
 

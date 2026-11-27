@@ -14,7 +14,8 @@ local errors = require("dbdash.template.errors")
 
 local M = {}
 
-local CMP = { ["=="] = true, ["!="] = true, ["<"] = true, ["<="] = true, [">"] = true, [">="] = true }
+local CMP =
+  { ["=="] = true, ["!="] = true, ["<"] = true, ["<="] = true, [">"] = true, [">="] = true }
 
 local DESCRIBE = {
   var_end = "end of print statement",
@@ -249,7 +250,13 @@ function P:parse_include(tok)
   end
   local with_context = self:context_clause(true)
   self:expect_block_end()
-  return { k = "Include", target = target, ignore_missing = ignore, with_context = with_context, line = tok.line }
+  return {
+    k = "Include",
+    target = target,
+    ignore_missing = ignore,
+    with_context = with_context,
+    line = tok.line,
+  }
 end
 
 ---{% block name [scoped] [required] %} ... {% endblock [name] %}
@@ -284,7 +291,15 @@ function P:parse_block(tok)
       end
     end
   end
-  return { k = "Block", name = nt.v, scoped = scoped, required = required, body = body, line = tok.line, col = nt.col }
+  return {
+    k = "Block",
+    name = nt.v,
+    scoped = scoped,
+    required = required,
+    body = body,
+    line = tok.line,
+    col = nt.col,
+  }
 end
 
 function P:parse_if(tok)
@@ -292,10 +307,8 @@ function P:parse_if(tok)
   local test, line = self:expression(), tok.line
   self:expect_block_end()
   while true do
-    local body, e = self:subparse(
-      { elif = true, ["else"] = true, endif = true },
-      "'elif' or 'else' or 'endif'"
-    )
+    local body, e =
+      self:subparse({ elif = true, ["else"] = true, endif = true }, "'elif' or 'else' or 'endif'")
     node.branches[#node.branches + 1] = { test = test, body = body, line = line }
     local et = self:next()
     if e == "elif" then
@@ -361,14 +374,29 @@ function P:parse_for(tok)
     self:next()
   end
   self:expect_block_end()
-  return { k = "For", targets = targets, iter = iter, test = test, recursive = recursive, body = body, else_ = else_, line = tok.line }
+  return {
+    k = "For",
+    targets = targets,
+    iter = iter,
+    test = test,
+    recursive = recursive,
+    body = body,
+    else_ = else_,
+    line = tok.line,
+  }
 end
 
 function P:parse_set(tok)
   -- {% set ns.attr = expr %}: an attribute of a namespace(); {% set args.name = expr %}
   -- assigns a dashboard argument ({% set meta.x %} cannot).
   local t, dot, attr = self:peek(), self:peek(1), self:peek(2)
-  if t.t == "name" and dot.t == "op" and dot.v == "." and attr.t == "name" and self:is_op("=", 3) then
+  if
+    t.t == "name"
+    and dot.t == "op"
+    and dot.v == "."
+    and attr.t == "name"
+    and self:is_op("=", 3)
+  then
     if t.v == "meta" then
       self:fail(t, "'meta' is read-only (dashboard metadata)")
     end
@@ -378,7 +406,13 @@ function P:parse_set(tok)
     if t.v == "args" then
       return { k = "SetArg", name = attr.v, expr = e, line = tok.line }
     end
-    return { k = "SetAttr", obj = { k = "Name", name = t.v, line = t.line, col = t.col }, attr = attr.v, expr = e, line = tok.line }
+    return {
+      k = "SetAttr",
+      obj = { k = "Name", name = t.v, line = t.line, col = t.col },
+      attr = attr.v,
+      expr = e,
+      line = tok.line,
+    }
   end
   local targets = self:targets()
   if not self:skip_op("=") then
@@ -458,7 +492,13 @@ function P:parse_import(tok)
   end
   local with_context = self:context_clause(false)
   self:expect_block_end()
-  return { k = "Import", target = target, alias = alias.v, with_context = with_context, line = tok.line }
+  return {
+    k = "Import",
+    target = target,
+    alias = alias.v,
+    with_context = with_context,
+    line = tok.line,
+  }
 end
 
 ---{% from 'file' import a, b as c %}
@@ -490,7 +530,13 @@ function P:parse_from(tok)
   until not self:skip_op(",")
   local with_context = self:context_clause(false)
   self:expect_block_end()
-  return { k = "FromImport", target = target, names = names, with_context = with_context, line = tok.line }
+  return {
+    k = "FromImport",
+    target = target,
+    names = names,
+    with_context = with_context,
+    line = tok.line,
+  }
 end
 
 -- Expressions ------------------------------------------------------------------------------
@@ -748,7 +794,11 @@ end
 function P:p_call(fn)
   local t = self:next() -- "("
   local args, kwargs, dyn_args, dyn_kwargs = self:p_args()
-  return node("Call", t, { fn = fn, args = args, kwargs = kwargs, dyn_args = dyn_args, dyn_kwargs = dyn_kwargs })
+  return node(
+    "Call",
+    t,
+    { fn = fn, args = args, kwargs = kwargs, dyn_args = dyn_args, dyn_kwargs = dyn_kwargs }
+  )
 end
 
 ---Parse call arguments after "(" up to and including ")": positional, keyword, then
@@ -797,7 +847,14 @@ function P:p_filter_expr(n)
         self:next()
         args, kwargs, dyn_args, dyn_kwargs = self:p_args()
       end
-      n = node("Filter", t, { node = n, name = t.v, args = args, kwargs = kwargs, dyn_args = dyn_args, dyn_kwargs = dyn_kwargs })
+      n = node("Filter", t, {
+        node = n,
+        name = t.v,
+        args = args,
+        kwargs = kwargs,
+        dyn_args = dyn_args,
+        dyn_kwargs = dyn_kwargs,
+      })
     elseif self:is_name("is") then
       self:next()
       local neg = false
@@ -816,7 +873,9 @@ function P:p_filter_expr(n)
         args, kwargs = self:p_args()
       elseif
         (TEST_ARG_START[nx.t] or (nx.t == "op" and (nx.v == "[" or nx.v == "{")))
-        and not (nx.t == "name" and (nx.v == "else" or nx.v == "or" or nx.v == "and" or nx.v == "if"))
+        and not (
+          nx.t == "name" and (nx.v == "else" or nx.v == "or" or nx.v == "and" or nx.v == "if")
+        )
       then
         args = { self:p_postfix(self:p_primary()) }
       end

@@ -131,7 +131,12 @@ function M.render(buf)
   local hl = {
     { row = 3, col_s = 0, col_e = #"●", group = item("running") },
     { row = 3, col_s = #"● = Running  ", col_e = #"● = Running  ◐", group = item("paused") },
-    { row = 3, col_s = #"● = Running  ◐ = Paused  ", col_e = #"● = Running  ◐ = Paused  ○", group = item("idle") },
+    {
+      row = 3,
+      col_s = #"● = Running  ◐ = Paused  ",
+      col_e = #"● = Running  ◐ = Paused  ○",
+      group = item("idle"),
+    },
   }
   local nodes = {}
 
@@ -155,7 +160,8 @@ function M.render(buf)
       local path = vim.fs.joinpath(dir, d)
       local open = is_expanded(root, path)
       lines[#lines + 1] = indent .. (open and "▾" or "▸") .. " " .. d .. "/"
-      hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #lines[#lines], group = css:hl("sidebar-dir") }
+      hl[#hl + 1] =
+        { row = #lines - 1, col_s = #indent, col_e = #lines[#lines], group = css:hl("sidebar-dir") }
       nodes[tostring(#lines)] = { path = path, dir = true, name_col = #indent }
       if open then
         walk(path, depth + 1)
@@ -198,7 +204,13 @@ function M.update_cursor(buf)
   local node = (vim.b[buf].dbdash_sidebar_nodes or {})[tostring(lnum)]
   local s = node and node.name_col or 0
   if #line > s then
-    vim.api.nvim_buf_set_extmark(buf, CURSOR_NS, lnum - 1, s, { end_col = #line, hl_group = M.css():hl("sidebar-item", { classes = { "cursor" } }) })
+    vim.api.nvim_buf_set_extmark(
+      buf,
+      CURSOR_NS,
+      lnum - 1,
+      s,
+      { end_col = #line, hl_group = M.css():hl("sidebar-item", { classes = { "cursor" } }) }
+    )
   end
 end
 

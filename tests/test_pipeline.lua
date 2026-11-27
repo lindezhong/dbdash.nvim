@@ -51,7 +51,12 @@ local function counters(d)
 end
 
 local function delta(a, b)
-  return { hits = b.hits - a.hits, misses = b.misses - a.misses, rows = b.rows - a.rows, draws = b.draws - a.draws }
+  return {
+    hits = b.hits - a.hits,
+    misses = b.misses - a.misses,
+    rows = b.rows - a.rows,
+    draws = b.draws - a.draws,
+  }
 end
 
 T["nothing changed: layout is reused and no row is written"] = function()
@@ -73,7 +78,11 @@ T["a new result of one panel lays out that panel only"] = function()
   -- panel b: measured twice (min / max-content) and laid out once; panel a: reused
   eq(dd.misses, 3)
   eq(dd.rows > 0, true)
-  eq(table.concat(vim.api.nvim_buf_get_lines(d.buf, 0, -1, false), "\n"):find("│ 3 │", 1, true) ~= nil, true)
+  eq(
+    table.concat(vim.api.nvim_buf_get_lines(d.buf, 0, -1, false), "\n"):find("│ 3 │", 1, true)
+      ~= nil,
+    true
+  )
 end
 
 T["a style change restyles, then lays out the panels it touches"] = function()
@@ -107,9 +116,11 @@ T["hit testing finds the node; events capture, then bubble"] = function()
   local b = d.panels[2]
   local row_title, row_chart
   for _, h in ipairs(d.hits) do
-    if h.node == b.node:find(function(n)
-      return n.tag == "panel"
-    end) and h.node ~= b.chart_node then
+    if
+      h.node == b.node:find(function(n)
+        return n.tag == "panel"
+      end) and h.node ~= b.chart_node
+    then
       row_title = row_title or h.row_s
     end
     if h.node == b.chart_node then

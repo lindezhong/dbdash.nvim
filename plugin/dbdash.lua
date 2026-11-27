@@ -117,11 +117,17 @@ end, {
   desc = "Trust a config with Lua code: DbDashTrust [allow|deny|remove] [config]",
 })
 for _, name in ipairs({ "DbDashMksession", "Mksession" }) do
-  command(name, function(o)
-    cmds().mksession(o.bang, o.args)
-  end, { nargs = "?", bang = true, complete = "file", desc = "Write a session (dashboards included)" })
+  command(
+    name,
+    function(o)
+      cmds().mksession(o.bang, o.args)
+    end,
+    { nargs = "?", bang = true, complete = "file", desc = "Write a session (dashboards included)" }
+  )
 end
-vim.cmd([[cnoreabbrev <expr> mksession (getcmdtype() ==# ':' && getcmdline() ==# 'mksession') ? 'DbDashMksession' : 'mksession']])
+vim.cmd(
+  [[cnoreabbrev <expr> mksession (getcmdtype() ==# ':' && getcmdline() ==# 'mksession') ? 'DbDashMksession' : 'mksession']]
+)
 
 local group = vim.api.nvim_create_augroup("dbdash", { clear = true })
 

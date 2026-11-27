@@ -34,7 +34,9 @@ function M.settings(css)
     pad = c.padding,
     border = border,
     border_group = hl.group({ color = c["border-color"] }),
-    background = c["background-color"] and hl.group({ ["background-color"] = c["background-color"] }) or nil,
+    background = c["background-color"] and hl.group({
+      ["background-color"] = c["background-color"],
+    }) or nil,
     justify = c["justify-self"],
     align = c["align-self"],
     title_group = css:hl("panel-title"),
@@ -47,7 +49,8 @@ end
 ---@return integer width, integer height
 function M.inner(s, width, height)
   local b = s.border and 2 or 0
-  return math.max(width - s.pad[2] - s.pad[4] - b, 10), math.max(height - s.pad[1] - s.pad[3] - b, 1)
+  return math.max(width - s.pad[2] - s.pad[4] - b, 10),
+    math.max(height - s.pad[1] - s.pad[3] - b, 1)
 end
 
 ---A title line of `width` cells: `text` aligned left, center or right.
@@ -145,7 +148,8 @@ function M.wrap(content, s, width, height, title)
   local function add(text, spans)
     lines[#lines + 1] = text
     for _, sp in ipairs(spans) do
-      hl[#hl + 1] = { row = #lines - 1, col_s = sp[1], col_e = sp[2], group = sp[3], priority = sp[4] }
+      hl[#hl + 1] =
+        { row = #lines - 1, col_s = sp[1], col_e = sp[2], group = sp[3], priority = sp[4] }
     end
   end
   local g = s.border_group
@@ -156,7 +160,8 @@ function M.wrap(content, s, width, height, title)
       local room = width - 4
       local tt = W.truncate(t, math.max(room - 2, 1), s.ellipsis)
       local fill = room - W.width(tt) - 2
-      local lead = s.title_align == "center" and math.floor(fill / 2) or (s.title_align == "right" and fill or 0)
+      local lead = s.title_align == "center" and math.floor(fill / 2)
+        or (s.title_align == "right" and fill or 0)
       local pre = b.tl .. b.h .. string.rep(b.h, lead) .. " "
       local line = pre .. tt .. " " .. string.rep(b.h, fill - lead) .. b.h .. b.tr
       local spans = { { 0, #pre, g }, { #pre + #tt, #line, g } }
@@ -199,7 +204,11 @@ function M.wrap(content, s, width, height, title)
   end
   if s.background then
     for r, l in ipairs(lines) do
-      table.insert(hl, 1, { row = r - 1, col_s = 0, col_e = #l, group = s.background, priority = 50 })
+      table.insert(
+        hl,
+        1,
+        { row = r - 1, col_s = 0, col_e = #l, group = s.background, priority = 50 }
+      )
     end
   end
   return { lines = lines, hl = hl, bg = s.background, full = s.background ~= nil or b ~= nil }

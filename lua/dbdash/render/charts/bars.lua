@@ -120,7 +120,12 @@ local function mark_values(marks, all)
       end
     end
     if x then
-      out[#out + 1] = { value = x, label = nn(m.label) or (type(v) == "string" and ("%s %s"):format(v, fmt.number(x))), class = nn(m.class), index = k }
+      out[#out + 1] = {
+        value = x,
+        label = nn(m.label) or (type(v) == "string" and ("%s %s"):format(v, fmt.number(x))),
+        class = nn(m.class),
+        index = k,
+      }
     end
   end
   return out
@@ -128,7 +133,8 @@ end
 
 ---The group of the k-th mark line: its element's color (mark.<class>, mark[label=...]).
 local function mark_group(ctx, m)
-  return C.item_hl(ctx, "marks", m.index, "mark") or ctx.css:hl("mark", { classes = m.class and { m.class } or nil })
+  return C.item_hl(ctx, "marks", m.index, "mark")
+    or ctx.css:hl("mark", { classes = m.class and { m.class } or nil })
 end
 M.mark_group = mark_group
 
@@ -138,7 +144,10 @@ M.mark_group = mark_group
 function M.horizontal(ctx, bars, o)
   local stacked = o.stacked
   local thick = math.max(1, o.bar_width or 1)
-  local gap = math.max(0, o.bar_gap or ((not stacked and #(bars[1] and segments(bars[1]) or {}) > 1) and 1 or 0))
+  local gap = math.max(
+    0,
+    o.bar_gap or ((not stacked and #(bars[1] and segments(bars[1]) or {}) > 1) and 1 or 0)
+  )
   local minv, maxv, all = value_range(bars, stacked, o.axes)
   -- The rows: every segment (grouped) or bar (stacked), `thick` lines each.
   local rows = {}
@@ -154,7 +163,8 @@ function M.horizontal(ctx, bars, o)
     end, segs)
     for gi, g in ipairs(groups) do
       for k = 1, thick do
-        rows[#rows + 1] = { bar = b, segs = g, label = (gi == 1 and k == 1) and b.label or "", first = k == 1 }
+        rows[#rows + 1] =
+          { bar = b, segs = g, label = (gi == 1 and k == 1) and b.label or "", first = k == 1 }
       end
     end
   end
@@ -284,7 +294,10 @@ function M.horizontal(ctx, bars, o)
       end
     end
     if m.label then
-      local at = math.max(W.width(label_line) + (label_line ~= "" and 1 or 0), c - math.floor(W.width(m.label) / 2))
+      local at = math.max(
+        W.width(label_line) + (label_line ~= "" and 1 or 0),
+        c - math.floor(W.width(m.label) / 2)
+      )
       local before = label_line .. string.rep(" ", at - W.width(label_line))
       label_line = before .. m.label
       label_hl[#label_hl + 1] = { col_s = #before, col_e = #label_line, group = group }
@@ -306,7 +319,14 @@ function M.vertical(ctx, bars, o)
   local stacked = o.stacked
   local minv, maxv, all = value_range(bars, stacked, o.axes)
   local lo, hi = C.limits(ctx, minv, maxv, o.axes and o.axes.ymin or 0, o.axes and o.axes.ymax)
-  local spec = { title = o.title, xlabel = o.xlabel, ylabel = o.ylabel, height = ctx.plot_height, legend = o.legend, legend_position = o.legend_position }
+  local spec = {
+    title = o.title,
+    xlabel = o.xlabel,
+    ylabel = o.ylabel,
+    height = ctx.plot_height,
+    legend = o.legend,
+    legend_position = o.legend_position,
+  }
   local _, labels = C.y_ticks(ctx, lo, hi, 15, o.value_format)
   spec.ylabels = labels
   local cols, rows = ctx.frame.plot_size(ctx, spec)
@@ -317,7 +337,8 @@ function M.vertical(ctx, bars, o)
   local slot = math.max(1, math.floor(cols / n))
   local cat_gap = o.bar_gap or (slot > 2 and 1 or 0)
   local inner = math.max(1, slot - cat_gap)
-  local bw = o.bar_width and math.max(1, math.min(o.bar_width, math.floor(inner / nseg))) or math.max(1, math.floor(inner / nseg))
+  local bw = o.bar_width and math.max(1, math.min(o.bar_width, math.floor(inner / nseg)))
+    or math.max(1, math.floor(inner / nseg))
   local grid = {}
   for r = 0, rows - 1 do
     grid[r] = {}
@@ -372,7 +393,8 @@ function M.vertical(ctx, bars, o)
       local vg = o.show_values and not stacked and value_group(ctx, s)
       if vg then
         local text = fmt.value(s.value, o.value_format)
-        local r = o.inside and (rows - math.floor(to)) or (rows - 1 - math.min(math.ceil(to), rows - 1))
+        local r = o.inside and (rows - math.floor(to))
+          or (rows - 1 - math.min(math.ceil(to), rows - 1))
         local at = start_c + math.floor((bw - W.width(text)) / 2)
         -- above the bar only when that cell is free (inside: over the bar)
         if W.width(text) <= bw + 1 and r >= 0 and r < rows and (o.inside or not grid[r][at]) then
@@ -383,7 +405,8 @@ function M.vertical(ctx, bars, o)
     local svg = o.show_values and stacked and value_group(ctx, segs[1])
     if svg then
       local text = fmt.value(total, o.value_format)
-      local r = o.inside and (rows - math.floor(top_h)) or (rows - 1 - math.min(math.ceil(top_h), rows - 1))
+      local r = o.inside and (rows - math.floor(top_h))
+        or (rows - 1 - math.min(math.ceil(top_h), rows - 1))
       local at = c0 + math.floor((bw - W.width(text)) / 2)
       if W.width(text) <= slot and r >= 0 and r < rows and (o.inside or not grid[r][at]) then
         put_text(r, at, text, svg)
@@ -438,7 +461,11 @@ function M.from_show(rs, show, ctx)
     local xaxis, long = C.long(rs, show)
     legend = {}
     for i, s in ipairs(long) do
-      legend[i] = { label = s.label, group = C.color(ctx, show, i, nil, s.label), label_group = C.item_hl(ctx, "legend", i, "legend") }
+      legend[i] = {
+        label = s.label,
+        group = C.color(ctx, show, i, nil, s.label),
+        label_group = C.item_hl(ctx, "legend", i, "legend"),
+      }
     end
     for ci, label in ipairs(xaxis.labels) do
       local segs = {}
@@ -450,7 +477,8 @@ function M.from_show(rs, show, ctx)
           end
         end
         local k = (ci - 1) * #long + si
-        segs[si] = { value = v, group = bar_group(ctx, k, legend[si].group), series = s.label, item = k }
+        segs[si] =
+          { value = v, group = bar_group(ctx, k, legend[si].group), series = s.label, item = k }
       end
       bars[ci] = { label = label, segments = segs }
     end
@@ -460,7 +488,11 @@ function M.from_show(rs, show, ctx)
     if #series > 1 then
       legend = {}
       for i, s in ipairs(series) do
-        legend[i] = { label = s.label, group = C.color(ctx, show, i, nil, s.label), label_group = C.item_hl(ctx, "legend", i, "legend") }
+        legend[i] = {
+          label = s.label,
+          group = C.color(ctx, show, i, nil, s.label),
+          label_group = C.item_hl(ctx, "legend", i, "legend"),
+        }
       end
     end
     for _, row in ipairs(rs.rows) do
@@ -469,13 +501,23 @@ function M.from_show(rs, show, ctx)
         local v = C.num(row[series[1].index])
         if v then
           local k = #bars + 1
-          bars[k] = { label = label, value = v, group = bar_group(ctx, k, C.color(ctx, show, 1, nil, label)), item = k }
+          bars[k] = {
+            label = label,
+            value = v,
+            group = bar_group(ctx, k, C.color(ctx, show, 1, nil, label)),
+            item = k,
+          }
         end
       else
         local segs = {}
         local base = #bars * #series
         for i, s in ipairs(series) do
-          segs[i] = { value = C.num(row[s.index]) or 0, group = bar_group(ctx, base + i, legend[i].group), series = s.label, item = base + i }
+          segs[i] = {
+            value = C.num(row[s.index]) or 0,
+            group = bar_group(ctx, base + i, legend[i].group),
+            series = s.label,
+            item = base + i,
+          }
         end
         bars[#bars + 1] = { label = label, segments = segs }
       end
@@ -532,7 +574,14 @@ local bin_cache = setmetatable({}, { __mode = "k" })
 
 ---The bins of a result (without colors), computed once per result and settings.
 function M.bins(rs, show)
-  local key = vim.json.encode({ show.value_column, show.bins, show.bin_width, show.bin_range, show.cumulative, show.normalize })
+  local key = vim.json.encode({
+    show.value_column,
+    show.bins,
+    show.bin_width,
+    show.bin_range,
+    show.cumulative,
+    show.normalize,
+  })
   local hit = bin_cache[rs]
   if hit and hit.key == key then
     return hit.bins, hit.vals
@@ -548,7 +597,14 @@ function M.histogram(rs, show, ctx)
   local group = C.color(ctx, show, 1)
   local out = {}
   for i, b in ipairs(bins) do
-    out[i] = { lower = b.lower, upper = b.upper, label = b.label, value = b.value, group = ctx and bar_group(ctx, i, group) or group, item = i }
+    out[i] = {
+      lower = b.lower,
+      upper = b.upper,
+      label = b.label,
+      value = b.value,
+      group = ctx and bar_group(ctx, i, group) or group,
+      item = i,
+    }
   end
   return out, vals
 end
@@ -628,7 +684,8 @@ function M.histogram_marks(show, bins, vals)
   for _, m in ipairs(mark_values(nn(show.mark_lines), vals)) do
     for _, b in ipairs(bins) do
       if m.value >= b.lower and m.value <= b.upper then
-        out[#out + 1] = { bin = b, label = m.label or fmt.number(m.value), class = m.class, index = m.index }
+        out[#out + 1] =
+          { bin = b, label = m.label or fmt.number(m.value), class = m.class, index = m.index }
         break
       end
     end

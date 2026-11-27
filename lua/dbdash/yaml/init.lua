@@ -48,10 +48,24 @@ end
 -- Scalar resolution ------------------------------------------------------------------------
 
 local BOOL = {
-  ["true"] = true, True = true, TRUE = true, yes = true, Yes = true, YES = true,
-  on = true, On = true, ON = true,
-  ["false"] = false, False = false, FALSE = false, no = false, No = false, NO = false,
-  off = false, Off = false, OFF = false,
+  ["true"] = true,
+  True = true,
+  TRUE = true,
+  yes = true,
+  Yes = true,
+  YES = true,
+  on = true,
+  On = true,
+  ON = true,
+  ["false"] = false,
+  False = false,
+  FALSE = false,
+  no = false,
+  No = false,
+  NO = false,
+  off = false,
+  Off = false,
+  OFF = false,
 }
 local NULLS = { [""] = true, ["~"] = true, null = true, Null = true, NULL = true }
 
@@ -126,9 +140,24 @@ local function utf8_char(cp)
 end
 
 local ESCAPES = {
-  ["0"] = "\0", a = "\a", b = "\b", t = "\t", ["\t"] = "\t", n = "\n", v = "\v", f = "\f",
-  r = "\r", e = "\27", [" "] = " ", ['"'] = '"', ["/"] = "/", ["\\"] = "\\",
-  N = "\194\133", _ = "\194\160", L = "\226\128\168", P = "\226\128\169",
+  ["0"] = "\0",
+  a = "\a",
+  b = "\b",
+  t = "\t",
+  ["\t"] = "\t",
+  n = "\n",
+  v = "\v",
+  f = "\f",
+  r = "\r",
+  e = "\27",
+  [" "] = " ",
+  ['"'] = '"',
+  ["/"] = "/",
+  ["\\"] = "\\",
+  N = "\194\133",
+  _ = "\194\160",
+  L = "\226\128\168",
+  P = "\226\128\169",
 }
 local HEX_LEN = { x = 2, u = 4, U = 8 }
 
@@ -325,7 +354,11 @@ function P:parse_flow(src, r, col)
       if ch:match(stop_pat) then
         break
       end
-      if ch == ":" and src:sub(j + 1, j + 1):match("^[%s,%]}]?$") and stop_pat:find(":", 1, true) then
+      if
+        ch == ":"
+        and src:sub(j + 1, j + 1):match("^[%s,%]}]?$")
+        and stop_pat:find(":", 1, true)
+      then
         break
       end
       if ch == "#" and j > 1 and src:sub(j - 1, j - 1):match("%s") then

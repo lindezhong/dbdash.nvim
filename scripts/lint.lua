@@ -39,7 +39,8 @@ end
 local function luacheck()
   need("luacheck")
   need("argparse")
-  local cmd = { vim.v.progpath, "-l", "scripts/luacheck.lua", "--formatter", "plain", "--codes", "--quiet" }
+  local cmd =
+    { vim.v.progpath, "-l", "scripts/luacheck.lua", "--formatter", "plain", "--codes", "--quiet" }
   vim.list_extend(cmd, PATHS)
   return run(cmd)
 end
@@ -67,8 +68,13 @@ local function luals()
     local path = vim.fn.fnamemodify(vim.uri_to_fname(uri), ":.")
     for _, d in ipairs(diags) do
       local s = d.range.start
-      lines[#lines + 1] =
-        ("%s:%d:%d: [%s] %s"):format(path, s.line + 1, s.character + 1, d.code, d.message:gsub("\n", " "))
+      lines[#lines + 1] = ("%s:%d:%d: [%s] %s"):format(
+        path,
+        s.line + 1,
+        s.character + 1,
+        d.code,
+        d.message:gsub("\n", " ")
+      )
     end
   end
   table.sort(lines)
@@ -83,9 +89,13 @@ end
 
 local failed = false
 for _, step in ipairs({
-  { "stylua", function()
-    return stylua(true)
-  end, true },
+  {
+    "stylua",
+    function()
+      return stylua(true)
+    end,
+    true,
+  },
   { "luacheck", luacheck, true },
   { "lua-language-server", luals, LUALS_BLOCKING },
 }) do

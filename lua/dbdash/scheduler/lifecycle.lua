@@ -23,9 +23,10 @@ local function show_in(buf, win, open)
   if not (win and vim.api.nvim_win_is_valid(win)) then
     open = open or "current"
     if open ~= "current" then
-      local wins = open == "tab" and vim.fn.win_findbuf(buf) or vim.tbl_filter(function(w)
-        return vim.api.nvim_win_get_buf(w) == buf
-      end, vim.api.nvim_tabpage_list_wins(0))
+      local wins = open == "tab" and vim.fn.win_findbuf(buf)
+        or vim.tbl_filter(function(w)
+          return vim.api.nvim_win_get_buf(w) == buf
+        end, vim.api.nvim_tabpage_list_wins(0))
       if wins[1] then
         vim.api.nvim_set_current_win(wins[1])
         return
@@ -89,7 +90,10 @@ function M.start(path, o)
       M.start(path, o)
     elseif answer == "deny" then
       vim.notify(
-        ("dbdash: %s denied; it will not run (:DbDashTrust allow %s to allow it)"):format(name, name),
+        ("dbdash: %s denied; it will not run (:DbDashTrust allow %s to allow it)"):format(
+          name,
+          name
+        ),
         vim.log.levels.WARN
       )
     else
@@ -174,7 +178,10 @@ function M.start(path, o)
     end
     local missing = args.missing_required(cfg.args, state)
     if #missing > 0 then
-      return notify({ phase = "args", message = "missing required argument '" .. (missing[1].key or missing[1].name) .. "'" })
+      return notify({
+        phase = "args",
+        message = "missing required argument '" .. (missing[1].key or missing[1].name) .. "'",
+      })
     end
     launch()
   end)

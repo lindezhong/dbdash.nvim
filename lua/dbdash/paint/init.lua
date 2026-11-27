@@ -13,7 +13,13 @@ local function stack(parts)
     local off = #out.lines
     vim.list_extend(out.lines, part.lines)
     for _, h in ipairs(part.hl) do
-      out.hl[#out.hl + 1] = { row = h.row + off, col_s = h.col_s, col_e = h.col_e, group = h.group, priority = h.priority }
+      out.hl[#out.hl + 1] = {
+        row = h.row + off,
+        col_s = h.col_s,
+        col_e = h.col_e,
+        group = h.group,
+        priority = h.priority,
+      }
     end
     -- the rows of elements inside a part (a table's rows, a text's lines) move with it
     for _, h in ipairs(part.hits or {}) do
@@ -40,10 +46,12 @@ function M.fragment(frag)
   local inner_w = frag.width - left - b - st.pad[2]
   local function add(part, node)
     if node and #part.lines > 0 then
-      hits[#hits + 1] = { row_s = top, row_e = top + #part.lines - 1, x = left, width = inner_w, node = node }
+      hits[#hits + 1] =
+        { row_s = top, row_e = top + #part.lines - 1, x = left, width = inner_w, node = node }
     end
     for _, h in ipairs(part.hits or {}) do -- elements inside the part, by rows
-      hits[#hits + 1] = { row_s = top + h.row_s, row_e = top + h.row_e, x = left, width = inner_w, node = h.node }
+      hits[#hits + 1] =
+        { row_s = top + h.row_s, row_e = top + h.row_e, x = left, width = inner_w, node = h.node }
     end
     top = top + #part.lines
     parts[#parts + 1] = part
@@ -76,21 +84,47 @@ function M.view(tree)
     list.body = body
     list.hits = {}
     for _, h in ipairs(painted.hits or {}) do
-      list.hits[#list.hits + 1] = { row_s = h.row_s + shift, row_e = h.row_e + shift, x = h.x, width = h.width, node = h.node }
+      list.hits[#list.hits + 1] = {
+        row_s = h.row_s + shift,
+        row_e = h.row_e + shift,
+        x = h.x,
+        width = h.width,
+        node = h.node,
+      }
     end
-    list.hits[#list.hits + 1] = { row_s = 0, row_e = #body.lines - 1, x = 0, width = tree.single.width, node = tree.single.node }
+    list.hits[#list.hits + 1] = {
+      row_s = 0,
+      row_e = #body.lines - 1,
+      x = 0,
+      width = tree.single.width,
+      node = tree.single.node,
+    }
   else
     if tree.grid.error then
-      list.header = stack({ tree.header, { lines = { tree.grid.error }, hl = { { row = 0, col_s = 0, col_e = #tree.grid.error, group = "DbDashError" } } } })
+      list.header = stack({
+        tree.header,
+        {
+          lines = { tree.grid.error },
+          hl = { { row = 0, col_s = 0, col_e = #tree.grid.error, group = "DbDashError" } },
+        },
+      })
     end
     for _, f in ipairs(tree.grid.fragments) do
-      list.layers[#list.layers + 1] = { x = f.x, y = f.y, width = f.width, height = f.height, out = M.fragment(f), node = f.node }
+      list.layers[#list.layers + 1] =
+        { x = f.x, y = f.y, width = f.width, height = f.height, out = M.fragment(f), node = f.node }
     end
     list.hits = {}
     for _, l in ipairs(list.layers) do
-      list.hits[#list.hits + 1] = { row_s = l.y, row_e = l.y + l.height - 1, x = l.x, width = l.width, node = l.node }
+      list.hits[#list.hits + 1] =
+        { row_s = l.y, row_e = l.y + l.height - 1, x = l.x, width = l.width, node = l.node }
       for _, h in ipairs(l.out.hits or {}) do
-        list.hits[#list.hits + 1] = { row_s = l.y + h.row_s, row_e = l.y + h.row_e, x = l.x + h.x, width = h.width, node = h.node }
+        list.hits[#list.hits + 1] = {
+          row_s = l.y + h.row_s,
+          row_e = l.y + h.row_e,
+          x = l.x + h.x,
+          width = h.width,
+          node = h.node,
+        }
       end
     end
   end

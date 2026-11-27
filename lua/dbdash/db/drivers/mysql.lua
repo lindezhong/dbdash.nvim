@@ -129,24 +129,56 @@ end
 -- Type mapping ----------------------------------------------------------------------------
 
 local TYPES = {
-  [0x01] = "integer", [0x02] = "integer", [0x03] = "integer", [0x08] = "integer", [0x09] = "integer",
+  [0x01] = "integer",
+  [0x02] = "integer",
+  [0x03] = "integer",
+  [0x08] = "integer",
+  [0x09] = "integer",
   [0x0d] = "integer",
-  [0x04] = "number", [0x05] = "number",
-  [0x00] = "decimal", [0xf6] = "decimal",
-  [0x0a] = "date", [0x0e] = "date",
+  [0x04] = "number",
+  [0x05] = "number",
+  [0x00] = "decimal",
+  [0xf6] = "decimal",
+  [0x0a] = "date",
+  [0x0e] = "date",
   [0x0b] = "time",
-  [0x07] = "datetime", [0x0c] = "datetime", [0x11] = "datetime", [0x12] = "datetime",
+  [0x07] = "datetime",
+  [0x0c] = "datetime",
+  [0x11] = "datetime",
+  [0x12] = "datetime",
   [0xf5] = "json",
-  [0x10] = "bytes", [0xff] = "bytes",
+  [0x10] = "bytes",
+  [0xff] = "bytes",
   [0x06] = "null",
 }
 local TYPE_NAMES = {
-  [0x00] = "DECIMAL", [0x01] = "TINYINT", [0x02] = "SMALLINT", [0x03] = "INT", [0x04] = "FLOAT",
-  [0x05] = "DOUBLE", [0x06] = "NULL", [0x07] = "TIMESTAMP", [0x08] = "BIGINT", [0x09] = "MEDIUMINT",
-  [0x0a] = "DATE", [0x0b] = "TIME", [0x0c] = "DATETIME", [0x0d] = "YEAR", [0x0f] = "VARCHAR",
-  [0x10] = "BIT", [0xf5] = "JSON", [0xf6] = "DECIMAL", [0xf7] = "ENUM", [0xf8] = "SET",
-  [0xf9] = "TINYBLOB", [0xfa] = "MEDIUMBLOB", [0xfb] = "LONGBLOB", [0xfc] = "BLOB",
-  [0xfd] = "VARCHAR", [0xfe] = "CHAR", [0xff] = "GEOMETRY",
+  [0x00] = "DECIMAL",
+  [0x01] = "TINYINT",
+  [0x02] = "SMALLINT",
+  [0x03] = "INT",
+  [0x04] = "FLOAT",
+  [0x05] = "DOUBLE",
+  [0x06] = "NULL",
+  [0x07] = "TIMESTAMP",
+  [0x08] = "BIGINT",
+  [0x09] = "MEDIUMINT",
+  [0x0a] = "DATE",
+  [0x0b] = "TIME",
+  [0x0c] = "DATETIME",
+  [0x0d] = "YEAR",
+  [0x0f] = "VARCHAR",
+  [0x10] = "BIT",
+  [0xf5] = "JSON",
+  [0xf6] = "DECIMAL",
+  [0xf7] = "ENUM",
+  [0xf8] = "SET",
+  [0xf9] = "TINYBLOB",
+  [0xfa] = "MEDIUMBLOB",
+  [0xfb] = "LONGBLOB",
+  [0xfc] = "BLOB",
+  [0xfd] = "VARCHAR",
+  [0xfe] = "CHAR",
+  [0xff] = "GEOMETRY",
 }
 local FLAG_UNSIGNED, FLAG_BINARY = 0x20, 0x80
 local BINARY_CHARSET = 63
@@ -239,7 +271,11 @@ function M.parse_url(info)
 end
 
 function M.connect(info)
-  local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
+  local sock = socket.connect(
+    info.host,
+    info.port,
+    { connect_timeout = info.connect_timeout, timeout = info.timeout }
+  )
   local c = setmetatable({ sock = sock, seq = 0 }, Conn)
   local ok, err = pcall(c.handshake, c, info)
   if not ok then
@@ -324,10 +360,13 @@ function Conn:handshake(info)
   local plugin = hs.plugin
   local auth = scramble(plugin, password, hs.nonce)
   local body = head(caps)
-    .. info.user .. "\0"
-    .. lenenc(#auth) .. auth
+    .. info.user
+    .. "\0"
+    .. lenenc(#auth)
+    .. auth
     .. (info.database and (info.database .. "\0") or "")
-    .. plugin .. "\0"
+    .. plugin
+    .. "\0"
   self:write_packet(body)
 
   local nonce = hs.nonce
@@ -468,7 +507,11 @@ function Conn:execute(query, opts)
     raise_err(err, "query")
   end
   result = result or { columns = {}, rows = {} }
-  return resultset.new(result.columns, result.rows, { truncated = result.truncated, affected = result.affected, warnings = warnings })
+  return resultset.new(
+    result.columns,
+    result.rows,
+    { truncated = result.truncated, affected = result.affected, warnings = warnings }
+  )
 end
 
 function Conn:close()

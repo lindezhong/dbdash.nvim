@@ -65,8 +65,16 @@ local function escape(s)
 end
 
 local BOOL = {
-  ["true"] = true, ["1"] = true, yes = true, on = true, y = true,
-  ["false"] = false, ["0"] = false, no = false, off = false, n = false,
+  ["true"] = true,
+  ["1"] = true,
+  yes = true,
+  on = true,
+  y = true,
+  ["false"] = false,
+  ["0"] = false,
+  no = false,
+  off = false,
+  n = false,
 }
 
 ---Infer how list/map elements should be typed from the default value and choices.
@@ -255,13 +263,19 @@ function M.parse_cli(specs, tokens)
     if #targets == 0 then
       local panel, name = key:match("^(.-)%.(.*)$")
       if panel and M.find(specs, name) then
-        fail("panel '%s' has no local argument '%s' (use %s= for the shared one)", panel, name, name)
+        fail(
+          "panel '%s' has no local argument '%s' (use %s= for the shared one)",
+          panel,
+          name,
+          name
+        )
       end
       local keys = M.keys(specs)
       fail(
         "unknown argument '%s'%s",
         key,
-        #keys > 0 and (" (known: " .. table.concat(keys, ", ") .. ")") or " (this config has no args)"
+        #keys > 0 and (" (known: " .. table.concat(keys, ", ") .. ")")
+          or " (this config has no args)"
       )
     end
     local is_explicit = key:find(".", 1, true) ~= nil
@@ -329,11 +343,17 @@ function M.check_value(spec, v)
   elseif t == "list" then
     ok = type(v) == "table" and (vim.islist(v) or next(v) == nil)
   elseif t == "map" then
-    ok = type(v) == "table" and (require("dbdash.util.map").is_map(v) or not vim.islist(v) or next(v) == nil)
+    ok = type(v) == "table"
+      and (require("dbdash.util.map").is_map(v) or not vim.islist(v) or next(v) == nil)
   end
   if not ok then
-    local what = type(v) == "table" and (vim.islist(v) and "a list" or "a mapping") or ("a " .. type(v))
-    return ("argument '%s' is %s, got %s"):format(spec.name, t == "int" and "an int" or ("a " .. t), what)
+    local what = type(v) == "table" and (vim.islist(v) and "a list" or "a mapping")
+      or ("a " .. type(v))
+    return ("argument '%s' is %s, got %s"):format(
+      spec.name,
+      t == "int" and "an int" or ("a " .. t),
+      what
+    )
   end
 end
 

@@ -16,7 +16,11 @@ local function response(status, headers, body)
 end
 
 local function json(body, extra)
-  return response("200 OK", vim.list_extend({ "Content-Type: application/json", "Content-Length: " .. #body }, extra or {}), body)
+  return response(
+    "200 OK",
+    vim.list_extend({ "Content-Type: application/json", "Content-Length: " .. #body }, extra or {}),
+    body
+  )
 end
 
 T["a JSON list of records is rows without a transform"] = function()
@@ -26,7 +30,10 @@ T["a JSON list of records is rows without a transform"] = function()
   local rs = h.ok(base .. "/v1/items", "curl")
   eq({ rs.columns[1].name, rs.columns[2].name }, { "n", "name" })
   eq(rs.rows, { { 1, "a" }, { vim.NIL, "b" } })
-  eq({ seen[1].method, seen[1].target, seen[1].headers.host }, { "GET", "/v1/items", base:match("//(.*)") })
+  eq(
+    { seen[1].method, seen[1].target, seen[1].headers.host },
+    { "GET", "/v1/items", base:match("//(.*)") }
+  )
 end
 
 T["other shapes need query.transform; the raw value keeps the response"] = function()
@@ -35,7 +42,10 @@ T["other shapes need query.transform; the raw value keeps the response"] = funct
   end)
   local r = h.query(base, "curl")
   eq(r.err.phase, "query")
-  eq(r.err.message, "the result is an object (data), not rows; add query.transform to reshape it (:help dbdash-transform)")
+  eq(
+    r.err.message,
+    "the result is an object (data), not rows; add query.transform to reshape it (:help dbdash-transform)"
+  )
   local raw = h.ok(base, "curl", { raw = true })
   eq(require("dbdash.db.lua_result").is_raw(raw), true)
   eq(raw.value.data.items[1].k, "x")
@@ -45,28 +55,41 @@ T["other shapes need query.transform; the raw value keeps the response"] = funct
     return response("200 OK", { "Content-Type: text/plain", "Content-Length: 5" }, "hello")
   end)
   eq(h.ok(base, "curl", { raw = true }).value, "hello")
-  eq(h.query(base, "curl").err.message:find("the result is not rows (got string); add query.transform", 1, true) ~= nil, true)
+  eq(
+    h.query(base, "curl").err.message
+      :find("the result is not rows (got string); add query.transform", 1, true) ~= nil,
+    true
+  )
 end
 
 T["curl: method, path, query, headers, JSON body, form, -G, -u"] = function()
   local base, seen = server(function()
     return json("[]")
   end)
-  h.ok(base .. "/api/v1?key=k%201&tls=disable", [[
+  h.ok(
+    base .. "/api/v1?key=k%201&tls=disable",
+    [[
     curl '/search?x=1&limit=5&tag=a&tag=b%20c' \
       -H 'X-Token: t' \
       --json '{"q": "neovim"}'
-  ]])
+  ]]
+  )
   local r = seen[1]
   eq({ r.method, r.target }, { "POST", "/api/v1/search?key=k%201&x=1&limit=5&tag=a&tag=b%20c" })
-  eq({ r.headers["x-token"], r.headers["content-type"], r.headers.accept, vim.json.decode(r.body) }, { "t", "application/json", "application/json", { q = "neovim" } })
+  eq(
+    { r.headers["x-token"], r.headers["content-type"], r.headers.accept, vim.json.decode(r.body) },
+    { "t", "application/json", "application/json", { q = "neovim" } }
+  )
   -- -d: a form by default, as curl; -X sets the method
   h.ok(base .. "/api", "curl -X put /abs -d 'a=1%262'")
   eq({ seen[2].method, seen[2].target, seen[2].body }, { "PUT", "/api/abs", "a=1%262" })
   eq(seen[2].headers["content-type"], "application/x-www-form-urlencoded")
   -- a body of its own type
   h.ok(base, "curl -H 'Content-Type: text/csv' --data-binary 'raw text'")
-  eq({ seen[3].method, seen[3].body, seen[3].headers["content-type"] }, { "POST", "raw text", "text/csv" })
+  eq(
+    { seen[3].method, seen[3].body, seen[3].headers["content-type"] },
+    { "POST", "raw text", "text/csv" }
+  )
   -- -G: the data goes to the query string
   h.ok(base, "curl /s -G --data-urlencode 'q=a b' -d n=1")
   eq({ seen[4].method, seen[4].target, seen[4].body }, { "GET", "/s?q=a%20b&n=1", "" })
@@ -83,7 +106,10 @@ T["bad curl commands and JSON requests are query errors"] = function()
     return h.query(base, cmd).err.message
   end
   eq(err('{"path": "/x"}'):find("the request is a curl command, not JSON", 1, true) ~= nil, true)
-  eq(err("curl --hedaer 'X: 1'"):find("curl option --hedaer is not supported", 1, true) ~= nil, true)
+  eq(
+    err("curl --hedaer 'X: 1'"):find("curl option --hedaer is not supported", 1, true) ~= nil,
+    true
+  )
   eq(err("curl -F a=@x.csv /up"):find("multipart", 1, true) ~= nil, true)
   eq(err("curl /a /b"), "curl: one URL per request (/a and /b)")
   eq(err("   "), "the request is empty: write a curl command (curl alone GETs database.url)")
@@ -94,13 +120,13 @@ T["bodies: chunked, close-delimited, slow chunks, 1xx first"] = function()
   local base = server(function()
     return {
       "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nContent-Type: application/json\r\n",
-      "Transfer-Encoding: chunked\r\n\r\n5\r\n[{\"a\"\r\n",
-      "6;ext=1\r\n: 1},{\r\n7\r\n\"a\": 2}\r\n1\r\n]\r\n0\r\nX-Trailer: y\r\n\r\n",
+      'Transfer-Encoding: chunked\r\n\r\n5\r\n[{"a"\r\n',
+      '6;ext=1\r\n: 1},{\r\n7\r\n"a": 2}\r\n1\r\n]\r\n0\r\nX-Trailer: y\r\n\r\n',
     }
   end)
   eq(h.ok(base, "curl").rows, { { 1 }, { 2 } })
   base = server(function()
-    return { "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n[{\"a\":", "3}]" }
+    return { 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n[{"a":', "3}]" }
   end)
   eq(h.ok(base, "curl").rows, { { 3 } })
 end
@@ -117,11 +143,21 @@ T["errors: HTTP status, auth status, invalid JSON, compressed"] = function()
     return json("[{")
   end)
   local e = h.query(base .. "/missing", "curl").err
-  eq({ e.phase, e.message }, { "query", "HTTP 404 Not Found from " .. base .. "/missing: no such x" })
+  eq(
+    { e.phase, e.message },
+    { "query", "HTTP 404 Not Found from " .. base .. "/missing: no such x" }
+  )
   eq(h.query(base .. "/secret", "curl").err.phase, "auth")
-  eq(h.query(base .. "/bad", "curl").err.message:find("the response is not valid JSON", 1, true) ~= nil, true)
+  eq(
+    h.query(base .. "/bad", "curl").err.message:find("the response is not valid JSON", 1, true)
+      ~= nil,
+    true
+  )
   -- Errors name the URL (the URL's path and the request's joined).
-  eq(h.query(base .. "/gz", "curl").err.message, "compressed responses (gzip) are not supported (" .. base .. "/gz)")
+  eq(
+    h.query(base .. "/gz", "curl").err.message,
+    "compressed responses (gzip) are not supported (" .. base .. "/gz)"
+  )
 end
 
 T["Basic auth from the URL; redirects keep it on the same host only"] = function()
@@ -132,7 +168,10 @@ T["Basic auth from the URL; redirects keep it on the same host only"] = function
     if req.target == "/start" then
       return response("302 Found", { "Location: /next?a=1", "Content-Length: 0" })
     elseif req.target == "/next?a=1" then
-      return response("307 Temporary Redirect", { "Location: " .. other .. "/final", "Content-Length: 0" })
+      return response(
+        "307 Temporary Redirect",
+        { "Location: " .. other .. "/final", "Content-Length: 0" }
+      )
     end
     return json("[]")
   end)
@@ -159,7 +198,10 @@ T["redirects: followed with -L only; --max-redirs"] = function()
     return response("302 Found", { "Location: /again", "Content-Length: 0" })
   end)
   eq(h.query(base, "curl").err.message:find("^HTTP 302 Found") ~= nil, true) -- as curl: not followed
-  eq(h.query(base, "curl -L --max-redirs 3").err.message, "too many redirects (more than 3) (" .. base .. "/)")
+  eq(
+    h.query(base, "curl -L --max-redirs 3").err.message,
+    "too many redirects (more than 3) (" .. base .. "/)"
+  )
 end
 
 T["cookies: curl's engine (-b strings and files, -b '', -c files, -j)"] = function()
@@ -167,7 +209,10 @@ T["cookies: curl's engine (-b strings and files, -b '', -c files, -j)"] = functi
   vim.fn.mkdir(dir, "p")
   local base, seen = server(function(req)
     if req.target == "/login" then
-      return response("302 Found", { "Location: /me", "Set-Cookie: session=new; Path=/; HttpOnly", "Content-Length: 0" })
+      return response(
+        "302 Found",
+        { "Location: /me", "Set-Cookie: session=new; Path=/; HttpOnly", "Content-Length: 0" }
+      )
     end
     return json("[]", { "Set-Cookie: seen=1; Path=/" })
   end)
@@ -259,7 +304,10 @@ end
 
 T["URLs: resolve redirects, encode"] = function()
   local base = http.parse_url("https://h.example:8443/a/b?x=1")
-  eq({ base.scheme, base.host, base.port, base.path, base.query }, { "https", "h.example", 8443, "/a/b", "x=1" })
+  eq(
+    { base.scheme, base.host, base.port, base.path, base.query },
+    { "https", "h.example", 8443, "/a/b", "x=1" }
+  )
   eq(http.format_url(http.resolve(base, "c?y=2")), "https://h.example:8443/a/c?y=2")
   eq(http.format_url(http.resolve(base, "/z")), "https://h.example:8443/z")
   eq(http.format_url(http.resolve(base, "//cdn.example/p")), "https://cdn.example/p")
@@ -268,11 +316,16 @@ T["URLs: resolve redirects, encode"] = function()
 end
 
 T["http:// cannot use tls; https:// defaults to verify-full"] = function()
-  eq(h.query("http://127.0.0.1:1/?tls=require", "curl").err.message, "http:// URLs cannot use tls (use https://)")
+  eq(
+    h.query("http://127.0.0.1:1/?tls=require", "curl").err.message,
+    "http:// URLs cannot use tls (use https://)"
+  )
   local info = require("dbdash.db.url").parse("https://api.example.com/v1?tls=require&key=1")
   info = require("dbdash.db.drivers.http").parse_url(info)
   eq({ info.tls, info.base_path, info.base_query }, { "require", "/v1", "key=1" })
-  info = require("dbdash.db.drivers.http").parse_url(require("dbdash.db.url").parse("https://api.example.com"))
+  info = require("dbdash.db.drivers.http").parse_url(
+    require("dbdash.db.url").parse("https://api.example.com")
+  )
   eq({ info.tls, info.base_path, info.base_query }, { "verify-full", "", nil })
   eq(info.port, 443)
   eq(require("dbdash.db.credentials").keys(info)[1], "https://api.example.com:443")

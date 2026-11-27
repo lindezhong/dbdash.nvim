@@ -138,7 +138,10 @@ function M.format(rs, fmt)
       lines[#lines + 1] = "| " .. table.concat(cells, " | ") .. " |"
     end
   else
-    error(("unknown export format %q (use %s)"):format(tostring(fmt), table.concat(M.FORMATS, ", ")), 0)
+    error(
+      ("unknown export format %q (use %s)"):format(tostring(fmt), table.concat(M.FORMATS, ", ")),
+      0
+    )
   end
   return table.concat(lines, "\n") .. "\n"
 end

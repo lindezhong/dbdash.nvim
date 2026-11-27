@@ -28,11 +28,19 @@ end
 
 T["column_list, separator, cell.null content; tabs and CR"] = function()
   local r = rs({ { "a", "string" }, { "b", "string" } }, { { "x\ty", "1" }, { vim.NIL, "2\r\n3" } })
-  eq(lines(r, { column_list = { "b", { column = "a" } }, separator = " | " }, nil, { ["cell.null"] = { content = "-" } }), {
-    "1 | x   y", -- the tab stops at column 8 of the line
-    "2",
-    "3 | -",
-  })
+  eq(
+    lines(
+      r,
+      { column_list = { "b", { column = "a" } }, separator = " | " },
+      nil,
+      { ["cell.null"] = { content = "-" } }
+    ),
+    {
+      "1 | x   y", -- the tab stops at column 8 of the line
+      "2",
+      "3 | -",
+    }
+  )
   local o = render.render(r, { type = "text", column_list = { "nope" } }, { width = 40 })
   eq(o.lines[1], "column_list: no column 'nope' in the result")
 end
@@ -40,7 +48,10 @@ end
 T["long lines wrap by display width, or are cut with white-space: nowrap"] = function()
   local r = rs({ { "s", "string" } }, { { ("abcdefghij"):rep(3) }, { ("中"):rep(12) } })
   eq(lines(r, {}, 20), { "abcdefghijabcdefghij", "abcdefghij", ("中"):rep(10), ("中"):rep(2) })
-  eq(lines(r, {}, 20, { line = { ["white-space"] = "nowrap" } }), { "abcdefghijabcdefghij", ("中"):rep(10) })
+  eq(
+    lines(r, {}, 20, { line = { ["white-space"] = "nowrap" } }),
+    { "abcdefghijabcdefghij", ("中"):rep(10) }
+  )
 end
 
 T["no rows; truncated results"] = function()

@@ -83,7 +83,11 @@ function M.normalize(v, o)
     end
     if #keys > 0 then
       table.sort(keys)
-      fail(o, "the result is an object (%s), not rows", table.concat(vim.list_slice(keys, 1, 5), ", "))
+      fail(
+        o,
+        "the result is an object (%s), not rows",
+        table.concat(vim.list_slice(keys, 1, 5), ", ")
+      )
     end
   end
   if names ~= nil and type(names) ~= "table" then

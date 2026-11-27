@@ -5,7 +5,13 @@ local fmt = require("dbdash.render.format")
 local M = {}
 
 -- Sequential scale (viridis-like), low to high.
-M.STOPS = { { 0x44, 0x01, 0x54 }, { 0x3b, 0x52, 0x8b }, { 0x21, 0x91, 0x8c }, { 0x5e, 0xc9, 0x62 }, { 0xfd, 0xe7, 0x25 } }
+M.STOPS = {
+  { 0x44, 0x01, 0x54 },
+  { 0x3b, 0x52, 0x8b },
+  { 0x21, 0x91, 0x8c },
+  { 0x5e, 0xc9, 0x62 },
+  { 0xfd, 0xe7, 0x25 },
+}
 M.LEVELS = 9
 
 ---"#rrggbb" -> { r, g, b }, or nil.
@@ -60,7 +66,10 @@ function M.colors(show, g, ctx)
     for _, c in ipairs(scale) do
       local rgb = rgb_of(c)
       if not rgb then
-        error({ phase = "render", message = ("color-scale: %q is not a #rrggbb color"):format(tostring(c)) }, 0)
+        error({
+          phase = "render",
+          message = ("color-scale: %q is not a #rrggbb color"):format(tostring(c)),
+        }, 0)
       end
       stops[#stops + 1] = rgb
     end
@@ -129,7 +138,11 @@ local grids = setmetatable({}, { __mode = "k" })
 
 ---@return { xs: string[], ys: string[], values: table<string, number>, lo: number, hi: number }
 function M.grid(rs, show)
-  local key = tostring(show.x_column) .. "\0" .. tostring(show.y_column) .. "\0" .. tostring(show.value_column)
+  local key = tostring(show.x_column)
+    .. "\0"
+    .. tostring(show.y_column)
+    .. "\0"
+    .. tostring(show.value_column)
   local hit = grids[rs]
   if hit and hit.key == key then
     return hit.grid

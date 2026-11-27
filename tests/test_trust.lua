@@ -78,7 +78,14 @@ end
 T["configs without Lua never ask"] = function()
   write("plain.sql", { "{% macro m() %}1{% endmacro %}" })
   eq(started(write("plain.yaml", PLAIN)), true)
-  eq(started(write("sql_import.yaml", { "database: { url: 'sqlite:///:memory:' }", "query:", "  sql: \"{% from 'plain.sql' import m %}SELECT {{ m() }}\"" })), true)
+  eq(
+    started(write("sql_import.yaml", {
+      "database: { url: 'sqlite:///:memory:' }",
+      "query:",
+      "  sql: \"{% from 'plain.sql' import m %}SELECT {{ m() }}\"",
+    })),
+    true
+  )
   eq(asked, 0)
 end
 
@@ -96,19 +103,26 @@ T["collect: the config first, then imported .lua files and {% lua %} templates"]
   })
   local files, has_lua = trust.collect(path, require("dbdash.config").load(path))
   eq(has_lua, true)
-  eq(vim.tbl_map(function(f)
-    return vim.fs.basename(f.path) .. ":" .. f.kind
-  end, files), { "board.yaml:config", "deep.lua:lua", "helpers.lua:lua", "with_lua.sql:template" })
+  eq(
+    vim.tbl_map(function(f)
+      return vim.fs.basename(f.path) .. ":" .. f.kind
+    end, files),
+    { "board.yaml:config", "deep.lua:lua", "helpers.lua:lua", "with_lua.sql:template" }
+  )
   -- a {% lua %} block in the config itself
   path = write("block.yaml", PLAIN)
-  vim.fn.writefile({ "database: { url: 'sqlite:///:memory:' }", "query: { sql: '{% lua %}return 1{% endlua %}' }" }, path)
+  vim.fn.writefile(
+    { "database: { url: 'sqlite:///:memory:' }", "query: { sql: '{% lua %}return 1{% endlua %}' }" },
+    path
+  )
   files, has_lua = trust.collect(path, require("dbdash.config").load(path))
   eq({ #files, has_lua }, { 1, true })
 end
 
 T["exec:// and luastream:// configs need trust like lua://"] = function()
   for _, url in ipairs({ "exec://", "luastream://" }) do
-    local path = write("push.yaml", { ("database: { url: '%s' }"):format(url), "query: { sql: 'echo 1' }" })
+    local path =
+      write("push.yaml", { ("database: { url: '%s' }"):format(url), "query: { sql: 'echo 1' }" })
     local files, needs = trust.collect(path, require("dbdash.config").load(path))
     eq({ url, needs, files[1].kind }, { url, true, "config" })
     eq(files[1].text:find("echo 1", 1, true) ~= nil, true) -- the View shows the script
@@ -116,10 +130,16 @@ T["exec:// and luastream:// configs need trust like lua://"] = function()
 end
 
 T["http(s):// configs that write a cookie file (curl -c) need trust"] = function()
-  local writes = write("writes.yaml", { "database: { url: 'http://127.0.0.1:1' }", "query: { sql: curl -b jar.txt -c jar.txt }" })
+  local writes = write(
+    "writes.yaml",
+    { "database: { url: 'http://127.0.0.1:1' }", "query: { sql: curl -b jar.txt -c jar.txt }" }
+  )
   local _, needs = trust.collect(writes, require("dbdash.config").load(writes))
   eq(needs, true)
-  local reads = write("reads.yaml", { "database: { url: 'http://127.0.0.1:1' }", "query: { sql: curl -b jar.txt }" })
+  local reads = write(
+    "reads.yaml",
+    { "database: { url: 'http://127.0.0.1:1' }", "query: { sql: curl -b jar.txt }" }
+  )
   _, needs = trust.collect(reads, require("dbdash.config").load(reads))
   eq(needs, false)
 end
@@ -138,9 +158,12 @@ T["collect: files reached through include and extends count too"] = function()
   })
   local files, has_lua = trust.collect(path, require("dbdash.config").load(path))
   eq(has_lua, true)
-  eq(vim.tbl_map(function(f)
-    return vim.fs.basename(f.path) .. ":" .. f.kind
-  end, files), { "board.yaml:config", "base.sql:template", "deep.lua:lua", "part.sql:template" })
+  eq(
+    vim.tbl_map(function(f)
+      return vim.fs.basename(f.path) .. ":" .. f.kind
+    end, files),
+    { "board.yaml:config", "base.sql:template", "deep.lua:lua", "part.sql:template" }
+  )
 end
 
 T["an included template with Lua that the trust does not cover asks again"] = function()
@@ -160,7 +183,10 @@ T["an included template with Lua that the trust does not cover asks again"] = fu
     return d.panels[1].error ~= nil or d.panels[1].rs ~= nil
   end, 10)
   eq(asked, 1)
-  eq(d.panels[1].error ~= nil and sched.format_error(d.panels[1].error):find("not trusted") ~= nil, true)
+  eq(
+    d.panels[1].error ~= nil and sched.format_error(d.panels[1].error):find("not trusted") ~= nil,
+    true
+  )
 end
 
 T["one question per config, listing every file; allowed until any of them changes"] = function()
@@ -253,7 +279,10 @@ T["View shows every file after a separator naming it; a allows and starts"] = fu
   local path = write("board.yaml", importing("helpers.lua"))
   local shown = view_then(path, "a")
   eq(shown.floating, true)
-  eq(vim.inspect(shown.title):find("board.yaml: Lua code - a allow, d deny, q close", 1, true) ~= nil, true)
+  eq(
+    vim.inspect(shown.title):find("board.yaml: Lua code - a allow, d deny, q close", 1, true) ~= nil,
+    true
+  )
   local l = shown.lines
   ---A line of ━ with " ... label " centered (the two sides differ by at most one).
   local function separator(line, label)
@@ -266,7 +295,10 @@ T["View shows every file after a separator naming it; a allows and starts"] = fu
       rw = rw + 1
     end
     local middle = table.concat(chars, "", lw + 1, #chars - rw)
-    return vim.startswith(middle, " ") and vim.endswith(middle, label) and lw >= 4 and math.abs(lw - rw) <= 1
+    return vim.startswith(middle, " ")
+      and vim.endswith(middle, label)
+      and lw >= 4
+      and math.abs(lw - rw) <= 1
   end
   -- the config first, without a separator (the title names it); then each imported file
   eq(vim.list_slice(l, 1, 6), importing("helpers.lua"))
@@ -308,7 +340,10 @@ local function run(path)
 end
 
 T["the same .lua helper works in query.sql and query.transform"] = function()
-  write("h.lua", { "return { twice = function(x) return x * 2 end, tag = function() return 'v' .. args.n end }" })
+  write(
+    "h.lua",
+    { "return { twice = function(x) return x * 2 end, tag = function() return 'v' .. args.n end }" }
+  )
   local path = write("both.yaml", {
     "database: { url: 'sqlite:///:memory:' }",
     "query:",
@@ -361,7 +396,10 @@ T["a file loaded through a computed path, or changed while running, asks again"]
     return not p.running
   end, 10)
   eq(asked, 3)
-  eq(sched.format_error(p.error):find("dyn.yaml not started (not trusted yet)", 1, true) ~= nil, true)
+  eq(
+    sched.format_error(p.error):find("dyn.yaml not started (not trusted yet)", 1, true) ~= nil,
+    true
+  )
   answer = "allow"
   p:refresh()
   vim.wait(5000, function()

@@ -7,7 +7,8 @@ local helpers = require("tests.helpers")
 local eq = MiniTest.expect.equality
 local S = MiniTest.new_set()
 
-local STEPS = { { value = 100, class = "warning" }, { value = 500, class = "danger", notify = true } }
+local STEPS =
+  { { value = 100, class = "warning" }, { value = 500, class = "danger", notify = true } }
 
 S["levels: highest step reached; below reverses the direction"] = function()
   local up = T.steps(STEPS)
@@ -19,7 +20,8 @@ S["levels: highest step reached; below reverses the direction"] = function()
   eq(T.level("650", up), 2) -- numeric text (decimals)
   eq(T.level(vim.NIL, up), 0)
   eq(T.level("n/a", up), 0)
-  local down = T.steps({ { value = 10, class = "danger" }, { value = 50, class = "warning" } }, true)
+  local down =
+    T.steps({ { value = 10, class = "danger" }, { value = 50, class = "warning" } }, true)
   eq(T.level(80, down, true), 0)
   eq(T.level(50, down, true), 1)
   eq(T.level(3, down, true), 2)
@@ -36,10 +38,18 @@ end
 
 S["stat value: its step's class colors it"] = function()
   local rs = resultset.new({ { name = "errors", type = "integer" } }, { { 650 } })
-  local out = render.render(rs, { type = "stat", title = "Errors", thresholds = STEPS }, { width = 60, height = 10 })
+  local out = render.render(
+    rs,
+    { type = "stat", title = "Errors", thresholds = STEPS },
+    { width = 60, height = 10 }
+  )
   eq(out.hl[2].group, "DiagnosticError") -- value.danger in the UA sheet
   -- a rule recolors the class (Grafana colorMode: background is a background-color)
-  local bg = render.render(rs, { type = "stat", thresholds = STEPS }, { width = 60, height = 10, style = { ["value.danger"] = { ["background-color"] = "#400000" } } })
+  local bg = render.render(
+    rs,
+    { type = "stat", thresholds = STEPS },
+    { width = 60, height = 10, style = { ["value.danger"] = { ["background-color"] = "#400000" } } }
+  )
   eq(bg.hl[1].group:match("^DbDashCss_") ~= nil, true)
   helpers.golden("stat/big/thresholds", out)
   rs = resultset.new({ { name = "errors", type = "integer" } }, { { 5 } })
@@ -48,21 +58,29 @@ S["stat value: its step's class colors it"] = function()
 end
 
 S["table cells: classes per column"] = function()
-  local rs = resultset.new(
-    { { name = "host", type = "string" }, { name = "errors", type = "integer" }, { name = "free_gb", type = "integer" } },
-    { { "a", 20, 80 }, { "b", 150, 40 }, { "c", 900, 5 }, { "d", vim.NIL, vim.NIL } }
-  )
+  local rs = resultset.new({
+    { name = "host", type = "string" },
+    { name = "errors", type = "integer" },
+    { name = "free_gb", type = "integer" },
+  }, { { "a", 20, 80 }, { "b", 150, 40 }, { "c", 900, 5 }, { "d", vim.NIL, vim.NIL } })
   local show = {
     type = "table",
     column_list = {
       "host",
       { column = "errors", thresholds = STEPS },
-      { column = "free_gb", thresholds = { { value = 50, class = "warning" }, { value = 10, class = "danger" } }, thresholds_below = true },
+      {
+        column = "free_gb",
+        thresholds = { { value = 50, class = "warning" }, { value = 10, class = "danger" } },
+        thresholds_below = true,
+      },
     },
   }
   helpers.golden("table/box/thresholds", render.render(rs, show, { width = 60, height = 20 }))
   local levels = T.levels(rs, show)
-  eq({ levels.errors.level, levels.errors.value, levels.free_gb.level, levels.free_gb.value }, { 2, 900, 2, 5 })
+  eq(
+    { levels.errors.level, levels.errors.value, levels.free_gb.level, levels.free_gb.value },
+    { 2, 900, 2, 5 }
+  )
 end
 
 S["config reports invalid thresholds with their line"] = function()

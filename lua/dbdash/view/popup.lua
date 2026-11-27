@@ -60,7 +60,14 @@ function M.open(lines, opts)
   end
   local ns = require("dbdash.view.buffer").ns
   for _, h in ipairs(opts.hl or {}) do
-    pcall(vim.api.nvim_buf_set_extmark, buf, ns, h.row, h.col_s, { end_col = h.col_e, hl_group = h.group })
+    pcall(
+      vim.api.nvim_buf_set_extmark,
+      buf,
+      ns,
+      h.row,
+      h.col_s,
+      { end_col = h.col_e, hl_group = h.group }
+    )
   end
 
   local win = vim.api.nvim_open_win(buf, true, {

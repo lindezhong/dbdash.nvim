@@ -31,10 +31,13 @@ end
 local function need(name)
   local impl = registry.get(name)
   if not impl then
-    error({ phase = "render", message = ("unknown style '%s' (available: %s)"):format(
-      name,
-      table.concat(registry.names(name:match("^(.*/)")), ", ")
-    ) }, 0)
+    error({
+      phase = "render",
+      message = ("unknown style '%s' (available: %s)"):format(
+        name,
+        table.concat(registry.names(name:match("^(.*/)")), ", ")
+      ),
+    }, 0)
   end
   return impl
 end
@@ -96,9 +99,13 @@ function M.with_title(out, title, subtitle, width, chart_type, css)
   local tc = css:get("title")
   local function line_of(text, part)
     local c = css:get(part)
-    local align = c["text-align"] ~= "start" and c["text-align"] or (LEFT_TITLES[chart_type] and "left" or "center")
+    local align = c["text-align"] ~= "start" and c["text-align"]
+      or (LEFT_TITLES[chart_type] and "left" or "center")
     local line, s, e = box.title_line(text, w, align, M.ellipsis(c))
-    return { lines = { (line:gsub("%s+$", "")) }, hl = { { row = 0, col_s = s, col_e = e, group = css:hl(part) } } }
+    return {
+      lines = { (line:gsub("%s+$", "")) },
+      hl = { { row = 0, col_s = s, col_e = e, group = css:hl(part) } },
+    }
   end
   local parts = { line_of(title, "title") }
   if subtitle and css:get("subtitle").display ~= "none" then
@@ -129,7 +136,13 @@ function M.render(rs, show, opts)
   local ok, res = pcall(function()
     local chart = css:get()
     local renderer, canvas = registry.resolve(show.type, chart)
-    local ctx = M.ctx({ width = opts.width, height = opts.height, canvas = canvas, palette = chart.palette, css = css })
+    local ctx = M.ctx({
+      width = opts.width,
+      height = opts.height,
+      canvas = canvas,
+      palette = chart.palette,
+      css = css,
+    })
     if chart["max-width"] then
       ctx.width = math.min(ctx.width, chart["max-width"])
     end

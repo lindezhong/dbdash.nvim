@@ -95,8 +95,11 @@ local function worker(path, sql, max_rows, timeout_ms, libs, readonly, create, c
     local i, n = 1, #s
     while i <= n do
       local c = s:byte(i)
-      local len = c < 0x80 and 1 or (c >= 0xC2 and c < 0xE0) and 2 or (c >= 0xE0 and c < 0xF0) and 3
-        or (c >= 0xF0 and c < 0xF5) and 4 or nil
+      local len = c < 0x80 and 1
+        or (c >= 0xC2 and c < 0xE0) and 2
+        or (c >= 0xE0 and c < 0xF0) and 3
+        or (c >= 0xF0 and c < 0xF5) and 4
+        or nil
       if not len or i + len - 1 > n then
         return false
       end
@@ -152,7 +155,8 @@ local function worker(path, sql, max_rows, timeout_ms, libs, readonly, create, c
   lib.sqlite3_progress_handler(db, 1000, progress, nil)
 
   local limit = tonumber(max_rows)
-  local out = { columns = {}, rows = {}, truncated = false, version = ffi.string(lib.sqlite3_libversion()) }
+  local out =
+    { columns = {}, rows = {}, truncated = false, version = ffi.string(lib.sqlite3_libversion()) }
   local err
   local pstmt = ffi.new("sqlite3_stmt*[1]")
   local tail = ffi.new("const char*[1]")
@@ -299,7 +303,8 @@ function M.decl_type(decl)
   return "unknown"
 end
 
-local CLASS_TYPE = { I = "integer", R = "number", S = "number", T = "string", X = "bytes", B = "bytes" }
+local CLASS_TYPE =
+  { I = "integer", R = "number", S = "number", T = "string", X = "bytes", B = "bytes" }
 
 ---Decode one tagged cell into a Lua value of the column's logical type.
 local function cell(tag, raw, ltype)

@@ -129,8 +129,15 @@ function M.collect(path, cfg)
   for _, p in ipairs(cfg.panels) do
     local q = p.query
     -- lua://, luastream:// and exec:// run code or commands from the config
-    local runs = p.database.type == "lua" or p.database.type == "luastream" or p.database.type == "exec"
-    if runs or q.transform or M.has_lua_block(q.sql or "") or M.has_lua_block(q.transform or "") then
+    local runs = p.database.type == "lua"
+      or p.database.type == "luastream"
+      or p.database.type == "exec"
+    if
+      runs
+      or q.transform
+      or M.has_lua_block(q.sql or "")
+      or M.has_lua_block(q.transform or "")
+    then
       has_lua = true
     end
     visit(q.sql or "")
@@ -296,10 +303,15 @@ end
 ---(both recorded), `q` / <Esc> close without deciding. `on_decided(answer)` gets "allow",
 ---"deny" or "cancel" once the window is closed.
 function M.view(config_path, files, on_decided)
-  local width = math.min(require("dbdash.util.size").resolve(require("dbdash").options.popup.max_width, vim.o.columns), vim.o.columns - 4)
+  local width = math.min(
+    require("dbdash.util.size").resolve(require("dbdash").options.popup.max_width, vim.o.columns),
+    vim.o.columns - 4
+  )
   local lines, seps = M.view_lines(files, width - 2)
   local win, buf = require("dbdash.view.popup").open(lines, {
-    title = ("%s: Lua code - a allow, d deny, q close"):format(vim.fn.fnamemodify(config_path, ":t")),
+    title = ("%s: Lua code - a allow, d deny, q close"):format(
+      vim.fn.fnamemodify(config_path, ":t")
+    ),
     filetype = "lua",
   })
   local ns = vim.api.nvim_create_namespace("dbdash_trust")

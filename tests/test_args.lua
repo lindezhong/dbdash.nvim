@@ -49,7 +49,10 @@ T["cli errors"] = function()
   eq(err(args.parse_cli, specs, { "limit=1.5" }), "argument 'limit': \"1.5\" is not an integer")
   eq(err(args.parse_cli, specs, { "min_age=old" }):find("not a number") ~= nil, true)
   eq(err(args.parse_cli, specs, { "active=maybe" }):find("not a boolean") ~= nil, true)
-  eq(err(args.parse_cli, specs, { "nope=1" }):find("unknown argument 'nope' %(known: min_age") ~= nil, true)
+  eq(
+    err(args.parse_cli, specs, { "nope=1" }):find("unknown argument 'nope' %(known: min_age") ~= nil,
+    true
+  )
   eq(err(args.parse_cli, specs, { "limit" }):find("expected name=value") ~= nil, true)
   eq(err(args.parse_cli, specs, { "limit=1", "limit=2" }):find("given twice") ~= nil, true)
   eq(err(args.parse_cli, specs, { "ids=1,x" }):find("not a number") ~= nil, true)
@@ -97,10 +100,16 @@ T["cli: a bare name sets every argument of that name, <panel>.name one panel's"]
   eq(args.parse_cli(scoped, { "region=JP" }), { region = "JP", ["orders.region"] = "JP" })
   eq(args.parse_cli(scoped, { "limit=3" }), { ["orders.limit"] = 3, ["2.limit"] = 3 })
   eq(args.parse_cli(scoped, { "orders.region=CN" }), { ["orders.region"] = "CN" })
-  eq(err(args.parse_cli, scoped, { "2.region=CN" }), "panel '2' has no local argument 'region' (use region= for the shared one)")
+  eq(
+    err(args.parse_cli, scoped, { "2.region=CN" }),
+    "panel '2' has no local argument 'region' (use region= for the shared one)"
+  )
   eq(err(args.parse_cli, scoped, { "limit=x" }):find("not a number") ~= nil, true)
   -- <panel>.name wins over the bare name, in either order.
-  eq(args.parse_cli(scoped, { "orders.region=CN", "region=JP" }), { region = "JP", ["orders.region"] = "CN" })
+  eq(
+    args.parse_cli(scoped, { "orders.region=CN", "region=JP" }),
+    { region = "JP", ["orders.region"] = "CN" }
+  )
   eq(err(args.parse_cli, scoped, { "region=JP", "region=CN" }), "argument 'region' given twice")
   eq(args.keys(scoped), { "region", "orders.region", "limit", "orders.limit", "2.limit" })
 end

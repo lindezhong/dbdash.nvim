@@ -18,7 +18,12 @@ local W = require("dbdash.util.width")
 function Panel:render_templates(run)
   local q = self.cfg.query
   local o = self:template_opts(run)
-  local sql = M.render_text(self.d, q.sql, q.sql_line, vim.tbl_extend("force", o, { autoescape = q.autoescape }))
+  local sql = M.render_text(
+    self.d,
+    q.sql,
+    q.sql_line,
+    vim.tbl_extend("force", o, { autoescape = q.autoescape })
+  )
   local code = q.transform and M.render_text(self.d, q.transform, q.transform_line, o) or nil
   return sql, code
 end
@@ -71,7 +76,8 @@ function Panel:new_run(values, parent, kind)
     values = values or args.resolve_panel(self.cfg, self.d.state),
     depth = parent and parent.depth + 1 or 0,
     -- The life: callbacks so far, records, and the cancel token of the refresh.
-    counter = parent and parent.counter or { n = 0, runs = {}, version = 0, cancel = require("dbdash.db.cancel").new() },
+    counter = parent and parent.counter
+      or { n = 0, runs = {}, version = 0, cancel = require("dbdash.db.cancel").new() },
     item = parent and parent.item or nil, -- push sources: the item a callback works on too
   }
   run.life = run.counter
@@ -166,8 +172,6 @@ function Panel:set_arg(run, name, v)
   args.set_modified(self.d.state, spec.key, v == nil and vim.NIL or v)
 end
 
-
-
 ---A visible argument of the panel by name (a local one shadows a shared one).
 function Panel:arg_spec(name)
   for _, spec in ipairs(self.cfg.visible_args) do
@@ -189,10 +193,20 @@ function Panel:helpers(run)
       end
       local limits = opts().lua
       if run.counter.n + 1 > limits.max_callbacks then
-        error(("dbdash.run: more than %d callbacks in one refresh (lua.max_callbacks)"):format(limits.max_callbacks), 2)
+        error(
+          ("dbdash.run: more than %d callbacks in one refresh (lua.max_callbacks)"):format(
+            limits.max_callbacks
+          ),
+          2
+        )
       end
       if run.depth + 1 > limits.max_callback_depth then
-        error(("dbdash.run: callbacks nested deeper than %d (lua.max_callback_depth)"):format(limits.max_callback_depth), 2)
+        error(
+          ("dbdash.run: callbacks nested deeper than %d (lua.max_callback_depth)"):format(
+            limits.max_callback_depth
+          ),
+          2
+        )
       end
       local values = {}
       for k, v in pairs(run.values) do
@@ -241,7 +255,8 @@ function M.render_text(d, text, line, o)
     table.insert(o.run.maps, args_map)
   end
   -- args and meta are read-only for the template's methods (args change with set_arg).
-  local vars = { args = R.freeze(args_map, "args"), meta = R.freeze(metadata.for_template(o.meta), "meta") }
+  local vars =
+    { args = R.freeze(args_map, "args"), meta = R.freeze(metadata.for_template(o.meta), "meta") }
   if o.run then
     table.insert(o.run.meta_maps, vars.meta)
   end
@@ -363,13 +378,17 @@ function M.check_file(d, path, text, kind, on_allow)
     end
   end)
   if not ok then
-    error(require("dbdash.template.errors").new(
-      "trust",
-      why or ("%s runs Lua that is not trusted yet: %s"):format(
-        vim.fn.fnamemodify(d.path, ":~:."),
-        vim.fn.fnamemodify(path, ":~:.")
-      )
-    ), 0)
+    error(
+      require("dbdash.template.errors").new(
+        "trust",
+        why
+          or ("%s runs Lua that is not trusted yet: %s"):format(
+            vim.fn.fnamemodify(d.path, ":~:."),
+            vim.fn.fnamemodify(path, ":~:.")
+          )
+      ),
+      0
+    )
   end
 end
 

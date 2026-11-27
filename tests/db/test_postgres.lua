@@ -11,7 +11,10 @@ end
 T["SCRAM-SHA-256 (RFC 7677 example)"] = function()
   local sent = {}
   local replies = {
-    { 11, "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096" },
+    {
+      11,
+      "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096",
+    },
     { 12, "v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=" },
   }
   pg.scram("pencil", function(mech, data)
@@ -29,7 +32,10 @@ end
 
 T["SCRAM rejects a wrong server signature"] = function()
   local replies = {
-    { 11, "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096" },
+    {
+      11,
+      "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096",
+    },
     { 12, "v=AAAATRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=" },
   }
   local ok, err = pcall(pg.scram, "pencil", function() end, function() end, function()
@@ -59,7 +65,7 @@ T["text values by OID"] = function()
 end
 
 T["error responses"] = function()
-  local f = pg.parse_error("SERROR\0C42601\0Msyntax error at or near \"SELEC\"\0P1\0\0")
+  local f = pg.parse_error('SERROR\0C42601\0Msyntax error at or near "SELEC"\0P1\0\0')
   eq(f, { S = "ERROR", C = "42601", M = 'syntax error at or near "SELEC"', P = "1" })
 end
 
@@ -77,18 +83,43 @@ end
 
 T["it: SCRAM login and type mapping"] = function()
   h.require_it()
-  local rs = h.ok(URL, [[
+  local rs = h.ok(
+    URL,
+    [[
     SELECT 1::int2 AS a, 2::int4 AS b, 9223372036854775807::int8 AS c, 1.5::float8 AS d,
            12.30::numeric(6,2) AS e, true AS f, 'héllo'::text AS g, '\x00ff'::bytea AS h,
            '2026-11-20'::date AS i, '2026-11-20 10:00:00+00'::timestamptz AS j,
            '{"k": [1, 2]}'::jsonb AS k, ARRAY[1, NULL, 3] AS l, ARRAY['x y', 'z'] AS m,
            'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid AS n, NULL::text AS o
-  ]])
-  eq(types(rs), { "integer", "integer", "integer", "number", "decimal", "boolean", "string", "bytes", "date", "datetime", "json", "array", "array", "uuid", "string" })
+  ]]
+  )
+  eq(types(rs), {
+    "integer",
+    "integer",
+    "integer",
+    "number",
+    "decimal",
+    "boolean",
+    "string",
+    "bytes",
+    "date",
+    "datetime",
+    "json",
+    "array",
+    "array",
+    "uuid",
+    "string",
+  })
   local r = rs.rows[1]
-  eq({ r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9] }, { 1, 2, "9223372036854775807", 1.5, "12.30", true, "héllo", "\0\255", "2026-11-20" })
+  eq(
+    { r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9] },
+    { 1, 2, "9223372036854775807", 1.5, "12.30", true, "héllo", "\0\255", "2026-11-20" }
+  )
   eq(r[10]:match("^2026%-11%-20 10:00:00") ~= nil, true)
-  eq({ r[11].k, r[12], r[13], r[14], r[15] }, { { 1, 2 }, { 1, vim.NIL, 3 }, { "x y", "z" }, "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", vim.NIL })
+  eq(
+    { r[11].k, r[12], r[13], r[14], r[15] },
+    { { 1, 2 }, { 1, vim.NIL, 3 }, { "x y", "z" }, "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", vim.NIL }
+  )
   eq(rs.columns[11].db_type, "jsonb")
 end
 
@@ -100,11 +131,15 @@ end
 
 T["it: multiple statements, max_rows and notices"] = function()
   h.require_it()
-  local rs = h.ok(URL, [[
+  local rs = h.ok(
+    URL,
+    [[
     CREATE TEMP TABLE t (n int);
     INSERT INTO t SELECT generate_series(1, 100);
     SELECT n FROM t ORDER BY n;
-  ]], { max_rows = 10 })
+  ]],
+    { max_rows = 10 }
+  )
   eq({ rs.row_count, rs.truncated, rs.rows[10][1] }, { 10, true, 10 })
   rs = h.ok(URL, "DO $$ BEGIN RAISE NOTICE 'hi there'; END $$; SELECT 1")
   eq(rs.warnings, { "NOTICE: hi there" })
@@ -113,7 +148,10 @@ end
 T["it: errors carry code and position"] = function()
   h.require_it()
   local r = h.query(URL, "SELECT 1 FROM nope")
-  eq({ r.err.phase, r.err.code, r.err.position, r.err.driver }, { "query", "42P01", 15, "postgres" })
+  eq(
+    { r.err.phase, r.err.code, r.err.position, r.err.driver },
+    { "query", "42P01", 15, "postgres" }
+  )
   r = h.query("postgres://dbdash:wrong@127.0.0.1:15432/dbdash_test", "SELECT 1")
   eq({ r.err.phase, r.err.code }, { "auth", "28P01" })
   r = h.query("postgres://dbdash@127.0.0.1:15432/dbdash_test", "SELECT 1")

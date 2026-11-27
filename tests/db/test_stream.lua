@@ -65,18 +65,23 @@ end
 -- exec:// ------------------------------------------------------------------------------------
 
 local function exec_opts(o)
-  return { options = vim.tbl_extend("force", { interpreter = LUA }, o or {}), base_dir = vim.fn.getcwd() }
+  return {
+    options = vim.tbl_extend("force", { interpreter = LUA }, o or {}),
+    base_dir = vim.fn.getcwd(),
+  }
 end
 
 T["exec: each stdout line is one item; the stream ends with the script"] = function()
-  local res = run("exec://", [[io.write("one\ntwo\n") io.stdout:flush() io.write('{"n": 3}')]], exec_opts())
+  local res =
+    run("exec://", [[io.write("one\ntwo\n") io.stdout:flush() io.write('{"n": 3}')]], exec_opts())
   eq(res.err, nil)
   eq(values(res), { "one", "two", '{"n": 3}' })
   eq(res.items[1][2].stream, "stdout")
 end
 
 T["exec: capture stdout, stderr or both, each with its stream"] = function()
-  local code = [[io.write("o1\n") io.stdout:flush() io.stderr:write("e1\n") io.stderr:flush() io.write("o2\n")]]
+  local code =
+    [[io.write("o1\n") io.stdout:flush() io.stderr:write("e1\n") io.stderr:flush() io.write("o2\n")]]
   eq(values(run("exec://", code, exec_opts({ capture = "stderr" }))), { "e1" })
   local both = run("exec://", code, exec_opts({ capture = "both" }))
   local seen = {}
@@ -93,13 +98,21 @@ T["exec: exit codes: ok_codes end normally, others fail with the end of stderr"]
   eq(res.err.message:find("exited with code 2", 1, true) ~= nil, true)
   eq(res.err.message:find("bad thing", 1, true) ~= nil, true)
   eq(run("exec://", [[os.exit(2)]], exec_opts({ ok_codes = { 0, 2 } })).err, nil)
-  eq(run("exec://", [[os.exit(0)]], exec_opts({ ok_codes = { 1 } })).err.message:find("code 0", 1, true) ~= nil, true)
+  eq(
+    run("exec://", [[os.exit(0)]], exec_opts({ ok_codes = { 1 } })).err.message:find(
+      "code 0",
+      1,
+      true
+    ) ~= nil,
+    true
+  )
 end
 
 T["exec: cwd (default: the config directory), env, stdin and the delimiter"] = function()
   local dir = vim.fs.normalize(vim.fn.tempname())
   vim.fn.mkdir(dir .. "/sub", "p")
-  local code = [[io.write(vim.uv.cwd(), "|", tostring(os.getenv("DBDASH_X")), "|", io.read("*a"), "|")]]
+  local code =
+    [[io.write(vim.uv.cwd(), "|", tostring(os.getenv("DBDASH_X")), "|", io.read("*a"), "|")]]
   local o = exec_opts({ delimiter = "|", env = { DBDASH_X = "x1" }, stdin = "in" })
   o.base_dir = dir
   eq(values(run("exec://", code, o)), { vim.uv.fs_realpath(dir), "x1", "in" })
@@ -113,15 +126,31 @@ T["exec: cwd (default: the config directory), env, stdin and the delimiter"] = f
 end
 
 T["exec: unknown or wrong options are config errors"] = function()
-  eq(run("exec://", "x", exec_opts({ nope = 1 })).err.message:find("unknown option database.options.nope", 1, true) ~= nil, true)
+  eq(
+    run("exec://", "x", exec_opts({ nope = 1 })).err.message:find(
+      "unknown option database.options.nope",
+      1,
+      true
+    ) ~= nil,
+    true
+  )
   eq(run("exec://", "x", exec_opts({ capture = "all" })).err.phase, "config")
   eq(run("exec://", "x", exec_opts({ ok_codes = {} })).err.phase, "config")
-  eq(run("exec://", "x", { options = { interpreter = { "/no/such/program" } } }).err.message:find("cannot run", 1, true) ~= nil, true)
+  eq(
+    run("exec://", "x", { options = { interpreter = { "/no/such/program" } } }).err.message:find(
+      "cannot run",
+      1,
+      true
+    ) ~= nil,
+    true
+  )
 end
 
 T["exec: stopping kills the script"] = function()
   local pidfile = vim.fn.tempname()
-  local code = ([[local f = io.open(%q, "w") f:write(vim.fn.getpid()) f:close() io.write("started\n") io.stdout:flush() while true do vim.uv.sleep(50) end]]):format(pidfile)
+  local code = ([[local f = io.open(%q, "w") f:write(vim.fn.getpid()) f:close() io.write("started\n") io.stdout:flush() while true do vim.uv.sleep(50) end]]):format(
+    pidfile
+  )
   local res = run("exec://", code, exec_opts(), 1500)
   eq(res.err.phase, "cancelled")
   eq(values(res), { "started" })
@@ -153,19 +182,26 @@ end
 -- luastream:// ---------------------------------------------------------------------------
 
 T["luastream: print and io.write are cut into items; emit passes one value as it is"] = function()
-  local res = run("luastream://", [[
+  local res = run(
+    "luastream://",
+    [[
     print("a", 1)
     io.write("b\nc")
     io.write("d\n")
     dbdash.emit({ { n = 1 } })
     return { { last = true } }
-  ]], { base_dir = vim.fn.getcwd() })
+  ]],
+    { base_dir = vim.fn.getcwd() }
+  )
   eq(res.err, nil)
   eq(values(res), { "a\t1", "b", "cd", { { n = 1 } }, { { last = true } } })
 end
 
 T["luastream: delimiter, errors, waiting and stopping"] = function()
-  eq(values(run("luastream://", [[io.write("x;y;")]], { options = { delimiter = ";" } })), { "x", "y" })
+  eq(
+    values(run("luastream://", [[io.write("x;y;")]], { options = { delimiter = ";" } })),
+    { "x", "y" }
+  )
   local res = run("luastream://", [[print("before") error("boom")]], {})
   eq({ values(res), res.err.message:find("boom", 1, true) ~= nil }, { { "before" }, true })
   -- It waits without blocking (dbdash.sleep) and stops when stopped.
@@ -184,13 +220,17 @@ T["luastream: cwd for files and commands; Neovim's own directory stays"] = funct
   vim.fn.writefile({ "l1", "l2" }, dir .. "/data/in.txt")
   vim.fn.writefile({ "return 'from dofile'" }, dir .. "/data/m.lua")
   local before = vim.fn.getcwd()
-  local res = run("luastream://", [[
+  local res = run(
+    "luastream://",
+    [[
     for l in io.lines("in.txt") do print(l) end
     local f = io.open("in.txt") print(f:read("*l")) f:close()
     print(dofile("m.lua"))
     print(dbdash.cwd)
     print(vim.trim(dbdash.system(jit.os == "Windows" and "cd" or "pwd").stdout))
-  ]], { base_dir = dir, options = { cwd = "data" } })
+  ]],
+    { base_dir = dir, options = { cwd = "data" } }
+  )
   eq(res.err, nil)
   local real = vim.uv.fs_realpath(dir .. "/data")
   local v = values(res)
@@ -199,7 +239,11 @@ T["luastream: cwd for files and commands; Neovim's own directory stays"] = funct
   eq(vim.uv.fs_realpath(vim.fs.normalize(v[6])), real)
   eq(vim.fn.getcwd(), before)
   if jit.os ~= "Windows" then
-    res = run("luastream://", [[local p = io.popen("pwd") print(vim.trim(p:read("*a"))) p:close()]], { base_dir = dir, options = { cwd = "data" } })
+    res = run(
+      "luastream://",
+      [[local p = io.popen("pwd") print(vim.trim(p:read("*a"))) p:close()]],
+      { base_dir = dir, options = { cwd = "data" } }
+    )
     eq(vim.uv.fs_realpath(values(res)[1]), real)
   end
 end

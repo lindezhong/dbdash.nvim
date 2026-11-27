@@ -34,7 +34,12 @@ function M.tags(lines)
       if root and root.key == "definitions" and #stack == 1 then
         entry.field = { key }
         tags[i] = "dbdash-schema-def-" .. key
-      elseif parent and parent.key == "properties" and root and (root.key == "properties" or root.key == "definitions") then
+      elseif
+        parent
+        and parent.key == "properties"
+        and root
+        and (root.key == "properties" or root.key == "definitions")
+      then
         -- A field: the nearest field above it (or the definition) gives its path.
         local base
         for j = #stack, 1, -1 do

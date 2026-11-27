@@ -85,7 +85,8 @@ T["ⓘ marks only what has a description"] = function()
   local lines = vim.api.nvim_buf_get_lines(d.buf, 0, 3, false)
   eq(lines[1], "Sales ⓘ")
   eq(lines[3]:match("^Visits ⓘ%s+Plain$") ~= nil, true)
-  local plain = run("plain", "database: { url: 'sqlite:///:memory:' }\nquery: { sql: SELECT 1 AS x }\n")
+  local plain =
+    run("plain", "database: { url: 'sqlite:///:memory:' }\nquery: { sql: SELECT 1 AS x }\n")
   eq(table.concat(vim.api.nvim_buf_get_lines(plain.buf, 0, -1, false), "\n"):find("ⓘ"), nil)
 end
 
@@ -94,7 +95,10 @@ T["K on the header shows the dashboard's, on a panel the panel's, rendered as Ma
   local lines, win = describe(d, 1)
   eq(lines, { "# Sales overview", "Last **24 hours** from sqlite." })
   local buf = vim.api.nvim_win_get_buf(win)
-  eq({ vim.bo[buf].filetype, vim.wo[win].wrap, vim.wo[win].linebreak, vim.wo[win].conceallevel }, { "markdown", true, true, 2 })
+  eq(
+    { vim.bo[buf].filetype, vim.wo[win].wrap, vim.wo[win].linebreak, vim.wo[win].conceallevel },
+    { "markdown", true, true, 2 }
+  )
   -- With the markdown parser, treesitter must highlight the float; without it (some
   -- Windows installs) the markdown syntax does, and no filetype plugin error is printed.
   -- language.add returns nil (it does not throw) when there is no parser.
@@ -123,13 +127,16 @@ end
 
 T["one chart: both descriptions in one float; the keys come from setup()"] = function()
   require("dbdash").setup({ lua = { confirm = false }, dashboard = { keys = { describe = "gK" } } })
-  local d = run("one", [[
+  local d = run(
+    "one",
+    [[
 title: Board
 description: About the board.
 database: { url: "sqlite:///:memory:" }
 query: { sql: SELECT 1 AS x }
 show: { title: Chart, description: "About **{{ meta.panel_title }}**." }
-]])
+]]
+  )
   eq(vim.api.nvim_buf_get_lines(d.buf, 0, 1, false)[1], "Board ⓘ")
   eq(vim.fn.maparg("gK", "n", false, true).buffer, 1)
   eq(vim.fn.maparg("K", "n", false, true).buffer, nil)
@@ -139,16 +146,22 @@ end
 
 T["descriptions: imports, errors with their line, trust for Lua"] = function()
   vim.fn.writefile({ "{% macro who() %}team {{ args.team }}{% endmacro %}" }, dir .. "/m.md")
-  local d = run("imp", [[
+  local d = run(
+    "imp",
+    [[
 database: { url: "sqlite:///:memory:" }
 args: [{ name: team, default: data }]
 description: |
   {% import 'm.md' as m %}Owned by {{ m.who() }}.
 query: { sql: SELECT 1 AS x }
-]])
+]]
+  )
   eq(describe(d, 3), { "Owned by team data." })
   vim.cmd("close")
-  local bad = run("bad", "database: { url: 'sqlite:///:memory:' }\nquery: { sql: SELECT 1 AS x }\nshow:\n  description: |\n    {{ nope }}\n")
+  local bad = run(
+    "bad",
+    "database: { url: 'sqlite:///:memory:' }\nquery: { sql: SELECT 1 AS x }\nshow:\n  description: |\n    {{ nope }}\n"
+  )
   local msgs = {}
   local real = vim.notify
   vim.notify = function(m)
@@ -159,7 +172,11 @@ query: { sql: SELECT 1 AS x }
   eq(table.concat(msgs, "\n"):find("bad%.yaml:5") ~= nil, true)
   -- A {% lua %} block in a description makes the config need trust.
   local path = dir .. "/lua.yaml"
-  vim.fn.writefile({ "database: { url: 'sqlite:///:memory:' }", "query: { sql: x }", "description: '{% lua %}x = 1{% endlua %}'" }, path)
+  vim.fn.writefile({
+    "database: { url: 'sqlite:///:memory:' }",
+    "query: { sql: x }",
+    "description: '{% lua %}x = 1{% endlua %}'",
+  }, path)
   local cfg = assert(require("dbdash.config").load(path))
   eq(select(2, require("dbdash.trust").collect(path, cfg)), true)
 end
@@ -190,13 +207,16 @@ T["floats work without treesitter parsers (filetype plugins would fail)"] = func
 end
 
 T["descriptions cannot assign arguments"] = function()
-  local d = run("assign", [[
+  local d = run(
+    "assign",
+    [[
 database: { url: "sqlite:///:memory:" }
 args: [{ name: n, type: int, default: 1 }]
 description: "{% lua %}args.n = 5{% endlua %}x"
 query: { sql: SELECT 1 AS x }
 show: { title: Chart, description: "{% set args.n = 6 %}y" }
-]])
+]]
+  )
   local errs = {}
   d:describe_async(function(e)
     errs[#errs + 1] = e
@@ -208,7 +228,10 @@ show: { title: Chart, description: "{% set args.n = 6 %}y" }
     return #errs == 2
   end, 10)
   for _, e in ipairs(errs) do
-    eq(sched.format_error(e):find("arguments cannot be assigned in a description", 1, true) ~= nil, true)
+    eq(
+      sched.format_error(e):find("arguments cannot be assigned in a description", 1, true) ~= nil,
+      true
+    )
   end
   local a = require("dbdash.args")
   eq(a.value(a.find(d.cfg.args, "n"), d.state), 1)

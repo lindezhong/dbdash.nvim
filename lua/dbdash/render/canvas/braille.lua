@@ -15,7 +15,11 @@ end, function(mask)
   local g = cache[mask]
   if not g then
     local cp = 0x2800 + mask
-    g = string.char(0xE0 + math.floor(cp / 0x1000), 0x80 + math.floor(cp / 0x40) % 0x40, 0x80 + cp % 0x40)
+    g = string.char(
+      0xE0 + math.floor(cp / 0x1000),
+      0x80 + math.floor(cp / 0x40) % 0x40,
+      0x80 + cp % 0x40
+    )
     cache[mask] = g
   end
   return g

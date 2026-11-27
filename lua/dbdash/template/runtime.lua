@@ -447,7 +447,12 @@ end
 
 ---HTML escaping (Jinja's escape / autoescape outside SQL).
 function R.html_escape(s)
-  return (s:gsub("[&<>\"']", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ['"'] = "&#34;", ["'"] = "&#39;" }))
+  return (
+    s:gsub(
+      "[&<>\"']",
+      { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ['"'] = "&#34;", ["'"] = "&#39;" }
+    )
+  )
 end
 
 ---Value written for {{ expr }}: with autoescape, the dialect's literal in SQL (env.escape),
@@ -728,7 +733,12 @@ end
 function R.call(env, fn, args, kwargs)
   check(fn)
   local mt = getmetatable(fn)
-  if type(fn) ~= "function" and mt ~= Macro and mt ~= Loop and not (mt and mt.__call and R.callable_types[mt]) then
+  if
+    type(fn) ~= "function"
+    and mt ~= Macro
+    and mt ~= Loop
+    and not (mt and mt.__call and R.callable_types[mt])
+  then
     raise("type", "'%s' object is not callable", typename(fn))
   end
   for i = 1, #args do
@@ -917,7 +927,8 @@ function R.lua_block(env, code, line, vars_fn)
   })
   -- Compiled for each run with its own environment: two renders may run the same block
   -- at once (each waiting inside it on a dbdash helper).
-  local chunk, err = load(string.rep("\n", line - 1) .. code, "=" .. name, "t", R.lua_env(env, { vars = view }))
+  local chunk, err =
+    load(string.rep("\n", line - 1) .. code, "=" .. name, "t", R.lua_env(env, { vars = view }))
   if not chunk then
     local l, rest = tostring(err):match(":(%d+): (.*)$")
     error(errors.new("lua", "syntax error: " .. (rest or tostring(err)), tonumber(l) or line), 0)
@@ -985,7 +996,11 @@ function R.check_args(name, args, kwargs, params, flags)
     elseif not known[k] then
       if not flags.catch_kwargs then
         if k == "caller" then
-          raise("type", "macro '%s' was invoked with two values for the special caller argument. This is most likely a bug.", name)
+          raise(
+            "type",
+            "macro '%s' was invoked with two values for the special caller argument. This is most likely a bug.",
+            name
+          )
         end
         raise("type", "macro '%s' takes no keyword argument '%s'", name, k)
       end
@@ -1067,7 +1082,12 @@ end
 function R.import_name(mod, name)
   local v = mod[name]
   if v == nil then
-    return R.undef(("the template '%s' does not export the requested name '%s'"):format(module_names[mod] or "?", name))
+    return R.undef(
+      ("the template '%s' does not export the requested name '%s'"):format(
+        module_names[mod] or "?",
+        name
+      )
+    )
   end
   return v
 end
@@ -1252,7 +1272,9 @@ local function slice_bounds(n, start, stop, step)
     end
     return i > upper and upper or i
   end
-  return clamp(int(start, nil), step > 0 and lower or upper), clamp(int(stop, nil), step > 0 and upper or lower), step
+  return clamp(int(start, nil), step > 0 and lower or upper),
+    clamp(int(stop, nil), step > 0 and upper or lower),
+    step
 end
 
 ---obj[start:stop:step] of a string (code points), list or tuple.
@@ -1315,7 +1337,6 @@ end
 local function op_error(op, a, b)
   raise("type", "unsupported operand type(s) for %s: '%s' and '%s'", op, typename(a), typename(b))
 end
-
 
 function R.add(a, b)
   check(a)

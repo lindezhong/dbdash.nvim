@@ -148,7 +148,12 @@ F.slice = function(_, v, args, kw)
 end
 
 F.dictsort = function(_, v, args, kw)
-  local case_sensitive, by, reverse = bind("dictsort", args, kw, { { "case_sensitive", false }, { "by", "key" }, { "reverse", false } })
+  local case_sensitive, by, reverse = bind(
+    "dictsort",
+    args,
+    kw,
+    { { "case_sensitive", false }, { "by", "key" }, { "reverse", false } }
+  )
   if not map.is_map(v) then
     raise("type", "dictsort: expected a mapping, got '%s'", R.typename(v))
   end
@@ -167,7 +172,8 @@ F.dictsort = function(_, v, args, kw)
 end
 
 F.groupby = function(_, v, args, kw)
-  local attribute, default, case_sensitive = bind("groupby", args, kw, { { "attribute" }, { "default", NONE }, { "case_sensitive", false } })
+  local attribute, default, case_sensitive =
+    bind("groupby", args, kw, { { "attribute" }, { "default", NONE }, { "case_sensitive", false } })
   local cs = R.truthy(case_sensitive)
   local key = attrgetter(attribute, not cs and ignore_case or nil, default)
   local real = attrgetter(attribute, nil, default)
@@ -187,7 +193,11 @@ F.groupby = function(_, v, args, kw)
   end
   for i, g in ipairs(out) do
     -- The key of a group is the value of its first item (case kept).
-    out[i] = R.named_tuple("_GroupTuple", { "grouper", "list" }, { cs and g.k or real(g.list[1]), g.list })
+    out[i] = R.named_tuple(
+      "_GroupTuple",
+      { "grouper", "list" },
+      { cs and g.k or real(g.list[1]), g.list }
+    )
   end
   return out
 end
@@ -299,7 +309,8 @@ F.rejectattr = function(env, v, args, kw)
 end
 
 local function min_or_max(name, v, args, kw, want_max)
-  local case_sensitive, attribute = bind(name, args, kw, { { "case_sensitive", false }, { "attribute", NONE } })
+  local case_sensitive, attribute =
+    bind(name, args, kw, { { "case_sensitive", false }, { "attribute", NONE } })
   local seq = items_of(v)
   if #seq == 0 then
     return R.undef("No aggregated item, sequence was empty.")
@@ -345,7 +356,12 @@ F.reverse = function(_, v, args, kw)
 end
 
 F.sort = function(_, v, args, kw)
-  local reverse, case_sensitive, attribute = bind("sort", args, kw, { { "reverse", false }, { "case_sensitive", false }, { "attribute", NONE } })
+  local reverse, case_sensitive, attribute = bind(
+    "sort",
+    args,
+    kw,
+    { { "reverse", false }, { "case_sensitive", false }, { "attribute", NONE } }
+  )
   local key = multi_attrgetter(attribute, not R.truthy(case_sensitive) and ignore_case or nil)
   return R.sorted(items_of(v), key, R.truthy(reverse))
 end
@@ -361,7 +377,8 @@ F.sum = function(_, v, args, kw)
 end
 
 F.unique = function(_, v, args, kw)
-  local case_sensitive, attribute = bind("unique", args, kw, { { "case_sensitive", false }, { "attribute", NONE } })
+  local case_sensitive, attribute =
+    bind("unique", args, kw, { { "case_sensitive", false }, { "attribute", NONE } })
   local key = attrgetter(attribute, not R.truthy(case_sensitive) and ignore_case or nil)
   local out, seen = {}, {}
   for _, item in ipairs(items_of(v)) do

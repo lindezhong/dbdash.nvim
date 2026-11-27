@@ -28,7 +28,12 @@ end
 
 ---Big-endian 32-bit integer as 4 bytes.
 function M.be32(n)
-  return string.char(bit.band(bit.rshift(n, 24), 255), bit.band(bit.rshift(n, 16), 255), bit.band(bit.rshift(n, 8), 255), bit.band(n, 255))
+  return string.char(
+    bit.band(bit.rshift(n, 24), 255),
+    bit.band(bit.rshift(n, 16), 255),
+    bit.band(bit.rshift(n, 8), 255),
+    bit.band(n, 255)
+  )
 end
 
 ---Comparison that does not stop at the first difference.

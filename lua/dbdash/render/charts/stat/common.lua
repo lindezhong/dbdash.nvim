@@ -88,7 +88,8 @@ function M.value(rs, show)
   elseif reduce == "mean" then
     return sum / #nums
   end
-  return nil, ("unknown reduce '%s' (first, last, mean, min, max, sum, count)"):format(tostring(reduce))
+  return nil,
+    ("unknown reduce '%s' (first, last, mean, min, max, sum, count)"):format(tostring(reduce))
 end
 
 ---Numeric value of a result for the panel history; nil when not numeric.

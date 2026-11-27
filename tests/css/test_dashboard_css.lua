@@ -58,7 +58,10 @@ T["the document mirrors the dashboard"] = function()
     "    show: { type: table, title: T }",
   })
   eq(d.doc.root.tag, "dashboard")
-  eq({ d.panels[1].node:describe(), d.panels[1].chart_node:describe() }, { "panel#kpi.stat", "chart.stat" })
+  eq(
+    { d.panels[1].node:describe(), d.panels[1].chart_node:describe() },
+    { "panel#kpi.stat", "chart.stat" }
+  )
   eq(d.panels[2].node:describe(), "panel#2.table")
 end
 
@@ -71,7 +74,13 @@ T["a rule in the document reaches the buffer"] = function()
     "    show: { type: table, title: K }",
   })
   eq(groups(d).DbDashHeader, true)
-  d.doc:set_sheet("runtime", assert(parser.sheet({ ["#kpi header"] = { color = "DiagnosticOk" }, ["panel-title"] = { color = "DiagnosticInfo" } })))
+  d.doc:set_sheet(
+    "runtime",
+    assert(parser.sheet({
+      ["#kpi header"] = { color = "DiagnosticOk" },
+      ["panel-title"] = { color = "DiagnosticInfo" },
+    }))
+  )
   d:redraw()
   local g = groups(d)
   eq({ g.DbDashHeader, g.DiagnosticOk, g.DiagnosticInfo }, { nil, true, true })

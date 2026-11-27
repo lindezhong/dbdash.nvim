@@ -103,7 +103,8 @@ end
 function M.render(ctx, spec, body)
   M.apply_style(ctx, spec)
   local ch = spec.chars or borders.STYLES.single
-  local g_border, g_axis, g_legend = ctx.css:border_hl("plot"), ctx.css:hl("axis"), ctx.css:hl("legend")
+  local g_border, g_axis, g_legend =
+    ctx.css:border_hl("plot"), ctx.css:hl("axis"), ctx.css:hl("legend")
   local cols, rows = 0, #body.lines
   for _, l in ipairs(body.lines) do
     cols = math.max(cols, W.width(l))

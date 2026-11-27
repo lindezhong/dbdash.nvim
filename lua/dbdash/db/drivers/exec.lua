@@ -59,7 +59,12 @@ end
 
 ---@param ctx dbdash.db.StreamCtx
 function M.produce(info, script, ctx)
-  local o = options.check("exec", info.options, SPEC, { capture = "stdout", delimiter = "\n", ok_codes = { 0 } })
+  local o = options.check(
+    "exec",
+    info.options,
+    SPEC,
+    { capture = "stdout", delimiter = "\n", ok_codes = { 0 } }
+  )
   local argv = vim.list_extend(vim.deepcopy(o.interpreter or M.default_interpreter()), { script })
   local cwd = options.dir("exec", o.cwd, ctx.base_dir)
   local env = {}
@@ -132,8 +137,12 @@ function M.produce(info, script, ctx)
     tail[#tail + 1] = partial
   end
   if not vim.tbl_contains(o.ok_codes, res.code) then
-    local why = res.signal and res.signal ~= 0 and ("killed by signal %d"):format(res.signal) or ("exited with code %d"):format(res.code)
-    dberr.raise("query", ("the script %s%s"):format(why, #tail > 0 and (":\n" .. table.concat(tail, "\n")) or ""))
+    local why = res.signal and res.signal ~= 0 and ("killed by signal %d"):format(res.signal)
+      or ("exited with code %d"):format(res.code)
+    dberr.raise(
+      "query",
+      ("the script %s%s"):format(why, #tail > 0 and (":\n" .. table.concat(tail, "\n")) or "")
+    )
   end
 end
 

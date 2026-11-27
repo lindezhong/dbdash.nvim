@@ -108,7 +108,8 @@ end
 
 -- Tokenizer -------------------------------------------------------------------------------
 
-local ESC = { n = "\n", r = "\r", t = "\t", b = "\b", a = "\a", ["\\"] = "\\", ['"'] = '"', ["'"] = "'" }
+local ESC =
+  { n = "\n", r = "\r", t = "\t", b = "\b", a = "\a", ["\\"] = "\\", ['"'] = '"', ["'"] = "'" }
 
 ---Split a command line like redis-cli: whitespace separates, quotes group, backslashes
 ---escape (\n, \t, \xHH inside double quotes).
@@ -405,7 +406,11 @@ function M.parse_url(info)
 end
 
 function M.connect(info)
-  local sock = socket.connect(info.host, info.port, { connect_timeout = info.connect_timeout, timeout = info.timeout })
+  local sock = socket.connect(
+    info.host,
+    info.port,
+    { connect_timeout = info.connect_timeout, timeout = info.timeout }
+  )
   local c = setmetatable({ sock = sock, resp = 2 }, Conn)
   local ok, err = pcall(function()
     if info.tls ~= "disable" then
@@ -413,7 +418,10 @@ function M.connect(info)
     end
     local hello = { "HELLO", "3" }
     if info.password then
-      vim.list_extend(hello, { "AUTH", (info.user and info.user ~= "") and info.user or "default", info.password })
+      vim.list_extend(
+        hello,
+        { "AUTH", (info.user and info.user ~= "") and info.user or "default", info.password }
+      )
     end
     local reply = c:call(hello)
     if is_err(reply) then
@@ -423,7 +431,8 @@ function M.connect(info)
       end
       -- Old servers (no HELLO / no RESP3): RESP2 with AUTH.
       if info.password then
-        local auth = (info.user and info.user ~= "") and { "AUTH", info.user, info.password } or { "AUTH", info.password }
+        local auth = (info.user and info.user ~= "") and { "AUTH", info.user, info.password }
+          or { "AUTH", info.password }
         local r = c:call(auth)
         if is_err(r) then
           raise_reply(r, "auth")

@@ -20,7 +20,13 @@ local function plain(v)
 end
 
 local function api_of(paths, extra)
-  return openapi.load("openapi: 3.1.0\ninfo: {title: t, version: '1'}\npaths:\n" .. paths .. (extra or ""), { base_dir = vim.fn.getcwd(), tokens = { tok = "s3cret", basic = "u:p", key = { "k1", "k2" }, ck = "c1" } })
+  return openapi.load(
+    "openapi: 3.1.0\ninfo: {title: t, version: '1'}\npaths:\n" .. paths .. (extra or ""),
+    {
+      base_dir = vim.fn.getcwd(),
+      tokens = { tok = "s3cret", basic = "u:p", key = { "k1", "k2" }, ck = "c1" },
+    }
+  )
 end
 
 local function err_of(fn)
@@ -30,14 +36,17 @@ local function err_of(fn)
 end
 
 T["routing: templates, concrete paths first, 404, 405 with the allowed methods, base path"] = function()
-  local api = openapi.load([[
+  local api = openapi.load(
+    [[
 openapi: 3.1.0
 info: {title: t, version: "1"}
 paths:
   /items/{id}: { get: { operationId: one }, delete: { operationId: del } }
   /items/latest: { get: { operationId: latest } }
   /a/{x}/b/{y}: { post: { operationId: two } }
-]], { base_path = "/api" })
+]],
+    { base_path = "/api" }
+  )
   local op, values = api:match("GET", "/api/items/latest")
   eq(op.id, "latest")
   op, values = api:match("GET", "/api/items/42")
@@ -57,7 +66,14 @@ local STYLES = {
   -- location, style, explode, type, raw, expected
   { "path", "matrix", false, "string", ";color=blue", "blue" },
   { "path", "matrix", false, "array", ";color=blue,black,brown", { "blue", "black", "brown" } },
-  { "path", "matrix", true, "array", ";color=blue;color=black;color=brown", { "blue", "black", "brown" } },
+  {
+    "path",
+    "matrix",
+    true,
+    "array",
+    ";color=blue;color=black;color=brown",
+    { "blue", "black", "brown" },
+  },
   { "path", "matrix", false, "object", ";color=R,100,G,200,B,150", { R = 100, G = 200, B = 150 } },
   { "path", "matrix", true, "object", ";R=100;G=200;B=150", { R = 100, G = 200, B = 150 } },
   { "path", "label", false, "string", ".blue", "blue" },
@@ -72,14 +88,56 @@ local STYLES = {
   { "path", "simple", true, "object", "R=100,G=200,B=150", { R = 100, G = 200, B = 150 } },
   { "query", "form", false, "string", "color=blue", "blue" },
   { "query", "form", false, "array", "color=blue,black,brown", { "blue", "black", "brown" } },
-  { "query", "form", true, "array", "color=blue&color=black&color=brown", { "blue", "black", "brown" } },
+  {
+    "query",
+    "form",
+    true,
+    "array",
+    "color=blue&color=black&color=brown",
+    { "blue", "black", "brown" },
+  },
   { "query", "form", false, "object", "color=R,100,G,200,B,150", { R = 100, G = 200, B = 150 } },
   { "query", "form", true, "object", "R=100&G=200&B=150", { R = 100, G = 200, B = 150 } },
-  { "query", "spaceDelimited", false, "array", "color=blue%20black%20brown", { "blue", "black", "brown" } },
-  { "query", "spaceDelimited", false, "object", "color=R%20100%20G%20200%20B%20150", { R = 100, G = 200, B = 150 } },
-  { "query", "pipeDelimited", false, "array", "color=blue|black|brown", { "blue", "black", "brown" } },
-  { "query", "pipeDelimited", false, "object", "color=R|100|G|200|B|150", { R = 100, G = 200, B = 150 } },
-  { "query", "deepObject", true, "object", "color[R]=100&color[G]=200&color[B]=150", { R = 100, G = 200, B = 150 } },
+  {
+    "query",
+    "spaceDelimited",
+    false,
+    "array",
+    "color=blue%20black%20brown",
+    { "blue", "black", "brown" },
+  },
+  {
+    "query",
+    "spaceDelimited",
+    false,
+    "object",
+    "color=R%20100%20G%20200%20B%20150",
+    { R = 100, G = 200, B = 150 },
+  },
+  {
+    "query",
+    "pipeDelimited",
+    false,
+    "array",
+    "color=blue|black|brown",
+    { "blue", "black", "brown" },
+  },
+  {
+    "query",
+    "pipeDelimited",
+    false,
+    "object",
+    "color=R|100|G|200|B|150",
+    { R = 100, G = 200, B = 150 },
+  },
+  {
+    "query",
+    "deepObject",
+    true,
+    "object",
+    "color[R]=100&color[G]=200&color[B]=150",
+    { R = 100, G = 200, B = 150 },
+  },
   { "header", "simple", false, "array", "blue,black,brown", { "blue", "black", "brown" } },
   { "header", "simple", true, "object", "R=100,G=200,B=150", { R = 100, G = 200, B = 150 } },
   { "cookie", "form", false, "array", "color=blue,black,brown", { "blue", "black", "brown" } },
@@ -96,7 +154,15 @@ T["parameters: every style and explode of the specification's examples"] = funct
   for _, c in ipairs(STYLES) do
     local where, style, explode, t, raw, want = unpack(c)
     local key = where == "path" and "/c/{color}" or "/c"
-    local api = api_of(("  %s:\n    get:\n      parameters:\n        - {name: color, in: %s, required: true, style: %s, explode: %s, schema: %s}\n"):format(key, where, style, tostring(explode), SCHEMAS[t]))
+    local api = api_of(
+      ("  %s:\n    get:\n      parameters:\n        - {name: color, in: %s, required: true, style: %s, explode: %s, schema: %s}\n"):format(
+        key,
+        where,
+        style,
+        tostring(explode),
+        SCHEMAS[t]
+      )
+    )
     local req = { headers = {}, query = "" }
     local path = "/c"
     if where == "path" then
@@ -112,7 +178,14 @@ T["parameters: every style and explode of the specification's examples"] = funct
     local ok, params = pcall(api.parameters, api, op, req, values)
     local got = ok and plain(params[where].color) or ("error: " .. vim.inspect(params))
     if not vim.deep_equal(got, want) then
-      wrong[#wrong + 1] = ("%s %s explode=%s %s %q -> %s"):format(where, style, tostring(explode), t, raw, vim.inspect(got))
+      wrong[#wrong + 1] = ("%s %s explode=%s %s %q -> %s"):format(
+        where,
+        style,
+        tostring(explode),
+        t,
+        raw,
+        vim.inspect(got)
+      )
     end
   end
   eq(wrong, {})
@@ -133,9 +206,16 @@ T["parameters: types, defaults, required, validation, empty values, content"] = 
         - {name: e, in: query, allowEmptyValue: true, schema: {type: [integer, "null"]}}
 ]])
   local op, values = api:match("GET", "/p/7")
-  local p = api:parameters(op, { query = "q=ab&flag=true&tags=1.5&tags=2&filter=%7B%22a%22%3A1%7D&e=", headers = {} }, values)
+  local p = api:parameters(
+    op,
+    { query = "q=ab&flag=true&tags=1.5&tags=2&filter=%7B%22a%22%3A1%7D&e=", headers = {} },
+    values
+  )
   eq(plain(p.path), { id = 7 })
-  eq(plain(p.query), { limit = 10, flag = true, tags = { 1.5, 2 }, q = "ab", filter = { a = 1 }, e = vim.NIL })
+  eq(
+    plain(p.query),
+    { limit = 10, flag = true, tags = { 1.5, 2 }, q = "ab", filter = { a = 1 }, e = vim.NIL }
+  )
   local function e400(query, headers, path)
     local o, v = api:match("GET", path or "/p/7")
     local e = err_of(function()
@@ -155,7 +235,8 @@ T["parameters: types, defaults, required, validation, empty values, content"] = 
 end
 
 T["security: bearer, basic, apiKey in a header or cookie; or / and of requirements"] = function()
-  local api = api_of([[
+  local api = api_of(
+    [[
   /a: { get: { security: [ {tok: []} ] } }
   /b: { get: { security: [ {basic: []} ] } }
   /c: { get: { security: [ {key: []} ] } }
@@ -163,7 +244,8 @@ T["security: bearer, basic, apiKey in a header or cookie; or / and of requiremen
   /e: { get: { security: [ {tok: [], ck: []} ] } }
   /f: { get: { security: [] } }
   /g: { get: {} }
-]], [[
+]],
+    [[
 security: [ {tok: []} ]
 components:
   securitySchemes:
@@ -171,7 +253,8 @@ components:
     basic: {type: http, scheme: basic}
     key: {type: apiKey, in: header, name: X-Key}
     ck: {type: apiKey, in: cookie, name: session}
-]])
+]]
+  )
   local function auth(path, headers)
     return (api:authorize(api:match("GET", path), headers))
   end
@@ -193,15 +276,34 @@ end
 T["security: refused schemes and missing credentials are config errors"] = function()
   local function load_err(schemes, sec)
     local e = err_of(function()
-      openapi.load(("openapi: 3.1.0\ninfo: {title: t, version: '1'}\npaths:\n  /a: { get: { security: [ {s: []} ] } }\ncomponents:\n  securitySchemes:\n    s: %s\n"):format(schemes), { tokens = sec })
+      openapi.load(
+        ("openapi: 3.1.0\ninfo: {title: t, version: '1'}\npaths:\n  /a: { get: { security: [ {s: []} ] } }\ncomponents:\n  securitySchemes:\n    s: %s\n"):format(
+          schemes
+        ),
+        { tokens = sec }
+      )
     end)
     eq(e.phase, "config")
     return e.message
   end
-  eq(load_err("{type: apiKey, in: query, name: k}", { s = "x" }):find("must not be in URLs", 1, true) ~= nil, true)
+  eq(
+    load_err("{type: apiKey, in: query, name: k}", { s = "x" }):find("must not be in URLs", 1, true)
+      ~= nil,
+    true
+  )
   eq(load_err("{type: oauth2, flows: {}}", { s = "x" }):find("not supported", 1, true) ~= nil, true)
-  eq(load_err("{type: http, scheme: digest}", { s = "x" }):find("not supported", 1, true) ~= nil, true)
-  eq(load_err("{type: http, scheme: bearer}", {}):find("no credentials for security scheme s", 1, true) ~= nil, true)
+  eq(
+    load_err("{type: http, scheme: digest}", { s = "x" }):find("not supported", 1, true) ~= nil,
+    true
+  )
+  eq(
+    load_err("{type: http, scheme: bearer}", {}):find(
+      "no credentials for security scheme s",
+      1,
+      true
+    ) ~= nil,
+    true
+  )
 end
 
 T["request bodies: media type choice, forms, multipart, kinds"] = function()
@@ -223,25 +325,48 @@ T["request bodies: media type choice, forms, multipart, kinds"] = function()
   eq(api:media(op, "text/csv"), "text/*")
   eq(api:media(op, "image/png"), nil)
   local _, m, mdoc = api:media(op, "application/x-www-form-urlencoded")
-  eq(plain(api:form("n=3&tags=a&tags=b&meta=%7B%22k%22%3A1%7D", m, mdoc)), { n = 3, tags = { "a", "b" }, meta = { k = 1 } })
+  eq(
+    plain(api:form("n=3&tags=a&tags=b&meta=%7B%22k%22%3A1%7D", m, mdoc)),
+    { n = 3, tags = { "a", "b" }, meta = { k = 1 } }
+  )
   local ct = "multipart/form-data; boundary=XyZ"
   local _, mm, mmdoc = api:media(op, ct)
   local body = table.concat({
-    "--XyZ", 'Content-Disposition: form-data; name="n"', "", "5",
-    "--XyZ", 'Content-Disposition: form-data; name="doc"; filename="d.json"', "Content-Type: application/json", "", '{"a": [1]}',
-    "--XyZ--", "",
+    "--XyZ",
+    'Content-Disposition: form-data; name="n"',
+    "",
+    "5",
+    "--XyZ",
+    'Content-Disposition: form-data; name="doc"; filename="d.json"',
+    "Content-Type: application/json",
+    "",
+    '{"a": [1]}',
+    "--XyZ--",
+    "",
   }, "\r\n")
   eq(plain(api:multipart(body, ct, mm, mmdoc)), { n = 5, doc = { a = { 1 } } })
-  eq({ openapi.kind("application/x-ndjson"), openapi.kind("text/csv"), openapi.kind("application/vnd.x+json"), openapi.kind("application/xml"), openapi.kind("application/x-custom", { "application/x-custom" }) },
-    { "stream-json", "stream-text", "json", "raw", "stream-text" })
+  eq({
+    openapi.kind("application/x-ndjson"),
+    openapi.kind("text/csv"),
+    openapi.kind("application/vnd.x+json"),
+    openapi.kind("application/xml"),
+    openapi.kind("application/x-custom", { "application/x-custom" }),
+  }, { "stream-json", "stream-text", "json", "raw", "stream-text" })
 end
 
 T["$ref: in the document and to other files (relative to the document)"] = function()
   local dir = vim.fs.normalize(vim.fn.tempname())
   vim.fn.mkdir(dir .. "/schemas", "p")
-  vim.fn.writefile({ "Order:", "  type: object", "  required: [id]", "  properties:", "    id: {$ref: 'common.yaml#/Id'}" }, dir .. "/schemas/order.yaml")
+  vim.fn.writefile({
+    "Order:",
+    "  type: object",
+    "  required: [id]",
+    "  properties:",
+    "    id: {$ref: 'common.yaml#/Id'}",
+  }, dir .. "/schemas/order.yaml")
   vim.fn.writefile({ "Id: {type: integer}" }, dir .. "/schemas/common.yaml")
-  local api = openapi.load([[
+  local api = openapi.load(
+    [[
 openapi: 3.1.0
 info: {title: t, version: "1"}
 paths:
@@ -259,20 +384,29 @@ components:
     order:
       content:
         application/json: {schema: {$ref: "schemas/order.yaml#/Order"}}
-]], { base_dir = dir })
+]],
+    { base_dir = dir }
+  )
   local op = api:match("POST", "/o")
   eq(plain(api:parameters(op, { query = "limit=3", headers = {} }, {}).query), { limit = 3 })
   local _, m, mdoc = api:media(op, "application/json")
   eq(api:validate(m.schema, openapi.decode_json('{"id": 1}'), mdoc), nil)
-  eq(api:validate(m.schema, openapi.decode_json('{"id": "x"}'), mdoc).message, "must be integer, got string")
+  eq(
+    api:validate(m.schema, openapi.decode_json('{"id": "x"}'), mdoc).message,
+    "must be integer, got string"
+  )
   eq(#api.files, 2) -- the files it read (for trust)
   eq(err_of(function()
-    openapi.load("openapi: 3.1.0\ninfo: {title: t, version: '1'}\npaths:\n  /a: {$ref: 'nope.yaml#/x'}\n", { base_dir = dir })
+    openapi.load(
+      "openapi: 3.1.0\ninfo: {title: t, version: '1'}\npaths:\n  /a: {$ref: 'nope.yaml#/x'}\n",
+      { base_dir = dir }
+    )
   end).message:find("missing file", 1, true) ~= nil, true)
 end
 
 T["versions: 3.1 and 3.0 (nullable); others are errors"] = function()
-  local doc30 = "openapi: 3.0.3\ninfo: {title: t, version: '1'}\npaths:\n  /a:\n    get:\n      parameters: [{name: x, in: header, schema: {type: integer, nullable: true}}]\n"
+  local doc30 =
+    "openapi: 3.0.3\ninfo: {title: t, version: '1'}\npaths:\n  /a:\n    get:\n      parameters: [{name: x, in: header, schema: {type: integer, nullable: true}}]\n"
   local api = openapi.load(doc30, {})
   eq(api.v30, true)
   eq(api:validate(api.doc.paths["/a"].get.parameters[1].schema, vim.NIL, api.doc), nil)

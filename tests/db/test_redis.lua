@@ -34,7 +34,7 @@ end
 T["tokenize like redis-cli"] = function()
   eq(redis.tokenize([[HGETALL "user:1001"]]), { "HGETALL", "user:1001" })
   eq(redis.tokenize([[SET k "a\nb\x41" 'it\'s' x\ y]]), { "SET", "k", "a\nbA", "it's", "x y" })
-  eq(redis.tokenize('  GET   k  '), { "GET", "k" })
+  eq(redis.tokenize("  GET   k  "), { "GET", "k" })
   eq(redis.tokenize('SET k ""'), { "SET", "k", "" })
   eq(pcall(redis.tokenize, 'GET "open'), false)
 end
@@ -42,12 +42,24 @@ end
 T["mappers"] = function()
   local rs = redis.mappers.HGETALL({ "f1", "v1", "f2", "v2" }, { "HGETALL", "h" }, 100)
   eq({ rs:column_names(), rs.rows }, { { "field", "value" }, { { "f1", "v1" }, { "f2", "v2" } } })
-  rs = redis.mappers.ZRANGE({ "a", "1.5", "b", "2" }, { "ZRANGE", "z", "0", "-1", "WITHSCORES" }, 100)
+  rs = redis.mappers.ZRANGE(
+    { "a", "1.5", "b", "2" },
+    { "ZRANGE", "z", "0", "-1", "WITHSCORES" },
+    100
+  )
   eq({ rs.rows, rs.columns[2].type }, { { { "a", 1.5 }, { "b", 2 } }, "number" })
-  rs = redis.mappers.INFO("# Server\r\nredis_version:7.4.1\r\nuptime_in_seconds:12\r\n# Clients\r\nconnected_clients:1\r\n", { "INFO" }, 100)
+  rs = redis.mappers.INFO(
+    "# Server\r\nredis_version:7.4.1\r\nuptime_in_seconds:12\r\n# Clients\r\nconnected_clients:1\r\n",
+    { "INFO" },
+    100
+  )
   eq(rs.rows[1], { "server", "redis_version", "7.4.1" })
   eq(rs.rows[3], { "clients", "connected_clients", 1 })
-  rs = redis.mappers.XRANGE({ { "1-0", { "temp", "20", "hum", "40" } }, { "2-0", { "temp", "21", "wind", "3" } } }, { "XRANGE", "s", "-", "+" }, 100)
+  rs = redis.mappers.XRANGE(
+    { { "1-0", { "temp", "20", "hum", "40" } }, { "2-0", { "temp", "21", "wind", "3" } } },
+    { "XRANGE", "s", "-", "+" },
+    100
+  )
   eq(rs:column_names(), { "id", "temp", "hum", "wind" })
   eq(rs.rows[2], { "2-0", "21", vim.NIL, "3" })
   rs = redis.mappers.LRANGE({ "a", "b", "c" }, { "LRANGE", "l", "0", "-1" }, 2)

@@ -97,7 +97,9 @@ local function parse_key(spki)
     return "rsa", require("dbdash.crypto.rsa").from_spki(spki)
   elseif alg == OID.ec then
     local param = spki.children[1].children[2]
-    local curve = param and param.tag == asn1.TAG.OID and require("dbdash.crypto.ecdsa").by_oid[asn1.oid(param)]
+    local curve = param
+      and param.tag == asn1.TAG.OID
+      and require("dbdash.crypto.ecdsa").by_oid[asn1.oid(param)]
     if not curve then
       return "unsupported", nil, "only P-256 and P-384 EC keys are supported"
     end
@@ -224,7 +226,8 @@ function M.parse(der)
   end
   local tbs = cert.children[1]
   local i = (tbs.children[1].tag == 0xa0) and 2 or 1
-  local issuer, validity, subject, spki = tbs.children[i + 2], tbs.children[i + 3], tbs.children[i + 4], tbs.children[i + 5]
+  local issuer, validity, subject, spki =
+    tbs.children[i + 2], tbs.children[i + 3], tbs.children[i + 4], tbs.children[i + 5]
   if not spki or not spki.children then
     fail("missing subject public key")
   end

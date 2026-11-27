@@ -96,7 +96,8 @@ T["inspect: path, rules by origin and specificity, computed style, box"] = funct
   cursor_on(d, d.panels[1].chart_node)
   vim.cmd("DbDashInspect panel-title")
   text = float_text()
-  local author, inline = text:find("author   panel-title", 1, true), text:find("inline   panel-title", 1, true)
+  local author, inline =
+    text:find("author   panel-title", 1, true), text:find("inline   panel-title", 1, true)
   eq({ author ~= nil, inline ~= nil, (author or 0) < (inline or 0) }, { true, true, true })
   eq(text:find("color +Special") ~= nil, true)
   -- the chart's box is highlighted in the dashboard
@@ -123,13 +124,19 @@ end
 T[":DbDashStyle set adds a runtime rule over every other origin; reset drops it"] = function()
   local d = start()
   vim.cmd("DbDashStyle set panel-title color DiagnosticOk")
-  eq(require("dbdash.css").hl_of(d.panels[2].node:find(function(n)
-    return n.tag == "panel-title"
-  end)), "DiagnosticOk")
+  eq(
+    require("dbdash.css").hl_of(d.panels[2].node:find(function(n)
+      return n.tag == "panel-title"
+    end)),
+    "DiagnosticOk"
+  )
   -- over the panel's own (inline) rule too
-  eq(require("dbdash.css").hl_of(d.panels[1].node:find(function(n)
-    return n.tag == "panel-title"
-  end)), "DiagnosticOk")
+  eq(
+    require("dbdash.css").hl_of(d.panels[1].node:find(function(n)
+      return n.tag == "panel-title"
+    end)),
+    "DiagnosticOk"
+  )
   -- JSON values; a grid change relays the panels out
   vim.cmd("DbDashStyle set dashboard grid-template-columns 1")
   eq(d.regions[2].row_s > d.regions[1].row_e, true)

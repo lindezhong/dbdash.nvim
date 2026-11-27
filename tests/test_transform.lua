@@ -90,7 +90,10 @@ T["template in the transform; errors point at the YAML line"] = function()
   eq(p.error.message:find("bad.yaml:6: attempt to index local 'x'", 1, true) ~= nil, true)
   eq(#notes, 1)
   eq(notes[1].level, vim.log.levels.ERROR)
-  eq(notes[1].msg:find("^dbdash: transform error: .*bad%.yaml:6: attempt to index local 'x'") ~= nil, true)
+  eq(
+    notes[1].msg:find("^dbdash: transform error: .*bad%.yaml:6: attempt to index local 'x'") ~= nil,
+    true
+  )
 end
 
 T["rs gives names, types and rows with nil for NULL"] = function()
@@ -120,7 +123,10 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
   -- http: rs is the decoded body, response the status/headers/body
   local base = h.http_server(function()
     local body = '{"items":[{"name":"a","count":2}]}'
-    return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Page: 1\r\nContent-Length: " .. #body .. "\r\n\r\n" .. body
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Page: 1\r\nContent-Length: "
+      .. #body
+      .. "\r\n\r\n"
+      .. body
   end)
   p = run("http", {
     ("database: { url: %q }"):format(base .. "/v1"),
@@ -144,11 +150,18 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
   })
   eq(p.error.phase, "transform")
   eq(p.error.message, "the result is not rows (got string)")
-  eq(notes[#notes], { msg = "dbdash: transform error: the result is not rows (got string)", level = vim.log.levels.ERROR })
+  eq(notes[#notes], {
+    msg = "dbdash: transform error: the result is not rows (got string)",
+    level = vim.log.levels.ERROR,
+  })
   -- without a transform the response itself is checked, with a hint
   p = run("http_plain", { ("database: { url: %q }"):format(base), "query: { sql: curl }" })
   eq(p.error.phase, "query")
-  eq(p.error.message:find("the result is an object (items), not rows; add query.transform", 1, true) ~= nil, true)
+  eq(
+    p.error.message:find("the result is an object (items), not rows; add query.transform", 1, true)
+      ~= nil,
+    true
+  )
   eq(notes[#notes], {
     msg = "dbdash: http query error: the result is an object (items), not rows; add query.transform to reshape it (:help dbdash-transform)",
     level = vim.log.levels.ERROR,
@@ -159,7 +172,9 @@ end
 T["http: cookies the server sets reach the next refresh through the -c / -b file"] = function()
   local base, seen = h.http_server(function(_, n)
     local set = n == 1 and "Set-Cookie: token=fresh; Path=/\r\n" or ""
-    return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" .. set .. "Content-Length: 2\r\n\r\n[]"
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+      .. set
+      .. "Content-Length: 2\r\n\r\n[]"
   end)
   local lines = {
     ("database: { url: %q }"):format(base),
@@ -188,12 +203,28 @@ T["http: cookies the server sets reach the next refresh through the -c / -b file
 end
 
 local DATABASES = {
-  { "postgres", "postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test", "SELECT 'a' AS name, 21 AS n" },
-  { "mysql", "mysql://dbdash:dbdash_pw@127.0.0.1:13306/dbdash_test", "SELECT 'a' AS name, 21 AS n" },
+  {
+    "postgres",
+    "postgres://dbdash:dbdash_pw@127.0.0.1:15432/dbdash_test",
+    "SELECT 'a' AS name, 21 AS n",
+  },
+  {
+    "mysql",
+    "mysql://dbdash:dbdash_pw@127.0.0.1:13306/dbdash_test",
+    "SELECT 'a' AS name, 21 AS n",
+  },
   { "mssql", "mssql://sa:Dbdash_pw1@127.0.0.1:11433/master", "SELECT 'a' AS name, 21 AS n" },
-  { "cassandra", "cassandra://cassandra:cassandra@127.0.0.1:19042/system", "SELECT cluster_name, native_protocol_version FROM system.local" },
+  {
+    "cassandra",
+    "cassandra://cassandra:cassandra@127.0.0.1:19042/system",
+    "SELECT cluster_name, native_protocol_version FROM system.local",
+  },
   { "redis", "redis://:dbdash_pw@127.0.0.1:16379/0", "INFO server" },
-  { "mongodb", "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin", '{"operation":"aggregate","pipeline":[{"$documents":[{"name":"a","n":21}]}]}' },
+  {
+    "mongodb",
+    "mongodb://dbdash:dbdash_pw@127.0.0.1:17017/admin?authSource=admin",
+    '{"operation":"aggregate","pipeline":[{"$documents":[{"name":"a","n":21}]}]}',
+  },
 }
 
 for _, db in ipairs(DATABASES) do

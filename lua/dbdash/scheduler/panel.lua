@@ -31,7 +31,10 @@ function Panel:track(rs)
   if v then
     self.values = self.values or {}
     table.insert(self.values, v)
-    local keep = math.max(C.HISTORY, tonumber(show.sparkline_length ~= vim.NIL and show.sparkline_length or nil) or 0)
+    local keep = math.max(
+      C.HISTORY,
+      tonumber(show.sparkline_length ~= vim.NIL and show.sparkline_length or nil) or 0
+    )
     while #self.values > keep do
       table.remove(self.values, 1)
     end
@@ -238,7 +241,10 @@ function Panel:cancel(reason)
   self.current = nil
   self.running = false
   run.life.cancel:cancel(reason)
-  self:finish_record(run, require("dbdash.db.error").new({ phase = "cancelled", message = "query cancelled: " .. reason }))
+  self:finish_record(
+    run,
+    require("dbdash.db.error").new({ phase = "cancelled", message = "query cancelled: " .. reason })
+  )
   self.prev, self.prev_runs = run.record, run.life.runs
   self:push_history({ cancelled = reason })
   run.life.cancel:release()

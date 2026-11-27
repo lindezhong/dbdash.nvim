@@ -113,11 +113,12 @@ function M.produce(info, text, ctx)
       tokens[k] = options.expand_env(v, what) -- ${NAME}: from the environment
     end
   end
-  local ok, api = pcall(openapi.load, vim.trim(text) ~= "" and text or default_doc(info.base_path), {
-    base_dir = ctx.base_dir,
-    base_path = info.base_path,
-    tokens = tokens,
-  })
+  local ok, api =
+    pcall(openapi.load, vim.trim(text) ~= "" and text or default_doc(info.base_path), {
+      base_dir = ctx.base_dir,
+      base_path = info.base_path,
+      tokens = tokens,
+    })
   if not ok then
     error(api, 0)
   end
@@ -128,14 +129,25 @@ function M.produce(info, text, ctx)
     for _, r in ipairs(api.routes) do
       for _, op in pairs(r.ops) do
         if #op.security == 0 then
-          dberr.raise("config", ("webhook:// on %s (not this machine) needs a security requirement on every operation; %s has none"):format(host, op.id))
+          dberr.raise(
+            "config",
+            ("webhook:// on %s (not this machine) needs a security requirement on every operation; %s has none"):format(
+              host,
+              op.id
+            )
+          )
         end
       end
     end
   end
   local bind = host == "localhost" and "127.0.0.1" or host
   local max_body = require("dbdash.util.bytes").parse(o.max_body)
-  local hosts = { [host:lower()] = true, localhost = is_local or nil, ["127.0.0.1"] = is_local or nil, ["::1"] = is_local or nil }
+  local hosts = {
+    [host:lower()] = true,
+    localhost = is_local or nil,
+    ["127.0.0.1"] = is_local or nil,
+    ["::1"] = is_local or nil,
+  }
   for _, h in ipairs(o.allowed_hosts) do
     hosts[h:lower()] = true
   end
@@ -178,7 +190,11 @@ function M.produce(info, text, ctx)
     end
     local authorized, challenge = api:authorize(op, req.headers)
     if not authorized then
-      return reject(401, "authentication required", challenge and { ["WWW-Authenticate"] = challenge } or nil)
+      return reject(
+        401,
+        "authentication required",
+        challenge and { ["WWW-Authenticate"] = challenge } or nil
+      )
     end
     local pok, params = pcall(api.parameters, api, op, req, path_values)
     if not pok then
@@ -196,9 +212,16 @@ function M.produce(info, text, ctx)
     local content_type = req.headers["content-type"]
     local vars = {
       params = params,
-      request = { method = req.method, path = req.path, operation_id = op.id, content_type = content_type, headers = headers },
+      request = {
+        method = req.method,
+        path = req.path,
+        operation_id = op.id,
+        content_type = content_type,
+        headers = headers,
+      },
     }
-    local has_body = (tonumber(req.headers["content-length"] or "0") or 0) > 0 or (req.headers["transfer-encoding"] or ""):lower():find("chunked", 1, true) ~= nil
+    local has_body = (tonumber(req.headers["content-length"] or "0") or 0) > 0
+      or (req.headers["transfer-encoding"] or ""):lower():find("chunked", 1, true) ~= nil
     local count = 0
     local function emit(v)
       count = count + 1
@@ -249,7 +272,10 @@ function M.produce(info, text, ctx)
           if media.schema ~= nil then
             local e = api:validate(media.schema, value, mdoc)
             if e then
-              server.error(400, ("item %d%s: %s"):format(n, e.path ~= "/" and (" " .. e.path) or "", e.message))
+              server.error(
+                400,
+                ("item %d%s: %s"):format(n, e.path ~= "/" and (" " .. e.path) or "", e.message)
+              )
             end
           end
           emit(value)
@@ -280,7 +306,10 @@ function M.produce(info, text, ctx)
       if media.schema ~= nil then
         local e = api:validate(media.schema, value, mdoc)
         if e then
-          server.error(400, ("request body%s: %s"):format(e.path ~= "/" and (" " .. e.path) or "", e.message))
+          server.error(
+            400,
+            ("request body%s: %s"):format(e.path ~= "/" and (" " .. e.path) or "", e.message)
+          )
         end
       end
       emit(value)
@@ -296,10 +325,19 @@ function M.produce(info, text, ctx)
       error(berr, 0)
     end
     if op.example then
-      local body = type(op.example.value) == "string" and op.example.value or vim.json.encode(op.example.value)
-      return { status = op.status or 202, headers = { ["Content-Type"] = op.example.type }, body = body }
+      local body = type(op.example.value) == "string" and op.example.value
+        or vim.json.encode(op.example.value)
+      return {
+        status = op.status or 202,
+        headers = { ["Content-Type"] = op.example.type },
+        body = body,
+      }
     end
-    return { status = op.status or 202, headers = { ["Content-Type"] = "application/json" }, body = vim.json.encode({ queued = count }) }
+    return {
+      status = op.status or 202,
+      headers = { ["Content-Type"] = "application/json" },
+      body = vim.json.encode({ queued = count }),
+    }
   end
 
   local lok, srv = pcall(server.listen, bind, info.port, {
@@ -315,7 +353,9 @@ function M.produce(info, text, ctx)
   ctx.on_stop(function()
     srv:close()
   end)
-  ctx.set_status(("listening %s:%d"):format(host:find(":", 1, true) and ("[" .. host .. "]") or host, srv.port))
+  ctx.set_status(
+    ("listening %s:%d"):format(host:find(":", 1, true) and ("[" .. host .. "]") or host, srv.port)
+  )
   -- Serve until stopped.
   require("dbdash.util.async").await(function(cb)
     ctx.cancel:on_cancel(function()

@@ -68,26 +68,60 @@ M.SCENARIOS = {
   table = function(n, seed)
     local rows = {}
     for r = 1, n do
-      rows[r] = { "name" .. r, (r * 7 + seed) % 1000, (r * 13 + seed) % 97 == 0 and vim.NIL or r * 3, r % 5, "x" .. (r + seed) % 9, r * 1.5 }
+      rows[r] = {
+        "name" .. r,
+        (r * 7 + seed) % 1000,
+        (r * 13 + seed) % 97 == 0 and vim.NIL or r * 3,
+        r % 5,
+        "x" .. (r + seed) % 9,
+        r * 1.5,
+      }
     end
-    return rs({ { "name", "string" }, { "a", "integer" }, { "b", "integer" }, { "c", "integer" }, { "d", "string" }, { "e", "number" } }, rows), {
-      type = "table",
-      column_list = { "name", { column = "a", thresholds = { { value = 900, class = "danger" } } }, "b", "c", "d", "e" },
-    }
+    return rs({
+      { "name", "string" },
+      { "a", "integer" },
+      { "b", "integer" },
+      { "c", "integer" },
+      { "d", "string" },
+      { "e", "number" },
+    }, rows),
+      {
+        type = "table",
+        column_list = {
+          "name",
+          { column = "a", thresholds = { { value = 900, class = "danger" } } },
+          "b",
+          "c",
+          "d",
+          "e",
+        },
+      }
   end,
   text = function(n, seed)
     local rows = {}
     for r = 1, n do
-      rows[r] = { ("2026-11-26 12:%02d:%02d %s request %d took %d ms"):format(r % 60, (r + seed) % 60, (r + seed) % 7 == 0 and "ERROR" or "INFO", r, (r * 37 + seed) % 900) }
+      rows[r] = {
+        ("2026-11-26 12:%02d:%02d %s request %d took %d ms"):format(
+          r % 60,
+          (r + seed) % 60,
+          (r + seed) % 7 == 0 and "ERROR" or "INFO",
+          r,
+          (r * 37 + seed) % 900
+        ),
+      }
     end
-    return rs({ { "line", "string" } }, rows), { type = "text", highlight = { { pattern = "ERROR", class = "error" } } }
+    return rs({ { "line", "string" } }, rows),
+      { type = "text", highlight = { { pattern = "ERROR", class = "error" } } }
   end,
   bar = function(n, seed)
     local rows = {}
     for r = 1, n do
       rows[r] = { "c" .. r, (r * 7 + seed) % 100, (r * 11 + seed) % 100, (r * 13 + seed) % 100 }
     end
-    return rs({ { "k", "string" }, { "s1", "integer" }, { "s2", "integer" }, { "s3", "integer" } }, rows),
+    return rs(
+      { { "k", "string" }, { "s1", "integer" }, { "s2", "integer" }, { "s3", "integer" } },
+      rows
+    ),
       { type = "bar", x_column = "k", y_columns = { "s1", "s2", "s3" } }
   end,
   line = function(n, seed)
@@ -95,7 +129,10 @@ M.SCENARIOS = {
     for r = 1, n do
       rows[r] = { r, math.sin(r / 10 + seed) * 50, math.cos(r / 7) * 40, (r + seed) % 30 }
     end
-    return rs({ { "x", "integer" }, { "s1", "number" }, { "s2", "number" }, { "s3", "integer" } }, rows),
+    return rs(
+      { { "x", "integer" }, { "s1", "number" }, { "s2", "number" }, { "s3", "integer" } },
+      rows
+    ),
       { type = "line", x_column = "x", y_columns = { "s1", "s2", "s3" } }
   end,
   scatter = function(n, seed)
@@ -111,14 +148,16 @@ M.SCENARIOS = {
     for r = 1, n do
       rows[r] = { "slice" .. r, 1 + (r * 7 + seed) % 50 }
     end
-    return rs({ { "l", "string" }, { "v", "integer" } }, rows), { type = "pie", label_column = "l", value_column = "v" }
+    return rs({ { "l", "string" }, { "v", "integer" } }, rows),
+      { type = "pie", label_column = "l", value_column = "v" }
   end,
   boxplot = function(n, seed)
     local rows = {}
     for r = 1, n * 20 do
       rows[r] = { "k" .. r % n, (r * 37 + seed) % 500 }
     end
-    return rs({ { "k", "string" }, { "v", "integer" } }, rows), { type = "boxplot", category_column = "k", value_column = "v" }
+    return rs({ { "k", "string" }, { "v", "integer" } }, rows),
+      { type = "boxplot", category_column = "k", value_column = "v" }
   end,
   heatmap = function(n, seed)
     local rows = {}
@@ -140,7 +179,8 @@ M.SCENARIOS = {
     for c = 1, n do
       names[c] = "v" .. c
     end
-    return rs(cols, { row }), { type = "stat", value_columns = n > 1 and names or nil, value_column = "v1" }
+    return rs(cols, { row }),
+      { type = "stat", value_columns = n > 1 and names or nil, value_column = "v1" }
   end,
 }
 

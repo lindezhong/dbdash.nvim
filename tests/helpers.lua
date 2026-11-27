@@ -41,10 +41,12 @@ function M.golden(name, out)
   local expected = table.concat(vim.fn.readfile(path, "b"), "\n")
   if expected ~= actual then
     vim.fn.writefile(vim.split(actual, "\n", { plain = true }), path:gsub("%.txt$", ".actual"), "b")
-    error(("golden mismatch for %s (see %s, update with UPDATE_GOLDEN=1)"):format(
-      path,
-      path:gsub("%.txt$", ".actual")
-    ))
+    error(
+      ("golden mismatch for %s (see %s, update with UPDATE_GOLDEN=1)"):format(
+        path,
+        path:gsub("%.txt$", ".actual")
+      )
+    )
   end
 end
 
@@ -129,10 +131,22 @@ function M.dns_respond(query, records)
           rdata = rdata .. string.char(#part) .. part
         end
       end
-      answers[#answers + 1] = "\192\12" .. u16(r.type) .. u16(1) .. "\0\0\0\60" .. u16(#rdata) .. rdata
+      answers[#answers + 1] = "\192\12"
+        .. u16(r.type)
+        .. u16(1)
+        .. "\0\0\0\60"
+        .. u16(#rdata)
+        .. rdata
     end
   end
-  return id .. u16(0x8180) .. u16(1) .. u16(#answers) .. u16(0) .. u16(0) .. question .. table.concat(answers)
+  return id
+    .. u16(0x8180)
+    .. u16(1)
+    .. u16(#answers)
+    .. u16(0)
+    .. u16(0)
+    .. question
+    .. table.concat(answers)
 end
 
 ---Fake UDP DNS server answering every query with `records`. Returns server, port.
@@ -146,7 +160,6 @@ function M.fake_dns(records)
   end)
   return udp, udp:getsockname().port
 end
-
 
 local http_servers = {}
 
@@ -182,7 +195,12 @@ function M.http_server(handle)
       if #buf - head_end - 3 < need then
         return
       end
-      local req = { method = method, target = target, headers = headers, body = buf:sub(head_end + 4, head_end + 3 + need) }
+      local req = {
+        method = method,
+        target = target,
+        headers = headers,
+        body = buf:sub(head_end + 4, head_end + 3 + need),
+      }
       seen[#seen + 1] = req
       c:read_stop()
       local out = handle(req, #seen)

@@ -53,7 +53,10 @@ function M.connect(host, port, opts)
     vim.uv.getaddrinfo(host, tostring(port), { socktype = "stream" }, cb)
   end)
   if err then
-    dberr.raise(err == "timeout" and "timeout" or "connect", ("cannot resolve %s: %s"):format(host, err))
+    dberr.raise(
+      err == "timeout" and "timeout" or "connect",
+      ("cannot resolve %s: %s"):format(host, err)
+    )
   end
   local last
   for _, a in ipairs(addrs or {}) do
@@ -86,7 +89,11 @@ function M.connect(host, port, opts)
   end
   dberr.raise(
     last == "timeout" and "timeout" or "connect",
-    ("cannot connect to %s:%d: %s"):format(host, port, last == "timeout" and "timed out" or tostring(last or "no address"))
+    ("cannot connect to %s:%d: %s"):format(
+      host,
+      port,
+      last == "timeout" and "timed out" or tostring(last or "no address")
+    )
   )
 end
 
@@ -187,7 +194,10 @@ function Socket:wait_raw()
   end)
   if err == "timeout" then
     self.waiter = nil
-    dberr.raise("timeout", ("no response from %s:%d within %.1fs"):format(self.host, self.port, self.timeout / 1000))
+    dberr.raise(
+      "timeout",
+      ("no response from %s:%d within %.1fs"):format(self.host, self.port, self.timeout / 1000)
+    )
   end
 end
 

@@ -33,7 +33,8 @@ local function json_type(v)
   elseif t == "boolean" then
     return "boolean"
   elseif t == "number" then
-    return (v == math.floor(v) and v == v and v ~= math.huge and v ~= -math.huge) and "integer" or "number"
+    return (v == math.floor(v) and v == v and v ~= math.huge and v ~= -math.huge) and "integer"
+      or "number"
   elseif t == "string" then
     return "string"
   elseif is_map(v) then
@@ -101,7 +102,20 @@ local function valid_date(y, mo, d)
   if not (y and mo and d) or mo < 1 or mo > 12 or d < 1 then
     return false
   end
-  local days = { 31, (y % 4 == 0 and (y % 100 ~= 0 or y % 400 == 0)) and 29 or 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+  local days = {
+    31,
+    (y % 4 == 0 and (y % 100 ~= 0 or y % 400 == 0)) and 29 or 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  }
   return d <= days[mo]
 end
 
@@ -187,7 +201,13 @@ local function valid_hostname(s)
     return false
   end
   for label in (s:gsub("%.$", "") .. "."):gmatch("([^.]*)%.") do
-    if #label == 0 or #label > 63 or not label:match("^[%w-]+$") or label:sub(1, 1) == "-" or label:sub(-1) == "-" then
+    if
+      #label == 0
+      or #label > 63
+      or not label:match("^[%w-]+$")
+      or label:sub(1, 1) == "-"
+      or label:sub(-1) == "-"
+    then
       return false
     end
   end
@@ -206,13 +226,18 @@ M.FORMATS = {
   time = valid_time,
   email = function(s)
     local loc, dom = s:match("^([^@%s]+)@([^@%s]+)$")
-    return loc ~= nil and not loc:match("^%.") and not loc:match("%.$") and not loc:find("..", 1, true) and valid_hostname(dom)
+    return loc ~= nil
+      and not loc:match("^%.")
+      and not loc:match("%.$")
+      and not loc:find("..", 1, true)
+      and valid_hostname(dom)
   end,
   uri = function(s)
-    return s:match("^%a[%w+.-]*:[^%s]*$") ~= nil and not s:find("[<>\"{}|\\^`]")
+    return s:match("^%a[%w+.-]*:[^%s]*$") ~= nil and not s:find('[<>"{}|\\^`]')
   end,
   uuid = function(s)
-    return s:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") ~= nil
+    return s:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$")
+      ~= nil
   end,
   ipv4 = valid_ipv4,
   ipv6 = valid_ipv6,
@@ -228,9 +253,12 @@ function M.pointer(doc, ptr)
   end
   local v = doc
   for part in (ptr:sub(2) .. "/"):gmatch("([^/]*)/") do
-    part = part:gsub("%%(%x%x)", function(h)
-      return string.char(tonumber(h, 16))
-    end):gsub("~1", "/"):gsub("~0", "~")
+    part = part
+      :gsub("%%(%x%x)", function(h)
+        return string.char(tonumber(h, 16))
+      end)
+      :gsub("~1", "/")
+      :gsub("~0", "~")
     if is_map(v) then
       v = v[part]
     elseif is_list(v) and part:match("^%d+$") then
@@ -337,7 +365,12 @@ function V:check_keywords(s, v, path, base)
   if t == "integer" or t == "number" then
     if s.multipleOf ~= nil then
       local q = v / s.multipleOf
-      if q ~= q or q == math.huge or q == -math.huge or math.abs(q - math.floor(q + 0.5)) > 1e-9 * math.max(1, math.abs(q)) then
+      if
+        q ~= q
+        or q == math.huge
+        or q == -math.huge
+        or math.abs(q - math.floor(q + 0.5)) > 1e-9 * math.max(1, math.abs(q))
+      then
         return err(path, "must be a multiple of %s", show(s.multipleOf))
       end
     end
@@ -366,7 +399,10 @@ function V:check_keywords(s, v, path, base)
     if s.pattern ~= nil then
       local r, rerr = regex.get(s.pattern)
       if not r then
-        error({ schema_error = true, message = ("invalid pattern %s: %s"):format(show(s.pattern), rerr) }, 0)
+        error({
+          schema_error = true,
+          message = ("invalid pattern %s: %s"):format(show(s.pattern), rerr),
+        }, 0)
       end
       if not r:test(v) then
         return err(path, "must match the pattern %s", show(s.pattern))
@@ -536,7 +572,11 @@ function V:check_keywords(s, v, path, base)
       end
     end
     if count == 0 then
-      return err(path, "must match one of the schemas in oneOf (%s)", first and first.message or "none")
+      return err(
+        path,
+        "must match one of the schemas in oneOf (%s)",
+        first and first.message or "none"
+      )
     elseif count > 1 then
       return err(path, "must match exactly one schema in oneOf, matches %d", count)
     end

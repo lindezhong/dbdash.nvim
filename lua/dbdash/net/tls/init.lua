@@ -18,7 +18,8 @@ Filter.__index = Filter
 function Filter:wrap(data)
   local out = {}
   for off = 1, math.max(#data, 1), record.MAX_PLAINTEXT do
-    out[#out + 1] = self.session.write:seal(TYPE.application_data, data:sub(off, off + record.MAX_PLAINTEXT - 1))
+    out[#out + 1] =
+      self.session.write:seal(TYPE.application_data, data:sub(off, off + record.MAX_PLAINTEXT - 1))
   end
   return table.concat(out)
 end

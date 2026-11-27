@@ -13,7 +13,8 @@ function M.countdown_text(fmt, secs, running)
     return "…"
   end
   local f = math.floor
-  local clock = secs >= 3600 and ("%d:%02d:%02d"):format(f(secs / 3600), f(secs % 3600 / 60), secs % 60)
+  local clock = secs >= 3600
+      and ("%d:%02d:%02d"):format(f(secs / 3600), f(secs % 3600 / 60), secs % 60)
     or ("%d:%02d"):format(f(secs / 60), secs % 60)
   return (fmt:gsub("{time}", tostring(secs)):gsub("{clock}", clock))
 end
@@ -72,7 +73,13 @@ function Dashboard:render_view(width, height)
   -- hit-test regions in buffer rows (events/)
   self.hits = {}
   for _, h in ipairs(list.hits or {}) do
-    self.hits[#self.hits + 1] = { row_s = h.row_s + offset, row_e = h.row_e + offset, x = h.x, width = h.width, node = h.node }
+    self.hits[#self.hits + 1] = {
+      row_s = h.row_s + offset,
+      row_e = h.row_e + offset,
+      x = h.x,
+      width = h.width,
+      node = h.node,
+    }
   end
   return lines, hl, body, offset, regions
 end
@@ -111,7 +118,13 @@ function Dashboard:redraw()
   self.regions = regions
   vim.list_extend(lines, body.lines)
   for _, h in ipairs(body.hl) do
-    hl[#hl + 1] = { row = h.row + offset, col_s = h.col_s, col_e = h.col_e, group = h.group, priority = h.priority }
+    hl[#hl + 1] = {
+      row = h.row + offset,
+      col_s = h.col_s,
+      col_e = h.col_e,
+      group = h.group,
+      priority = h.priority,
+    }
   end
   if #lines == 0 then
     lines = { "" }
@@ -145,7 +158,8 @@ function Dashboard:update_status()
       countdown = M.countdown_text(p_format, p:remaining(), p.running)
     end
     if p.push then
-      countdown = p:push_state() .. (countdown and p:push_state() ~= "ended" and ("  " .. countdown) or "")
+      countdown = p:push_state()
+        .. (countdown and p:push_state() ~= "ended" and ("  " .. countdown) or "")
     end
     buffer.set_status(self.buf, {
       header = header,
@@ -167,10 +181,14 @@ function Dashboard:update_status()
       if p.push then
         text = p:push_state() .. (p_shown and p:push_state() ~= "ended" and ("  " .. text) or "")
       end
-      marks[#marks + 1] = { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text), text = text }
+      marks[#marks + 1] =
+        { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text), text = text }
     end
   end
-  buffer.set_status(self.buf, { header = header, panels = marks, countdown_hl = scope(self.header_node):hl("countdown") })
+  buffer.set_status(
+    self.buf,
+    { header = header, panels = marks, countdown_hl = scope(self.header_node):hl("countdown") }
+  )
 end
 
 ---Panel whose region contains buffer line `lnum` (1-based) and display column `dcol`

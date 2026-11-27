@@ -3,7 +3,8 @@ local M = {}
 
 ---@param file string? path to a single test file, empty for the whole suite
 function M.run(file)
-  local files = (file and file ~= "") and { file } or vim.fn.globpath("tests", "**/test_*.lua", false, true)
+  local files = (file and file ~= "") and { file }
+    or vim.fn.globpath("tests", "**/test_*.lua", false, true)
   -- A test file that does not compile would make mini.test wait forever: fail fast instead.
   for _, f in ipairs(files) do
     local ok, err = loadfile(f)

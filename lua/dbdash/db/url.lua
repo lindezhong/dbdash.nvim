@@ -117,7 +117,8 @@ function M.parse(raw)
   -- Common parameters.
   local p = u.params
   u.tls = (p.tls or "disable"):lower()
-  local MODES = { disable = true, require = true, pin = true, ["verify-ca"] = true, ["verify-full"] = true }
+  local MODES =
+    { disable = true, require = true, pin = true, ["verify-ca"] = true, ["verify-full"] = true }
   if not MODES[u.tls] then
     fail("tls must be disable, require, pin, verify-ca or verify-full (got %q)", p.tls)
   end
@@ -129,7 +130,8 @@ function M.parse(raw)
   end
   local err
   local dbdash = require("dbdash")
-  u.connect_timeout, err = duration.parse(p.connect_timeout or dbdash.options.defaults.connect_timeout)
+  u.connect_timeout, err =
+    duration.parse(p.connect_timeout or dbdash.options.defaults.connect_timeout)
   if err then
     fail("connect_timeout: %s", err)
   end

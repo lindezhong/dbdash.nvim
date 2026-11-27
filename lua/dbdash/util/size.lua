@@ -8,7 +8,7 @@ local M = {}
 function M.check(v)
   if type(v) == "number" then
     if v < 1 or v ~= math.floor(v) then
-      return "must be a positive integer or a percentage like \"30%\""
+      return 'must be a positive integer or a percentage like "30%"'
     end
     return nil
   end
@@ -18,7 +18,9 @@ function M.check(v)
       return nil
     end
   end
-  return ("invalid size %s (use a number of cells or a percentage like \"30%%\")"):format(vim.inspect(v))
+  return ('invalid size %s (use a number of cells or a percentage like "30%%")'):format(
+    vim.inspect(v)
+  )
 end
 
 ---Resolve a size spec against `total` cells: numbers as they are, "N%" as

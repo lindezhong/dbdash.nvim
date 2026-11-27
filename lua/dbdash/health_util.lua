@@ -43,17 +43,17 @@ function M.dns()
   end
   local servers = require("dbdash.net.dns").nameservers()
   if #servers > 0 then
-    vim.health.ok(
-      "name servers from /etc/resolv.conf: "
-        .. table.concat(
-          vim.tbl_map(function(s)
-            return s.host
-          end, servers),
-          ", "
-        )
-    )
+    vim.health.ok("name servers from /etc/resolv.conf: " .. table.concat(
+      vim.tbl_map(function(s)
+        return s.host
+      end, servers),
+      ", "
+    ))
   else
-    vim.health.warn("no name servers in /etc/resolv.conf", "Only needed for mongodb+srv://; add ?dns=host:port to the URL")
+    vim.health.warn(
+      "no name servers in /etc/resolv.conf",
+      "Only needed for mongodb+srv://; add ?dns=host:port to the URL"
+    )
   end
 end
 

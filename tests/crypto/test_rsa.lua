@@ -8,7 +8,10 @@ T["bignum round trips and modexp (checked with Python pow)"] = function()
   eq(bn.to_hex(a), "d3b5e1f00b1c2a99887766554433221100ffeeddccbbaa99")
   eq(bn.to_bytes(bn.from_bytes("\0\0\1\2"), 4), "\0\0\1\2")
   local n = bn.from_hex(string.rep("f", 60) .. "1")
-  eq(bn.to_hex(bn.modexp(a, bn.from_int(65537), n)), "540c2baa991f6150a2cb0899b5c71e22fb92b918fedcdf9646c43ac1814e")
+  eq(
+    bn.to_hex(bn.modexp(a, bn.from_int(65537), n)),
+    "540c2baa991f6150a2cb0899b5c71e22fb92b918fedcdf9646c43ac1814e"
+  )
   eq(bn.to_hex(bn.modexp(a, a, n)), "d6b20b4d87db8a940805241b8f4f5bbc5b4c137ec4a6dd421bb03f331190")
   eq(bn.to_hex(bn.modexp(bn.from_int(4), bn.from_int(13), bn.from_int(497))), ("%x"):format(445))
 end
@@ -42,10 +45,19 @@ T["OAEP ciphertext decrypts with openssl"] = function()
   local f = assert(io.open(ctfile, "wb"))
   f:write(ct)
   f:close()
-  local out = vim.system({
-    "openssl", "pkeyutl", "-decrypt", "-inkey", "tests/fixtures/rsa2048.pem",
-    "-pkeyopt", "rsa_padding_mode:oaep", "-in", ctfile,
-  }):wait()
+  local out = vim
+    .system({
+      "openssl",
+      "pkeyutl",
+      "-decrypt",
+      "-inkey",
+      "tests/fixtures/rsa2048.pem",
+      "-pkeyopt",
+      "rsa_padding_mode:oaep",
+      "-in",
+      ctfile,
+    })
+    :wait()
   eq(out.code, 0)
   eq(out.stdout, msg)
 end

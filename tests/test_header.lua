@@ -38,7 +38,17 @@ end
 
 local function marks(d, row)
   local out = {}
-  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(d.buf, buffer.ns_status, { row, 0 }, { row, -1 }, { details = true })) do
+  for _, m in
+    ipairs(
+      vim.api.nvim_buf_get_extmarks(
+        d.buf,
+        buffer.ns_status,
+        { row, 0 },
+        { row, -1 },
+        { details = true }
+      )
+    )
+  do
     if m[4].virt_text then
       out[#out + 1] = m[4].virt_text[1][1]
     end
@@ -55,7 +65,9 @@ T["countdown_text: {time}, {clock}, running"] = function()
 end
 
 T["title and global countdown: a header line, the panel's countdown below it"] = function()
-  local d = run("one", [[
+  local d = run(
+    "one",
+    [[
 title: Sales overview
 interval: 10m
 database: { url: "sqlite:///:memory:" }
@@ -64,7 +76,8 @@ show: { interval: 30s }
 style:
   countdown: { display: block, content: "{time}s" }
   header countdown: { content: "all in {clock}" }
-]])
+]]
+  )
   local lines = vim.api.nvim_buf_get_lines(d.buf, 0, 3, false)
   eq({ lines[1], lines[2] }, { "Sales overview", "" })
   eq(marks(d, 0)[1]:match("^all in %d+:%d%d$") ~= nil, true)
@@ -73,28 +86,35 @@ style:
 end
 
 T["grid: the header above the panels; without title or countdown, none"] = function()
-  local d = run("grid", [[
+  local d = run(
+    "grid",
+    [[
 interval: 1h
 style: { "header countdown": { display: block } }
 database: { url: "sqlite:///:memory:" }
 panels:
   - query: { sql: SELECT 1 AS x }
     show: { title: A }
-]])
+]]
+  )
   local lines = vim.api.nvim_buf_get_lines(d.buf, 0, 3, false)
   eq({ lines[1], lines[2], lines[3] }, { "", "", "A" })
   eq(#marks(d, 0), 1)
-  local plain = run("plain", "database: { url: 'sqlite:///:memory:' }\nquery: { sql: SELECT 1 AS x }\n")
+  local plain =
+    run("plain", "database: { url: 'sqlite:///:memory:' }\nquery: { sql: SELECT 1 AS x }\n")
   eq(vim.api.nvim_buf_get_lines(plain.buf, 0, 1, false)[1] ~= "", true)
   eq(plain.panels[1].meta.dashboard_title, nil)
 end
 
 T["the header countdown counts down to the top-level interval: none without one"] = function()
-  local d = run("nointerval", [[
+  local d = run(
+    "nointerval",
+    [[
 style: { "header countdown": { display: block } }
 database: { url: "sqlite:///:memory:" }
 query: { sql: SELECT 1 AS x }
-]])
+]]
+  )
   eq(#marks(d, 0), 0)
 end
 
@@ -104,14 +124,17 @@ T["threshold notifications use the dashboard title when the panel has none"] = f
   vim.notify = function(msg)
     notes[#notes + 1] = msg
   end
-  run("thr", [[
+  run(
+    "thr",
+    [[
 title: Board
 database: { url: "sqlite:///:memory:" }
 query: { sql: SELECT 99 AS v }
 show:
   type: stat
   thresholds: [{ value: 50, class: danger, notify: true }]
-]])
+]]
+  )
   vim.notify = real
   local found = false
   for _, n in ipairs(notes) do
@@ -121,7 +144,10 @@ show:
 end
 
 T["the sidebar lists file names only, not titles"] = function()
-  vim.fn.writefile({ "title: My board", "database: { url: 'sqlite:///:memory:' }", "query: { sql: x }" }, dir .. "/a.yaml")
+  vim.fn.writefile(
+    { "title: My board", "database: { url: 'sqlite:///:memory:' }", "query: { sql: x }" },
+    dir .. "/a.yaml"
+  )
   local sidebar = require("dbdash.view.sidebar")
   local buf = vim.api.nvim_create_buf(false, true)
   local cwd = vim.fn.getcwd()

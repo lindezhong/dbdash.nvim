@@ -188,7 +188,14 @@ function M.render(rs, show, ctx)
         text = text:gsub("\n", "↵")
         multi = false
       end
-      cells[r][c] = { text = text, null = is_null, group = d.group, wrap = d.wrap, valign = d.valign, ellipsis = d.ellipsis }
+      cells[r][c] = {
+        text = text,
+        null = is_null,
+        group = d.group,
+        wrap = d.wrap,
+        valign = d.valign,
+        ellipsis = d.ellipsis,
+      }
       local tw = 0
       if multi then
         for line in (text .. "\n"):gmatch("([^\n]*)\n") do
@@ -203,7 +210,9 @@ function M.render(rs, show, ctx)
       end
     end
   end
-  local wrap_mode = cell["white-space"] ~= "nowrap" and (cell["word-break"] == "break-all" and "char" or "word") or nil
+  local wrap_mode = cell["white-space"] ~= "nowrap"
+      and (cell["word-break"] == "break-all" and "char" or "word")
+    or nil
 
   -- Box-drawing: "rich" (the default) mixes a heavy header with a light body (like rich);
   -- another border style draws all lines with it, none drops them.
@@ -341,7 +350,10 @@ function M.render(rs, show, ctx)
       end
       add(row_line(texts, groups, v))
       if row_bg[r] then
-        table.insert(hl_spans, { row = #lines - 1, col_s = 0, col_e = #lines[#lines], group = row_bg[r], priority = 50 })
+        table.insert(
+          hl_spans,
+          { row = #lines - 1, col_s = 0, col_e = #lines[#lines], group = row_bg[r], priority = 50 }
+        )
       end
     end
     -- the row element's lines (hit testing: :DbDashInspect on a row)

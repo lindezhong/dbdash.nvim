@@ -35,7 +35,12 @@ function M.render(rs, show, ctx)
   local function add(s, spans, shift)
     lines[#lines + 1] = s
     for _, sp in ipairs(spans or {}) do
-      hl[#hl + 1] = { row = #lines - 1, col_s = sp[1] + (shift or 0), col_e = sp[2] + (shift or 0), group = sp[3] }
+      hl[#hl + 1] = {
+        row = #lines - 1,
+        col_s = sp[1] + (shift or 0),
+        col_e = sp[2] + (shift or 0),
+        group = sp[3],
+      }
     end
   end
   local width = math.max(10, ctx.width - 2)
@@ -47,9 +52,12 @@ function M.render(rs, show, ctx)
     add("(no positive values to plot)", { { 0, 28, ctx.css:hl("note") } })
     return { lines = lines, hl = hl }
   end
-  local sizes = apportion(vim.tbl_map(function(it)
-    return it.value
-  end, items), width)
+  local sizes = apportion(
+    vim.tbl_map(function(it)
+      return it.value
+    end, items),
+    width
+  )
   local parts, spans, pos = { " " }, {}, 1
   for i, it in ipairs(items) do
     local s = string.rep("█", sizes[i])

@@ -19,7 +19,10 @@ M.Error = Error
 
 ---@return dbdash.template.Error
 function M.new(kind, message, line, col)
-  return setmetatable({ phase = "template", kind = kind, message = message, line = line, col = col }, Error)
+  return setmetatable(
+    { phase = "template", kind = kind, message = message, line = line, col = col },
+    Error
+  )
 end
 
 function M.is(e)

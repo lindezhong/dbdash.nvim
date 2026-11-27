@@ -35,7 +35,12 @@ function M.report(node, box)
   local computed = style.get(node)
   local lines = { M.path(node), "" }
   if box then
-    lines[#lines + 1] = ("box        lines %d-%d, columns %d-%d"):format(box.row_s + 1, box.row_e + 1, box.x, box.x + box.width - 1)
+    lines[#lines + 1] = ("box        lines %d-%d, columns %d-%d"):format(
+      box.row_s + 1,
+      box.row_e + 1,
+      box.x,
+      box.x + box.width - 1
+    )
   end
   lines[#lines + 1] = "highlight  " .. (css.hl_of(node) or "(none)")
   lines[#lines + 1] = ""
@@ -52,7 +57,13 @@ function M.report(node, box)
     for _, k in ipairs(keys) do
       decls[#decls + 1] = ("%s: %s"):format(k, value_text(m.rule.decls[k]))
     end
-    lines[#lines + 1] = ("  %-8s %s  (%d,%d,%d)"):format(m.origin, m.rule.selector.text, sp[1], sp[2], sp[3])
+    lines[#lines + 1] = ("  %-8s %s  (%d,%d,%d)"):format(
+      m.origin,
+      m.rule.selector.text,
+      sp[1],
+      sp[2],
+      sp[3]
+    )
     lines[#lines + 1] = "           { " .. table.concat(decls, "; ") .. " }"
   end
   lines[#lines + 1] = ""
@@ -152,7 +163,13 @@ function M.open(d, tag)
       local text = vim.api.nvim_buf_get_lines(buf, r, r + 1, false)[1] or ""
       local s, e = byte_at(text, box.x), byte_at(text, box.x + box.width)
       if e > s then
-        vim.api.nvim_buf_set_extmark(buf, M.ns, r, s, { end_col = e, hl_group = "Visual", priority = 300 })
+        vim.api.nvim_buf_set_extmark(
+          buf,
+          M.ns,
+          r,
+          s,
+          { end_col = e, hl_group = "Visual", priority = 300 }
+        )
       end
     end
     vim.api.nvim_create_autocmd("CursorMoved", {
@@ -167,7 +184,11 @@ function M.open(d, tag)
   end
   local lines = M.report(node, box)
   if others then
-    table.insert(lines, 2, ("(%d %s elements here: the first; put the cursor on another)"):format(others, tag))
+    table.insert(
+      lines,
+      2,
+      ("(%d %s elements here: the first; put the cursor on another)"):format(others, tag)
+    )
   end
   return require("dbdash.view.popup").open(lines, { title = "DbDash inspect: " .. node:describe() })
 end

@@ -40,7 +40,15 @@ local function build(parts)
     attrs.fg = fg
     if is_group(parts.color) and src then
       -- keep the group's own attributes (bold titles stay bold)
-      for _, k in ipairs({ "bold", "italic", "underline", "undercurl", "strikethrough", "reverse", "bg" }) do
+      for _, k in ipairs({
+        "bold",
+        "italic",
+        "underline",
+        "undercurl",
+        "strikethrough",
+        "reverse",
+        "bg",
+      }) do
         if src[k] ~= nil then
           attrs[k] = src[k]
         end
@@ -101,7 +109,11 @@ function M.make(c)
   if not (parts.color or parts.bg or parts.bold or parts.italic or parts.decoration) then
     return nil
   end
-  if parts.color and not (parts.bg or parts.bold or parts.italic or parts.decoration) and is_group(parts.color) then
+  if
+    parts.color
+    and not (parts.bg or parts.bold or parts.italic or parts.decoration)
+    and is_group(parts.color)
+  then
     return parts.color
   end
   local key = table.concat({

@@ -81,7 +81,8 @@ function M.iso_now(t)
   end
   local sign = offset < 0 and "-" or "+"
   offset = math.abs(offset)
-  return os.date("%Y-%m-%dT%H:%M:%S", t) .. ("%s%02d:%02d"):format(sign, math.floor(offset / 3600), math.floor(offset % 3600 / 60))
+  return os.date("%Y-%m-%dT%H:%M:%S", t)
+    .. ("%s%02d:%02d"):format(sign, math.floor(offset / 3600), math.floor(offset % 3600 / 60))
 end
 
 local function user_name()

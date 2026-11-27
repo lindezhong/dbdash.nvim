@@ -183,7 +183,10 @@ function Ctx:database(db, prefix)
       end
     end
     if not ok then
-      self:fail(prefix .. "database.password_cmd", "password_cmd must be a command string or a list of strings")
+      self:fail(
+        prefix .. "database.password_cmd",
+        "password_cmd must be a command string or a list of strings"
+      )
     end
   end
   local scheme = M.scheme_of(url)
@@ -198,7 +201,11 @@ function Ctx:database(db, prefix)
     self:fail(prefix .. "database.url", "Oracle is not supported by dbdash.nvim")
   end
   if not typ then
-    self:fail(prefix .. "database.url", "cannot infer database type from url %q; set database.type", url)
+    self:fail(
+      prefix .. "database.url",
+      "cannot infer database type from url %q; set database.type",
+      url
+    )
   end
   if not M.DB_TYPES[typ] then
     self:fail(prefix .. "database.type", "unsupported database type '%s'", typ)
@@ -277,7 +284,8 @@ function Ctx:query(q, prefix, db)
     transform = transform,
     transform_line = tp and tp.line or 1,
     autoescape = autoescape == true,
-    max_rows = self:expect(prefix .. "query.max_rows", q.max_rows, "integer", true) or DEFAULTS.max_rows,
+    max_rows = self:expect(prefix .. "query.max_rows", q.max_rows, "integer", true)
+      or DEFAULTS.max_rows,
     timeout = self:duration(prefix .. "query.timeout", q.timeout),
     args = self:args_list(q.args, prefix .. "query.args"),
   }
@@ -317,7 +325,11 @@ function Ctx:show(s, top_interval, prefix)
   for _, axis in ipairs({ "x_axis", "y_axis" }) do
     local a = nn((nn(s.axes) or {})[axis])
     if a and nn(a.grid) ~= nil then
-      self:fail(("%sshow.axes.%s.grid"):format(prefix, axis), "grid lines are appearance: style: \"grid.%s\" { display: block }", axis:sub(1, 1))
+      self:fail(
+        ("%sshow.axes.%s.grid"):format(prefix, axis),
+        'grid lines are appearance: style: "grid.%s" { display: block }',
+        axis:sub(1, 1)
+      )
     end
   end
   local T = require("dbdash.render.thresholds")
@@ -342,11 +354,19 @@ function Ctx:show(s, top_interval, prefix)
       ok = ok and type(n) == "string"
     end
     if not ok then
-      self:fail(prefix .. "show.args_show", "args_show must be true, false or a list of argument names")
+      self:fail(
+        prefix .. "show.args_show",
+        "args_show must be true, false or a list of argument names"
+      )
     end
   end
   out.args_show = as or false
-  out.refresh_hidden = self:expect(prefix .. "show.refresh_hidden", s.refresh_hidden, "boolean", true) == true
+  out.refresh_hidden = self:expect(
+    prefix .. "show.refresh_hidden",
+    s.refresh_hidden,
+    "boolean",
+    true
+  ) == true
   return out
 end
 
@@ -393,7 +413,12 @@ M.MOVED = {
 
 ---Report a field that moved into style sheets.
 function Ctx:moved(path)
-  self:fail(path, "'%s' is appearance and moved to %s", path, M.MOVED[path:gsub("^panels%[%d+%]%.", "")])
+  self:fail(
+    path,
+    "'%s' is appearance and moved to %s",
+    path,
+    M.MOVED[path:gsub("^panels%[%d+%]%.", "")]
+  )
 end
 
 ---A style sheet (selector -> properties), parsed in the order written; errors name the
@@ -432,7 +457,8 @@ local PANEL_ONLY = {
 }
 
 local function panel_only(section, key)
-  return PANEL_ONLY[section][key] or (section == "show" and type(key) == "string" and key:match("_columns?$") ~= nil)
+  return PANEL_ONLY[section][key]
+    or (section == "show" and type(key) == "string" and key:match("_columns?$") ~= nil)
 end
 
 ---`b` over `a`: mappings merge key by key (recursively), anything else (lists too) replaces.
@@ -470,7 +496,8 @@ function M.arg_refs(text)
     local after = text:sub(e + 1)
     if not before:match("[%.:]%s*$") then -- not x.args
       local name = after:match("^%s*%.%s*([%a_][%w_]*)")
-      local key = after:match("^%s*%[%s*'([%a_][%w_]*)'%s*%]") or after:match('^%s*%[%s*"([%a_][%w_]*)"%s*%]')
+      local key = after:match("^%s*%[%s*'([%a_][%w_]*)'%s*%]")
+        or after:match('^%s*%[%s*"([%a_][%w_]*)"%s*%]')
       if name then
         if after:match("^%s*%.%s*[%a_][%w_]*%s*%(") then -- args.items(), args.keys()
           all = true
@@ -479,7 +506,12 @@ function M.arg_refs(text)
         end
       elseif key then
         names[key] = true
-      elseif after:match("^%s*%[") or after:match("^%s*[,)]") or before:match("[(,]%s*$") or before:match("%f[%w_]in%s+$") then
+      elseif
+        after:match("^%s*%[")
+        or after:match("^%s*[,)]")
+        or before:match("[(,]%s*$")
+        or before:match("%f[%w_]in%s+$")
+      then
         all = true
       end
     end
@@ -542,9 +574,16 @@ function M.validate(data, file, positions)
     for section, m in pairs({ query = top_query, show = top_show }) do
       for k in map.pairs(m or map.new()) do
         if panel_only(section, k) then
-          local hint = (section == "query" and k == "args") and "; shared arguments go in the top-level args"
+          local hint = (section == "query" and k == "args")
+              and "; shared arguments go in the top-level args"
             or ""
-          ctx:fail(("%s.%s"):format(section, k), "'%s.%s' belongs to one panel; with panels, set it in each panel%s", section, k, hint)
+          ctx:fail(
+            ("%s.%s"):format(section, k),
+            "'%s.%s' belongs to one panel; with panels, set it in each panel%s",
+            section,
+            k,
+            hint
+          )
         end
       end
     end
@@ -602,7 +641,8 @@ function M.validate(data, file, positions)
   end
   for _, spec in ipairs(cfg.args) do
     spec.path = nil
-    spec.key = (spec.panel and count[spec.name] > 1) and (spec.panel_id .. "." .. spec.name) or spec.name
+    spec.key = (spec.panel and count[spec.name] > 1) and (spec.panel_id .. "." .. spec.name)
+      or spec.name
   end
   if not cfg.grid then
     local p = cfg.panels[1]
@@ -669,7 +709,11 @@ function Ctx:panel(raw, prefix, cfg, index, id, top_interval)
   local show = self:show(raw.show, top_interval, prefix)
   if M.PUSH_TYPES[db.type] and show.refresh_hidden then
     -- A push source keeps receiving while hidden anyway; only drawing waits.
-    self:fail(prefix .. "show.refresh_hidden", "refresh_hidden does not apply to %s:// (push sources keep receiving while hidden)", db.type)
+    self:fail(
+      prefix .. "show.refresh_hidden",
+      "refresh_hidden does not apply to %s:// (push sources keep receiving while hidden)",
+      db.type
+    )
   end
   local panel = {
     index = index,

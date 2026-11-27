@@ -109,7 +109,9 @@ local function names_used(node, out)
     out[node.name] = true
   end
   for key, v in pairs(node) do
-    if type(v) == "table" and not ((node.k == "Macro" or node.k == "CallBlock") and key == "body") then
+    if
+      type(v) == "table" and not ((node.k == "Macro" or node.k == "CallBlock") and key == "body")
+    then
       if not (v.k == "Macro") then
         names_used(v, out)
       end
@@ -236,7 +238,11 @@ function C:expr(n)
     return ("rt.%s(%s, %s)"):format(BINOPS[n.op], self:expr(n.l), self:expr(n.r))
   elseif k == "Compare" then
     if #n.ops == 1 then
-      return ("rt.cmp(%q, %s, %s)"):format(n.ops[1].op, self:expr(n.first), self:expr(n.ops[1].expr))
+      return ("rt.cmp(%q, %s, %s)"):format(
+        n.ops[1].op,
+        self:expr(n.first),
+        self:expr(n.ops[1].expr)
+      )
     end
     local parts = { "(function() local a = " .. self:expr(n.first) }
     for i, o in ipairs(n.ops) do
@@ -293,7 +299,13 @@ local RESERVED = { args = true, meta = true }
 local function check_reserved(body)
   local function bad(node, name)
     if RESERVED[name] then
-      errors.syntax(node.line, node.col, "'%s' is reserved (dashboard %s) and cannot be assigned", name, name == "args" and "arguments" or "metadata")
+      errors.syntax(
+        node.line,
+        node.col,
+        "'%s' is reserved (dashboard %s) and cannot be assigned",
+        name,
+        name == "args" and "arguments" or "metadata"
+      )
     end
   end
   walk(body, function(st)
@@ -486,7 +498,16 @@ function C:macro(target, name, params, body)
   self:indent(1)
   self:emit("local o = {}")
   -- Check the arguments; info has varargs, kwargs and caller.
-  self:emit(("local %s = rt.check_args(%q, %s, %s, { %s }, %s)"):format(info, name, args, kwargs, table.concat(names, ", "), flags_lua))
+  self:emit(
+    ("local %s = rt.check_args(%q, %s, %s, { %s }, %s)"):format(
+      info,
+      name,
+      args,
+      kwargs,
+      table.concat(names, ", "),
+      flags_lua
+    )
+  )
   -- Bind parameters: positional, then keyword, then defaults.
   local bindings = {}
   for i, p in ipairs(params) do
@@ -500,11 +521,13 @@ function C:macro(target, name, params, body)
       self:emit(("if %s == nil then %s = %s end"):format(lua, lua, self:expr(p.default)))
       self.scopes[#self.scopes] = nil
     else
-      self:emit(("if %s == nil then %s = rt.undef(%q) end"):format(
-        lua,
-        lua,
-        ("'%s' is undefined (missing argument of macro %s)"):format(p.name, name)
-      ))
+      self:emit(
+        ("if %s == nil then %s = rt.undef(%q) end"):format(
+          lua,
+          lua,
+          ("'%s' is undefined (missing argument of macro %s)"):format(p.name, name)
+        )
+      )
     end
   end
   if flags.catch_varargs then
@@ -605,11 +628,13 @@ function C:stmt(st)
   elseif k == "Lua" then
     self:line(st)
     -- The template variables visible here (set, for, macro arguments), for `vars`.
-    self:emit(("o[#o + 1] = rt.lua_block(env, %q, %d, function() return %s end)"):format(
-      st.code,
-      st.line,
-      self:visible_locals()
-    ))
+    self:emit(
+      ("o[#o + 1] = rt.lua_block(env, %q, %d, function() return %s end)"):format(
+        st.code,
+        st.line,
+        self:visible_locals()
+      )
+    )
   elseif k == "Output" then
     self:line(st)
     self:emit(("o[#o + 1] = rt.out(env, %s)"):format(self:expr(st.expr)))
@@ -663,9 +688,11 @@ function C:stmt(st)
   elseif k == "FilterBlock" then
     self:line(st)
     local v = self:capture(st.body)
-    self:emit(("o[#o + 1] = rt.out(env, rt.markup(env, %s))"):format(
-      self:apply_filters(("rt.markup(env, %s)"):format(v), st.filters)
-    ))
+    self:emit(
+      ("o[#o + 1] = rt.out(env, rt.markup(env, %s))"):format(
+        self:apply_filters(("rt.markup(env, %s)"):format(v), st.filters)
+      )
+    )
   elseif k == "With" then
     self:line(st)
     self:emit("do")
@@ -681,7 +708,13 @@ function C:stmt(st)
       if #vars == 1 then
         self:emit(("local %s = %s"):format(vars[1], self:expr(a.expr)))
       else
-        self:emit(("local %s = rt.unpack(%s, %d)"):format(table.concat(vars, ", "), self:expr(a.expr), #vars))
+        self:emit(
+          ("local %s = rt.unpack(%s, %d)"):format(
+            table.concat(vars, ", "),
+            self:expr(a.expr),
+            #vars
+          )
+        )
       end
     end
     self:scoped_body(st.body, bindings)
@@ -708,27 +741,40 @@ function C:stmt(st)
     self:emit(("local %s"):format(caller))
     self:macro(caller, "caller", st.params, st.body)
     local call = vim.deepcopy(st.call)
-    call.kwargs = vim.list_extend(vim.deepcopy(call.kwargs or {}), { { "caller", { k = "Raw", lua = caller } } })
+    call.kwargs = vim.list_extend(
+      vim.deepcopy(call.kwargs or {}),
+      { { "caller", { k = "Raw", lua = caller } } }
+    )
     self:emit(("o[#o + 1] = rt.out(env, %s)"):format(self:expr(call)))
   elseif k == "Import" then
     self:line(st)
     local b = self.scopes[#self.scopes][st.alias]
-    self:emit(("%s = rt.import(env, %s, %s)"):format(b.lua, self:expr(st.target), self:import_context(st)))
+    self:emit(
+      ("%s = rt.import(env, %s, %s)"):format(b.lua, self:expr(st.target), self:import_context(st))
+    )
   elseif k == "FromImport" then
     self:line(st)
     local mod = self:tmp()
-    self:emit(("local %s = rt.import(env, %s, %s)"):format(mod, self:expr(st.target), self:import_context(st)))
+    self:emit(
+      ("local %s = rt.import(env, %s, %s)"):format(
+        mod,
+        self:expr(st.target),
+        self:import_context(st)
+      )
+    )
     for _, n in ipairs(st.names) do
       local b = self.scopes[#self.scopes][n.alias]
       self:emit(("%s = rt.import_name(%s, %q)"):format(b.lua, mod, n.name))
     end
   elseif k == "Include" then
     self:line(st)
-    self:emit(("o[#o + 1] = rt.include(env, %s, %s, %s)"):format(
-      self:expr(st.target),
-      tostring(st.ignore_missing),
-      self:import_context(st)
-    ))
+    self:emit(
+      ("o[#o + 1] = rt.include(env, %s, %s, %s)"):format(
+        self:expr(st.target),
+        tostring(st.ignore_missing),
+        self:import_context(st)
+      )
+    )
   elseif k == "Extends" then
     self:line(st)
     self:emit(("rt.extends(env, reg, %s, #o)"):format(self:expr(st.target)))
@@ -797,7 +843,12 @@ function C:blocks(body)
       required[#required + 1] = ("[%q] = true"):format(b.name)
     end
   end
-  self:emit(("rt.add_blocks(reg, { %s }, { %s })"):format(table.concat(fns, ", "), table.concat(required, ", ")))
+  self:emit(
+    ("rt.add_blocks(reg, { %s }, { %s })"):format(
+      table.concat(fns, ", "),
+      table.concat(required, ", ")
+    )
+  )
 end
 
 ---Compile an AST body into Lua source.
@@ -805,7 +856,10 @@ end
 ---@return string
 function M.compile(body)
   check_reserved(body)
-  local c = setmetatable({ buf = {}, depth = 0, n = 0, scopes = {}, exports = {}, exported = {}, loops = {} }, C)
+  local c = setmetatable(
+    { buf = {}, depth = 0, n = 0, scopes = {}, exports = {}, exported = {}, loops = {} },
+    C
+  )
   c:emit("local rt = ...")
   c:emit("return function(ctx, env, L, reg)")
   c.depth = 1
@@ -827,7 +881,12 @@ function M.compile(body)
   end
   local exports = "{ " .. table.concat(ex, ", ") .. " }"
   if extends then
-    c:emit(("if reg.parent then return rt.render_parent(env, reg, ctx, %s, o), %s end"):format(c:visible_locals(), exports))
+    c:emit(
+      ("if reg.parent then return rt.render_parent(env, reg, ctx, %s, o), %s end"):format(
+        c:visible_locals(),
+        exports
+      )
+    )
   end
   c:close_scope()
   c:emit("return table.concat(o), " .. exports)

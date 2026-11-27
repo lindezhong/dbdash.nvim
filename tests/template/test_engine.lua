@@ -62,7 +62,10 @@ end
 T["context values from YAML keep their types"] = function()
   local yaml = require("dbdash.yaml")
   local ctx = yaml.parse("depts: [IT, HR]\nfilters: {region: Asia}\nnone_val: ~\n")
-  eq(template.render("{{ depts|join(',') }} {{ filters.region }} {{ none_val }}", ctx), "IT,HR Asia None")
+  eq(
+    template.render("{{ depts|join(',') }} {{ filters.region }} {{ none_val }}", ctx),
+    "IT,HR Asia None"
+  )
 end
 
 T["autoescape hook formats output values"] = function()
@@ -97,27 +100,39 @@ T["file imports: relative to the base dir, cached by mtime, cycles detected"] = 
   eq(template.render(src, {}, { env = env }), "'a'")
   -- A changed file is reloaded (new mtime).
   vim.wait(20)
-  write("lib/q.sql", "{% macro q(v) %}\"{{ v }}\"{% endmacro %}")
+  write("lib/q.sql", '{% macro q(v) %}"{{ v }}"{% endmacro %}')
   vim.uv.fs_utime(dir .. "/lib/q.sql", os.time() + 5, os.time() + 5)
   env = template.env(require("dbdash.db.dialect").get("postgres"), false, dir)
   eq(template.render(src, {}, { env = env }), '"a"')
   write("a.sql", "{% import 'b.sql' as b %}")
   write("b.sql", "{% import 'a.sql' as a %}")
-  local e = err_of("{% import 'a.sql' as a %}", {}, { env = template.env(require("dbdash.db.dialect").get("postgres"), false, dir) })
+  local e = err_of(
+    "{% import 'a.sql' as a %}",
+    {},
+    { env = template.env(require("dbdash.db.dialect").get("postgres"), false, dir) }
+  )
   eq(e.message:find("circular import of 'a.sql'") ~= nil, true)
-  e = err_of("{% import 'missing.sql' as m %}", {}, { env = template.env(require("dbdash.db.dialect").get("postgres"), false, dir) })
+  e = err_of(
+    "{% import 'missing.sql' as m %}",
+    {},
+    { env = template.env(require("dbdash.db.dialect").get("postgres"), false, dir) }
+  )
   eq(e.message:find("template not found") ~= nil, true)
 end
 
 T["errors inside imported templates name the file"] = function()
-  local env = { load_template = require("dbdash.template.loader").dict({ ["h.sql"] = "\n{{ 1 + 'a' }}" }) }
+  local env =
+    { load_template = require("dbdash.template.loader").dict({ ["h.sql"] = "\n{{ 1 + 'a' }}" }) }
   local e = err_of("{% import 'h.sql' as h %}", {}, { env = env })
   eq({ e.kind, e.line, e.source }, { "type", 2, "h.sql" })
 end
 
 T["macros render safe output under autoescape"] = function()
   local env = template.env(require("dbdash.db.dialect").get("postgres"), true)
-  eq(template.render([[{% macro m(v) %}x = {{ v }}{% endmacro %}{{ m("it's") }}]], {}, { env = env }), "x = 'it''s'")
+  eq(
+    template.render([[{% macro m(v) %}x = {{ v }}{% endmacro %}{{ m("it's") }}]], {}, { env = env }),
+    "x = 'it''s'"
+  )
 end
 
 T["args and meta are read-only for methods; set args.x still works"] = function()
@@ -135,19 +150,27 @@ T["args and meta are read-only for methods; set args.x still works"] = function(
     eq({ src, e.message:find("is read-only", 1, true) ~= nil }, { src, true })
   end
   -- Reading methods and copies are fine.
-  eq(template.render("{{ args.ids.index(2) }} {{ args.m.get('k') }} {% set c = args.m.copy() %}{% set _ = c.update({'k': 5}) %}{{ c.k }} {{ args.m.k }}", ctx), "1 1 5 1")
+  eq(
+    template.render(
+      "{{ args.ids.index(2) }} {{ args.m.get('k') }} {% set c = args.m.copy() %}{% set _ = c.update({'k': 5}) %}{{ c.k }} {{ args.m.k }}",
+      ctx
+    ),
+    "1 1 5 1"
+  )
 end
 
 T["imported templates see args and meta (globals) with and without context"] = function()
   local map = require("dbdash.util.map")
-  local ctx = { args = map.from_pairs({ { "days", 7 } }), meta = map.from_pairs({ { "os", "linux" } }) }
+  local ctx =
+    { args = map.from_pairs({ { "days", 7 } }), meta = map.from_pairs({ { "os", "linux" } }) }
   local env = {
     context = ctx,
     load_template = require("dbdash.template.loader").dict({
       ["m.sql"] = "{% macro f() %}{{ args.days }} {{ meta.os }} {{ y is defined }}{% endmacro %}",
     }),
   }
-  local src = "{% set y = 1 %}{% import 'm.sql' as a %}{% import 'm.sql' as b with context %}{{ a.f() }}|{{ b.f() }}"
+  local src =
+    "{% set y = 1 %}{% import 'm.sql' as a %}{% import 'm.sql' as b with context %}{{ a.f() }}|{{ b.f() }}"
   eq(template.render(src, ctx, { env = env }), "7 linux False|7 linux True")
 end
 

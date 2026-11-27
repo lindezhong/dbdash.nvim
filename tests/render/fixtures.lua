@@ -21,7 +21,32 @@ end
 
 function M.hourly_visits()
   local rows = {}
-  local visits = { 12, 8, 5, 3, 2, 4, 15, 40, 85, 120, 135, 128, 110, 125, 140, 150, 138, 120, 95, 80, 66, 50, 35, 20 }
+  local visits = {
+    12,
+    8,
+    5,
+    3,
+    2,
+    4,
+    15,
+    40,
+    85,
+    120,
+    135,
+    128,
+    110,
+    125,
+    140,
+    150,
+    138,
+    120,
+    95,
+    80,
+    66,
+    50,
+    35,
+    20,
+  }
   for h = 0, 23 do
     rows[#rows + 1] = { ("%02d:00"):format(h), visits[h + 1], math.floor(visits[h + 1] * 0.3) }
   end
@@ -45,7 +70,10 @@ function M.scores()
       rows[#rows + 1] = { class, v }
     end
   end
-  return resultset.new({ { name = "class", type = "string" }, { name = "score", type = "integer" } }, rows)
+  return resultset.new(
+    { { name = "class", type = "string" }, { name = "score", type = "integer" } },
+    rows
+  )
 end
 
 -- Activity per weekday and hour (heatmap).

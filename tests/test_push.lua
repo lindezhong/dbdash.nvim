@@ -65,9 +65,12 @@ query:
 show: { type: table, interval: 1s }
 ]])
   local p = d.panels[1]
-  eq(wait(function()
-    return p.ended
-  end), true)
+  eq(
+    wait(function()
+      return p.ended
+    end),
+    true
+  )
   eq(p.store.seen, { "1", "2", "3", "4", "5" })
   eq(rows(p), { { "push", 5, "push" } }) -- (columns by name: kind, n, prev)
   eq({ p.stream.received, p.stream.processed, p.refresh_count }, { 5, 5, 5 })
@@ -173,15 +176,21 @@ query:
 show: { type: table, interval: 1s }
 ]])
   local p = d.panels[1]
-  eq(wait(function()
-    return rows(p)[1] and rows(p)[1][1] == "one"
-  end), true)
+  eq(
+    wait(function()
+      return rows(p)[1] and rows(p)[1][1] == "one"
+    end),
+    true
+  )
   local first = p.stream
   require("dbdash.args").set_modified(d.state, "word", "two")
   d:restart()
-  eq(wait(function()
-    return rows(p)[1] and rows(p)[1][1] == "two"
-  end), true)
+  eq(
+    wait(function()
+      return rows(p)[1] and rows(p)[1][1] == "two"
+    end),
+    true
+  )
   eq(first.token.cancelled, true) -- the old one stopped
 end
 
@@ -205,7 +214,11 @@ show: { type: table, interval: 1s }
 end
 
 T["a full queue drops the oldest items"] = function()
-  require("dbdash").setup({ lua = { confirm = false }, dashboard = { pause_hidden = false }, push = { max_queue = 3 } })
+  require("dbdash").setup({
+    lua = { confirm = false },
+    dashboard = { pause_hidden = false },
+    push = { max_queue = 3 },
+  })
   local d = start([[
 database: { url: "luastream://" }
 query:
@@ -250,9 +263,12 @@ show: { type: table, interval: 1s }
   eq(p.stream.processed > before, true) -- still consuming
   eq(draws, 0)
   d:resume()
-  eq(wait(function()
-    return draws > 0
-  end, 1500), true)
+  eq(
+    wait(function()
+      return draws > 0
+    end, 1500),
+    true
+  )
   d.redraw = real
 end
 
@@ -269,14 +285,20 @@ query:
 show: { type: table, interval: 1s }
 ]]):format(INTERP, pidfile))
   local p = d.panels[1]
-  eq(wait(function()
-    return p.rs ~= nil
-  end), true)
+  eq(
+    wait(function()
+      return p.rs ~= nil
+    end),
+    true
+  )
   local pid = tonumber(vim.fn.readfile(pidfile)[1])
   sched.stop(d.path)
-  eq(wait(function()
-    return vim.uv.kill(pid, 0) ~= 0
-  end), true)
+  eq(
+    wait(function()
+      return vim.uv.kill(pid, 0) ~= 0
+    end),
+    true
+  )
 end
 
 T["webhook: requests become items of the panel; its header says where it listens"] = function()
@@ -288,23 +310,36 @@ query:
 show: { type: table, interval: 1s }
 ]])
   local p = d.panels[1]
-  eq(wait(function()
-    return p:push_state():match("^listening") ~= nil
-  end), true)
+  eq(
+    wait(function()
+      return p:push_state():match("^listening") ~= nil
+    end),
+    true
+  )
   local port = tonumber(p:push_state():match(":(%d+)$"))
   local done
-  vim.system({ vim.v.progpath, "--clean", "--headless", "-l", RUN_LUA, ([[
+  vim.system({
+    vim.v.progpath,
+    "--clean",
+    "--headless",
+    "-l",
+    RUN_LUA,
+    ([[
     local tcp = vim.uv.new_tcp()
     tcp:connect("127.0.0.1", %d, function()
       tcp:write("POST /in HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: text/plain\r\nContent-Length: 6\r\n\r\nhello\n")
     end)
     vim.wait(1000)
-  ]]):format(port) }, {}, function()
+  ]]):format(port),
+  }, {}, function()
     done = true
   end)
-  eq(wait(function()
-    return rows(p)[1] ~= nil
-  end), true)
+  eq(
+    wait(function()
+      return rows(p)[1] ~= nil
+    end),
+    true
+  )
   eq(rows(p), { { "hello", "POST" } })
   wait(function()
     return done

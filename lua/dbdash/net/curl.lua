@@ -15,7 +15,21 @@ local function fail(msg, ...)
   error({ phase = "query", kind = "value", message = msg:format(...) }, 0)
 end
 
-local C_ESC = { n = "\n", t = "\t", r = "\r", a = "\a", b = "\b", e = "\27", E = "\27", f = "\f", v = "\v", ["\\"] = "\\", ["'"] = "'", ['"'] = '"', ["?"] = "?" }
+local C_ESC = {
+  n = "\n",
+  t = "\t",
+  r = "\r",
+  a = "\a",
+  b = "\b",
+  e = "\27",
+  E = "\27",
+  f = "\f",
+  v = "\v",
+  ["\\"] = "\\",
+  ["'"] = "'",
+  ['"'] = '"',
+  ["?"] = "?",
+}
 
 ---Split a command line into words (shell quoting).
 ---@param text string
@@ -261,7 +275,15 @@ function M.parse(text, base_dir)
   if words[1] == "curl" then
     table.remove(words, 1)
   end
-  local r = { headers = {}, follow = false, insecure = false, cookie_strings = {}, cookie_files = {}, cookie_engine = false, junk_session = false }
+  local r = {
+    headers = {},
+    follow = false,
+    insecure = false,
+    cookie_strings = {},
+    cookie_files = {},
+    cookie_engine = false,
+    junk_session = false,
+  }
   local data, json = {}, {}
   local get, head, has_data = false, false, false
   local i = 1
@@ -337,7 +359,10 @@ function M.parse(text, base_dir)
       head = true
     elseif key == "url" then
       if v:match("^%a[%w+.-]*://") then
-        fail("curl: write the path only (e.g. /search): the scheme, host and port are database.url's, not %s", v)
+        fail(
+          "curl: write the path only (e.g. /search): the scheme, host and port are database.url's, not %s",
+          v
+        )
       end
       if r.url then
         fail("curl: one URL per request (%s and %s)", r.url, v)
@@ -392,7 +417,10 @@ function M.parse(text, base_dir)
     i = i + 1
   end
   if r.url and r.url:match("^%a[%w+.-]*://") then
-    fail("curl: write the path only (e.g. /search): the scheme, host and port are database.url's, not %s", r.url)
+    fail(
+      "curl: write the path only (e.g. /search): the scheme, host and port are database.url's, not %s",
+      r.url
+    )
   end
   if #json > 0 then
     -- --json: the data as is, sent and accepted as JSON

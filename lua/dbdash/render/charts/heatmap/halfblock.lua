@@ -16,7 +16,14 @@ function M.render(rs, show, ctx)
     local a, b = g.ys[2 * r - 1], g.ys[2 * r]
     ylabels[r] = b and (a .. "/" .. b) or a
   end
-  local spec = { title = C.nn(show.title), xlabel = axes.xlabel, ylabel = axes.ylabel, ylabels = ylabels, height = rows, min_rows = rows }
+  local spec = {
+    title = C.nn(show.title),
+    xlabel = axes.xlabel,
+    ylabel = axes.ylabel,
+    ylabels = ylabels,
+    height = rows,
+    min_rows = rows,
+  }
   local cols = ctx.frame.plot_size(ctx, spec)
   local cw = math.max(1, math.min(4, math.floor(cols / math.max(#g.xs, 1))))
   local lines, hl = {}, {}
