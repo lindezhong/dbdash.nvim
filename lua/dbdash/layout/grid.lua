@@ -242,110 +242,129 @@ end
 ---@param ncols integer
 ---@param areas table?
 ---@return dbdash.layout.Place[]?, { index: integer, field: string, message: string }? err
+---Cells taken by placed items.
+local Used = {}
+Used.__index = Used
+
+---Is the rs x cs block at (r, c) inside the columns and free?
+function Used:free(r, c, rs, cs)
+  if c < 1 or c + cs - 1 > self.ncols or r < 1 then
+    return false
+  end
+  for y = r, r + rs - 1 do
+    for x = c, c + cs - 1 do
+      if self[y] and self[y][x] then
+        return false
+      end
+    end
+  end
+  return true
+end
+
+function Used:take(i, p)
+  for y = p.row, p.row + p.row_span - 1 do
+    self[y] = self[y] or {}
+    for x = p.col, p.col + p.span - 1 do
+      self[y][x] = i
+    end
+  end
+end
+
+local function placement_error(i, field, msg, ...)
+  return nil, { index = i, field = field, message = msg:format(...) }
+end
+
+---An item with an area, or with both row and column: its place (nil: it flows), or nil and
+---an error.
+local function place_fixed(used, i, it, areas)
+  local p
+  if it.area then
+    local a = areas and areas[it.area]
+    if not a then
+      return placement_error(i, "area", "no area named %q in grid-template-areas", it.area)
+    end
+    p = { row = a.row, col = a.col, span = a.span, row_span = a.row_span }
+  elseif it.row and it.column then
+    p = { row = it.row, col = it.column, span = it.span or 1, row_span = it.row_span or 1 }
+  else
+    return false
+  end
+  local field = it.area and "area" or "column"
+  if p.col + p.span - 1 > used.ncols then
+    local msg = "column %d + span %d is past the %d columns"
+    return placement_error(i, field, msg, p.col, p.span, used.ncols)
+  end
+  if not used:free(p.row, p.col, p.row_span, p.span) then
+    local other = used[p.row] and used[p.row][p.col]
+    return placement_error(i, it.area and "area" or "row", "overlaps panel %d", other or 0)
+  end
+  return p
+end
+
+---An item with a row or a column only (the first free place along it), or an auto item
+---(after the cursor, row by row); returns its place or nil and an error.
+local function place_flowing(used, i, it, cursor)
+  local ncols = used.ncols
+  local cs = math.max(1, math.min(it.span or 1, ncols))
+  local rs = it.row_span or 1
+  local p
+  if it.column then
+    if it.column + cs - 1 > ncols then
+      local msg = "column %d + span %d is past the %d columns"
+      return placement_error(i, "column", msg, it.column, cs, ncols)
+    end
+    local r = 1
+    while not used:free(r, it.column, rs, cs) do
+      r = r + 1
+    end
+    p = { row = r, col = it.column }
+  elseif it.row then
+    local c = 1
+    while c + cs - 1 <= ncols and not used:free(it.row, c, rs, cs) do
+      c = c + 1
+    end
+    if c + cs - 1 > ncols then
+      return placement_error(i, "row", "no room in row %d", it.row)
+    end
+    p = { row = it.row, col = c }
+  else
+    local r, c = cursor.r, cursor.c
+    while not used:free(r, c, rs, cs) do
+      c = c + 1
+      if c + cs - 1 > ncols then
+        r, c = r + 1, 1
+      end
+    end
+    p = { row = r, col = c }
+    cursor.r, cursor.c = r, c + cs
+  end
+  p.span, p.row_span = cs, rs
+  return p
+end
+
 function M.place(items, ncols, areas)
-  local used = {} -- used[row][col] = item index
-  local function free(r, c, rs, cs)
-    if c < 1 or c + cs - 1 > ncols or r < 1 then
-      return false
-    end
-    for y = r, r + rs - 1 do
-      for x = c, c + cs - 1 do
-        if used[y] and used[y][x] then
-          return false
-        end
-      end
-    end
-    return true
-  end
-  local function take(i, p)
-    for y = p.row, p.row + p.row_span - 1 do
-      used[y] = used[y] or {}
-      for x = p.col, p.col + p.span - 1 do
-        used[y][x] = i
-      end
-    end
-  end
+  local used = setmetatable({ ncols = ncols }, Used)
   local out = {}
-  local function fail(i, field, msg, ...)
-    return nil, { index = i, field = field, message = msg:format(...) }
-  end
   -- 1. Areas and items with both row and column.
   for i, it in ipairs(items) do
-    local p
-    if it.area then
-      local a = areas and areas[it.area]
-      if not a then
-        return fail(i, "area", "no area named %q in grid-template-areas", it.area)
-      end
-      p = { row = a.row, col = a.col, span = a.span, row_span = a.row_span }
-    elseif it.row and it.column then
-      p = { row = it.row, col = it.column, span = it.span or 1, row_span = it.row_span or 1 }
-    end
-    if p then
-      if p.col + p.span - 1 > ncols then
-        return fail(
-          i,
-          it.area and "area" or "column",
-          "column %d + span %d is past the %d columns",
-          p.col,
-          p.span,
-          ncols
-        )
-      end
-      if not free(p.row, p.col, p.row_span, p.span) then
-        local other = used[p.row] and used[p.row][p.col]
-        return fail(i, it.area and "area" or "row", "overlaps panel %d", other or 0)
-      end
-      take(i, p)
+    local p, err = place_fixed(used, i, it, areas)
+    if p == nil then
+      return nil, err
+    elseif p then
+      used:take(i, p)
       out[i] = p
     end
   end
   -- 2. A row or a column only, then 3. auto items (cursor-based).
-  local cur_r, cur_c = 1, 1
+  local cursor = { r = 1, c = 1 }
   for pass = 2, 3 do
     for i, it in ipairs(items) do
       if not out[i] and ((pass == 2) == (it.row ~= nil or it.column ~= nil)) then
-        local cs = math.max(1, math.min(it.span or 1, ncols))
-        local rs = it.row_span or 1
-        local p
-        if it.column then
-          if it.column + cs - 1 > ncols then
-            return fail(
-              i,
-              "column",
-              "column %d + span %d is past the %d columns",
-              it.column,
-              cs,
-              ncols
-            )
-          end
-          local r = 1
-          while not free(r, it.column, rs, cs) do
-            r = r + 1
-          end
-          p = { row = r, col = it.column }
-        elseif it.row then
-          local c = 1
-          while c + cs - 1 <= ncols and not free(it.row, c, rs, cs) do
-            c = c + 1
-          end
-          if c + cs - 1 > ncols then
-            return fail(i, "row", "no room in row %d", it.row)
-          end
-          p = { row = it.row, col = c }
-        else
-          local r, c = cur_r, cur_c
-          while not free(r, c, rs, cs) do
-            c = c + 1
-            if c + cs - 1 > ncols then
-              r, c = r + 1, 1
-            end
-          end
-          p = { row = r, col = c }
-          cur_r, cur_c = r, c + cs
+        local p, err = place_flowing(used, i, it, cursor)
+        if not p then
+          return nil, err
         end
-        p.span, p.row_span = cs, rs
-        take(i, p)
+        used:take(i, p)
         out[i] = p
       end
     end
