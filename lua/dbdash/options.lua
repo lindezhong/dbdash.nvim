@@ -69,7 +69,8 @@ local db_defaults = require("dbdash.db.defaults") -- the built-in values
 ---@field defaults dbdash.DefaultsOptions
 ---@field errors dbdash.ErrorsOptions
 ---@field lua dbdash.LuaOptions
----@field push { max_queue: integer, max_record: integer|string } push sources (:help dbdash-push)
+---@field push { max_queue: integer?, max_record: integer|string } push sources (:help dbdash-push):
+---  results waiting per panel (unlimited by default), the longest item
 local defaults = {
   mappings = true,
   countdown_interval = 10000,
@@ -118,7 +119,7 @@ local defaults = {
     max_callback_depth = 10,
   },
   push = {
-    max_queue = 1000,
+    max_queue = nil, -- unlimited: a busy source keeps every item (memory grows meanwhile)
     max_record = db_defaults.BUILTIN.max_record,
   },
 }
@@ -277,7 +278,7 @@ local SPEC = {
     max_callback_depth = int(1),
   },
   push = {
-    max_queue = int(1),
+    max_queue = optional(int(1)),
     max_record = require("dbdash.util.bytes").check,
   },
 }
