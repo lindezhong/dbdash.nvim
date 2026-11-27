@@ -25,7 +25,7 @@ T["own and top-level deadlines at the same moment: one query"] = function()
     "query: { sql: 'return { { x = 1 } }' }",
     "show: { type: table, interval: 1s }",
   }, f)
-  sched.start(f, { no_show = true })
+  require("dbdash.view.dashboard").start(f, { no_show = true })
   local d = assert(sched.get(sched.normalize(f)))
   local p = d.panels[1]
   vim.wait(4300, function()

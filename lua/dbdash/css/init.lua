@@ -170,4 +170,11 @@ function M.ellipsis(c)
   return v
 end
 
+---A countdown element (under the header or a panel): shown?, its format (content).
+---@return boolean shown, string format
+function M.countdown(parent)
+  local c = require("dbdash.css.style").get(require("dbdash.dom.node").child(parent, "countdown"))
+  return c.display ~= "none", c.content or "Next update: {time}s"
+end
+
 return M

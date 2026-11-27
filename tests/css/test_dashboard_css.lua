@@ -21,7 +21,7 @@ local T = MiniTest.new_set({
 local function start(lines)
   local f = vim.fn.tempname() .. ".yaml"
   vim.fn.writefile(lines, f)
-  sched.start(f, { no_show = true })
+  require("dbdash.view.dashboard").start(f, { no_show = true })
   local d = assert(sched.get(sched.normalize(f)))
   vim.wait(5000, function()
     for _, p in ipairs(d.panels) do
@@ -81,7 +81,7 @@ T["a rule in the document reaches the buffer"] = function()
       ["panel-title"] = { color = "DiagnosticInfo" },
     }))
   )
-  d:redraw()
+  require("dbdash.view.dashboard").redraw(d)
   local g = groups(d)
   eq({ g.DbDashHeader, g.DiagnosticOk, g.DiagnosticInfo }, { nil, true, true })
 end

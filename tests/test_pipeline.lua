@@ -36,12 +36,12 @@ local CFG = {
 local function start()
   local f = vim.fn.tempname() .. ".yaml"
   vim.fn.writefile(CFG, f)
-  sched.start(f, { no_show = true })
+  require("dbdash.view.dashboard").start(f, { no_show = true })
   local d = assert(sched.get(sched.normalize(f)))
   vim.wait(5000, function()
     return d.panels[1].rs and d.panels[2].rs and not d.render_pending
   end, 10)
-  d:redraw()
+  require("dbdash.view.dashboard").redraw(d)
   return d
 end
 
@@ -62,7 +62,7 @@ end
 T["nothing changed: layout is reused and no row is written"] = function()
   local d = start()
   local before = counters(d)
-  d:redraw()
+  require("dbdash.view.dashboard").redraw(d)
   local dd = delta(before, counters(d))
   eq({ dd.misses, dd.rows, dd.draws }, { 0, 0, 1 })
   eq(dd.hits > 0, true)
@@ -73,7 +73,7 @@ T["a new result of one panel lays out that panel only"] = function()
   local p = d.panels[2]
   local before = counters(d)
   p.rs = require("dbdash.db.resultset").new({ { name = "m", type = "integer" } }, { { 3 } })
-  d:redraw()
+  require("dbdash.view.dashboard").redraw(d)
   local dd = delta(before, counters(d))
   -- panel b: measured twice (min / max-content) and laid out once; panel a: reused
   eq(dd.misses, 3)
@@ -89,7 +89,7 @@ T["a style change restyles, then lays out the panels it touches"] = function()
   local d = start()
   local before = counters(d)
   d.doc:set_sheet("runtime", assert(parser.sheet({ ["#a header"] = { color = "DiagnosticOk" } })))
-  d:redraw()
+  require("dbdash.view.dashboard").redraw(d)
   local dd = delta(before, counters(d))
   eq(d.last_restyle.damage, require("dbdash.css.properties").DAMAGE.repaint)
   -- repaint damage: panel a is laid out again for its new colors, its intrinsic sizes are
@@ -102,7 +102,7 @@ T["requests in one batch render once"] = function()
   local d = start()
   local before = counters(d)
   for _ = 1, 5 do
-    d:request_render()
+    require("dbdash.view.dashboard").request_render(d)
   end
   vim.wait(500, function()
     return not d.render_pending
@@ -134,7 +134,7 @@ T["hit testing finds the node; events capture, then bubble"] = function()
     end
   end
   eq(events.hit_test(d, row_chart + 1, x), b.chart_node)
-  eq(sched.get(d.path):panel_at(row_chart + 1, x), b)
+  eq(require("dbdash.view.dashboard").panel_at(sched.get(d.path), row_chart + 1, x), b)
   local order = {}
   d.doc.root:on("ping", function(ev)
     order[#order + 1] = "root-capture:" .. ev.phase

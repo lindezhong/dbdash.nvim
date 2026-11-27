@@ -288,4 +288,14 @@ end
 
 M.Node = Node
 
+---The direct child of `parent` with `tag` (created at the end when missing).
+function M.child(parent, tag)
+  for _, c in ipairs(parent.children) do
+    if c.tag == tag then
+      return c
+    end
+  end
+  return parent:append(M.new(tag))
+end
+
 return M

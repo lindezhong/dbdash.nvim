@@ -43,7 +43,7 @@ end
 local function start(name, text)
   local path = dir .. "/" .. name .. ".yaml"
   vim.fn.writefile(vim.split(text, "\n"), path)
-  sched.start(path, { no_show = true })
+  require("dbdash.view.dashboard").start(path, { no_show = true })
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   settle(d)
   return d, path

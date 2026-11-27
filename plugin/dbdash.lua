@@ -142,9 +142,9 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
     local sched = require("dbdash.dashboard")
     local d = sched.get(path)
     if d and d.buf == ev.buf then
-      d:redraw() -- :edit cleared the buffer of a running dashboard
+      require("dbdash.view.dashboard").redraw(d) -- :edit cleared the buffer of a running dashboard
     else
-      sched.start(path, { buf = ev.buf, no_show = true })
+      require("dbdash.view.dashboard").start(path, { buf = ev.buf, no_show = true })
     end
   end,
 })
@@ -158,7 +158,7 @@ vim.api.nvim_create_autocmd("BufWriteCmd", {
 vim.api.nvim_create_autocmd("SessionLoadPost", {
   group = group,
   callback = function()
-    require("dbdash.dashboard").adopt_session_buffers()
+    require("dbdash.view.dashboard").adopt_session_buffers()
   end,
 })
 vim.api.nvim_create_autocmd("VimLeavePre", {
@@ -175,7 +175,7 @@ vim.api.nvim_create_autocmd({ "BufWinEnter", "BufWinLeave", "WinClosed", "TabEnt
   callback = function()
     if package.loaded["dbdash.dashboard"] then
       vim.schedule(function()
-        require("dbdash.dashboard").update_visibility()
+        require("dbdash.view.dashboard").update_visibility()
       end)
     end
   end,
@@ -185,7 +185,7 @@ vim.api.nvim_create_autocmd("WinClosed", {
   group = group,
   callback = function(ev)
     if package.loaded["dbdash.dashboard"] then
-      require("dbdash.dashboard").on_win_closed(tonumber(ev.match))
+      require("dbdash.view.dashboard").on_win_closed(tonumber(ev.match))
     end
   end,
 })
@@ -193,7 +193,7 @@ vim.api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
   group = group,
   callback = function()
     if package.loaded["dbdash.dashboard"] then
-      require("dbdash.dashboard").on_resize()
+      require("dbdash.view.dashboard").on_resize()
     end
   end,
 })

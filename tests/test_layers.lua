@@ -39,21 +39,6 @@ local LAYERS = {
   },
 }
 
--- Requires that still go up, until dashboard/ and view/dashboard are separated
--- (they build the dashboard's DOM and draw it from the application layer, and the
--- dashboard package's files add methods to one package that requires them).
-local PENDING = {
-  ["dbdash.dom.build"] = true,
-  ["dbdash.dashboard"] = true,
-  ["dbdash.dashboard.dashboard"] = true,
-  ["dbdash.dashboard.lifecycle"] = true,
-  ["dbdash.dashboard.panel"] = true,
-  ["dbdash.dashboard.run"] = true,
-  ["dbdash.dashboard.shared"] = true,
-  ["dbdash.dashboard.stream"] = true,
-  ["dbdash.dashboard.view"] = true,
-}
-
 local level = {}
 for i, names in ipairs(LAYERS) do
   for _, n in ipairs(names) do
@@ -99,7 +84,7 @@ T["modules require their own layer or below"] = function()
   for mod, deps in pairs(graph()) do
     for dep in pairs(deps) do
       local a, b = level[group(mod)], level[group(dep)]
-      if a and b and b > a and not PENDING[mod] then
+      if a and b and b > a then
         up[#up + 1] = mod .. " -> " .. dep
       end
     end
@@ -115,7 +100,7 @@ T["no require cycles"] = function()
   local function visit(v)
     index[v], low[v], next_index = next_index, next_index, next_index + 1
     stack[#stack + 1], on[v] = v, true
-    for w in pairs(PENDING[v] and {} or g[v] or {}) do
+    for w in pairs(g[v] or {}) do
       if g[w] then
         if index[w] == nil then
           visit(w)

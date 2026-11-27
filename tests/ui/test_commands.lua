@@ -553,11 +553,10 @@ T["on exit dashboards stop refreshing but mksession() still sees them"] = functi
   child.api.nvim_exec_autocmds("VimLeavePre", {})
   eq(
     child.lua_get(
-      "require('dbdash.dashboard').list()[1].gtimer == nil and require('dbdash.dashboard').list()[1].ctimer == nil"
+      "require('dbdash.dashboard').list()[1].clock.timer == nil and require('dbdash.dashboard').list()[1].ctimer == nil"
     ),
     true
   )
-  eq(child.lua_get("require('dbdash.dashboard').list()[1].panels[1].timer == nil"), true)
   local file = dir .. "/exit.dbdash"
   child.lua("require('dbdash').mksession(...)", { file })
   local data = vim.json.decode(table.concat(vim.fn.readfile(file), "\n"))
@@ -999,10 +998,10 @@ local function panel(expr)
 end
 
 T["backoff: consecutive failures wait 2x, 4x... the interval; success resets"] = function()
-  eq(child.lua_get("require('dbdash.dashboard').backoff_delay(1000, 1, 8)"), 1000)
-  eq(child.lua_get("require('dbdash.dashboard').backoff_delay(1000, 3, 8)"), 4000)
-  eq(child.lua_get("require('dbdash.dashboard').backoff_delay(1000, 6, 8)"), 8000)
-  eq(child.lua_get("require('dbdash.dashboard').backoff_delay(1000, 6, 1)"), 1000)
+  eq(child.lua_get("require('dbdash.dashboard.panel').backoff_delay(1000, 1, 8)"), 1000)
+  eq(child.lua_get("require('dbdash.dashboard.panel').backoff_delay(1000, 3, 8)"), 4000)
+  eq(child.lua_get("require('dbdash.dashboard.panel').backoff_delay(1000, 6, 8)"), 8000)
+  eq(child.lua_get("require('dbdash.dashboard.panel').backoff_delay(1000, 6, 1)"), 1000)
   vim.fn.writefile(BROKEN, dir .. "/broken2.yaml")
   child.cmd("DbDashStart broken2.yaml")
   child.lua([[_G.wait_for = function(fn) return vim.wait(10000, fn, 20) end]])

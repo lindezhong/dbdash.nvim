@@ -30,7 +30,7 @@ local function find(name)
 end
 
 -- dashboard.keys action -> command function and description.
-local ACTIONS = {
+M.ACTIONS = {
   modify = { "modify_variable", "Modify an argument" },
   show_args = { "show_variables", "Show arguments" },
   refresh = { "restart", "Refresh now" },
@@ -47,7 +47,7 @@ function M.apply_keys(buf)
   end
   local keys = require("dbdash.options").current.dashboard.keys
   local mapped = {}
-  for action, def in pairs(ACTIONS) do
+  for action, def in pairs(M.ACTIONS) do
     local lhs = keys[action]
     if lhs then
       vim.keymap.set("n", lhs, function()

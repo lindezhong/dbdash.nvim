@@ -1,228 +1,15 @@
--- Starting and stopping dashboards: trust, buffers, windows, visibility and sessions.
-local M = require("dbdash.dashboard")
+-- Starting and stopping dashboards (the model's side): a config loaded, checked and
+-- trusted, its dashboard created and registered, its sources started; stopped, cancelled
+-- and unregistered. The views (view/dashboard.lua) ask for arguments and show it.
+local M = {}
 local S = require("dbdash.dashboard.shared")
 local Panel, Dashboard = S.Panel, S.Dashboard
-local opts, notify, now = S.opts, S.notify, S.now
+local opts, now = S.opts, S.now
 local args = require("dbdash.args")
-local buffer = require("dbdash.view.buffer")
 local config = require("dbdash.config")
+local events = require("dbdash.dashboard.events")
+local registry = require("dbdash.dashboard.registry")
 
----@class dbdash.StartOpts
----@field tokens string[]? command-line name=value arguments
----@field ask_all boolean? prompt for every argument (:DbDashStart!)
----@field buf integer? buffer to adopt
----@field win integer? window to show the dashboard in (default: current, or `open`)
----@field open "current"|"vsplit"|"split"|"tab"|nil how to show it when no `win` is given
----@field no_show boolean? do not display the buffer
----@field on_started fun(d: dbdash.Dashboard)?
-
----Show `buf` in `win`; without a window, per `open` ("current" | "vsplit" | "split" |
----"tab", see setup({ dashboard = { open = ... } })). A dashboard already visible in a
----split (current tab) or a tab (any tab) is jumped to instead of opened again.
-local function show_in(buf, win, open)
-  if not (win and vim.api.nvim_win_is_valid(win)) then
-    open = open or "current"
-    if open ~= "current" then
-      local wins = open == "tab" and vim.fn.win_findbuf(buf)
-        or vim.tbl_filter(function(w)
-          return vim.api.nvim_win_get_buf(w) == buf
-        end, vim.api.nvim_tabpage_list_wins(0))
-      if wins[1] then
-        vim.api.nvim_set_current_win(wins[1])
-        return
-      end
-      vim.cmd(({ vsplit = "vsplit", split = "split", tab = "tabnew" })[open])
-      if open == "tab" then
-        local scratch = vim.api.nvim_get_current_buf()
-        vim.api.nvim_win_set_buf(0, buf)
-        if scratch ~= buf and vim.fn.bufname(scratch) == "" and not vim.bo[scratch].modified then
-          pcall(vim.api.nvim_buf_delete, scratch, { force = true })
-        end
-      end
-    end
-    win = vim.api.nvim_get_current_win()
-  end
-  if vim.api.nvim_win_get_buf(win) ~= buf then
-    vim.api.nvim_win_set_buf(win, buf)
-  end
-  vim.api.nvim_set_current_win(win)
-end
-
----Start a dashboard, or switch to it when it is already running.
----@param path string
----@param o dbdash.StartOpts?
-function M.start(path, o)
-  o = o or {}
-  path = M.normalize(path)
-  local existing = M.dashboards[path]
-  if existing then
-    if o.tokens and #o.tokens > 0 then
-      local ok, cli = pcall(args.parse_cli, existing.cfg.args, o.tokens)
-      if not ok then
-        return notify(cli)
-      end
-      for k, v in pairs(cli) do
-        existing.state.cli[k] = v
-      end
-      existing:restart()
-    end
-    buffer.apply_keys(existing.buf)
-    if not o.no_show then
-      show_in(existing.buf, o.win, o.open)
-    end
-    if o.on_started then
-      o.on_started(existing)
-    end
-    return existing
-  end
-
-  if vim.fn.filereadable(path) == 0 then
-    return notify({ phase = "config", message = "config file not found: " .. path })
-  end
-  local cfg, err = config.load(path)
-  if not cfg then
-    return notify(err)
-  end
-  local trusted, why, level = M.trusted(path, cfg, function(answer)
-    -- The decision made in the View float.
-    local name = vim.fn.fnamemodify(path, ":~:.")
-    if answer == "allow" then
-      M.start(path, o)
-    elseif answer == "deny" then
-      vim.notify(
-        ("dbdash: %s denied; it will not run (:DbDashTrust allow %s to allow it)"):format(
-          name,
-          name
-        ),
-        vim.log.levels.WARN
-      )
-    else
-      vim.notify(("dbdash: %s not started (not trusted yet)"):format(name), vim.log.levels.INFO)
-    end
-  end)
-  if not trusted then
-    if why then
-      vim.notify("dbdash: " .. why, level or vim.log.levels.WARN)
-    end
-    return
-  end
-  local ok, cli = pcall(args.parse_cli, cfg.args, o.tokens or {})
-  if not ok then
-    return notify(cli)
-  end
-  local state = args.new_state(cli)
-
-  local function launch()
-    if M.dashboards[path] then -- started meanwhile (e.g. twice from the sidebar)
-      return
-    end
-    local d = setmetatable({
-      path = path,
-      cfg = cfg,
-      state = state,
-      panels = {},
-      -- curl -c in its queries: trusted above (or trust is not required here)
-      writes_trusted = require("dbdash.trust").writes(cfg),
-    }, Dashboard)
-    for i, pc in ipairs(cfg.panels) do
-      d.panels[i] = setmetatable({
-        d = d,
-        index = i,
-        cfg = pc,
-        running = false,
-        push = config.PUSH_TYPES[pc.database.type] or nil, -- a push source (scheduler/stream.lua)
-        next_at = now(),
-        history = {},
-        style = {},
-        store = {}, -- `store` of the panel's Lua code, for as long as the dashboard runs
-      }, Panel)
-    end
-    require("dbdash.dom.build").dashboard(d) -- d.doc: the dashboard's document
-    local restored = require("dbdash.session").take_pending(path)
-    if restored then
-      require("dbdash.session").apply_args(d, restored)
-    end
-    d.buf = buffer.create(path, o.buf)
-    M.dashboards[path] = d
-    -- Deleting the buffer (:bdelete, :bwipeout) stops the dashboard.
-    vim.api.nvim_create_autocmd({ "BufDelete", "BufWipeout" }, {
-      buffer = d.buf,
-      once = true,
-      callback = function()
-        M.stop(path, { keep_buffer = true })
-      end,
-    })
-    if not o.no_show then
-      show_in(d.buf, o.win, o.open)
-    end
-    d:redraw()
-    d:start_timers()
-    vim.schedule(M.update_visibility) -- e.g. restored by a session into another tab
-    require("dbdash.view.sidebar").refresh()
-    if o.on_started then
-      o.on_started(d)
-    end
-  end
-
-  local to_ask = o.ask_all and cfg.args or args.missing_required(cfg.args, state)
-  if #to_ask == 0 then
-    launch()
-    return
-  end
-  require("dbdash.view.args_ui").ask_all(to_ask, state, function(done)
-    if not done then
-      if o.buf and vim.api.nvim_buf_is_valid(o.buf) then
-        buffer.create(path, o.buf) -- keep the adopted buffer usable
-      end
-      return
-    end
-    local missing = args.missing_required(cfg.args, state)
-    if #missing > 0 then
-      return notify({
-        phase = "args",
-        message = "missing required argument '" .. (missing[1].key or missing[1].name) .. "'",
-      })
-    end
-    launch()
-  end)
-end
-
----Stop a dashboard and close its buffer.
----@param path string
----@param o { keep_buffer: boolean? }?
-function M.stop(path, o)
-  local d = M.dashboards[path]
-  if not d then
-    return false
-  end
-  M.dashboards[path] = nil
-  d:stop_timers()
-  d:cancel("dashboard stopped")
-  if not (o and o.keep_buffer) and vim.api.nvim_buf_is_valid(d.buf) then
-    -- Keep windows open: show the alternate buffer (or an empty one) first.
-    for _, win in ipairs(vim.fn.win_findbuf(d.buf)) do
-      vim.api.nvim_win_call(win, function()
-        local alt = vim.fn.bufnr("#")
-        if alt > 0 and alt ~= d.buf and vim.fn.buflisted(alt) == 1 then
-          vim.cmd("buffer " .. alt)
-        else
-          vim.cmd("enew")
-        end
-      end)
-    end
-    pcall(vim.api.nvim_buf_delete, d.buf, { force = true })
-  end
-  require("dbdash.view.sidebar").refresh()
-  return true
-end
-
----True when the config may run: it has no Lua (lua:// or query.transform), or the user
----trusts it (dbdash.trust: asks once, and again after the file changes, recorded in Neovim's
----trust database) unless setup({ lua = { confirm = false } }) or the file is in
----lua.trusted_dirs. Returns false and the reason otherwise.
----@param path string normalized config path
----@param cfg dbdash.Config
----@param on_viewed fun(answer: string)? the decision made after viewing the file
 ---False when setup turns the trust question off for this config (lua.confirm = false, or
 ---the config is under one of lua.trusted_dirs).
 function M.trust_required(path)
@@ -239,6 +26,10 @@ function M.trust_required(path)
   return true
 end
 
+---True when the config may run: it has no Lua (lua:// or query.transform), or the user
+---trusts it (dbdash.trust: asks once, and again after the file changes) unless setup turns
+---the question off. Returns false and the reason otherwise.
+---@param on_viewed fun(answer: string)? the decision made after viewing the files
 function M.trusted(path, cfg, on_viewed)
   local trust = require("dbdash.trust")
   local files, has_lua = trust.collect(path, cfg)
@@ -248,20 +39,108 @@ function M.trusted(path, cfg, on_viewed)
   return trust.check(path, files, on_viewed)
 end
 
----Pause dashboards that no window of the current tab page shows, resume the others
----(setup({ dashboard = { pause_hidden = true } }), the default).
-function M.update_visibility()
-  local pause_hidden = opts().dashboard.pause_hidden
-  local shown = {}
-  for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-    shown[vim.api.nvim_win_get_buf(w)] = true
+---Load a config to start: its config and its argument state from the command line.
+---Returns nil and an error (or a message and its level) when it cannot start.
+---@param path string normalized config path
+---@param tokens string[]? command-line name=value arguments
+---@param on_viewed fun(answer: string)? the decision made in the trust prompt's View float
+---@return dbdash.Config? cfg, dbdash.ArgState|table|string|nil state_or_err, integer? level
+function M.prepare(path, tokens, on_viewed)
+  if vim.fn.filereadable(path) == 0 then
+    return nil, { phase = "config", message = "config file not found: " .. path }
   end
-  for _, d in pairs(M.dashboards) do
-    if not pause_hidden or shown[d.buf] then
-      d:resume()
-    else
-      d:pause()
+  local cfg, err = config.load(path)
+  if not cfg then
+    return nil, err
+  end
+  local trusted, why, level = M.trusted(path, cfg, on_viewed)
+  if not trusted then
+    return nil, why, level or vim.log.levels.WARN
+  end
+  local ok, cli = pcall(args.parse_cli, cfg.args, tokens or {})
+  if not ok then
+    return nil, cli
+  end
+  return cfg, args.new_state(cli)
+end
+
+---Set argument values (text) as edited values; returns true if any was applied.
+function M.apply_args(d, values)
+  local applied = false
+  for key, text in pairs(values) do
+    -- By key ("name" shared, "<panel>.name" local); a key of no argument (sessions from
+    -- before local arguments) sets every argument of that name.
+    local specs = {}
+    if type(text) == "string" and type(key) == "string" then
+      local spec = args.find(d.cfg.args, key)
+      specs = spec and { spec } or args.match(d.cfg.args, key)
     end
+    for _, spec in ipairs(specs) do
+      local ok, v = pcall(args.parse_value, spec, text)
+      if ok then
+        args.set_modified(d.state, spec.key or spec.name, v)
+        applied = true
+      end
+    end
+  end
+  return applied
+end
+
+---Create, register and start the dashboard of a prepared config.
+---@param restored table<string, string>? argument values (text) restored from a session
+---@return dbdash.Dashboard
+function M.create(path, cfg, state, restored)
+  local d = setmetatable({
+    path = path,
+    cfg = cfg,
+    state = state,
+    panels = {},
+    -- curl -c in its queries: trusted above (or trust is not required here)
+    writes_trusted = require("dbdash.trust").writes(cfg),
+  }, Dashboard)
+  for i, pc in ipairs(cfg.panels) do
+    d.panels[i] = setmetatable({
+      d = d,
+      index = i,
+      cfg = pc,
+      running = false,
+      push = config.PUSH_TYPES[pc.database.type] or nil, -- shown as a push source
+      next_at = now(),
+      history = {},
+      style = {},
+      store = {}, -- `store` of the panel's Lua code, for as long as the dashboard runs
+    }, Panel)
+  end
+  local document = require("dbdash.dashboard.document")
+  document.dashboard(d) -- d.doc: the dashboard's document
+  if restored then
+    M.apply_args(d, restored)
+  end
+  registry.dashboards[path] = d
+  document.sync(d)
+  d:start_timers()
+  events:emit("started", d)
+  return d
+end
+
+---Stop a dashboard: its sources and clock stop, queries are cancelled.
+---@param path string
+---@param o { keep_buffer: boolean? }? (for its view)
+function M.stop(path, o)
+  local d = registry.dashboards[path]
+  if not d then
+    return false
+  end
+  registry.dashboards[path] = nil
+  d:stop_timers()
+  d:cancel("dashboard stopped")
+  events:emit("stopped", d, o or {})
+  return true
+end
+
+function M.stop_all()
+  for path in pairs(registry.dashboards) do
+    M.stop(path, { keep_buffer = true })
   end
 end
 
@@ -269,7 +148,8 @@ end
 ---to reach the servers), but keep the dashboards and their arguments so session hooks
 ---that run later (VimLeave) can still save them.
 function M.freeze_all()
-  for _, d in pairs(M.dashboards) do
+  for _, d in pairs(registry.dashboards) do
+    d:pause() -- (its views stop their countdowns)
     d:stop_timers()
     d:cancel("Neovim exits")
   end
@@ -279,53 +159,4 @@ function M.freeze_all()
   end, 10)
 end
 
----A window closes (WinClosed: it still shows its buffer). Closing the last window of a
----dashboard (:q, :close, :only, :tabclose) stops it like :DbDashStop; a dashboard that is
----only hidden (another buffer in its window, another tab page) pauses instead. Not while
----Neovim exits or a session loads (they close and recreate windows).
----@param win integer
-function M.on_win_closed(win)
-  if vim.v.exiting ~= vim.NIL or vim.g.SessionLoad == 1 then
-    return
-  end
-  local ok, buf = pcall(vim.api.nvim_win_get_buf, win)
-  local d = ok and M.for_buf(buf)
-  if not d then
-    return
-  end
-  vim.schedule(function()
-    if M.dashboards[d.path] ~= d or vim.v.exiting ~= vim.NIL or vim.g.SessionLoad == 1 then
-      return
-    end
-    if vim.api.nvim_buf_is_valid(d.buf) and #vim.fn.win_findbuf(d.buf) == 0 then
-      M.stop(d.path)
-    end
-  end)
-end
-
-function M.stop_all()
-  for path in pairs(M.dashboards) do
-    M.stop(path, { keep_buffer = true })
-  end
-end
-
----Redraw dashboards whose window size changed (uses cached data).
-function M.on_resize()
-  for _, d in pairs(M.dashboards) do
-    local w, h = buffer.size(d.buf)
-    if not d.last_size or d.last_size[1] ~= w or d.last_size[2] ~= h then
-      d.doc:note_reason("viewport") -- Servo: RestyleReason::ViewportChanged
-      d:request_render()
-    end
-  end
-end
-
----Start dashboards for restored session buffers named dbdash://<path>.
-function M.adopt_session_buffers()
-  for _, b in ipairs(vim.api.nvim_list_bufs()) do
-    local path = buffer.path_of(vim.api.nvim_buf_get_name(b))
-    if path and vim.api.nvim_buf_is_loaded(b) and not M.dashboards[path] then
-      M.start(path, { buf = b, no_show = true })
-    end
-  end
-end
+return M

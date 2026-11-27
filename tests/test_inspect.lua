@@ -44,12 +44,12 @@ local CFG = {
 local function start()
   local f = vim.fn.tempname() .. ".yaml"
   vim.fn.writefile(CFG, f)
-  sched.start(f)
+  require("dbdash.view.dashboard").start(f)
   local d = assert(sched.get(sched.normalize(f)))
   vim.wait(5000, function()
     return d.panels[1].rs and d.panels[2].rs and not d.render_pending
   end, 10)
-  d:redraw()
+  require("dbdash.view.dashboard").redraw(d)
   vim.api.nvim_set_current_win(vim.fn.bufwinid(d.buf))
   return d
 end

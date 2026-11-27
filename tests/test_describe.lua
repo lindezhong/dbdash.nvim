@@ -30,7 +30,7 @@ local T = MiniTest.new_set({
 local function run(name, text)
   local path = dir .. "/" .. name .. ".yaml"
   vim.fn.writefile(vim.split(text, "\n"), path)
-  sched.start(path)
+  require("dbdash.view.dashboard").start(path)
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   vim.wait(10000, function()
     for _, p in ipairs(d.panels) do
@@ -40,7 +40,7 @@ local function run(name, text)
     end
     return true
   end, 10)
-  d:redraw()
+  require("dbdash.view.dashboard").redraw(d)
   return d
 end
 

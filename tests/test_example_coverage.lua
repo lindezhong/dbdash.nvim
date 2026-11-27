@@ -209,7 +209,7 @@ T["every chart type's example shows all of its renderers (and canvases)"] = func
       absent[#absent + 1] = f
     else
       local seen = {}
-      local d = require("dbdash.dom.build").from_config(cfg)
+      local d = require("dbdash.dashboard.document").from_config(cfg)
       for _, p in ipairs(d.panels) do
         local r, canvas =
           registry.resolve(p.cfg.show.type, require("dbdash.css.style").get(p.chart_node))

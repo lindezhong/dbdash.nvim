@@ -151,14 +151,14 @@ T["a redraw of a dashboard where nothing changed"] = function()
     "  sql: WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1000) SELECT i, i * 7 % 100 AS v, 'row ' || i AS t FROM n",
     "show: { type: table, interval: 1h }",
   }, f)
-  sched.start(f, { no_show = true })
+  require("dbdash.view.dashboard").start(f, { no_show = true })
   local d = assert(sched.get(sched.normalize(f)))
   vim.wait(10000, function()
     return d.panels[1].rs and not d.render_pending
   end, 10)
-  d:redraw()
+  require("dbdash.view.dashboard").redraw(d)
   local ms = H.measure(function()
-    d:redraw()
+    require("dbdash.view.dashboard").redraw(d)
   end, 7)
   sched.stop(d.path)
   require("dbdash").setup({})

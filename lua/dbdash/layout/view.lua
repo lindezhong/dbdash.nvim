@@ -32,7 +32,7 @@ local M = {}
 ---@field caption_bottom boolean?
 
 local function child(node, tag)
-  return require("dbdash.dom.build").child(node, tag)
+  return require("dbdash.dom.node").child(node, tag)
 end
 
 local function text(n)
@@ -46,7 +46,7 @@ function M.header(d)
   local title = text(child(d.header_node, "header-title")) or ""
   local icon_node = child(d.header_node, "description-icon")
   local icon = text(icon_node)
-  local countdown = require("dbdash.dom.build").countdown(d.header_node) and d.cfg.refresh_all
+  local countdown = require("dbdash.css").countdown(d.header_node) and d.cfg.refresh_all
   if not (d.cfg.title or countdown or icon) then
     return { lines = {}, hl = {} }
   end

@@ -1,4 +1,5 @@
--- Building documents from configs (the HTML parser's place in Servo): a dashboard is
+-- The document of a dashboard (the HTML parser's place in Servo), and its updates from the
+-- dashboard's state (commit): a dashboard is
 --   dashboard
 --     header            title, ⓘ, the global countdown
 --     panel#<id>.<type> one per panel (id: the panel's id), with its title, args line,
@@ -6,19 +7,9 @@
 -- Parts of the view and of charts are created when they are first styled (css.scope).
 local css = require("dbdash.css")
 local dom = require("dbdash.dom.node")
+local format_error = require("dbdash.util.error").format
 
 local M = {}
-
--- dashboard.keys actions (events) -> the command that is their default action
-M.ACTIONS = {
-  modify = "modify_variable",
-  show_args = "show_variables",
-  refresh = "restart",
-  reset = "reset_variables",
-  show_sql = "show_sql",
-  export = "export",
-  describe = "describe",
-}
 
 ---Build (or rebuild) the document of a dashboard: d.doc, d.header_node, and for every
 ---panel p.node and p.chart_node.
@@ -27,17 +18,6 @@ function M.dashboard(d)
   local doc = css.document("dashboard")
   d.doc = doc
   d.header_node = doc.root:append(dom.new("header"))
-  -- the dashboard keys are events at the cursor; their default actions listen on the root
-  for action, fn in pairs(M.ACTIONS) do
-    doc.root:on(action, function(ev)
-      local commands = require("dbdash.commands")
-      if action == "export" then
-        commands.export({}, false, ev.detail and ev.detail.register) -- "xe: register x
-      else
-        commands[fn]()
-      end
-    end)
-  end
   -- the config's sheets: the dashboard's (author origin), each panel's (inline, scoped)
   if d.cfg.style_rules then
     doc:set_sheet("author", d.cfg.style_rules)
@@ -53,22 +33,20 @@ function M.dashboard(d)
   return doc
 end
 
----The direct child of `parent` with `tag` (created at the end when missing).
-local function child(parent, tag)
-  for _, c in ipairs(parent.children) do
-    if c.tag == tag then
-      return c
-    end
-  end
-  return parent:append(dom.new(tag))
-end
-M.child = child
+local child = dom.child
 
----Bring the view's nodes up to date with the dashboard's state (titles, ⓘ, errors,
----argument values). Only changes mark nodes dirty, as DOM mutations do in a browser.
+---The header shows ⓘ for the dashboard's description, and in a one-chart dashboard for the
+---chart's too (the chart has no title line of its own).
+function M.header_icon(d)
+  local cfg = d.cfg
+  return cfg.description ~= nil or (not cfg.grid and d.panels[1].cfg.show.description ~= nil)
+end
+
+---Commit: bring the nodes up to date with the dashboard's state (titles, ⓘ, errors,
+---argument values, each panel's content). Only changes mark nodes dirty, as DOM mutations
+---do in a browser; the document then asks its view for a frame (Document.on_update).
 ---@param d table the dashboard
----@param o { format_error: fun(err: any): string, header_icon: boolean }
-function M.sync(d, o)
+function M.sync(d)
   if not d.doc then
     M.dashboard(d)
   end
@@ -80,7 +58,7 @@ function M.sync(d, o)
     n:set_text(shown and c.display ~= "none" and c.content or nil)
   end
   child(d.header_node, "header-title"):set_text(d.cfg.title or "")
-  icon(d.header_node, o.header_icon)
+  icon(d.header_node, M.header_icon(d))
   for _, p in ipairs(d.panels) do
     local show = p:show_config()
     -- the chart type (:DbDashStyle can switch it) is the elements' class and attribute
@@ -96,7 +74,7 @@ function M.sync(d, o)
     local title = child(p.node, "panel-title")
     title:set_text(style.get(title).display == "none" and "" or p:title())
     icon(p.node, p.cfg.show.description ~= nil)
-    child(p.node, "error"):set_text(p.error and o.format_error(p.error) or nil)
+    child(p.node, "error"):set_text(p.error and format_error(p.error) or nil)
     local sub = show.subtitle
     child(p.node, "subtitle"):set_text(sub ~= nil and sub ~= vim.NIL and sub or nil)
     -- the argument line: arg-name (.local for a panel's own) = arg-value, per shown arg
@@ -128,18 +106,6 @@ function M.from_config(cfg)
   end
   M.dashboard(d)
   return d
-end
-
----A countdown element (under the header or a panel): shown?, its format (content).
----@return boolean shown, string format
-function M.countdown(parent)
-  local c = require("dbdash.css.style").get(child(parent, "countdown"))
-  return c.display ~= "none", c.content or "Next update: {time}s"
-end
-
----A document for one view of its own (the sidebar, a popup): root `tag`.
-function M.view(tag)
-  return css.document(tag)
 end
 
 return M

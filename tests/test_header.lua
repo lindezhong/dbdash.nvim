@@ -22,7 +22,7 @@ local T = MiniTest.new_set({
 local function run(name, text)
   local path = dir .. "/" .. name .. ".yaml"
   vim.fn.writefile(vim.split(text, "\n"), path)
-  sched.start(path, { no_show = true })
+  require("dbdash.view.dashboard").start(path, { no_show = true })
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   vim.wait(10000, function()
     for _, p in ipairs(d.panels) do
@@ -32,7 +32,7 @@ local function run(name, text)
     end
     return true
   end, 10)
-  d:redraw()
+  require("dbdash.view.dashboard").redraw(d)
   return d
 end
 
@@ -57,11 +57,11 @@ local function marks(d, row)
 end
 
 T["countdown_text: {time}, {clock}, running"] = function()
-  eq(sched.countdown_text("{time}s", 42), "42s")
-  eq(sched.countdown_text("all in {clock}", 582), "all in 9:42")
-  eq(sched.countdown_text("{clock}", 3725), "1:02:05")
-  eq(sched.countdown_text("{clock}", 5), "0:05")
-  eq(sched.countdown_text("{time}s", 5, true), "…")
+  eq(require("dbdash.view.dashboard").countdown_text("{time}s", 42), "42s")
+  eq(require("dbdash.view.dashboard").countdown_text("all in {clock}", 582), "all in 9:42")
+  eq(require("dbdash.view.dashboard").countdown_text("{clock}", 3725), "1:02:05")
+  eq(require("dbdash.view.dashboard").countdown_text("{clock}", 5), "0:05")
+  eq(require("dbdash.view.dashboard").countdown_text("{time}s", 5, true), "…")
 end
 
 T["title and global countdown: a header line, the panel's countdown below it"] = function()

@@ -110,7 +110,7 @@ local sidebar_doc
 function M.css()
   local user = require("dbdash.css").user_rules()
   if not sidebar_doc or sidebar_doc.user ~= user then
-    sidebar_doc = { doc = require("dbdash.dom.build").view("sidebar"), user = user }
+    sidebar_doc = { doc = require("dbdash.css").document("sidebar"), user = user }
   end
   return require("dbdash.css").scope(sidebar_doc.doc.root)
 end
@@ -270,10 +270,9 @@ local function on_enter(buf)
   if not path then
     return
   end
-  local sched = require("dbdash.dashboard")
   local side_win = vim.api.nvim_get_current_win()
   local win = target_win(side_win)
-  sched.start(path, { win = win })
+  require("dbdash.view.dashboard").start(path, { win = win })
   M.refresh()
 end
 
@@ -398,5 +397,13 @@ function M.close()
 end
 
 M.HEADER_LINES = HEADER_LINES
+
+-- The list follows the dashboards: started, stopped, hidden, shown again.
+local events = require("dbdash.dashboard.events")
+for _, e in ipairs({ "started", "stopped", "paused", "resumed" }) do
+  events:on(e, function()
+    M.refresh()
+  end)
+end
 
 return M

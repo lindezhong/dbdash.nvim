@@ -41,7 +41,7 @@ for _, f in ipairs(files) do
         h.require_it()
       end
     end
-    sched.start(f, { no_show = true })
+    require("dbdash.view.dashboard").start(f, { no_show = true })
     local d = assert(sched.get(sched.normalize(f)), "dashboard did not start")
     ---A webhook panel waits for requests: listening is enough.
     local function waiting(p)
@@ -89,7 +89,7 @@ for _, name in ipairs({ "statements", "filters", "tests_functions", "methods", "
     for _, spec in ipairs(cfg.args) do
       map.set(args, spec.name, spec.default)
     end
-    sched.start(f, { no_show = true })
+    require("dbdash.view.dashboard").start(f, { no_show = true })
     local d = assert(sched.get(sched.normalize(f)))
     vim.wait(10000, function()
       for _, p in ipairs(d.panels) do
@@ -132,7 +132,7 @@ T["every example dashboard and panel has a description that renders"] = function
         { f, i, true }
       )
     end
-    sched.start(f, { no_show = true })
+    require("dbdash.view.dashboard").start(f, { no_show = true })
     local d = assert(sched.get(sched.normalize(f)))
     local results = {}
     local function collect(key)
@@ -161,7 +161,7 @@ end
 T["examples cover every chart type and alternative style"] = function()
   local seen = {}
   for _, f in ipairs(files) do
-    local d = require("dbdash.dom.build").from_config(assert(config.load(f)))
+    local d = require("dbdash.dashboard.document").from_config(assert(config.load(f)))
     for _, p in ipairs(d.panels) do
       local chart = require("dbdash.css.style").get(p.chart_node)
       local renderer, canvas = require("dbdash.render.registry").resolve(p.cfg.show.type, chart)

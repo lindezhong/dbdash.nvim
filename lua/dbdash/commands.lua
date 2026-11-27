@@ -32,7 +32,7 @@ function M.start(fargs, bang)
     return err("usage: DbDashStart <config.yaml> [name=value ...]")
   end
   local path = table.remove(fargs, 1)
-  sched.start(
+  require("dbdash.view.dashboard").start(
     path,
     { tokens = fargs, ask_all = bang, open = require("dbdash.options").current.dashboard.open }
   )
@@ -99,7 +99,11 @@ local function with_panel(d, fn)
   if vim.api.nvim_get_current_buf() == d.buf then
     local cur = vim.api.nvim_win_get_cursor(0)
     local line = vim.api.nvim_get_current_line()
-    local p = d:panel_at(cur[1], vim.fn.strdisplaywidth(line:sub(1, cur[2])))
+    local p = require("dbdash.view.dashboard").panel_at(
+      d,
+      cur[1],
+      vim.fn.strdisplaywidth(line:sub(1, cur[2]))
+    )
     if p then
       return fn(p)
     end
@@ -148,7 +152,7 @@ function M.status()
   if d.cfg.refresh_all then
     lines[#lines + 1] = ("Interval:  every panel refreshes every %ds, next in %ds"):format(
       d.cfg.refresh_all / 1000,
-      d:remaining_global()
+      require("dbdash.view.dashboard").remaining_global(d)
     )
   end
   for _, p in ipairs(d.panels) do
@@ -490,7 +494,11 @@ function M.describe()
       return show({ dashboard_part() })
     end
     local line = vim.api.nvim_get_current_line()
-    local p = d:panel_at(cur[1], vim.fn.strdisplaywidth(line:sub(1, cur[2])))
+    local p = require("dbdash.view.dashboard").panel_at(
+      d,
+      cur[1],
+      vim.fn.strdisplaywidth(line:sub(1, cur[2]))
+    )
     if p then
       return show({ panel_part(p) })
     end
@@ -605,7 +613,7 @@ function M.style(fargs)
         ("%s%s: %s"):format(perr.key, perr.property and (" " .. perr.property) or "", perr.message)
       )
     end
-    return d:redraw()
+    return require("dbdash.view.dashboard").redraw(d)
   end
   if a == "reset" then
     d.runtime_style = new_sheet()
@@ -616,7 +624,7 @@ function M.style(fargs)
       end
     end
     d.doc:set_sheet("runtime", {})
-    return d:redraw()
+    return require("dbdash.view.dashboard").redraw(d)
   end
   with_panel(d, function(p)
     if not a then
@@ -669,7 +677,7 @@ function M.style(fargs)
       end
     end
     apply_runtime(d)
-    d:redraw()
+    require("dbdash.view.dashboard").redraw(d)
   end)
 end
 
@@ -808,6 +816,15 @@ function M.complete_update(arglead, cmdline)
     end
   end
   return out
+end
+
+---A dashboard key's action (an event that reached the document's root): its command.
+function M.action(_, action, ev)
+  if action == "export" then
+    M.export({}, false, ev.detail and ev.detail.register) -- "xe: register x
+  else
+    M[require("dbdash.view.buffer").ACTIONS[action][1]]()
+  end
 end
 
 return M

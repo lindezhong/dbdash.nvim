@@ -15,6 +15,8 @@ local M = {}
 ---@field dirty_root dbdash.dom.Node?
 ---@field reasons table<string, boolean>
 ---@field version integer bumped by every change
+---@field on_update fun()? called when the document gets something to update (set by its view)
+---@field updating boolean? a frame is updating it (changes then need no other frame)
 local Document = {}
 Document.__index = Document
 
@@ -52,6 +54,7 @@ end
 
 ---Record a dirty node (Servo: Element::restyle + note_dirty_element).
 function Document:note_dirty(n, kind)
+  local idle = not self:needs_update()
   self.version = self.version + 1
   n:bump()
   local prev = self.pending[n]
@@ -67,13 +70,28 @@ function Document:note_dirty(n, kind)
     p = p.parent
   end
   self.dirty_root = self.dirty_root and common_ancestor(self.dirty_root, n) or n
+  if idle then
+    self:updated()
+  end
+end
+
+---The document has something to update now (it had nothing): on_update, set by the view
+---showing it, asks for a frame (as a DOM change schedules a rendering update in a browser).
+function Document:updated()
+  if self.on_update and not self.updating then
+    self.on_update()
+  end
 end
 
 ---A document-wide reason to restyle (Servo's RestyleReason): "sheets", "viewport",
 ---"theme".
 function Document:note_reason(reason)
+  local idle = not self:needs_update()
   self.version = self.version + 1
   self.reasons[reason] = true
+  if idle then
+    self:updated()
+  end
 end
 
 ---Is there anything for the next update to do?

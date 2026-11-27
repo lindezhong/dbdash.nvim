@@ -35,7 +35,7 @@ function M.restore(state)
       path = sched.normalize(path)
       local d = sched.get(path)
       if d then
-        if M.apply_args(d, values) then
+        if sched.apply_args(d, values) then
           d:restart()
         end
       else
@@ -77,29 +77,6 @@ function M.load_session(file)
   end
   M.restore(data.dashboards)
   return true
-end
-
----Set argument values (text) as edited values; returns true if any was applied.
-function M.apply_args(d, values)
-  local args = require("dbdash.args")
-  local applied = false
-  for key, text in pairs(values) do
-    -- By key ("name" shared, "<panel>.name" local); a key of no argument (sessions from
-    -- before local arguments) sets every argument of that name.
-    local specs = {}
-    if type(text) == "string" and type(key) == "string" then
-      local spec = args.find(d.cfg.args, key)
-      specs = spec and { spec } or args.match(d.cfg.args, key)
-    end
-    for _, spec in ipairs(specs) do
-      local ok, v = pcall(args.parse_value, spec, text)
-      if ok then
-        args.set_modified(d.state, spec.key or spec.name, v)
-        applied = true
-      end
-    end
-  end
-  return applied
 end
 
 ---Values restored for `path` before it was running (consumed).

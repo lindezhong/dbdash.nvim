@@ -9,6 +9,11 @@ require("dbdash.trust").viewer = function(...)
   return require("dbdash.view.trust").view(...)
 end
 
+-- The dashboard keys' actions are commands (the controller).
+require("dbdash.dashboard.events"):on("action", function(...)
+  require("dbdash.commands").action(...)
+end)
+
 -- Global mappings ---------------------------------------------------------------------------
 
 M.MAPPINGS = {
@@ -86,7 +91,7 @@ end
 
 ---Start a dashboard. `tokens` are "name=value" arguments.
 function M.start(path, tokens)
-  return require("dbdash.dashboard").start(path, { tokens = tokens })
+  return require("dbdash.view.dashboard").start(path, { tokens = tokens })
 end
 
 function M.stop(path)

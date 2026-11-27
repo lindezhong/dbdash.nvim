@@ -675,7 +675,7 @@ end
 ---Place the panels with the config's style sheets (computed as a dashboard would), so a
 ---grid that cannot be laid out is an error with the line of the rule at fault.
 function Ctx:check_grid(cfg)
-  local fake = require("dbdash.dom.build").from_config(cfg)
+  local fake = require("dbdash.dashboard.document").from_config(cfg)
   local style = require("dbdash.css.style")
   local items = {}
   for i, p in ipairs(fake.panels) do

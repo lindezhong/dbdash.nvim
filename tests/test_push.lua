@@ -35,7 +35,7 @@ local function start(text)
   local path = dir .. "/push.yaml"
   sched.stop(sched.normalize(path)) -- a case may start a second one
   vim.fn.writefile(vim.split(text, "\n"), path)
-  sched.start(path, { no_show = true })
+  require("dbdash.view.dashboard").start(path, { no_show = true })
   return assert(sched.get(sched.normalize(path)), "dashboard did not start")
 end
 
@@ -115,11 +115,15 @@ show: { type: table, interval: 1s }
 ]])
   local p = d.panels[1]
   local draws = 0
-  local real = d.redraw
-  d.redraw = function(self)
-    draws = draws + 1
-    return real(self)
+  local view = require("dbdash.view.dashboard")
+  local real = view.redraw
+  view.redraw = function(dd)
+    draws = draws + (dd == d and 1 or 0)
+    return real(dd)
   end
+  MiniTest.finally(function()
+    view.redraw = real
+  end)
   wait(function()
     return p.ended
   end, 8000)
@@ -253,11 +257,15 @@ show: { type: table, interval: 1s }
   end)
   d:pause()
   local draws = 0
-  local real = d.redraw
-  d.redraw = function(self)
-    draws = draws + 1
-    return real(self)
+  local view = require("dbdash.view.dashboard")
+  local real = view.redraw
+  view.redraw = function(dd)
+    draws = draws + (dd == d and 1 or 0)
+    return real(dd)
   end
+  MiniTest.finally(function()
+    view.redraw = real
+  end)
   local before = p.stream.processed
   vim.wait(350)
   eq(p.stream.processed > before, true) -- still consuming

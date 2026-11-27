@@ -67,7 +67,7 @@ local function importing(lua_file)
 end
 
 local function started(path)
-  sched.start(path, { no_show = true })
+  require("dbdash.view.dashboard").start(path, { no_show = true })
   local ok = sched.get(sched.normalize(path)) ~= nil
   if ok then
     sched.stop(sched.normalize(path))
@@ -177,7 +177,7 @@ T["an included template with Lua that the trust does not cover asks again"] = fu
   eq(asked, 0)
   -- The computed include now has Lua: it is checked when it is loaded.
   write("part.sql", { "SELECT {% lua %}return 1{% endlua %} AS x" })
-  sched.start(path, { no_show = true })
+  require("dbdash.view.dashboard").start(path, { no_show = true })
   local d = sched.get(sched.normalize(path))
   vim.wait(3000, function()
     return d.panels[1].error ~= nil or d.panels[1].rs ~= nil
@@ -250,7 +250,7 @@ end
 local function view_then(path, key)
   answer = "view"
   local before = #vim.api.nvim_list_wins()
-  sched.start(path, { no_show = true })
+  require("dbdash.view.dashboard").start(path, { no_show = true })
   local win = vim.api.nvim_get_current_win()
   local buf = vim.api.nvim_get_current_buf()
   local ns = vim.api.nvim_get_namespaces().dbdash_trust
@@ -330,7 +330,7 @@ end
 
 ---Start and wait for the first refresh; returns the panel.
 local function run(path)
-  sched.start(path, { no_show = true })
+  require("dbdash.view.dashboard").start(path, { no_show = true })
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   local p = d.panels[1]
   vim.wait(5000, function()

@@ -1,19 +1,19 @@
 -- Dashboards: their clock (dashboard/timer.lua), refreshing every panel, pause and resume.
 local S = require("dbdash.dashboard.shared")
 local Dashboard = S.Dashboard
-local opts, close_timer = S.opts, S.close_timer
+local events = require("dbdash.dashboard.events")
 
----The countdown display: updated every countdown_interval while shown.
-local function start_countdowns(d)
-  d.ctimer = vim.uv.new_timer()
-  local every = opts().countdown_interval
-  d.ctimer:start(every, every, function()
-    vim.schedule(function()
-      if d.ctimer then
-        d:update_status()
-      end
-    end)
-  end)
+---Commit (dashboard/document.lua): the document takes the dashboard's state; a panel whose
+---result settled is laid out again (its chart's values may change with the same result).
+---@param p dbdash.Panel?
+function Dashboard:commit(p)
+  if not self.doc then
+    return
+  end
+  require("dbdash.dashboard.document").sync(self)
+  if p and p.chart_node then
+    p.chart_node:dirty("content")
+  end
 end
 
 ---Refresh every panel now (r, changed arguments): a query running is cancelled, and every
@@ -29,7 +29,6 @@ end
 
 ---Start the dashboard's clock and every panel's source (its first query now).
 function Dashboard:start_timers()
-  start_countdowns(self)
   self.clock = require("dbdash.dashboard.timer").new(self)
   self.clock:start()
   for _, p in ipairs(self.panels) do
@@ -46,8 +45,6 @@ function Dashboard:cancel(reason)
 end
 
 function Dashboard:stop_timers()
-  close_timer(self.ctimer)
-  self.ctimer = nil
   if self.clock then
     self.clock:stop()
   end
@@ -83,12 +80,10 @@ function Dashboard:pause()
     return
   end
   self.paused = true
-  close_timer(self.ctimer)
-  self.ctimer = nil
   if self.clock then
     self.clock:pause()
   end
-  require("dbdash.view.sidebar").refresh()
+  events:emit("paused", self)
 end
 
 ---Continue after pause(): what came due while hidden refreshes now, the rest keeps its
@@ -98,16 +93,10 @@ function Dashboard:resume()
     return
   end
   self.paused = false
-  start_countdowns(self)
   if self.clock then
     self.clock:resume()
   end
-  if self.render_skipped then
-    self.render_skipped = false
-    self:request_render()
-  end
-  self:update_status()
-  require("dbdash.view.sidebar").refresh()
+  events:emit("resumed", self)
 end
 
 function Dashboard:remaining()

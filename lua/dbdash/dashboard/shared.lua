@@ -1,5 +1,5 @@
 -- State shared by the scheduler's modules: the Panel and Dashboard classes and small
--- helpers. See lua/dbdash/dashboard/init.lua.
+-- helpers.
 local M = {}
 
 ---@class dbdash.HistoryEntry
@@ -48,7 +48,7 @@ end
 
 ---Report an error (§3.8: only errors produce messages).
 function M.notify(err)
-  vim.notify("dbdash: " .. require("dbdash.dashboard").format_error(err), vim.log.levels.ERROR)
+  vim.notify("dbdash: " .. require("dbdash.util.error").format(err), vim.log.levels.ERROR)
 end
 
 function M.now()

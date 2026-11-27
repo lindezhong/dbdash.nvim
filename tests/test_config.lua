@@ -541,7 +541,7 @@ local GRID = "database: { url: 'sqlite:///:memory:' }\n"
 
 ---A dashboard's grid from its sheets, placed as layout does (from computed styles).
 local function grid_of(yaml)
-  local d = require("dbdash.dom.build").from_config(assert(load(yaml)))
+  local d = require("dbdash.dashboard.document").from_config(assert(load(yaml)))
   local style = require("dbdash.css.style")
   local items = {}
   for i, p in ipairs(d.panels) do

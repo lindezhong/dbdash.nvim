@@ -1,5 +1,5 @@
 -- Runs of a panel's pipeline (refreshes and dbdash.run() callbacks) with their records,
-local M = require("dbdash.dashboard")
+local M = {}
 local S = require("dbdash.dashboard.shared")
 local Panel, Dashboard = S.Panel, S.Dashboard
 local opts = S.opts
@@ -372,7 +372,10 @@ function M.check_file(d, path, text, kind, on_allow)
   if kind == "template" and not trust.has_lua_block(text) then
     return
   end
-  if not M.trust_required(d.path) or trust.covers(d.path, path, text) then
+  if
+    not require("dbdash.dashboard.lifecycle").trust_required(d.path)
+    or trust.covers(d.path, path, text)
+  then
     return
   end
   local files = trust.collect(d.path, d.cfg)
@@ -417,3 +420,5 @@ function Panel:render_async(cb)
     end)
   end)
 end
+
+return M

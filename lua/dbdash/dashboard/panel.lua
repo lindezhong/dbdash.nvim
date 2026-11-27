@@ -1,10 +1,12 @@
 -- Panels: a run of the panel's source (db.run: queried on ticks, or sending data), its
 -- results through query.transform and the rows check, one at a time, and their records.
-local M = require("dbdash.dashboard")
+local M = {}
 local S = require("dbdash.dashboard.shared")
 local Panel = S.Panel
-local opts, notify, now, as_error = S.opts, S.notify, S.now, S.as_error
+local opts, now, as_error = S.opts, S.now, S.as_error
+local events = require("dbdash.dashboard.events")
 local async = require("dbdash.util.async")
+local format_error = require("dbdash.util.error").format
 local db = require("dbdash.db")
 
 -- Panels -----------------------------------------------------------------------------------
@@ -38,8 +40,8 @@ function Panel:track(rs)
   end
 end
 
----Notify once when a value rises to a threshold step with notify = true (it notifies
----again after falling back and crossing it again).
+---Tell (the threshold event) when a value rises to a threshold step with notify = true;
+---again after falling back and crossing it again.
 function Panel:check_thresholds(rs)
   local T = require("dbdash.render.thresholds")
   local ok, levels = pcall(T.levels, rs, self.cfg.show)
@@ -50,22 +52,7 @@ function Panel:check_thresholds(rs)
   for key, cur in pairs(levels) do
     local prev = self.levels[key] or 0
     if cur.level > prev and cur.step and cur.step.notify then
-      local t = self.cfg.show.title
-      local title = (t and t ~= "") and t
-        or self.d.cfg.title
-        or (self.d.cfg.grid and self:title() or vim.fn.fnamemodify(self.d.path, ":t"))
-      local what = cur.column and (cur.column .. " = ") or ""
-      local value = require("dbdash.render.table").format_value(cur.value, nil, "NULL")
-      vim.notify(
-        ("dbdash: %s: %s%s %s %s"):format(
-          title,
-          what,
-          value,
-          cur.below and "≤" or "≥",
-          require("dbdash.util.number").numstr(cur.step.value)
-        ),
-        vim.log.levels.WARN
-      )
+      events:emit("threshold", self.d, self, cur)
     end
     self.levels[key] = cur.level
   end
@@ -142,7 +129,7 @@ function Panel:prepare_run()
   self.current = run
   self.running = true
   self.refresh_count = (self.refresh_count or 0) + 1 -- meta.refresh_count
-  self.d:update_status()
+  events:emit("state", self.d, self)
   local sql, code = self:render_templates(run)
   run.record.sql, run.code = sql, code
   if run.depth == 0 then
@@ -180,7 +167,7 @@ function Panel:on_tick()
   end
   if self.dirty then
     self.dirty = false
-    self.d:request_render()
+    self.d:commit(self)
   end
 end
 
@@ -212,7 +199,7 @@ function Panel:start()
   o.on_status = function(text)
     if self.gen == gen then
       feed.state = text
-      self.d:update_status()
+      events:emit("state", self.d, self)
     end
   end
   local query
@@ -223,7 +210,7 @@ function Panel:start()
       local to = self:template_opts(run)
       to.cancel = feed.token
       local q = self.cfg.query
-      feed.sql = M.render_text(
+      feed.sql = require("dbdash.dashboard.run").render_text(
         self.d,
         q.sql,
         q.sql_line,
@@ -249,7 +236,7 @@ function Panel:start()
   end, function(err)
     self:on_end(gen, err)
   end)
-  self.d:request_render()
+  self.d:commit(self)
 end
 
 ---Restart: the user asked (r, changed arguments). A query running is cancelled.
@@ -360,7 +347,7 @@ function Panel:consume(gen)
   end, function(err)
     feed.busy = false
     if err then
-      notify(as_error(err))
+      events:emit("error", self.d, self, as_error(err), { always = true })
     end
     if self.gen == gen and feed.ended then
       self:finish_feed(feed)
@@ -409,12 +396,9 @@ end
 ---An error of a result: notified (errors.notify). A source queried on ticks backs off:
 ---after failures in a row its next query waits longer (errors.backoff).
 function Panel:fail(err)
-  local changed = not self.error or M.format_error(self.error) ~= M.format_error(err)
+  local changed = not self.error or format_error(self.error) ~= format_error(err)
   self.error = err
-  local mode = opts().errors.notify
-  if mode == "always" or (mode == "once" and changed) then
-    notify(err)
-  end
+  events:emit("error", self.d, self, err, { changed = changed })
   if not self.waits_ticks then
     return
   end
@@ -447,7 +431,7 @@ function Panel:settle(run, err, rs)
   self.prev, self.prev_runs = run.record, run.life.runs
   run.life.cancel:release()
   if err then
-    self:push_history({ error = M.format_error(err) })
+    self:push_history({ error = format_error(err) })
     self:fail(err)
   else
     self.prev_ok, self.prev_ok_runs = run.record, run.life.runs
@@ -468,10 +452,9 @@ function Panel:settle(run, err, rs)
   end
   if not ticked then
     self.dirty = true
-  elseif err and not self.d.cfg.grid then
-    self.d:update_status()
   else
-    self.d:request_render()
+    self.d:commit(self) -- (a single chart's error is in the status line: state)
+    events:emit("state", self.d, self)
   end
 end
 
@@ -503,12 +486,12 @@ function Panel:finish_feed(feed)
   self.running = false
   if feed.end_error then
     self.error = feed.end_error
-    self:push_history({ error = M.format_error(feed.end_error) })
-    notify(feed.end_error)
+    self:push_history({ error = format_error(feed.end_error) })
+    events:emit("error", self.d, self, feed.end_error, { always = true })
   end
   self.next_at = nil
   self.dirty = false
-  self.d:request_render()
+  self.d:commit(self)
 end
 
 ---Run query.transform on a query result and check its value as rows. `rs` is a result set
@@ -543,7 +526,7 @@ function Panel:finish_record(run, err)
   r.finished_at = require("dbdash.util.uuid").now_ms()
   r.elapsed_ms = r.finished_at - r.started_at
   r.ok = err == nil
-  r.error = err ~= nil and M.format_error(as_error(err)) or nil
+  r.error = err ~= nil and format_error(as_error(err)) or nil
   run.life.version = run.life.version + 1
 end
 
@@ -557,7 +540,9 @@ function Panel:push_pipeline(run)
   local o = self:template_opts(run)
   run.record.sql = self.stream and self.stream.sql
   run.record.query = item.value
-  local code = q.transform and M.render_text(self.d, q.transform, q.transform_line, o) or nil
+  local code = q.transform
+      and require("dbdash.dashboard.run").render_text(self.d, q.transform, q.transform_line, o)
+    or nil
   local started = vim.uv.hrtime()
   local rs
   if code then
@@ -607,3 +592,5 @@ function Panel:push_state()
   local st = self.feed
   return st and st.state or "stopped"
 end
+
+return M

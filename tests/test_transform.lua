@@ -32,7 +32,7 @@ local T = MiniTest.new_set({
 local function run(name, lines)
   local path = dir .. "/" .. name .. ".yaml"
   vim.fn.writefile(lines, path)
-  sched.start(path, { no_show = true })
+  require("dbdash.view.dashboard").start(path, { no_show = true })
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   local p = d.panels[1]
   vim.wait(20000, function()

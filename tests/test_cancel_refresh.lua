@@ -56,7 +56,7 @@ local T = MiniTest.new_set({
 local function start(text)
   local path = dir .. "/c.yaml"
   vim.fn.writefile(vim.split(text, "\n"), path)
-  sched.start(path, { no_show = true })
+  require("dbdash.view.dashboard").start(path, { no_show = true })
   return assert(sched.get(sched.normalize(path)), "dashboard did not start")
 end
 
