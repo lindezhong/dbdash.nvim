@@ -148,12 +148,9 @@ function M.decode_body(res)
   return v
 end
 
----@param text string the rendered curl command
----@param opts { timeout: integer, allow_writes: boolean? }
-function Conn:execute(text, opts)
-  local info = self.info
-  local req = parse_request(text, info)
-  local url = request_url(info, req)
+---The request's headers by name; a body without a Content-Type is a form (as curl -d).
+---@return table<string, string> headers, fun(name: string): boolean? has
+local function request_headers(req)
   local headers = {}
   for _, h in ipairs(req.headers) do
     headers[h[1]] = h[2]
@@ -168,30 +165,65 @@ function Conn:execute(text, opts)
   if req.body and not has("content-type") then
     headers["Content-Type"] = "application/x-www-form-urlencoded" -- as curl -d sends
   end
-  -- curl's cookie engine: on with -b or -c; the jar lives for this request and its
-  -- redirects, filled from the -b files and written to the -c file afterwards
-  local jar, configured, jar_file
-  if req.cookie_engine then
-    jar = cookie.new()
-    for _, file in ipairs(req.cookie_files) do
-      jar:load(cookie.read_file(file, info.base_dir, req.junk_session))
-    end
-    configured = {}
-    for _, s in ipairs(req.cookie_strings) do
-      vim.list_extend(configured, cookie.from_string(s, info.host))
-    end
-    if req.cookie_jar then
-      jar_file = cookie_jar_path(req.cookie_jar, info, opts)
-    end
+  return headers, has
+end
+
+---curl's cookie engine: on with -b or -c; the jar lives for this request and its
+---redirects, filled from the -b files and written to the -c file afterwards. Returns the
+---jar, the cookies given as strings and the file to write.
+local function cookie_engine(req, info, opts)
+  if not req.cookie_engine then
+    return nil
   end
-  local auth
+  local jar = cookie.new()
+  for _, file in ipairs(req.cookie_files) do
+    jar:load(cookie.read_file(file, info.base_dir, req.junk_session))
+  end
+  local configured = {}
+  for _, s in ipairs(req.cookie_strings) do
+    vim.list_extend(configured, cookie.from_string(s, info.host))
+  end
+  local jar_file = req.cookie_jar and cookie_jar_path(req.cookie_jar, info, opts) or nil
+  return jar, configured, jar_file
+end
+
+---Basic authentication (-u, else the URL's user) unless an Authorization header is given.
+local function basic_auth(req, info, has)
   local user, password = info.user, info.password
   if req.user then
     user, password = req.user:match("^([^:]*):?(.*)$")
   end
   if user and user ~= "" and not has("authorization") then
-    auth = "Basic " .. vim.base64.encode(user .. ":" .. (password or ""))
+    return "Basic " .. vim.base64.encode(user .. ":" .. (password or ""))
   end
+end
+
+---A response that is not 2xx: an error (401 and 403 in the auth phase) with the start of
+---its body.
+local function check_status(res)
+  if res.status >= 200 and res.status <= 299 then
+    return
+  end
+  local excerpt = vim.trim(res.body:sub(1, 300):gsub("%s+", " "))
+  dberr.raise(
+    (res.status == 401 or res.status == 403) and "auth" or "query",
+    ("HTTP %d %s from %s%s"):format(
+      res.status,
+      res.reason,
+      res.url,
+      excerpt ~= "" and (": " .. excerpt) or ""
+    )
+  )
+end
+
+---@param text string the rendered curl command
+---@param opts { timeout: integer, allow_writes: boolean? }
+function Conn:execute(text, opts)
+  local info = self.info
+  local req = parse_request(text, info)
+  local url = request_url(info, req)
+  local headers, has = request_headers(req)
+  local jar, configured, jar_file = cookie_engine(req, info, opts)
   local tls_mode = info.scheme == "https" and info.tls or nil
   if tls_mode and req.insecure then
     tls_mode = "require" -- curl -k: encrypted, the certificate not verified
@@ -201,7 +233,7 @@ function Conn:execute(text, opts)
     url = url,
     headers = headers,
     body = req.body,
-    auth = auth,
+    auth = basic_auth(req, info, has),
     cookies = configured,
   }, {
     jar = jar,
@@ -231,18 +263,7 @@ function Conn:execute(text, opts)
     end
     error(res, 0)
   end
-  if res.status < 200 or res.status > 299 then
-    local excerpt = vim.trim(res.body:sub(1, 300):gsub("%s+", " "))
-    dberr.raise(
-      (res.status == 401 or res.status == 403) and "auth" or "query",
-      ("HTTP %d %s from %s%s"):format(
-        res.status,
-        res.reason,
-        res.url,
-        excerpt ~= "" and (": " .. excerpt) or ""
-      )
-    )
-  end
+  check_status(res)
   local response = {
     status = res.status,
     reason = res.reason,
