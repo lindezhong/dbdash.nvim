@@ -4,6 +4,11 @@ local M = {}
 
 local options = require("dbdash.options")
 
+-- The UI side of hooks the lower layers call: the trust prompt's View float.
+require("dbdash.trust").viewer = function(...)
+  return require("dbdash.view.trust").view(...)
+end
+
 -- Global mappings ---------------------------------------------------------------------------
 
 M.MAPPINGS = {
