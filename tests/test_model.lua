@@ -38,9 +38,11 @@ local function on_fake_clock(text)
   local d =
     require("dbdash.dashboard.dashboard").new(path, cfg, require("dbdash.args").new_state({}))
   local now = 0
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   vim.uv.now = function()
     return now
   end
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   vim.uv.update_time = function() end
   d.clock.timer = {
     stop = function() end,
@@ -221,11 +223,13 @@ show: { type: table, interval: 1h }
 end
 
 T["a database's loop: failures in a row back off; the first success ends it"] = function()
-  local waits, handle = {}, nil
+  local waits = {}
+  local handle ---@type dbdash.db.RunHandle
   local outcomes = { false, false, false, true }
   local n = 0
   local done = false
   local now = real_now()
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   vim.uv.now = function()
     return now
   end

@@ -43,7 +43,7 @@ end
 T["${ENV} expands, percent-encodes URL characters, $${ stays literal"] = function()
   vim.uv.os_setenv("DBDASH_T_PW", "p@ss:w/rd")
   eq(cred.expand_env("postgres://u:${DBDASH_T_PW}@h/db"), "postgres://u:p%40ss%3Aw%2Frd@h/db")
-  eq(url.parse(cred.expand_env("postgres://u:${DBDASH_T_PW}@h/db")).password, "p@ss:w/rd")
+  eq(url.parse(assert(cred.expand_env("postgres://u:${DBDASH_T_PW}@h/db"))).password, "p@ss:w/rd")
   eq(cred.expand_env("x$${HOME}y"), "x${HOME}y")
   local v, err = cred.expand_env("postgres://u:${DBDASH_T_UNSET}@h/db")
   eq({ v, err }, { nil, "environment variable DBDASH_T_UNSET is not set" })
@@ -131,12 +131,14 @@ T["config: password_cmd is validated, unset ${ENV} reported with its line"] = fu
     f
   )
   local _, err = require("dbdash.config").load(f)
+  assert(err)
   eq(err.message:find(":2:%d+: environment variable DBDASH_T_UNSET is not set") ~= nil, true)
   vim.fn.writefile(
     { "database:", "  url: postgres://u@h/db", "  password_cmd: 3", "query: { sql: x }" },
     f
   )
   _, err = require("dbdash.config").load(f)
+  assert(err)
   eq(err.message:find("password_cmd must be a command string") ~= nil, true)
   vim.fn.writefile({
     "database:",
@@ -145,7 +147,7 @@ T["config: password_cmd is validated, unset ${ENV} reported with its line"] = fu
     "query: { sql: x }",
   }, f)
   local cfg = assert(require("dbdash.config").load(f))
-  eq(cfg.database.password_cmd, { "pass", "show", "db" })
+  eq(assert(cfg.database).password_cmd, { "pass", "show", "db" })
 end
 
 T["integration: password_cmd, passwords.json and ${ENV} against PostgreSQL"] = function()

@@ -91,7 +91,7 @@ end
 
 T["dbdash helpers wait without blocking; the query timeout stops loops"] = function()
   local ticks = 0
-  local timer = vim.uv.new_timer()
+  local timer = assert(vim.uv.new_timer())
   timer:start(5, 5, function()
     ticks = ticks + 1
   end)

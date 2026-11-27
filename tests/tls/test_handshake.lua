@@ -234,7 +234,10 @@ T["downgrade sentinel is rejected"] = function()
   local random = string.rep("\1", 24) .. "DOWNGRD\1"
   local body = "\3\3" .. random .. "\0" .. "\192\47" .. "\0"
   local ok, err = pcall(hs.parse_server_hello, body)
-  eq({ ok, err.message:find("downgrade") ~= nil }, { false, true })
+  eq({
+    ok,
+    (err --[[@as dbdash.Error]]).message:find("downgrade") ~= nil,
+  }, { false, true })
   local plain = "\3\3" .. string.rep("\1", 32) .. "\0" .. "\192\47" .. "\0"
   eq(hs.parse_server_hello(plain).version, 0x0303)
 end

@@ -124,6 +124,7 @@ T["chain: failures explain themselves"] = function()
   local bad = cert("leaf.pem")
   bad.signature = bad.signature:sub(1, -2) .. string.char((bad.signature:byte(-1) + 1) % 256)
   local ok, reason = verify.chain(bad, { cert("inter.pem") }, ROOT, NOW)
+  assert(reason)
   eq({ ok, reason:find("bad signature") ~= nil }, { false, true })
 end
 

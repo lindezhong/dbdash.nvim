@@ -154,7 +154,7 @@ T["a redraw of a dashboard where nothing changed"] = function()
   require("dbdash.view.dashboard").start(f, { no_show = true })
   local d = assert(sched.get(sched.normalize(f)))
   vim.wait(10000, function()
-    return d.panels[1].rs and not d.render_pending
+    return d.panels[1].rs ~= nil and not d.render_pending
   end, 10)
   require("dbdash.view.dashboard").redraw(d)
   local ms = H.measure(function()

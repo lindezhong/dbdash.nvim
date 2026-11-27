@@ -35,13 +35,13 @@ T["invalid and unsupported patterns are errors"] = function()
   end
   eq(accepted, {})
   local _, err = re.get("(?=a)")
-  eq(err:find("lookaround", 1, true) ~= nil, true)
+  eq(assert(err):find("lookaround", 1, true) ~= nil, true)
 end
 
 T["long inputs do not overflow the stack"] = function()
-  local r = re.get("^[a-z]+$")
+  local r = assert(re.get("^[a-z]+$"))
   eq(r:test(("a"):rep(100000)), true)
-  eq(re.get("^(ab)*$"):test(("ab"):rep(2000)), true)
+  eq(assert(re.get("^(ab)*$")):test(("ab"):rep(2000)), true)
 end
 
 return T

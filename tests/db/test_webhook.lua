@@ -79,7 +79,7 @@ end
 local function raw(port, text, o)
   o = o or {}
   local res
-  local tcp = vim.uv.new_tcp()
+  local tcp = assert(vim.uv.new_tcp())
   local chunks = {}
   tcp:connect("127.0.0.1", port, function(err)
     if err then
@@ -327,7 +327,7 @@ T["chunked bodies, slow requests and the connection limit"] = function()
   -- A request that stops half way gets 408 after the timeout.
   eq(raw(st.port, "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\n", { slow = true }).status, 408)
   -- While one connection is open (max_connections = 1), another is closed at once.
-  local held = vim.uv.new_tcp()
+  local held = assert(vim.uv.new_tcp())
   held:connect("127.0.0.1", st.port, function()
     held:write("POST / HTTP/1.1\r\n")
   end)

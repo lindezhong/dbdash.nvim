@@ -121,7 +121,7 @@ T["it: https with verify-full (the default), pin, redirects and cookies"] = func
   local who = h.ok(base .. "/whoami?tls=require", "curl -b jar.txt -c jar.txt -b lang=zh", opts)
   eq(who.rows[1][1], "session=s3cret; lang=zh")
   -- plain http on the same routes; a raw (wrapped) result for the transform
-  local raw = h.ok("http://127.0.0.1:18080/wrapped", "curl", { raw = true })
+  local raw = h.ok("http://127.0.0.1:18080/wrapped", "curl", { raw = true }) ---@type any
   eq({ raw.value.total, raw.value.data.items[1].name, raw.vars.response.status }, { 1, "a", 200 })
 end
 

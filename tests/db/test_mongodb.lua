@@ -132,7 +132,7 @@ local function ensure_rs()
   -- Wait until the member is primary.
   vim.wait(30000, function()
     local s = h.query(direct, [[{"operation": "command", "command": {"hello": 1}}]])
-    return s.rs and s.rs:get(1, "isWritablePrimary") == true
+    return s.rs ~= nil and s.rs:get(1, "isWritablePrimary") == true
   end, 500)
 end
 

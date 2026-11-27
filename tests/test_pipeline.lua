@@ -39,7 +39,7 @@ local function start()
   require("dbdash.view.dashboard").start(f, { no_show = true })
   local d = assert(sched.get(sched.normalize(f)))
   vim.wait(5000, function()
-    return d.panels[1].rs and d.panels[2].rs and not d.render_pending
+    return d.panels[1].rs ~= nil and d.panels[2].rs ~= nil and not d.render_pending
   end, 10)
   require("dbdash.view.dashboard").redraw(d)
   return d

@@ -34,6 +34,7 @@ for _, f in ipairs(files) do
   T[f:gsub("^example/", "")] = function()
     local cfg, err = config.load(f)
     eq(err, nil)
+    assert(cfg)
     for _, p in ipairs(cfg.panels) do
       -- Examples run anywhere, except the ones on the docker services (make it-up) or the
       -- network: only with DBDASH_IT.
@@ -200,7 +201,7 @@ end
 
 local function schema_check(...)
   local argv =
-    vim.list_extend(vim.deepcopy(have_python()), { "-I", "tests/examples_schema.py", ... })
+    vim.list_extend(vim.deepcopy(assert(have_python())), { "-I", "tests/examples_schema.py", ... })
   return vim.system(argv, { text = true }):wait()
 end
 

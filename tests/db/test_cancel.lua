@@ -393,7 +393,7 @@ end
 local function driver_cancel_ends_query(raw, q)
   local url = require("dbdash.db.url")
   local drv = db.driver_for(raw)
-  local info = url.parse(raw)
+  local info = url.parse(raw) --[[@as dbdash.db.ConnInfo]]
   info.options = {}
   if drv.parse_url then
     info = drv.parse_url(info)
@@ -402,7 +402,7 @@ local function driver_cancel_ends_query(raw, q)
   local t0 = vim.uv.hrtime()
   async.run(function()
     conn = drv.connect(info)
-    conn:execute(q, { max_rows = 10, timeout = 60000 })
+    conn:execute(q, { max_rows = 10, timeout = 60000, cancel = require("dbdash.db.cancel").new() })
   end, function(e)
     done, err = vim.uv.hrtime(), e
   end)

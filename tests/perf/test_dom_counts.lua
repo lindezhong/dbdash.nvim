@@ -26,7 +26,7 @@ local function built(kind, size, seed)
   style.restyle(doc)
   local r = doc.restyled
   doc.restyled = nil
-  return doc, chart, r
+  return doc, chart, assert(r)
 end
 
 -- kinds whose elements grow with the rows, and the elements per row: a row, its 6 cells

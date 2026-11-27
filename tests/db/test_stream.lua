@@ -160,7 +160,7 @@ T["exec: stopping kills the script"] = function()
   local res = run("exec://", code, exec_opts(), 1500)
   eq(res.err.phase, "cancelled")
   eq(values(res), { "started" })
-  local pid = tonumber(vim.fn.readfile(pidfile)[1])
+  local pid = assert(tonumber(vim.fn.readfile(pidfile)[1]))
   local function alive()
     return vim.uv.kill(pid, 0) == 0 -- (returns nil and an error once it is gone)
   end

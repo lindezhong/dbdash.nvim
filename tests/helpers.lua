@@ -151,14 +151,14 @@ end
 
 ---Fake UDP DNS server answering every query with `records`. Returns server, port.
 function M.fake_dns(records)
-  local udp = vim.uv.new_udp()
+  local udp = assert(vim.uv.new_udp())
   udp:bind("127.0.0.1", 0)
   udp:recv_start(function(_, data, addr)
-    if data then
-      udp:send(M.dns_respond(data, records), addr.ip, addr.port)
+    if data and addr then
+      udp:send(M.dns_respond(data, records), addr.ip, addr.port, function() end)
     end
   end)
-  return udp, udp:getsockname().port
+  return udp, assert(udp:getsockname()).port
 end
 
 local http_servers = {}
@@ -168,15 +168,18 @@ local http_servers = {}
 ---a pause between them. Every request is recorded in the returned list.
 function M.http_server(handle)
   local seen = {}
-  local srv = vim.uv.new_tcp()
+  local srv = assert(vim.uv.new_tcp())
   srv:bind("127.0.0.1", 0)
   srv:listen(8, function()
-    local c = vim.uv.new_tcp()
+    local c = assert(vim.uv.new_tcp())
     srv:accept(c)
     local buf = ""
     c:read_start(function(err, chunk)
       if err or not chunk then
-        return c:is_closing() or c:close()
+        if not c:is_closing() then
+          c:close()
+        end
+        return
       end
       buf = buf .. chunk
       local head_end = buf:find("\r\n\r\n", 1, true)
@@ -189,9 +192,9 @@ function M.http_server(handle)
       local headers = {}
       for i = 2, #lines do
         local k, v = lines[i]:match("^([^:]+):%s*(.*)$")
-        headers[k:lower()] = v
+        headers[assert(k):lower()] = v
       end
-      local need = tonumber(headers["content-length"] or "0")
+      local need = tonumber(headers["content-length"] or "0") or 0
       if #buf - head_end - 3 < need then
         return
       end
@@ -225,7 +228,7 @@ function M.http_server(handle)
     end)
   end)
   http_servers[#http_servers + 1] = srv
-  return "http://127.0.0.1:" .. srv:getsockname().port, seen
+  return "http://127.0.0.1:" .. assert(srv:getsockname()).port, seen
 end
 
 ---Close the servers started by http_server (post_case hook).

@@ -16,6 +16,7 @@ S["levels: highest step reached; below reverses the direction"] = function()
   eq(T.level(100, up), 1)
   eq(T.level(499.9, up), 1)
   local level, step = T.level(800, up)
+  assert(step)
   eq({ level, step.class, step.notify }, { 2, "danger", true })
   eq(T.level("650", up), 2) -- numeric text (decimals)
   eq(T.level(vim.NIL, up), 0)
@@ -95,7 +96,7 @@ S["config reports invalid thresholds with their line"] = function()
     "      thresholds: [{ class: danger }]",
   }, f)
   local _, err = require("dbdash.config").load(f)
-  eq(err.message:find("thresholds%[0%]: value must be a number") ~= nil, true)
+  eq(assert(err).message:find("thresholds%[0%]: value must be a number") ~= nil, true)
 end
 
 return S

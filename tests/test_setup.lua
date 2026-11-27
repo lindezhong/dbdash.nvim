@@ -8,6 +8,7 @@ local T = MiniTest.new_set({
   hooks = {
     pre_case = function()
       notes = {}
+      ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
       vim.notify = function(msg, level)
         notes[#notes + 1] = { msg = msg, level = level }
       end
@@ -74,7 +75,7 @@ T["invalid values are reported with their path and fall back to the default"] = 
     { o.sidebar.width, o.sidebar.position, o.dashboard.open, o.defaults.history },
     { 30, "left", "current", 20 }
   )
-  eq(o.colour, nil)
+  eq(rawget(o, "colour"), nil)
 end
 
 T["mappings: true, false, or per name"] = function()

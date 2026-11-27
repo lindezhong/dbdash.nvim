@@ -7,7 +7,7 @@ local T = MiniTest.new_set()
 local function err(text, base_dir)
   local ok, e = pcall(curl.parse, text, base_dir)
   eq(ok, false)
-  return e.message
+  return (e --[[@as dbdash.Error]]).message
 end
 
 T["words: quotes, $'..', escapes, line continuations, comments"] = function()

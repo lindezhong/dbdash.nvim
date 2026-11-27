@@ -47,7 +47,7 @@ local function start()
   require("dbdash.view.dashboard").start(f)
   local d = assert(sched.get(sched.normalize(f)))
   vim.wait(5000, function()
-    return d.panels[1].rs and d.panels[2].rs and not d.render_pending
+    return d.panels[1].rs ~= nil and d.panels[2].rs ~= nil and not d.render_pending
   end, 10)
   require("dbdash.view.dashboard").redraw(d)
   vim.api.nvim_set_current_win(vim.fn.bufwinid(d.buf))
@@ -145,6 +145,7 @@ T[":DbDashStyle set adds a runtime rule over every other origin; reset drops it"
   -- an invalid rule is refused and the sheet stays as it was
   local errs = {}
   local notify = vim.notify
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   vim.notify = function(m)
     errs[#errs + 1] = m
   end

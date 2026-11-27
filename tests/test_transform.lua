@@ -13,6 +13,7 @@ local T = MiniTest.new_set({
       vim.fn.mkdir(dir, "p")
       require("dbdash").setup({ lua = { confirm = false } }) -- trust is tested in test_trust.lua
       notes = {} -- failed refreshes notify (errors.notify = "once"); checked below
+      ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
       vim.notify = function(msg, level)
         notes[#notes + 1] = { msg = msg, level = level }
       end
@@ -36,7 +37,7 @@ local function run(name, lines)
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   local p = d.panels[1]
   vim.wait(20000, function()
-    return (p.rs or p.error) and not p.running
+    return (p.rs or p.error) ~= nil and not p.running
   end, 10)
   return p
 end

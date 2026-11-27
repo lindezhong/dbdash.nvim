@@ -10,9 +10,6 @@ local function say(text)
   io.stdout:write(text, "\n")
 end
 
--- lua-language-server findings fail the check from Warning up.
-local LUALS_BLOCKING = false
-
 local function run(cmd, env)
   local r = vim.system(cmd, { text = true, env = env }):wait()
   return r.code, (r.stdout or "") .. (r.stderr or "")
@@ -97,6 +94,7 @@ if arg[1] == "fmt" then
   os.exit(1)
 end
 
+-- Every tool's findings fail the check (lua-language-server's from Warning up).
 local failed = false
 for _, step in ipairs({
   {
@@ -104,21 +102,17 @@ for _, step in ipairs({
     function()
       return stylua(true)
     end,
-    true,
   },
-  { "luacheck", luacheck, true },
-  { "lua-language-server", luals, LUALS_BLOCKING },
+  { "luacheck", luacheck },
+  { "lua-language-server", luals },
 }) do
-  local name, fn, blocking = step[1], step[2], step[3]
+  local name, fn = step[1], step[2]
   local code, out = fn()
   if code == 0 then
     say(("lint: %s ok"):format(name))
-  elseif blocking then
+  else
     failed = true
     say(("lint: %s found problems:\n%s"):format(name, vim.trim(out)))
-  else
-    local n = select(2, out:gsub("\n", "")) + 1
-    say(("lint: %s: %d problems (not blocking yet)"):format(name, n))
   end
 end
 os.exit(failed and 1 or 0)

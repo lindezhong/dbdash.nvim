@@ -33,6 +33,7 @@ local DEFAULTS = setmetatable({}, {
 ---@field type string
 ---@field url string
 ---@field options table
+---@field password_cmd (string|string[])?
 
 ---@class dbdash.ConfigQuery
 ---@field sql string

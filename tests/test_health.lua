@@ -13,6 +13,7 @@ end
 local T = MiniTest.new_set({
   hooks = {
     pre_case = function()
+      ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
       vim.notify = function() end
       remove_file()
     end,
@@ -75,10 +76,12 @@ T["dbdash.sqlite: the library and its version, or how to install it"] = function
   eq(text:match("OK [^\n]*SQLite %d+%.%d+") ~= nil, true)
   local sqlite = require("dbdash.db.drivers.sqlite")
   local orig = sqlite.lib_candidates
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   sqlite.lib_candidates = function()
     return { "/nonexistent/libsqlite3.so" }
   end
   text = check("dbdash.sqlite")
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   sqlite.lib_candidates = orig
   eq(has(text, "ERROR cannot load the SQLite library"), true)
   eq(has(text, "database.options.lib_path"), true)

@@ -5,14 +5,14 @@ local T = MiniTest.new_set()
 
 ---Start a local TCP server; `on_conn(client)` handles each connection.
 local function server(on_conn)
-  local srv = vim.uv.new_tcp()
+  local srv = assert(vim.uv.new_tcp())
   srv:bind("127.0.0.1", 0)
   srv:listen(8, function()
-    local c = vim.uv.new_tcp()
+    local c = assert(vim.uv.new_tcp())
     srv:accept(c)
     on_conn(c)
   end)
-  return srv, srv:getsockname().port
+  return srv, assert(srv:getsockname()).port
 end
 
 local function run(fn)

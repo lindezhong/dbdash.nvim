@@ -62,6 +62,7 @@ end
 
 T["records value positions"] = function()
   local _, pos = yaml.parse("query:\n  sql: |\n    SELECT 1\n  args:\n    - name: x\n")
+  assert(pos)
   eq(pos["query.sql"], { line = 3, col = 5 })
   eq(pos["query.args[1].name"].line, 5)
 end

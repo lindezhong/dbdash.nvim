@@ -10,7 +10,7 @@ local T = MiniTest.new_set()
 local function url_err(raw)
   local ok, e = pcall(url.parse, raw)
   eq(ok, false)
-  return e.message
+  return (e --[[@as dbdash.Error]]).message
 end
 
 T["url: full form with percent-decoding"] = function()
@@ -128,7 +128,7 @@ db.register({
         elseif q == "slow" then
           async.sleep(500)
         elseif q == "crash" then
-          local t = nil
+          local t = nil ---@type table (a Lua error on purpose)
           return t.x
         end
         return resultset.new({ { name = "max_rows", type = "integer" } }, { { opts.max_rows } })

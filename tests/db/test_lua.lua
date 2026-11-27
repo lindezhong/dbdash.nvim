@@ -58,7 +58,7 @@ end
 T["dbdash.system waits without blocking the editor"] = function()
   local cmd = jit.os == "Windows" and "ping -n 2 127.0.0.1 >NUL" or "sleep 0.4"
   local maxgap, last = 0, vim.uv.hrtime()
-  local t = vim.uv.new_timer()
+  local t = assert(vim.uv.new_timer())
   t:start(1, 1, function()
     local n = vim.uv.hrtime()
     maxgap = math.max(maxgap, (n - last) / 1e6)

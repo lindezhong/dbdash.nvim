@@ -14,6 +14,7 @@ local T = MiniTest.new_set({
       vim.fn.mkdir(dir, "p")
       require("dbdash").setup({ lua = { confirm = false } }) -- trust is tested in test_trust.lua
       notes = {}
+      ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
       vim.notify = function(msg, level)
         notes[#notes + 1] = { msg = msg, level = level }
       end
@@ -51,7 +52,7 @@ T["every name has a value of the right type"] = function()
     "query: { sql: SELECT 1 AS x }",
     "show: { type: table, title: Board, interval: 7s }",
   })
-  local v = p.meta
+  local v = assert(p.meta)
   local strings = {
     "cwd",
     "config_file",
@@ -96,7 +97,7 @@ T["db_*: from the URL as written, without the password or expanded ${NAME}"] = f
     "database: { url: 'postgres://app:${DBDASH_TEST_SECRET}@db.internal/shop?tls=require' }",
     "query: { sql: SELECT 1 }",
   })
-  local v = p.meta
+  local v = assert(p.meta)
   eq(
     { v.db_type, v.db_host, v.db_port, v.db_name, v.db_user },
     { "postgres", "db.internal", 5432, "shop", "app" }
@@ -227,9 +228,9 @@ T["bare argument names, assigning args/meta and writing meta are errors"] = func
     true
   )
   local _, err = template.render("{% set args = 1 %}{{ args }}", {})
-  eq(err.message, "'args' is reserved (dashboard arguments) and cannot be assigned")
+  eq(assert(err).message, "'args' is reserved (dashboard arguments) and cannot be assigned")
   _, err = template.render("{% for meta in [1] %}{% endfor %}", {})
-  eq(err.message, "'meta' is reserved (dashboard metadata) and cannot be assigned")
+  eq(assert(err).message, "'meta' is reserved (dashboard metadata) and cannot be assigned")
   local l = run("ro", { "database: { url: 'lua://' }", "query: { sql: 'meta.os = 1; return {}' }" })
   eq(l.error.message:find("meta is read-only (meta.os)", 1, true) ~= nil, true)
 end

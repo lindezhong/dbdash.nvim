@@ -15,10 +15,12 @@ local T = MiniTest.new_set({
       vim.fn.mkdir(dir, "p")
       os.remove(trust.file())
       notes, levels, asked, asked_files, answer = {}, {}, 0, nil, "cancel"
+      ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
       vim.notify = function(msg, level)
         notes[#notes + 1] = msg
         levels[#levels + 1] = level
       end
+      ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
       trust.ask = function(_, files)
         asked = asked + 1
         asked_files = vim.tbl_map(function(f)
@@ -29,6 +31,7 @@ local T = MiniTest.new_set({
     end,
     post_case = function()
       vim.notify = real_notify
+      ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
       trust.ask = real_ask
       dbdash.setup({})
       for _, d in ipairs(sched.list()) do
@@ -101,7 +104,7 @@ T["collect: the config first, then imported .lua files and {% lua %} templates"]
     "    {% import 'helpers.lua' as h %}{% from \"with_lua.sql\" import x %}{% import 'plain.sql' as p %}",
     "    SELECT 1",
   })
-  local files, has_lua = trust.collect(path, require("dbdash.config").load(path))
+  local files, has_lua = trust.collect(path, assert(require("dbdash.config").load(path)))
   eq(has_lua, true)
   eq(
     vim.tbl_map(function(f)
@@ -115,7 +118,7 @@ T["collect: the config first, then imported .lua files and {% lua %} templates"]
     { "database: { url: 'sqlite:///:memory:' }", "query: { sql: '{% lua %}return 1{% endlua %}' }" },
     path
   )
-  files, has_lua = trust.collect(path, require("dbdash.config").load(path))
+  files, has_lua = trust.collect(path, assert(require("dbdash.config").load(path)))
   eq({ #files, has_lua }, { 1, true })
 end
 
@@ -123,7 +126,7 @@ T["exec:// and luastream:// configs need trust like lua://"] = function()
   for _, url in ipairs({ "exec://", "luastream://" }) do
     local path =
       write("push.yaml", { ("database: { url: '%s' }"):format(url), "query: { sql: 'echo 1' }" })
-    local files, needs = trust.collect(path, require("dbdash.config").load(path))
+    local files, needs = trust.collect(path, assert(require("dbdash.config").load(path)))
     eq({ url, needs, files[1].kind }, { url, true, "config" })
     eq(files[1].text:find("echo 1", 1, true) ~= nil, true) -- the View shows the script
   end
@@ -134,13 +137,13 @@ T["http(s):// configs that write a cookie file (curl -c) need trust"] = function
     "writes.yaml",
     { "database: { url: 'http://127.0.0.1:1' }", "query: { sql: curl -b jar.txt -c jar.txt }" }
   )
-  local _, needs = trust.collect(writes, require("dbdash.config").load(writes))
+  local _, needs = trust.collect(writes, assert(require("dbdash.config").load(writes)))
   eq(needs, true)
   local reads = write(
     "reads.yaml",
     { "database: { url: 'http://127.0.0.1:1' }", "query: { sql: curl -b jar.txt }" }
   )
-  _, needs = trust.collect(reads, require("dbdash.config").load(reads))
+  _, needs = trust.collect(reads, assert(require("dbdash.config").load(reads)))
   eq(needs, false)
 end
 
@@ -156,7 +159,7 @@ T["collect: files reached through include and extends count too"] = function()
     "    {% extends 'base.sql' %}",
     "    {% block q %}{% include ['missing.sql', 'part.sql'] ignore missing %}{% include 'other.sql' %}{% endblock %}",
   })
-  local files, has_lua = trust.collect(path, require("dbdash.config").load(path))
+  local files, has_lua = trust.collect(path, assert(require("dbdash.config").load(path)))
   eq(has_lua, true)
   eq(
     vim.tbl_map(function(f)
@@ -223,7 +226,7 @@ T["two configs sharing a .lua file are asked about separately"] = function()
   eq(started(a), true)
   eq(started(b), true)
   eq(asked, 2)
-  eq({ trust.state(a, trust.collect(a, require("dbdash.config").load(a))) }, { "allowed" })
+  eq({ trust.state(a, trust.collect(a, assert(require("dbdash.config").load(a)))) }, { "allowed" })
 end
 
 T["Deny is remembered; :DbDashTrust allow / remove decide without the question"] = function()
@@ -306,7 +309,7 @@ T["View shows every file after a separator naming it; a allows and starts"] = fu
   eq(separator(l[8], "helpers.lua (Lua) "), true)
   eq(vim.list_slice(l, 9, 10), { "return {}", "-- helper" })
   eq(shown.separators, { { 7, "DbDashTrustFile" } })
-  eq(trust.state(path, trust.collect(path, require("dbdash.config").load(path))), "allowed")
+  eq(trust.state(path, trust.collect(path, assert(require("dbdash.config").load(path)))), "allowed")
   eq(sched.get(sched.normalize(path)) ~= nil, true) -- started after allowing
   eq(asked, 1)
 end
@@ -315,13 +318,16 @@ T["View: d denies, q closes without deciding (no split window either way)"] = fu
   local path = write("lua.yaml", LUA)
   local wins = #vim.api.nvim_list_wins()
   view_then(path, "d")
-  eq(trust.state(path, trust.collect(path, require("dbdash.config").load(path))), "denied")
+  eq(trust.state(path, trust.collect(path, assert(require("dbdash.config").load(path)))), "denied")
   eq(sched.get(sched.normalize(path)), nil)
   eq(levels[#levels], vim.log.levels.WARN)
   eq(#vim.api.nvim_list_wins(), wins)
   local other = write("other.yaml", TRANSFORM)
   view_then(other, "q")
-  eq(trust.state(other, trust.collect(other, require("dbdash.config").load(other))), "unknown")
+  eq(
+    trust.state(other, trust.collect(other, assert(require("dbdash.config").load(other)))),
+    "unknown"
+  )
   eq(sched.get(sched.normalize(other)), nil)
   eq(notes[#notes]:find("other.yaml not started (not trusted yet)", 1, true) ~= nil, true)
   eq(levels[#levels], vim.log.levels.INFO)
@@ -334,7 +340,7 @@ local function run(path)
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   local p = d.panels[1]
   vim.wait(5000, function()
-    return (p.rs or p.error) and not p.running
+    return (p.rs or p.error) ~= nil and not p.running
   end, 10)
   return p
 end

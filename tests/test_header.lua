@@ -121,6 +121,7 @@ end
 T["threshold notifications use the dashboard title when the panel has none"] = function()
   local notes = {}
   local real = vim.notify
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   vim.notify = function(msg)
     notes[#notes + 1] = msg
   end

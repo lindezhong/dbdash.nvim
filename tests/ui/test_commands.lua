@@ -38,6 +38,7 @@ local function setup_child(keep_dir)
     vim.opt.runtimepath:prepend(%q)
     vim.cmd("runtime plugin/dbdash.lua")
     _G.notes = {}
+    ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
     vim.notify = function(msg, level) table.insert(_G.notes, { msg = msg, level = level }) end
     _G.wait_for = function(fn) return vim.wait(5000, fn, 10) end
   ]]):format(ROOT))
@@ -1089,6 +1090,7 @@ T[":DbDashTrust allows, denies and forgets a config without the question"] = fun
     local trust = require("dbdash.trust")
     os.remove(trust.file())
     _G.asked = 0
+    ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
     trust.ask = function() _G.asked = _G.asked + 1 return "cancel" end
     _G.state = function()
       local cfg = require("dbdash.config").load("l.yaml")

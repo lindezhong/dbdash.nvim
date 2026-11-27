@@ -13,6 +13,7 @@ local T = MiniTest.new_set({
       require("dbdash").setup({ lua = { confirm = false } }) -- trust is tested in test_trust.lua
       -- Refresh errors notify; keep them (the cases check the errors) instead of printing.
       notes = {}
+      ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
       vim.notify = function(msg, level)
         notes[#notes + 1] = { msg = msg, level = level }
       end
@@ -609,7 +610,10 @@ end
 T["{% set args.x %} outside a dashboard is an error"] = function()
   local out, err = require("dbdash.template").render("{% set args.n = 1 %}", {}, {})
   eq(out, nil)
-  eq((err.message or ""):find("args can only be assigned in a dashboard", 1, true) ~= nil, true)
+  eq(
+    (assert(err).message or ""):find("args can only be assigned in a dashboard", 1, true) ~= nil,
+    true
+  )
 end
 
 T["assigning args: the documented callback case (copy, callback assigns 10)"] = function()
@@ -1050,7 +1054,7 @@ query:
   )
   local p = d.panels[1]
   eq(p.error ~= nil, true)
-  local r = p.prev
+  local r = assert(p.prev)
   eq(
     { r.ok, r.query.rows[1][1], r.result, r.error:find("bad transform", 1, true) ~= nil },
     { false, 7, nil, true }

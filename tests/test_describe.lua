@@ -93,6 +93,7 @@ end
 T["K on the header shows the dashboard's, on a panel the panel's, rendered as Markdown"] = function()
   local d = run("grid", GRID)
   local lines, win = describe(d, 1)
+  assert(win)
   eq(lines, { "# Sales overview", "Last **24 hours** from sqlite." })
   local buf = vim.api.nvim_win_get_buf(win)
   eq(
@@ -116,6 +117,7 @@ T["K on the header shows the dashboard's, on a panel the panel's, rendered as Ma
   -- The panel without one: a warning, no float.
   local notes = {}
   local real = vim.notify
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   vim.notify = function(m)
     notes[#notes + 1] = m
   end
@@ -164,6 +166,7 @@ query: { sql: SELECT 1 AS x }
   )
   local msgs = {}
   local real = vim.notify
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   vim.notify = function(m)
     msgs[#msgs + 1] = m
   end
@@ -185,9 +188,11 @@ T["floats work without treesitter parsers (filetype plugins would fail)"] = func
   -- Some Neovim installs (seen on Windows) have no parser for lua or markdown: the
   -- built-in ftplugins then fail in vim.treesitter.start(), printing an error.
   local real_start, real_add = vim.treesitter.start, vim.treesitter.language.add
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   vim.treesitter.start = function()
     error("Parser could not be created")
   end
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   vim.treesitter.language.add = function(lang)
     return nil, ("No parser for language %q"):format(lang)
   end

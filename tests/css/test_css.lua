@@ -35,9 +35,11 @@ T["selectors: parse, specificity, errors"] = function()
   eq(select(2, parser.selector("a[")):find("missing ']'") ~= nil, true)
   eq(select(2, parser.selector("a > b")):find("unexpected") ~= nil, true)
   local _, err = parser.sheet({ title = { colour = "red" } })
+  assert(err)
   eq(err.key, "title")
   eq(err.message:find("unknown property 'colour'") ~= nil, true)
   _, err = parser.sheet({ title = { ["text-align"] = "middle" } })
+  assert(err)
   eq(err.message:find("expected one of") ~= nil, true)
 end
 

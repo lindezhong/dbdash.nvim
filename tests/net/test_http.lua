@@ -46,7 +46,7 @@ T["other shapes need query.transform; the raw value keeps the response"] = funct
     r.err.message,
     "the result is an object (data), not rows; add query.transform to reshape it (:help dbdash-transform)"
   )
-  local raw = h.ok(base, "curl", { raw = true })
+  local raw = h.ok(base, "curl", { raw = true }) ---@type any (a raw result)
   eq(require("dbdash.db.lua_result").is_raw(raw), true)
   eq(raw.value.data.items[1].k, "x")
   eq({ raw.vars.response.status, raw.vars.response.headers["x-total"] }, { 200, "1" })
@@ -54,7 +54,7 @@ T["other shapes need query.transform; the raw value keeps the response"] = funct
   base = server(function()
     return response("200 OK", { "Content-Type: text/plain", "Content-Length: 5" }, "hello")
   end)
-  eq(h.ok(base, "curl", { raw = true }).value, "hello")
+  eq((h.ok(base, "curl", { raw = true }) --[[@as any]]).value, "hello")
   eq(
     h.query(base, "curl").err.message
       :find("the result is not rows (got string); add query.transform", 1, true) ~= nil,
@@ -142,7 +142,7 @@ T["errors: HTTP status, auth status, invalid JSON, compressed"] = function()
     end
     return json("[{")
   end)
-  local e = h.query(base .. "/missing", "curl").err
+  local e = assert(h.query(base .. "/missing", "curl").err)
   eq(
     { e.phase, e.message },
     { "query", "HTTP 404 Not Found from " .. base .. "/missing: no such x" }
@@ -349,7 +349,7 @@ T["path: the URL's path and the command's path are joined as they are"] = functi
     eq({ c[1], c[2], seen[#seen].target }, { c[1], c[2], c[3] })
   end
   -- A full URL is refused: the host is database.url's.
-  local e = h.query(base .. "/v1", "curl http://other.example/x").err
+  local e = assert(h.query(base .. "/v1", "curl http://other.example/x").err)
   eq(e.message:find("write the path only", 1, true) ~= nil, true)
 end
 

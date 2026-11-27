@@ -20,7 +20,7 @@ db.register({
           async.sleep(2000)
         end
         log[#log + 1] = "done " .. q
-        return resultset.new({ { name = "q", type = "text" } }, { { q } })
+        return resultset.new({ { name = "q", type = "string" } }, { { q } })
       end,
       close = function() end,
     }
@@ -83,15 +83,16 @@ T["a requested refresh cancels the running one and starts at once"] = function()
   local d = start(SLOW)
   local p = d.panels[1]
   wait_running(p)
-  local first = p.current
+  local first = assert(p.current)
   d:restart() -- what `r` does
   eq(has("cancel") or vim.wait(1000, function()
     return has("cancel")
   end, 5), true)
   -- The new refresh runs already; the old one is closed as cancelled.
   eq({ p.running, p.current ~= first, p.refresh_count }, { true, true, 2 })
+  local prev = assert(p.prev)
   eq(
-    { p.prev.id, p.prev.ok, p.prev.error },
+    { prev.id, prev.ok, prev.error },
     { first.record.id, false, "query cancelled: replaced by a new refresh" }
   )
   eq(p.history[1].cancelled, "replaced by a new refresh")
@@ -205,11 +206,13 @@ T[":DbDashStatus lists a cancelled refresh"] = function()
   local lines
   local popup = require("dbdash.view.popup")
   local real = popup.open
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   popup.open = function(l)
     lines = l
   end
   vim.api.nvim_set_current_buf(d.buf)
   pcall(require("dbdash.commands").status)
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   popup.open = real
   eq(
     lines ~= nil

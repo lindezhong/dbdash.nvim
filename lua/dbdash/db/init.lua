@@ -166,6 +166,12 @@ function M.query(raw_url, query, opts, callback)
   return handle
 end
 
+---@class dbdash.db.RunHandle a run of db.run
+---@field stop fun(self, reason: string?) stop the run
+---@field report fun(self, ok: boolean) the consumer took a result (ok or not)
+---@field stats { items: integer, truncated: integer, rejected: table<integer, integer> }
+---@field status string? what the source is doing
+
 -- Push sources --------------------------------------------------------------------------------
 
 ---Cut text at `delimiter` and pass each complete piece to `emit`. Pieces longer than
@@ -228,7 +234,7 @@ end
 ---@param opts dbdash.db.QueryOpts
 ---@param on_result fun(err: table?, value: any, vars: table?, tag: any)
 ---@param on_end fun(err: dbdash.Error?)
----@return { stop: fun(self, reason: string?), stats: { items: integer, truncated: integer } }
+---@return dbdash.db.RunHandle
 function M.run(raw_url, query, opts, on_result, on_end)
   opts = opts or {}
   local token = require("dbdash.db.cancel").new(opts.cancel)

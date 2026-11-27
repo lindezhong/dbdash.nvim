@@ -339,7 +339,7 @@ end
 
 ---The Cookie header for a request to `url`: configured cookies, overridden by name with the
 ---cookies the server set (the jar). nil when there are none.
----@param configured dbdash.http.Cookie[]
+---@param configured dbdash.http.Cookie[]?
 function Jar:header(url, configured, now)
   now = now or os.time()
   local stored = {}

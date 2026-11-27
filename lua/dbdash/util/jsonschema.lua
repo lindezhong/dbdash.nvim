@@ -642,12 +642,13 @@ end
 ---@class dbdash.jsonschema.Opts
 ---@field formats boolean?
 ---@field nullable boolean?
----@field resolve fun(ref: string, base: any): any, any a $ref to its schema and base
+---@field resolve (fun(ref: string, base: any): any, any)? a $ref to its schema and base
 
 ---Validate `value` against `schema` (in `doc`, the document its $refs point into; default:
 ---the schema itself).
 ---@param opts dbdash.jsonschema.Opts?
----@return { path: string, message: string }? error the first problem, nil when valid
+---@return { path: string, message: string, schema_error: boolean? }? error the first
+---  problem, nil when valid (schema_error: the schema itself is wrong)
 function M.validate(schema, value, opts, doc)
   local v = setmetatable({ opts = opts or {}, depth = 0 }, V)
   local ok, res = pcall(V.check, v, schema, value, "", doc or schema)

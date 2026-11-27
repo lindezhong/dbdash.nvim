@@ -8,7 +8,7 @@ local T = MiniTest.new_set()
 ---Run fn() while a 1 ms timer measures the longest gap of the main loop (ms).
 local function longest_stall(fn)
   local maxgap, last = 0, vim.uv.hrtime()
-  local t = vim.uv.new_timer()
+  local t = assert(vim.uv.new_timer())
   t:start(1, 1, function()
     local n = vim.uv.hrtime()
     maxgap = math.max(maxgap, (n - last) / 1e6)

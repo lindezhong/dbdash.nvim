@@ -16,6 +16,7 @@ local T = MiniTest.new_set({
       -- (no_show dashboards are not visible: keep them from pausing)
       require("dbdash").setup({ lua = { confirm = false }, dashboard = { pause_hidden = false } })
       notes = {}
+      ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
       vim.notify = function(msg)
         notes[#notes + 1] = msg
       end
@@ -117,29 +118,25 @@ show: { type: table, interval: 1s }
   local draws = 0
   local view = require("dbdash.view.dashboard")
   local real = view.redraw
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   view.redraw = function(dd)
     draws = draws + (dd == d and 1 or 0)
     return real(dd)
   end
   MiniTest.finally(function()
+    ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
     view.redraw = real
   end)
   wait(function()
     return p.ended
   end, 8000)
-  d.redraw = real
   -- ~1 s of items: about two interval ticks and the final draw (no draw per item).
   eq(draws <= 5, true)
   eq(rows(p), { { 40 } })
   -- Nothing new: no draws (after the end's own draw, which is coalesced like any other).
   vim.wait(50)
-  draws = 0
-  d.redraw = function(self)
-    draws = draws + 1
-    return real(self)
-  end
+  draws = 0 -- (view.redraw still counts)
   vim.wait(2200)
-  d.redraw = real
   eq(draws, 0)
 end
 
@@ -186,12 +183,12 @@ show: { type: table, interval: 1s }
     end),
     true
   )
-  local first = p.stream
+  local first = assert(p.stream)
   require("dbdash.args").set_modified(d.state, "word", "two")
   d:restart()
   eq(
     wait(function()
-      return rows(p)[1] and rows(p)[1][1] == "two"
+      return rows(p)[1] ~= nil and rows(p)[1][1] == "two"
     end),
     true
   )
@@ -259,11 +256,13 @@ show: { type: table, interval: 1s }
   local draws = 0
   local view = require("dbdash.view.dashboard")
   local real = view.redraw
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
   view.redraw = function(dd)
     draws = draws + (dd == d and 1 or 0)
     return real(dd)
   end
   MiniTest.finally(function()
+    ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
     view.redraw = real
   end)
   local before = p.stream.processed
@@ -277,7 +276,6 @@ show: { type: table, interval: 1s }
     end, 1500),
     true
   )
-  d.redraw = real
 end
 
 T["stopping the dashboard kills the script"] = function()
@@ -299,7 +297,7 @@ show: { type: table, interval: 1s }
     end),
     true
   )
-  local pid = tonumber(vim.fn.readfile(pidfile)[1])
+  local pid = assert(tonumber(vim.fn.readfile(pidfile)[1]))
   sched.stop(d.path)
   eq(
     wait(function()

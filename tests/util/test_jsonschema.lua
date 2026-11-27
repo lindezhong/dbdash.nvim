@@ -113,7 +113,7 @@ T["$ref into the document and through resolve; bad schemas are reported"] = func
   local doc = decode('{"components": {"schemas": {"Id": {"type": "integer"}}}}')
   local s = decode('{"$ref": "#/components/schemas/Id"}')
   eq(js.validate(s, 3, nil, doc), nil)
-  eq(js.validate(s, "x", nil, doc).message, "must be integer, got string")
+  eq(assert(js.validate(s, "x", nil, doc)).message, "must be integer, got string")
   local ext = decode('{"type": "string"}')
   local r = js.validate(decode('{"$ref": "other.yaml#/x"}'), 1, {
     resolve = function(ref)
@@ -121,15 +121,19 @@ T["$ref into the document and through resolve; bad schemas are reported"] = func
       return ext, ext
     end,
   })
-  eq(r.message, "must be string, got integer")
-  eq(js.validate(decode('{"$ref": "#/nope"}'), 1).schema_error, true)
+  eq(assert(r).message, "must be string, got integer")
+  eq(assert(js.validate(decode('{"$ref": "#/nope"}'), 1)).schema_error, true)
   eq(
-    js.validate(decode('{"pattern": "(?=x)"}'), "x").message:find("invalid pattern", 1, true) ~= nil,
+    assert(js.validate(decode('{"pattern": "(?=x)"}'), "x")).message:find(
+      "invalid pattern",
+      1,
+      true
+    ) ~= nil,
     true
   )
   -- A $ref loop stops.
   eq(
-    js.validate(decode('{"$defs": {"a": {"$ref": "#/$defs/a"}}, "$ref": "#/$defs/a"}'), 1).schema_error,
+    assert(js.validate(decode('{"$defs": {"a": {"$ref": "#/$defs/a"}}, "$ref": "#/$defs/a"}'), 1)).schema_error,
     true
   )
 end

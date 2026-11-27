@@ -41,7 +41,8 @@ T["SCRAM rejects a wrong server signature"] = function()
   local ok, err = pcall(pg.scram, "pencil", function() end, function() end, function()
     return unpack(table.remove(replies, 1))
   end, "rOprNGfwEbeRWgbNEkqO", "user")
-  eq({ ok, err.phase, err.message:find("signature mismatch") ~= nil }, { false, "auth", true })
+  local e = err --[[@as dbdash.Error]]
+  eq({ ok, e.phase, e.message:find("signature mismatch") ~= nil }, { false, "auth", true })
 end
 
 T["array literals"] = function()
@@ -61,7 +62,10 @@ T["text values by OID"] = function()
   eq(pg.decode_value("t", 16), true)
   eq(pg.decode_value("123.4500", 1700), "123.4500")
   local j = pg.decode_value('{"b": [1, 2], "a": null}', 3802)
-  eq({ map.keys(j), j.b }, { { "a", "b" }, { 1, 2 } })
+  eq({
+    map.keys(j --[[@as table]]),
+    j.b,
+  }, { { "a", "b" }, { 1, 2 } })
 end
 
 T["error responses"] = function()

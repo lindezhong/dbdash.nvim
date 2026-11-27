@@ -47,12 +47,12 @@ paths:
 ]],
     { base_path = "/api" }
   )
-  local op = api:match("GET", "/api/items/latest")
+  local op = assert(api:match("GET", "/api/items/latest"))
   eq(op.id, "latest")
   local values
-  op, values = api:match("GET", "/api/items/42")
+  op, values = assert(api:match("GET", "/api/items/42"))
   eq({ op.id, values.id }, { "one", "42" })
-  op, values = api:match("POST", "/api/a/1/b/2")
+  op, values = assert(api:match("POST", "/api/a/1/b/2"))
   eq({ op.id, values.x, values.y }, { "two", "1", "2" })
   eq({ api:match("GET", "/items/42") }, { nil, 404 }) -- the base path is part of it
   eq({ api:match("GET", "/api/items/1/x") }, { nil, 404 })
@@ -388,12 +388,13 @@ components:
 ]],
     { base_dir = dir }
   )
-  local op = api:match("POST", "/o")
+  local op = assert(api:match("POST", "/o"))
   eq(plain(api:parameters(op, { query = "limit=3", headers = {} }, {}).query), { limit = 3 })
   local _, m, mdoc = api:media(op, "application/json")
+  assert(m)
   eq(api:validate(m.schema, openapi.decode_json('{"id": 1}'), mdoc), nil)
   eq(
-    api:validate(m.schema, openapi.decode_json('{"id": "x"}'), mdoc).message,
+    assert(api:validate(m.schema, openapi.decode_json('{"id": "x"}'), mdoc)).message,
     "must be integer, got string"
   )
   eq(#api.files, 2) -- the files it read (for trust)

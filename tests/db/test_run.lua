@@ -7,7 +7,7 @@ local T = MiniTest.new_set()
 
 ---Run until it ends; ticks: how many times wait_tick says go on.
 local function run(query, ticks)
-  local results, ended = {}, false
+  local results, ended = {}, nil ---@type table[], { err: table? }?
   local n = 0
   local wait = ticks and function()
     n = n + 1
@@ -22,9 +22,9 @@ local function run(query, ticks)
     ended = { err = err }
   end)
   vim.wait(5000, function()
-    return ended ~= false
+    return ended ~= nil
   end, 10)
-  return results, ended
+  return results, assert(ended, "the run did not end")
 end
 
 T["one query per tick, with the tag of its rendering"] = function()
