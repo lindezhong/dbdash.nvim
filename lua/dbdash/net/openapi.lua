@@ -647,103 +647,123 @@ local VALID_STYLES = {
   cookie = { form = true },
 }
 
+---A parameter's style (checked against its location) and explode.
+local function style_of(op, p)
+  local where = p["in"]
+  local style = p.style or DEFAULT_STYLE[where]
+  if not VALID_STYLES[where][style] then
+    cfg_error(
+      "%s: parameter %s: style %s is not allowed in %s",
+      op.id,
+      p.name,
+      tostring(style),
+      where
+    )
+  end
+  local explode = p.explode
+  if explode == nil then
+    explode = style == "form"
+  end
+  return style, explode
+end
+
+---The raw text of a parameter in its location (`rq`: the request's parts).
+local function raw_value(rq, name, where)
+  if where == "query" then
+    local raw
+    for i, kv in ipairs(rq.qpairs) do
+      if kv[1] == name then
+        raw, rq.used[i] = kv[2], true
+      end
+    end
+    return raw
+  elseif where == "path" then
+    return rq.path_raw[name] and unescape(rq.path_raw[name])
+  elseif where == "header" then
+    return rq.req.headers[name:lower()]
+  end
+  return rq.cookies[name]
+end
+
+---A parameter described by a media type (e.g. JSON in a query parameter): its value and
+---the media type's schema with its document.
+function Api:content_value(rq, p, doc)
+  local name, where = p.name, p["in"]
+  local raw = raw_value(rq, name, where)
+  -- a parameter's content has one media type
+  local mt, media = map.first(p.content)
+  if mt == nil then
+    return nil, p.schema, doc
+  end
+  local m, mdoc = self:deref(media, doc)
+  if raw == nil or not mt:find("json", 1, true) then
+    return raw, m.schema, mdoc
+  end
+  local v, err = M.decode_json(raw)
+  if v == nil and err then
+    bad(400, "%s parameter %s: invalid JSON (%s)", where, name, err)
+  end
+  return v, m.schema, mdoc
+end
+
+---A cookie parameter's value by its schema's type (form style: comma separated).
+function Api:cookie_value(c, schema, doc, t)
+  if t == "array" then
+    return self:list_of(type(c) == "table" and c or split(c, ","), schema, doc)
+  elseif t == "object" then
+    return self:object_of(flat_pairs(split(type(c) == "table" and c[1] or c, ",")), schema, doc)
+  end
+  return self:coerce(type(c) == "table" and c[1] or c, schema, doc)
+end
+
+---A parameter with a schema: its value by location and style.
+function Api:styled_value(rq, p, doc)
+  local name, where, schema = p.name, p["in"], p.schema
+  local style, explode = rq.style, rq.explode
+  local t = self:schema_type(schema, doc)
+  if where == "query" then
+    local allow_empty = p.allowEmptyValue == true
+    return self:query_value(rq.qpairs, name, style, explode, schema, doc, t, allow_empty, rq.used)
+  elseif where == "path" then
+    local raw = rq.path_raw[name]
+    if raw ~= nil then
+      return self:path_value(raw, style, explode, schema, doc, t, name)
+    end
+  elseif where == "header" then
+    local h = rq.req.headers[name:lower()]
+    if h ~= nil then
+      return self:simple(h, explode, schema, doc, t)
+    end
+  else
+    local c = rq.cookies[name]
+    if c ~= nil then
+      return self:cookie_value(c, schema, doc, t)
+    end
+  end
+end
+
 ---Deserialize and validate the operation's parameters. Returns { path = {...}, query =
 ---{...}, header = {...}, cookie = {...} } (mappings by name, defaults filled in); raises
 ---{ http_status = 400 } for missing or invalid ones.
 ---@param req { query: string?, headers: table }
 function Api:parameters(op, req, path_raw)
   local out = { path = map.new(), query = map.new(), header = map.new(), cookie = map.new() }
-  local qpairs = M.query_pairs(req.query)
-  local cookies = M.cookies(req.headers.cookie)
-  local used = {}
+  local rq = {
+    req = req,
+    path_raw = path_raw,
+    qpairs = M.query_pairs(req.query),
+    cookies = M.cookies(req.headers.cookie),
+    used = {},
+  }
   for _, entry in ipairs(op.params) do
     local p, doc = entry.p, entry.doc
     local name, where = p.name, p["in"]
-    local style = p.style or DEFAULT_STYLE[where]
-    if not VALID_STYLES[where][style] then
-      cfg_error(
-        "%s: parameter %s: style %s is not allowed in %s",
-        op.id,
-        name,
-        tostring(style),
-        where
-      )
-    end
-    local explode = p.explode
-    if explode == nil then
-      explode = style == "form"
-    end
-    local schema, sdoc = p.schema, doc
-    local value
+    rq.style, rq.explode = style_of(op, p)
+    local value, schema, sdoc
     if p.content ~= nil then
-      -- A parameter described by a media type (e.g. JSON in a query parameter).
-      local raw
-      if where == "query" then
-        for i, kv in ipairs(qpairs) do
-          if kv[1] == name then
-            raw, used[i] = kv[2], true
-          end
-        end
-      elseif where == "path" then
-        raw = path_raw[name] and unescape(path_raw[name])
-      elseif where == "header" then
-        raw = req.headers[name:lower()]
-      else
-        raw = cookies[name]
-      end
-      -- a parameter's content has one media type
-      local mt, media = map.first(p.content)
-      if mt ~= nil then
-        local m, mdoc = self:deref(media, doc)
-        schema, sdoc = m.schema, mdoc
-        if raw ~= nil then
-          if mt:find("json", 1, true) then
-            local v, err = M.decode_json(raw)
-            if v == nil and err then
-              bad(400, "%s parameter %s: invalid JSON (%s)", where, name, err)
-            end
-            value = v
-          else
-            value = raw
-          end
-        end
-      end
+      value, schema, sdoc = self:content_value(rq, p, doc)
     else
-      local t = self:schema_type(schema, doc)
-      if where == "query" then
-        value = self:query_value(
-          qpairs,
-          name,
-          style,
-          explode,
-          schema,
-          doc,
-          t,
-          p.allowEmptyValue == true,
-          used
-        )
-      elseif where == "path" then
-        if path_raw[name] ~= nil then
-          value = self:path_value(path_raw[name], style, explode, schema, doc, t, name)
-        end
-      elseif where == "header" then
-        local h = req.headers[name:lower()]
-        if h ~= nil then
-          value = self:simple(h, explode, schema, doc, t)
-        end
-      else
-        local c = cookies[name]
-        if c ~= nil then
-          if t == "array" then
-            value = self:list_of(type(c) == "table" and c or split(c, ","), schema, doc)
-          elseif t == "object" then
-            value =
-              self:object_of(flat_pairs(split(type(c) == "table" and c[1] or c, ",")), schema, doc)
-          else
-            value = self:coerce(type(c) == "table" and c[1] or c, schema, doc)
-          end
-        end
-      end
+      value, schema, sdoc = self:styled_value(rq, p, doc), p.schema, doc
     end
     if value == nil then
       local _, s = self:schema_type(schema, sdoc)
