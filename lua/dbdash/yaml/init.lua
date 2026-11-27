@@ -315,132 +315,140 @@ function P:flow(r, text, col, path)
   end
 end
 
+---@class dbdash.yaml.Flow a flow collection being parsed
+---@field src string
+---@field i integer the position
+---@field no integer the line number
+---@field col integer the column of src's first character
+local F = {}
+F.__index = F
+
+function F:ws()
+  self.i = self.src:match("^%s*()", self.i)
+end
+
+---Raise INCOMPLETE at the end of the input (the collection goes on on the next line).
+function F:at_end()
+  if self.i > #self.src then
+    error(INCOMPLETE, 0)
+  end
+end
+
+---Skip whitespace; INCOMPLETE at the end.
+function F:next()
+  self:ws()
+  self:at_end()
+  return self.src:sub(self.i, self.i)
+end
+
+---A plain scalar up to a character of `stop_pat`, ": " (keys) or " #".
+function F:plain(stop_pat)
+  local src, j = self.src, self.i
+  while j <= #src do
+    local ch = src:sub(j, j)
+    if ch:match(stop_pat) then
+      break
+    end
+    if ch == ":" and src:sub(j + 1, j + 1):match("^[%s,%]}]?$") and stop_pat:find(":", 1, true) then
+      break
+    end
+    if ch == "#" and j > 1 and src:sub(j - 1, j - 1):match("%s") then
+      break
+    end
+    j = j + 1
+  end
+  local s = trim(src:sub(self.i, j - 1))
+  self.i = j
+  return s
+end
+
+---A quoted or plain scalar (a key stays text; a value is resolved: numbers, booleans...).
+function F:scalar(is_key)
+  self:at_end()
+  local src, i = self.src, self.i
+  local c = src:sub(i, i)
+  if c == '"' or c == "'" then
+    local s, after = scan_quoted(src, i, self.no, self.col + i - 1)
+    if not s then
+      error(INCOMPLETE, 0)
+    end
+    self.i = after
+    return s
+  end
+  if c == "&" or c == "*" then
+    fail(self.no, self.col + i - 1, "anchors and aliases are not supported")
+  elseif c == "!" then
+    fail(self.no, self.col + i - 1, "tags are not supported")
+  end
+  local s = self:plain(is_key and "[,%[%]{}:]" or "[,%[%]{}]")
+  if is_key then
+    return s
+  end
+  return resolve_plain(s)
+end
+
+---After an entry: `close` ends the collection (true), "," goes on.
+function F:next_or(close, what)
+  local d = self:next()
+  self.i = self.i + 1
+  if d == close then
+    return true
+  elseif d ~= "," then
+    fail(self.no, self.col + self.i - 2, "expected ',' or '%s' in flow %s", close, what)
+  end
+end
+
+function F:sequence()
+  self.i = self.i + 1
+  local t = {}
+  repeat
+    if self:next() == "]" then
+      self.i = self.i + 1
+      return t
+    end
+    t[#t + 1] = self:value()
+  until self:next_or("]", "sequence")
+  return t
+end
+
+function F:mapping()
+  self.i = self.i + 1
+  local t = map.new()
+  repeat
+    if self:next() == "}" then
+      self.i = self.i + 1
+      return t
+    end
+    local k = self:scalar(true)
+    local v = NULL
+    if self:next() == ":" then
+      self.i = self.i + 1
+      local d = self:next()
+      if d ~= "," and d ~= "}" then
+        v = self:value()
+      end
+    end
+    map.set(t, k, v)
+  until self:next_or("}", "mapping")
+  return t
+end
+
+function F:value()
+  local c = self:next()
+  if c == "[" then
+    return self:sequence()
+  elseif c == "{" then
+    return self:mapping()
+  end
+  return self:scalar(false)
+end
+
 ---Recursive-descent parser over a flow string. Raises INCOMPLETE at end of input.
 ---@return any value, integer next_index
 function P:parse_flow(src, r, col)
-  local i = 1
-  local function ws()
-    i = src:match("^%s*()", i)
-  end
-  local function at_end()
-    if i > #src then
-      error(INCOMPLETE, 0)
-    end
-  end
-  local value
-
-  local function plain(stop_pat)
-    local j = i
-    while j <= #src do
-      local ch = src:sub(j, j)
-      if ch:match(stop_pat) then
-        break
-      end
-      if
-        ch == ":"
-        and src:sub(j + 1, j + 1):match("^[%s,%]}]?$")
-        and stop_pat:find(":", 1, true)
-      then
-        break
-      end
-      if ch == "#" and j > 1 and src:sub(j - 1, j - 1):match("%s") then
-        break
-      end
-      j = j + 1
-    end
-    local s = trim(src:sub(i, j - 1))
-    i = j
-    return s
-  end
-
-  local function scalar(is_key)
-    at_end()
-    local c = src:sub(i, i)
-    if c == '"' or c == "'" then
-      local s, after = scan_quoted(src, i, r.no, col + i - 1)
-      if not s then
-        error(INCOMPLETE, 0)
-      end
-      i = after
-      return s
-    end
-    if c == "&" or c == "*" then
-      fail(r.no, col + i - 1, "anchors and aliases are not supported")
-    elseif c == "!" then
-      fail(r.no, col + i - 1, "tags are not supported")
-    end
-    local s = plain(is_key and "[,%[%]{}:]" or "[,%[%]{}]")
-    if is_key then
-      return s
-    end
-    return resolve_plain(s)
-  end
-
-  function value()
-    ws()
-    at_end()
-    local c = src:sub(i, i)
-    if c == "[" then
-      i = i + 1
-      local t = {}
-      while true do
-        ws()
-        at_end()
-        if src:sub(i, i) == "]" then
-          i = i + 1
-          return t
-        end
-        t[#t + 1] = value()
-        ws()
-        at_end()
-        local d = src:sub(i, i)
-        i = i + 1
-        if d == "]" then
-          return t
-        elseif d ~= "," then
-          fail(r.no, col + i - 2, "expected ',' or ']' in flow sequence")
-        end
-      end
-    elseif c == "{" then
-      i = i + 1
-      local t = map.new()
-      while true do
-        ws()
-        at_end()
-        if src:sub(i, i) == "}" then
-          i = i + 1
-          return t
-        end
-        local k = scalar(true)
-        ws()
-        at_end()
-        local v = NULL
-        if src:sub(i, i) == ":" then
-          i = i + 1
-          ws()
-          at_end()
-          local d = src:sub(i, i)
-          if d ~= "," and d ~= "}" then
-            v = value()
-          end
-        end
-        map.set(t, k, v)
-        ws()
-        at_end()
-        local d = src:sub(i, i)
-        i = i + 1
-        if d == "}" then
-          return t
-        elseif d ~= "," then
-          fail(r.no, col + i - 2, "expected ',' or '}' in flow mapping")
-        end
-      end
-    end
-    return scalar(false)
-  end
-
-  local v = value()
-  return v, i
+  local f = setmetatable({ src = src, i = 1, no = r.no, col = col }, F)
+  local v = f:value()
+  return v, f.i
 end
 
 ---Parse the inline part of a value ("rest" after "key:" or "-").
