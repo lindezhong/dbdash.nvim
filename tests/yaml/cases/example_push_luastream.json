@@ -1,17 +1,17 @@
 {
  "title": "luastream://",
  "description": "`luastream://`: Lua code whose `print()` / `io.write()` output (or `dbdash.emit()`) is\nthe data, item by item. Runs Lua, so it asks for trust first. See\n`:help dbdash-luastream`.\n",
- "show": {
-  "style": {
-   "panel_border": "single",
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "panel": {
+   "border": "single",
    "padding": [
     0,
     1
    ]
   }
- },
- "layout": {
-  "columns": 2
  },
  "panels": [
   {
@@ -25,7 +25,7 @@
    "show": {
     "type": "line",
     "title": "print(): one reading per second",
-    "description": "One JSON row printed per second; the panel redraws on its `interval` when something\nis new.\n",
+    "description": "One JSON row printed per second; the panel shows new data at most once per\n`interval`.\n",
     "x_column": "at",
     "y_column": "load",
     "interval": "2s"
@@ -48,6 +48,34 @@
     "title": "io.write() with a delimiter, dbdash.emit(), cwd",
     "description": "`io.write()` with `delimiter: \";\"`, `dbdash.emit()` for a value as it is, and `cwd`\nfor `dbdash.cwd()`.\n",
     "interval": "1s"
+   }
+  },
+  {
+   "database": {
+    "url": "luastream://"
+   },
+   "query": {
+    "args": [
+     {
+      "name": "unit",
+      "type": "string",
+      "default": "C",
+      "choices": [
+       "C",
+       "F"
+      ],
+      "description": "Unit of the reading"
+     }
+    ],
+    "sql": "-- A temperature every 2 seconds, in Celsius.\nfor i = 1, 600 do\n  print(vim.json.encode({ celsius = 15 + math.random(0, 100) / 10 }))\n  dbdash.sleep(2000)\nend\n",
+    "transform": "local c = vim.json.decode(rs).celsius\nlocal value = args.unit == \"F\" and c * 9 / 5 + 32 or c\nif meta.run.kind == \"callback\" then\n  return { { value = value } }                  -- for the caller below\nend\n-- the same item again, in the other unit\nlocal other = args.unit == \"F\" and \"C\" or \"F\"\nlocal again = dbdash.run({ unit = other }).rows[1][1]\nreturn { columns = { \"reading\", \"other unit\" },\n         rows = { { (\"%.1f °%s\"):format(value, args.unit),\n                    (\"%.1f °%s\"):format(again, other) } } }\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "dbdash.run(): the same item in the other unit",
+    "description": "`dbdash.run({ unit = ... })` in `query.transform` takes the current item again with\nanother argument. Change the unit with `:DbDashUpdateVariable unit F`.\n",
+    "args_show": true,
+    "interval": "2s"
    }
   }
  ]

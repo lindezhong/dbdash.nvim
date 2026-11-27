@@ -1,17 +1,18 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# Line chart: every style and option, one panel each (press K on a panel for what it
-# shows). Options follow Chart.js and ECharts: series (y_columns, series_column),
-# line_style (fill, points, steps, markers, gaps), axes (titles, limits, format, log scale,
-# ticks, grid), legend, mark_lines / mark_points. The CSS-like styles every chart takes
-# are in css.yaml.
+# Line chart: every renderer and option, one panel each (press K on a panel for what it
+# shows). Options follow Chart.js and ECharts: series (y_columns, series_column), gaps,
+# axes (titles, limits, format, log scale, ticks), mark_lines / mark_points; style rules
+# draw the rest: series { curve, fill, color }, point, grid lines, the legend. The style
+# rules every chart takes are in css.yaml.
 
 title: "Line chart"
 description: |
   A line chart draws one or more series over an x axis: `x_column` and `y_column` (or
-  `y_columns`, or `series_column` for long data). The default style is a braille canvas;
-  `canvas` picks another pixel grid and `renderer: asciichart` draws box lines.
-  See `:help dbdash-chart-types`.
+  `y_columns`, or `series_column` for long data). The default is a braille canvas; the
+  style rule `chart { canvas }` picks another pixel grid and `chart { renderer: asciichart }`
+  draws box lines.
+  See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"
@@ -19,8 +20,8 @@ database:
 show:
   interval: 5m
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -33,20 +34,23 @@ panels:
       type: line
       title: "y_columns, legend, axes (canvas: braille, the default)"
       description: |
-        Three series from `y_columns`, each with a `label` and a `color`; the legend sits on
-        the `right` (default) or `bottom`; `axes.y_axis` sets a title, `min_value` and a
-        Python `format` for the tick labels. Braille draws 2 x 4 dots per character.
+        Three series from `y_columns`, each with a `label`, colored by `series.<label>`
+        rules; the legend sits on the `right` (default) or `bottom` (`legend { position }`);
+        `axes.y_axis` sets a title, `min_value` and a Python `format` for the tick labels.
+        Braille draws 2 x 4 dots per character.
       x_column: hour
       y_columns:
-        - { column: visits, label: "All", color: "#61afef" }
-        - { column: mobile, label: "Mobile", color: "#e06c75" }
-        - { column: desktop, label: "Desktop", color: "#98c379" }
-      legend: { show: true, position: right }
+        - { column: visits, label: All }
+        - { column: mobile, label: Mobile }
+        - { column: desktop, label: Desktop }
       axes:
         x_axis: { title: "Hour" }
         y_axis: { title: "Visits", min_value: 0, format: "{:,.0f}" }
-      show_countdown: true
-      countdown_format: "Next update: {time}s"
+    style:
+      "series.All": { color: "#61afef" }
+      "series.Mobile": { color: "#e06c75" }
+      "series.Desktop": { color: "#98c379" }
+      countdown: { display: block, content: "Next update: {time}s" }
 
   - query:
       sql: |
@@ -54,11 +58,12 @@ panels:
         SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
     show:
       type: line
-      title: "canvas: quadrant"
-      description: "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts."
-      canvas: quadrant
+      title: "chart { canvas: quadrant }"
+      description: "`chart { canvas: quadrant }`: 2 x 2 pixels per character (▗▄▖), works in most fonts."
       x_column: hour
       y_column: visits
+    style:
+      chart: { canvas: quadrant }
 
   - query:
       sql: |
@@ -66,11 +71,12 @@ panels:
         SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
     show:
       type: line
-      title: "canvas: block"
-      description: "`canvas: block`: one full block per pixel (coarse but bold)."
-      canvas: block
+      title: "chart { canvas: block }"
+      description: "`chart { canvas: block }`: one full block per pixel (coarse but bold)."
       x_column: hour
       y_column: visits
+    style:
+      chart: { canvas: block }
 
   - query:
       sql: |
@@ -78,11 +84,12 @@ panels:
         SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
     show:
       type: line
-      title: "canvas: halfblock"
-      description: "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄)."
-      canvas: halfblock
+      title: "chart { canvas: halfblock }"
+      description: "`chart { canvas: halfblock }`: 1 x 2 pixels per character (▀ ▄)."
       x_column: hour
       y_column: visits
+    style:
+      chart: { canvas: halfblock }
 
   - query:
       sql: |
@@ -90,11 +97,12 @@ panels:
         SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
     show:
       type: line
-      title: "canvas: ascii"
-      description: "`canvas: ascii`: plain ASCII characters, for any terminal or font."
-      canvas: ascii
+      title: "chart { canvas: ascii }"
+      description: "`chart { canvas: ascii }`: plain ASCII characters, for any terminal or font."
       x_column: hour
       y_column: visits
+    style:
+      chart: { canvas: ascii }
 
   - query:
       sql: |
@@ -102,13 +110,14 @@ panels:
         SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
     show:
       type: line
-      title: "renderer: asciichart"
+      title: "chart { renderer: asciichart }"
       description: |
-        `renderer: asciichart` draws the line with box characters (╭─╯) instead of a pixel
-        canvas. Try it on any line chart with `:DbDashStyle line asciichart`.
-      renderer: asciichart
+        `chart { renderer: asciichart }` draws the line with box characters (╭─╯) instead of a
+        pixel canvas. Try it on any line chart with `:DbDashStyle line asciichart`.
       x_column: hour
       y_column: visits
+    style:
+      chart: { renderer: asciichart }
 
   - query:
       sql: |
@@ -120,12 +129,13 @@ panels:
       title: "series_column: long data"
       description: |
         Long data (one row per x and series) with `series_column`: one line per value of
-        `region`, colored from the `palette` (`tableau` here; `theme` follows the
-        colorscheme).
+        `region`, colored from the palette (`chart { palette: tableau }` here; `theme`
+        follows the colorscheme); `legend { position: bottom }` puts the legend below.
       x_column: day
       y_column: orders
       series_column: region
-      palette: tableau
+    style:
+      chart: { palette: tableau }
       legend: { position: bottom }
 
   - query:
@@ -134,11 +144,13 @@ panels:
         SELECT n AS x, 20 + 15 * sin(n / 2.0) AS y FROM h
     show:
       type: line
-      title: "line_style: fill_area, show_points"
-      description: "`fill_area` fills under the line (Chart.js `fill`); `show_points` marks every point."
+      title: "series { fill }, point { display: block }"
+      description: "`series { fill: true }` fills under the line (Chart.js `fill`); `point { display: block }` marks every point."
       x_column: x
       y_column: y
-      line_style: { fill_area: true, show_points: true }
+    style:
+      series: { fill: true }
+      point: { display: block }
 
   - query:
       sql: |
@@ -146,13 +158,15 @@ panels:
         UNION ALL SELECT 5, 9 UNION ALL SELECT 6, 9 UNION ALL SELECT 7, 4
     show:
       type: line
-      title: "line_style.stepped"
+      title: "series { curve: step-after }"
       description: |
-        Steps instead of slopes (Chart.js `stepped`): `true` / `before` (the value changes
-        at the start), `after`, `middle`. Good for states and counters.
+        Steps instead of slopes (Chart.js `stepped`): `curve: step` / `step-before` (the
+        value changes at the start), `step-after`, `step-middle`. Good for states and
+        counters.
       x_column: t
       y_column: level
-      line_style: { stepped: after }
+    style:
+      series: { curve: step-after }
 
   - query:
       sql: |
@@ -160,13 +174,16 @@ panels:
         UNION ALL SELECT 5, 8 UNION ALL SELECT 6, 5 UNION ALL SELECT 7, 7
     show:
       type: line
-      title: "line_style: point, span_gaps: false"
+      title: "point { content }, span_gaps: false"
       description: |
-        `point` marks each point with a character (Chart.js `pointStyle`); `span_gaps:
-        false` leaves a gap where the value is NULL instead of joining across it.
+        `point { display: block, content: "●" }` marks each point with a character (Chart.js
+        `pointStyle`); `span_gaps: false` leaves a gap where the value is NULL instead of
+        joining across it.
       x_column: t
       y_column: v
-      line_style: { point: "●", span_gaps: false }
+      span_gaps: false
+    style:
+      point: { display: block, content: "●" }
 
   - query:
       sql: |
@@ -174,17 +191,21 @@ panels:
         SELECT n AS month, round(power(2.4, n)) AS users FROM h
     show:
       type: line
-      title: "axes: scale: log, ticks, grid"
+      title: "axes: scale: log, ticks; grid lines"
       subtitle: "users per month, log scale"
       description: |
         A log y axis (Chart.js `type: logarithmic`) for growth over orders of magnitude;
-        `ticks` asks for about that many x ticks, `grid` draws grid lines at the ticks.
+        `ticks` asks for about that many x ticks, `grid.x` / `grid.y { display: block }` draw
+        grid lines at the ticks.
         `subtitle` adds a muted line under the title.
       x_column: month
       y_column: users
       axes:
-        x_axis: { ticks: 6, grid: true }
-        y_axis: { scale: log, grid: true }
+        x_axis: { ticks: 6 }
+        y_axis: { scale: log }
+    style:
+      "grid.x": { display: block }
+      "grid.y": { display: block }
 
   - query:
       sql: |
@@ -195,15 +216,18 @@ panels:
       title: "mark_lines, mark_points"
       description: |
         Reference lines (ECharts `markLine`): a fixed value with a label, or `mean`, `min`,
-        `max` of the data, on the `y` (default) or `x` axis. `mark_points` labels each
-        series' `max` and `min` (ECharts `markPoint`).
+        `max` of the data, on the `y` (default) or `x` axis; a line's `class` styles it
+        (`mark.slo { color }`). `mark_points` labels each series' `max` and `min` (ECharts
+        `markPoint`).
       x_column: hour
       y_column: latency
       mark_lines:
-        - { value: 90, label: "SLO 90 ms", color: "#e06c75" }
+        - { value: 90, label: "SLO 90 ms", class: slo }
         - { value: mean }
         - { value: "12", axis: x, label: "noon" }
       mark_points: [max, min]
+    style:
+      mark.slo: { color: "#e06c75" }
 
   - query:
       sql: |
@@ -211,14 +235,16 @@ panels:
         SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
     show:
       type: line
-      title: "x_label, y_label, height, width, legend: false"
+      title: "x_label, y_label; plot height, chart max-width, no legend"
       description: |
-        `x_label` / `y_label` are short for the axis titles; `height` fixes the plot rows,
-        `width` caps the chart width; `legend: false` hides the legend.
+        `x_label` / `y_label` are short for the axis titles; `plot { height }` fixes the plot
+        rows, `chart { max-width }` caps the chart width; `legend { display: none }` hides
+        the legend.
       x_column: hour
       y_column: visits
       x_label: "hour of day"
       y_label: "visits"
-      height: 6
-      width: 60
-      legend: false
+    style:
+      plot: { height: 6 }
+      chart: { max-width: 60 }
+      legend: { display: none }

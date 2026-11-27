@@ -1,14 +1,14 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
 # Pie chart: every renderer and option, one panel each (press K on a panel). After
-# Chart.js pie / doughnut and ECharts pie: a bar or a circle, a donut, a half circle,
+# Chart.js pie / doughnut and ECharts pie: a bar or a circle, a hole, a half circle,
 # sorting, the first N and "Other", colors, and what the legend shows.
 
 title: "Pie chart"
 description: |
   A pie chart shows each row's share: `label_column` names the slices, `value_column`
-  sizes them (positive values only). The default style is one proportional bar with a
-  legend; `renderer: circle` draws a round pie. See `:help dbdash-chart-types`.
+  sizes them (positive values only). The default renderer is one proportional bar with a
+  legend; `chart { renderer: circle }` draws a round pie. See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"
@@ -16,8 +16,8 @@ database:
 show:
   interval: 5m
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -27,13 +27,19 @@ panels:
         UNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40
     show:
       type: pie
-      title: "bar (default): colors by position"
+      title: "bar (default): series:nth-child(N) colors"
       description: |
         One bar split in proportion, the legend under it with the value and the percentage.
-        `colors` as a list colors the slices in order.
+        `series:nth-child(N) { color }` colors the slices in order.
       label_column: dept
       value_column: budget
-      colors: ["#e06c75", "#61afef", "#98c379", "#e5c07b", "#c678dd", "#56b6c2"]
+    style:
+      "series:nth-child(1)": { color: "#e06c75" }
+      "series:nth-child(2)": { color: "#61afef" }
+      "series:nth-child(3)": { color: "#98c379" }
+      "series:nth-child(4)": { color: "#e5c07b" }
+      "series:nth-child(5)": { color: "#c678dd" }
+      "series:nth-child(6)": { color: "#56b6c2" }
   - query:
       sql: |
         SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310
@@ -41,14 +47,14 @@ panels:
         UNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40
     show:
       type: pie
-      renderer: circle
-      title: "renderer: circle, palette: tableau"
+      title: "chart { renderer: circle, palette: tableau }"
       description: |
-        A round pie on a braille canvas, the legend beside it (`legend.position: bottom` puts
-        it under); `palette: tableau` instead of the colorscheme's colors.
+        A round pie on a braille canvas, the legend beside it (`legend { position: bottom }`
+        puts it under); `palette: tableau` instead of the colorscheme's colors.
       label_column: dept
       value_column: budget
-      palette: tableau
+    style:
+      chart: { renderer: circle, palette: tableau }
   - query:
       sql: |
         SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310
@@ -56,15 +62,16 @@ panels:
         UNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40
     show:
       type: pie
-      renderer: circle
-      title: "donut, format"
+      title: "chart { hole }, format"
       description: |
-        `donut: 0.6` leaves a hole of 60% of the radius (Chart.js `cutout`) and writes the
-        total in it; `format` is the Python format of the values ("{:,} k").
+        `chart { hole: 0.6 }` leaves a hole of 60% of the radius (a doughnut, Chart.js
+        `cutout`) and writes the total in it; `format` is the Python format of the values
+        ("{:,} k").
       label_column: dept
       value_column: budget
       format: "{:,} k"
-      style: { donut: 0.6 }
+    style:
+      chart: { renderer: circle, hole: 0.6 }
   - query:
       sql: |
         SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310
@@ -72,15 +79,15 @@ panels:
         UNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40
     show:
       type: pie
-      renderer: circle
-      title: "half, legend: bottom"
+      title: "chart { angle: 180 }, legend { position: bottom }"
       description: |
-        `half: true` draws the upper half (Chart.js `circumference: 180`, a gauge-like pie);
-        the legend goes `bottom`.
+        `chart { angle: 180 }` draws the upper half (Chart.js `circumference: 180`, a
+        gauge-like pie); `legend { position: bottom }` puts the legend under it.
       label_column: dept
       value_column: budget
+    style:
+      chart: { renderer: circle, angle: 180 }
       legend: { position: bottom }
-      style: { half: true }
   - query:
       sql: |
         SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310
@@ -91,10 +98,12 @@ panels:
       title: "sort, top, other_label"
       description: |
         `sort: desc` orders the slices by size, `top: 3` keeps the three largest and puts the
-        rest in one slice named by `other_label` (default "Other").
+        rest in one slice named by `other_label` (default "Other"; styled as `series.other`).
       label_column: dept
       value_column: budget
-      style: { sort: desc, top: 3, other_label: "Rest" }
+      sort: desc
+      top: 3
+      other_label: Rest
   - query:
       sql: |
         SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310
@@ -102,11 +111,13 @@ panels:
         UNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40
     show:
       type: pie
-      title: "colors by name, legend parts"
+      title: "series.<name> colors, legend parts"
       description: |
-        `colors` as a mapping colors slices by name; `show_labels`, `show_values` and
-        `show_percentages` pick the legend's columns.
+        `series.<name> { color }` colors slices by name; `label`, `value` and `percent {
+        display: none }` leave a column out of the legend.
       label_column: dept
       value_column: budget
-      colors: { Engineering: "#61afef", Sales: "#98c379" }
-      style: { show_labels: true, show_values: false, show_percentages: true }
+    style:
+      "series.Engineering": { color: "#61afef" }
+      "series.Sales": { color: "#98c379" }
+      value: { display: none }

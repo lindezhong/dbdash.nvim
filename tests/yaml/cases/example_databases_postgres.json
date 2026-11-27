@@ -27,14 +27,17 @@
    "default": 5
   }
  ],
- "show": {
-  "style": {
-   "panel_border": "rounded",
-   "border_style": "#61afef"
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "panel": {
+   "border": "rounded",
+   "border-color": "#61afef"
+  },
+  "table": {
+   "border-color": "#61afef"
   }
- },
- "layout": {
-  "columns": 2
  },
  "panels": [
   {
@@ -74,8 +77,12 @@
     "type": "table",
     "title": "Sessions (pg_stat_activity; this one is dbdash.nvim)",
     "description": "The sessions of this database; `query.max_rows` and `query.timeout` limit the query.\n",
-    "interval": "10s",
-    "span": 2
+    "interval": "10s"
+   },
+   "style": {
+    "panel": {
+     "grid-column": "span 2"
+    }
    }
   }
  ]

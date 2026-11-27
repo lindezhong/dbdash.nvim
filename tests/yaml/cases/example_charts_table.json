@@ -1,6 +1,6 @@
 {
  "title": "Table",
- "description": "A table shows the rows as they are: every column (or `column_list`), one row per result\nrow, long cells wrapping inside their column. See `:help dbdash-chart-types` and\n`:help dbdash-css`.\n",
+ "description": "A table shows the rows as they are: every column (or `column_list`), one row per result\nrow, long cells wrapping inside their column. See `:help dbdash-charts` and\n`:help dbdash-css`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
@@ -14,8 +14,10 @@
  "show": {
   "interval": "1m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -25,7 +27,7 @@
    "show": {
     "type": "table",
     "title": "column_list: alias, width, thresholds",
-    "description": "`column_list` picks the columns in order: `alias` renames the header, `width` fixes\nthe width, `thresholds` color a column's cells by value (>= 50 yellow, >= 90 red).\nThe query reads the argument `team` (shown above the table by `args_show`).\n",
+    "description": "`column_list` picks the columns in order: `alias` renames the header, `width` fixes\nthe width, `thresholds` give a column's cells a class by value (>= 50 `warning`,\n>= 90 `danger`). The query reads the argument `team` (shown above the table by\n`args_show`); `countdown { display: block }` shows the time to the next refresh.\n",
     "args_show": true,
     "column_list": [
      {
@@ -39,11 +41,11 @@
       "thresholds": [
        {
         "value": 50,
-        "color": "yellow"
+        "class": "warning"
        },
        {
         "value": 90,
-        "color": "red"
+        "class": "danger"
        }
       ]
      },
@@ -56,9 +58,13 @@
       "alias": "Status"
      },
      "team"
-    ],
-    "show_countdown": true,
-    "countdown_format": "Next update: {time}s"
+    ]
+   },
+   "style": {
+    "countdown": {
+     "display": "block",
+     "content": "Next update: {time}s"
+    }
    }
   },
   {
@@ -68,7 +74,7 @@
    "show": {
     "type": "table",
     "title": "thresholds_below: lower is worse",
-    "description": "`thresholds_below: true` turns the steps around: a value at or below a step gets\nits color (free space under 30% yellow, under 10% red).\n",
+    "description": "`thresholds_below: true` turns the steps around: a value at or below a step gets\nits class (free space under 30% `warning`, under 10% `danger`).\n",
     "column_list": [
      "volume",
      {
@@ -78,11 +84,11 @@
       "thresholds": [
        {
         "value": 30,
-        "color": "yellow"
+        "class": "warning"
        },
        {
         "value": 10,
-        "color": "red"
+        "class": "danger"
        }
       ]
      }
@@ -95,14 +101,16 @@
    },
    "show": {
     "type": "table",
-    "title": "sort, max_rows_shown",
-    "description": "`sort` orders the rows here, whatever the query did (DataTables `order`):\n`{ column, order: asc | desc }`, NULLs last. `max_rows_shown` shows the first N\nand says how many more there are.\n",
-    "style": {
-     "sort": {
-      "column": "ms",
-      "order": "desc"
-     },
-     "max_rows_shown": 5
+    "title": "sort, table { line-clamp }",
+    "description": "`sort` orders the rows here, whatever the query did (DataTables `order`):\n`{ column, order: asc | desc }`, NULLs last. `table { line-clamp: 5 }` shows the\nfirst 5 rows and says how many more there are.\n",
+    "sort": {
+     "column": "ms",
+     "order": "desc"
+    }
+   },
+   "style": {
+    "table": {
+     "line-clamp": 5
     }
    }
   },
@@ -112,8 +120,8 @@
    },
    "show": {
     "type": "table",
-    "title": "column_list: format, style, align",
-    "description": "`format` is a Python format for a numeric column (`{:,.2f}`, `{:.1%}`;\nDataTables `render`), `style` colors a whole column (AG Grid `cellStyle`), `align`\nis its CSS `text-align` (numbers are right-aligned by default).\n",
+    "title": "column_list: format, align; cell[column=...] color",
+    "description": "`format` is a Python format for a numeric column (`{:,.2f}`, `{:.1%}`;\nDataTables `render`), `align` is its text-align (numbers are right-aligned by\ndefault); the rule `cell[column=\"revenue\"] { color }` colors a whole column (AG\nGrid `cellStyle`).\n",
     "column_list": [
      {
       "column": "product",
@@ -121,8 +129,7 @@
      },
      {
       "column": "revenue",
-      "format": "{:,.2f}",
-      "style": "#98c379"
+      "format": "{:,.2f}"
      },
      {
       "column": "margin",
@@ -130,6 +137,11 @@
       "align": "left"
      }
     ]
+   },
+   "style": {
+    "cell[column=\"revenue\"]": {
+     "color": "#98c379"
+    }
    }
   },
   {
@@ -138,22 +150,20 @@
    },
    "show": {
     "type": "table",
-    "title": "row_thresholds: color whole rows",
-    "description": "`row_thresholds` colors every cell of a row by one column's value (AG Grid\n`rowStyle`): rows with 1+ errors yellow, 10+ red. `below: true` turns it around.\n",
-    "style": {
-     "row_thresholds": {
-      "column": "errors",
-      "steps": [
-       {
-        "value": 1,
-        "color": "yellow"
-       },
-       {
-        "value": 10,
-        "color": "red"
-       }
-      ]
-     }
+    "title": "row_thresholds: classes on whole rows",
+    "description": "`row_thresholds` gives a row a class by one column's value (AG Grid `rowStyle`):\nrows with 1+ errors `warning`, 10+ `danger`, which color every cell of the row.\n`below: true` turns it around.\n",
+    "row_thresholds": {
+     "column": "errors",
+     "steps": [
+      {
+       "value": 1,
+       "class": "warning"
+      },
+      {
+       "value": 10,
+       "class": "danger"
+      }
+     ]
     }
    }
   },
@@ -163,15 +173,27 @@
    },
    "show": {
     "type": "table",
-    "title": "compact and striped, null_text",
-    "description": "Bootstrap `.table-sm` (`cell_padding: 0`) and `.table-striped` (`striped`: the\nbackground of every other row), the header and border colors, and how NULL looks\n(`null_text`, `null_style`).\n",
-    "style": {
-     "cell_padding": 0,
-     "striped": "#2c313a",
-     "header_style": "bold #61afef",
-     "border_style": "#5c6370",
-     "null_text": "-",
-     "null_style": "italic #e06c75"
+    "title": "compact and striped, cell.null",
+    "description": "Bootstrap `.table-sm` (`cell { padding: 0 }`) and `.table-striped`\n(`row:nth-child(even) { background-color }`), the header and border colors, and how\nNULL looks (`cell.null { content, color, font-style }`).\n"
+   },
+   "style": {
+    "cell": {
+     "padding": 0
+    },
+    "row:nth-child(even)": {
+     "background-color": "#2c313a"
+    },
+    "header": {
+     "font-weight": "bold",
+     "color": "#61afef"
+    },
+    "table": {
+     "border-color": "#5c6370"
+    },
+    "cell.null": {
+     "content": "-",
+     "font-style": "italic",
+     "color": "#e06c75"
     }
    }
   },
@@ -181,12 +203,18 @@
    },
    "show": {
     "type": "table",
-    "title": "border: heavy, show_lines, caption: bottom",
-    "description": "One line style for the whole table (`border`: single, rounded, heavy, double,\ndashed, ascii; `false` / `none` for none; the default mixes a heavy header with a\nlight body), lines between the rows (`show_lines`), and the title under the table\n(`caption: bottom`, CSS `caption-side`).\n",
-    "style": {
-     "border": "heavy",
-     "show_lines": true,
-     "caption": "bottom"
+    "title": "table { border: heavy }, rule, caption-side",
+    "description": "One line style for the whole table (`table { border }`: single, rounded, heavy,\ndouble, dashed, ascii, none; the default `rich` mixes a heavy header with a light\nbody), lines between the rows (`rule { display: block }`), and the title under the\ntable (`panel-title { caption-side: bottom }`).\n"
+   },
+   "style": {
+    "table": {
+     "border": "heavy"
+    },
+    "rule": {
+     "display": "block"
+    },
+    "panel-title": {
+     "caption-side": "bottom"
     }
    }
   },
@@ -196,18 +224,20 @@
    },
    "show": {
     "type": "table",
-    "title": "wrap, cell_width, cell_height, column height",
-    "description": "Long cells wrap at spaces (`wrap: true`, the default; `\"char\"` breaks anywhere,\n`false` keeps one line cut with \"…\"), newlines in a value start a new line.\n`cell_width` / `cell_height` limit every column, `column_list[].width` / `height`\none column; a cell still too long ends with \"…\".\n",
+    "title": "wrapping; cell { width, height }, column height",
+    "description": "Long cells wrap at spaces (`cell { word-break: break-all }` breaks anywhere,\n`white-space: nowrap` keeps one line cut with \"…\"), newlines in a value start a new\nline. `cell { width, height }` limit every column, `column_list[].width` / `height`\none column; a cell still too long ends with `text-overflow` (\"…\").\n",
     "column_list": [
      {
       "column": "note",
       "height": 2
      },
      "lines"
-    ],
-    "style": {
-     "cell_width": 22,
-     "cell_height": 4
+    ]
+   },
+   "style": {
+    "cell": {
+     "width": 22,
+     "height": 4
     }
    }
   },
@@ -217,10 +247,12 @@
    },
    "show": {
     "type": "table",
-    "title": "border: false",
-    "description": "No border: plain columns under a rule (Bootstrap `.table-borderless`).",
-    "style": {
-     "border": false
+    "title": "table { border: none }",
+    "description": "No border: plain columns under a rule (Bootstrap `.table-borderless`)."
+   },
+   "style": {
+    "table": {
+     "border": "none"
     }
    }
   }

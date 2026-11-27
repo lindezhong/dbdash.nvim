@@ -19,11 +19,10 @@ args:
   - name: city
     default: "Zürich"
 
-show:
-  style: { panel_border: rounded, border_style: "#c678dd" }
-
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
+  panel: { border: rounded, border-color: "#c678dd" }
+  table: { border-color: "#c678dd" }
 
 panels:
   - query:

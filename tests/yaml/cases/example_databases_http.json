@@ -1,65 +1,98 @@
 {
  "title": "HTTP",
- "description": "HTTP APIs: a local nginx answers with lists, wrapped lists, redirects and cookies.\nNeeds `make it-up` (port 18080). See `:help dbdash-http`.\n",
+ "description": "HTTP APIs written as curl commands: lists, wrapped lists, a redirect, a JSON POST, a\nquoted argument and a login kept in a cookie file. Needs `make it-up` (port 18080).\nSee `:help dbdash-http`.\n",
  "database": {
   "url": "http://127.0.0.1:18080"
  },
- "show": {
-  "style": {
-   "title_align": "center",
+ "args": [
+  {
+   "name": "q",
+   "default": "it's a test",
+   "description": "Sent URL-encoded by the quoting panel"
+  }
+ ],
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "panel-title": {
+   "text-align": "center"
+  },
+  "panel": {
    "padding": [
     0,
     1
    ]
   }
  },
- "layout": {
-  "columns": 2
- },
  "panels": [
   {
    "query": {
-    "sql": "{\"path\": \"/items\"}"
+    "sql": "curl /items"
    },
    "show": {
     "type": "table",
     "title": "A JSON list of objects: rows as they are",
-    "description": "`{\"path\": \"/items\"}` GETs `http://127.0.0.1:18080/items`; a JSON list of objects is\nshown as rows without a transform.\n",
+    "description": "`curl /items` GETs `http://127.0.0.1:18080/items`; a JSON list of objects is shown as\nrows without a transform.\n",
     "interval": "1m"
    }
   },
   {
    "query": {
-    "sql": "{\"path\": \"/wrapped\", \"query\": {\"page\": 1}}",
+    "sql": "curl /wrapped -G -d page=1",
     "transform": "-- rs is the decoded body; response has status, headers, body and url.\nlocal out = {}\nfor _, it in ipairs(rs.data.items) do\n  out[#out + 1] = { name = it.name, n = it.n, total = rs.total, status = response.status }\nend\nreturn out\n"
    },
    "show": {
     "type": "table",
     "title": "A wrapped list: query.transform takes it out",
-    "description": "The rows are inside `data.items`: `query.transform` takes them out, and reads\n`response.status` too.\n",
+    "description": "`-G -d page=1` sends the data as URL parameters (`/wrapped?page=1`). The rows are\ninside `data.items`: `query.transform` takes them out, and reads `response.status`.\n",
     "interval": "1m"
    }
   },
   {
    "query": {
-    "sql": "{\"path\": \"/old\"}"
+    "sql": "curl -L /old"
    },
    "show": {
     "type": "table",
-    "title": "A redirect (301) followed",
-    "description": "`/old` answers 301; the redirect is followed (up to `redirects`, default 5).\n",
+    "title": "A redirect (301) followed with -L",
+    "description": "`/old` answers 301 to `/items`; as with curl, `-L` follows it (`--max-redirs N`\nlimits how many). Without `-L` the 301 itself is the answer, shown as an error.\n",
     "interval": "1m"
    }
   },
   {
    "query": {
-    "sql": "{% if meta.refresh_count == 1 %}{\"path\": \"/login\"}{% else %}{\"path\": \"/whoami\", \"cookies\": \"lang=zh\"}{% endif %}\n",
-    "transform": "-- The first refresh logs in (the server sets a cookie), later ones show what is sent.\nif response.url:find(\"/login\") then return { { cookie = \"(logged in; refresh with r)\" } } end\nreturn rs\n"
+    "sql": "curl -X POST /items \\\n  -H 'X-Request: dbdash' \\\n  --json '{\"limit\": 5}'\n"
    },
    "show": {
     "type": "table",
-    "title": "Cookies kept between refreshes",
-    "description": "The first refresh logs in and the server sets a cookie; later refreshes send it (and\nthe configured `cookies`) to `/whoami`, which echoes them. Press `r`.\n",
+    "title": "A POST with --json and a header",
+    "description": "`--json` sends a JSON body with its Content-Type and Accept (`-d` would send a form,\nas curl does); `-H` adds a header.\n",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "autoescape": true,
+    "sql": "curl /items -G --data-urlencode q={{ args.q }}"
+   },
+   "show": {
+    "type": "table",
+    "title": "An argument as one quoted word",
+    "args_show": true,
+    "description": "With `query.autoescape`, `{{ args.q }}` is written as a shell-quoted word, so a value\nsuch as `it's a test` cannot break the command (`| shell_quote` does the same\nwithout autoescape). `-G` moves the data, URL-encoded, to the URL: `?q=it%27s...`.\n",
+    "interval": "1m"
+   }
+  },
+  {
+   "query": {
+    "sql": "{% if meta.refresh_count == 1 %}curl /login -c .cookies.txt\n{%- else %}curl /whoami -b .cookies.txt -c .cookies.txt -b 'lang=zh'{% endif %}\n",
+    "transform": "-- The first refresh logs in (the server sets a cookie, written to .cookies.txt);\n-- later ones read it back and show what was sent.\nif response.url:find(\"/login\") then return { { cookie = \"(logged in; refresh with r)\" } } end\nreturn rs\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "A login kept in a cookie file (-b / -c)",
+    "description": "As with curl: the first refresh logs in and `-c .cookies.txt` writes the cookie the\nserver set (next to this file); later refreshes read it with `-b .cookies.txt` (and\nsend `-b 'lang=zh'` too) to `/whoami`, which echoes them. Press `r`. A config that\nwrites a cookie file asks whether you trust it first.\n",
     "interval": "5s"
    }
   }

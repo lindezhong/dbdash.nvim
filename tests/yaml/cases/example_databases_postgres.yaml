@@ -28,11 +28,10 @@ args:
     type: int
     default: 5
 
-show:
-  style: { panel_border: rounded, border_style: "#61afef" }
-
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
+  panel: { border: rounded, border-color: "#61afef" }
+  table: { border-color: "#61afef" }
 
 panels:
   - query:
@@ -86,4 +85,5 @@ panels:
       description: |
         The sessions of this database; `query.max_rows` and `query.timeout` limit the query.
       interval: 10s
-      span: 2
+    style:
+      panel: { grid-column: span 2 }

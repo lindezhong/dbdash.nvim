@@ -1,14 +1,16 @@
 {
  "title": "Stat",
- "description": "A stat shows one value in large digits, its change since the previous refresh and a\nsparkline of the last refreshes. The value is the first row of `value_column` (default:\nthe first numeric column), or `reduce` of all rows. See `:help dbdash-chart-types`.\n",
+ "description": "A stat shows one value in large digits, its change since the previous refresh and a\nsparkline of the last refreshes. The value is the first row of `value_column` (default:\nthe first numeric column), or `reduce` of all rows. See `:help dbdash-charts`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "show": {
   "interval": "5s"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -18,19 +20,19 @@
    "show": {
     "type": "stat",
     "title": "format, unit, thresholds (notify)",
-    "description": "`format` is a Python format (\"{:,}\"), `unit` follows the value. `thresholds` color it\n(>= 1000 yellow, >= 1190 red); a step with `notify: true` also notifies once when the\nvalue rises to it.\n",
+    "description": "`format` is a Python format (\"{:,}\"), `unit` follows the value. `thresholds` give the\nvalue a class (>= 1000 `warning`, >= 1190 `danger`), which the default style sheet\ncolors; a step with `notify: true` also notifies once when the value rises to it.\n",
     "value_column": "users",
     "format": "{:,}",
     "unit": "users",
     "thresholds": [
      {
       "value": 1000,
-      "color": "yellow"
+      "class": "warning"
      },
      {
       "value": 1190,
-      "color": "red",
-      "notify": true
+      "notify": true,
+      "class": "danger"
      }
     ]
    }
@@ -48,11 +50,11 @@
     "thresholds": [
      {
       "value": 30,
-      "color": "yellow"
+      "class": "warning"
      },
      {
       "value": 10,
-      "color": "red"
+      "class": "danger"
      }
     ],
     "delta_mode": "absolute"
@@ -78,20 +80,29 @@
    },
    "show": {
     "type": "stat",
-    "title": "color_mode: background, sparkline_length",
-    "description": "`color_mode: background` shows the value reversed, in its color as the background\n(Grafana `colorMode`; `none` leaves it plain). `sparkline_length: 40` keeps the last 40\nrefreshes.\n",
-    "color_mode": "background",
+    "title": "background color by class, sparkline_length",
+    "description": "Grafana's `colorMode: background` is a style rule: `value.success { background-color }`\nputs the threshold's color behind the value. `sparkline_length: 40` keeps the last 40\nrefreshes.\n",
     "sparkline_length": 40,
     "thresholds": [
      {
       "value": 0,
-      "color": "green"
+      "class": "success"
      },
      {
       "value": 400,
-      "color": "red"
+      "class": "danger"
      }
     ]
+   },
+   "style": {
+    "value.success": {
+     "background-color": "DiagnosticOk",
+     "color": "#282c34"
+    },
+    "value.danger": {
+     "background-color": "DiagnosticError",
+     "color": "#282c34"
+    }
    }
   },
   {
@@ -100,12 +111,20 @@
    },
    "show": {
     "type": "stat",
-    "title": "text_size: normal, delta: false, sparkline: false",
-    "description": "`text_size: normal` writes the value on one line instead of block digits; `delta:\nfalse` and `sparkline: false` hide the second line.\n",
-    "format": "{:.2f} ms",
-    "text_size": "normal",
-    "delta": false,
-    "sparkline": false
+    "title": "value { font-size: normal }, no delta and sparkline",
+    "description": "`value { font-size: normal }` writes the value on one line instead of block digits;\n`delta` and `sparkline { display: none }` hide the second line.\n",
+    "format": "{:.2f} ms"
+   },
+   "style": {
+    "value": {
+     "font-size": "normal"
+    },
+    "delta": {
+     "display": "none"
+    },
+    "sparkline": {
+     "display": "none"
+    }
    }
   },
   {
@@ -116,7 +135,6 @@
     "type": "stat",
     "title": "value_columns: several values",
     "description": "`value_columns` shows several values side by side (a Grafana stat with several fields),\neach a column name or `{ column, label, format, unit, prefix }`. The change and\nsparkline follow the first value.\n",
-    "span": 2,
     "value_columns": [
      "orders",
      {
@@ -130,6 +148,11 @@
       "prefix": "-"
      }
     ]
+   },
+   "style": {
+    "panel": {
+     "grid-column": "span 2"
+    }
    }
   }
  ]

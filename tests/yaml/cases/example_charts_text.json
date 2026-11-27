@@ -1,14 +1,16 @@
 {
  "title": "Text",
- "description": "A text chart shows the result without a table: each row is its cells joined by\n`style.separator`; newlines in a cell start new lines and long lines wrap. Good for\nlogs, messages and `lua://` output. See `:help dbdash-chart-types`.\n",
+ "description": "A text chart shows the result without a table: each row is its cells joined by\n`separator`; newlines in a cell start new lines and long lines wrap. Good for\nlogs, messages and `lua://` output. See `:help dbdash-charts`.\n",
  "database": {
   "url": "sqlite3:///:memory:"
  },
  "show": {
   "interval": "5m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -24,8 +26,38 @@
      "level",
      "message"
     ],
-    "style": {
-     "separator": " │ "
+    "separator": " │ "
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 12)\nSELECT strftime('%H:%M:%S', 'now', '-' || (12 - i) || ' minutes') AS at,\n       CASE WHEN i % 5 = 0 THEN 'ERROR' WHEN i % 3 = 0 THEN 'WARN ' ELSE 'INFO ' END AS level,\n       'request ' || i || ' served in ' || (i * 37 % 200) || ' ms' AS message\nFROM n\n"
+   },
+   "show": {
+    "type": "text",
+    "title": "highlight, reverse, line numbers",
+    "description": "`highlight` gives the lines that match a Vim regex a class (the first rule wins),\ncolored by `line.<class>` rules; `reverse` puts the last row first (newest on top),\n`line-number { display: block }` numbers the rows.\n",
+    "reverse": true,
+    "highlight": [
+     {
+      "pattern": "ERROR",
+      "class": "error"
+     },
+     {
+      "pattern": "WARN",
+      "class": "warn"
+     }
+    ]
+   },
+   "style": {
+    "line-number": {
+     "display": "block"
+    },
+    "line.error": {
+     "color": "#e06c75"
+    },
+    "line.warn": {
+     "color": "#e5c07b"
     }
    }
   },
@@ -35,34 +67,14 @@
    },
    "show": {
     "type": "text",
-    "title": "highlight, reverse, line_numbers",
-    "description": "`highlight` colors the lines that match a Vim regex (the first rule wins), `reverse`\nputs the last row first (newest on top), `line_numbers` numbers the rows.\n",
-    "style": {
-     "reverse": true,
-     "line_numbers": true,
-     "highlight": [
-      {
-       "pattern": "ERROR",
-       "color": "#e06c75"
-      },
-      {
-       "pattern": "WARN",
-       "color": "#e5c07b"
-      }
-     ]
-    }
-   }
-  },
-  {
-   "query": {
-    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 12)\nSELECT strftime('%H:%M:%S', 'now', '-' || (12 - i) || ' minutes') AS at,\n       CASE WHEN i % 5 = 0 THEN 'ERROR' WHEN i % 3 = 0 THEN 'WARN ' ELSE 'INFO ' END AS level,\n       'request ' || i || ' served in ' || (i * 37 % 200) || ' ms' AS message\nFROM n\n"
+    "title": "chart { line-clamp }, line { color }",
+    "description": "`chart { line-clamp: 5 }` shows the first 5 lines and how many more there are;\n`line { color }` colors the text.\n"
    },
-   "show": {
-    "type": "text",
-    "title": "max_lines, color",
-    "description": "`max_lines` shows the first N lines and how many more there are; `style.color` colors\nthe text (CSS `color`).\n",
-    "style": {
-     "max_lines": 5,
+   "style": {
+    "chart": {
+     "line-clamp": 5
+    },
+    "line": {
      "color": "#98c379"
     }
    }
@@ -74,7 +86,7 @@
    "show": {
     "type": "text",
     "title": "wrap (default), newlines",
-    "description": "Long lines wrap at spaces (`wrap: true`, CSS `white-space: normal`; `\"char\"` breaks\nanywhere); newlines in a cell start new lines.\n"
+    "description": "Long lines wrap at spaces (`line { white-space: normal }`, the default;\n`word-break: break-all` breaks anywhere); newlines in a cell start new lines.\n"
    }
   },
   {
@@ -83,11 +95,13 @@
    },
    "show": {
     "type": "text",
-    "title": "wrap: false, ellipsis",
-    "description": "`wrap: false` keeps one line per row and cuts it at the edge (`ellipsis` marks the cut,\nCSS `text-overflow`).\n",
-    "style": {
-     "wrap": false,
-     "ellipsis": "…"
+    "title": "white-space: nowrap, text-overflow",
+    "description": "`line { white-space: nowrap }` keeps one line per row and cuts it at the edge\n(`text-overflow: \"…\"` marks the cut; the default `clip` does not).\n"
+   },
+   "style": {
+    "line": {
+     "white-space": "nowrap",
+     "text-overflow": "…"
     }
    }
   },
@@ -97,11 +111,15 @@
    },
    "show": {
     "type": "text",
-    "title": "text_align: center, null_text",
-    "description": "`text_align` is CSS `text-align` for the lines (left, center, right); `null_text` is\nwhat a NULL shows (default nothing).\n",
-    "style": {
-     "text_align": "center",
-     "null_text": "(none)"
+    "title": "line { text-align: center }, cell.null",
+    "description": "`line { text-align }` aligns the lines (left, center, right); `cell.null { content }`\nis what a NULL shows (default nothing).\n"
+   },
+   "style": {
+    "line": {
+     "text-align": "center"
+    },
+    "cell.null": {
+     "content": "(none)"
     }
    }
   }

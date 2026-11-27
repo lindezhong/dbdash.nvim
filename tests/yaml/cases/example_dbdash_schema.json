@@ -2,7 +2,7 @@
  "$schema": "http://json-schema.org/draft-07/schema#",
  "$id": "dbdash.schema.yaml",
  "title": "dbdash.nvim dashboard",
- "description": "One dashboard: either a single chart (database / query / show) or several panels (panels / layout). Top-level bare fields (interval, args, layout) are dashboard-wide; the top-level database, query and show are the panels' defaults (without panels: the only panel). See :help dbdash-config.",
+ "description": "One dashboard: either a single chart (database / query / show) or several panels (panels). Top-level bare fields (interval, args, style) are dashboard-wide; the top-level database, query and show are the panels' defaults (without panels: the only panel). All appearance is in style sheets (style, panels[].style). See :help dbdash-config.",
  "type": "object",
  "if": {
   "required": [
@@ -24,11 +24,6 @@
      "title": false,
      "subtitle": false,
      "description": false,
-     "span": false,
-     "area": false,
-     "row": false,
-     "column": false,
-     "row_span": false,
      "column_list": false,
      "x_label": false,
      "y_label": false
@@ -42,16 +37,6 @@
  "else": {
   "required": [
    "database"
-  ],
-  "not": {
-   "required": [
-    "layout"
-   ]
-  }
- },
- "dependencies": {
-  "show_countdown": [
-   "interval"
   ]
  },
  "properties": {
@@ -65,7 +50,7 @@
   },
   "show": {
    "$ref": "#/definitions/show",
-   "description": "The single chart's show; with panels, defaults of every panel's show (interval, show_countdown, countdown_format, args_show, refresh_hidden, style, ...), merged key by key."
+   "description": "The single chart's show; with panels, defaults of every panel's show (interval, args_show, refresh_hidden, axes, ...), merged key by key."
   },
   "interval": {
    "$ref": "#/definitions/duration",
@@ -79,15 +64,6 @@
    "type": "string",
    "description": "The dashboard's description: a template (the shared args; meta without panel fields; it cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe; ⓘ in the header says there is one."
   },
-  "show_countdown": {
-   "type": "boolean",
-   "default": false,
-   "description": "Count down to the next refresh of every panel (needs interval), right of the title."
-  },
-  "countdown_format": {
-   "type": "string",
-   "description": "Text of that countdown ({time} seconds, {clock} m:ss; default setup defaults.countdown_format)."
-  },
   "args": {
    "type": "array",
    "description": "Shared arguments: every panel can use them. A panel's query.args are its own (only that panel sees them) and shadow a shared argument of the same name there. On the command line name=value sets every argument of that name, <panel id>.name=value one panel's own (a local name nothing else has is plain name too).",
@@ -95,73 +71,14 @@
     "$ref": "#/definitions/arg"
    }
   },
-  "layout": {
-   "type": "object",
-   "description": "Grid layout for panels.",
-   "additionalProperties": false,
-   "properties": {
-    "columns": {
-     "description": "Column tracks (CSS grid-template-columns): a number of equal columns, a string (\"1fr 2fr 30\", \"repeat(3, 1fr)\") or a list. Tracks: an integer (display columns), \"N%\", \"Nfr\", auto (1fr) or \"minmax(a, b)\". Default 1, or the width of areas. See :help dbdash-layout.",
-     "oneOf": [
-      {
-       "type": "integer",
-       "minimum": 1
-      },
-      {
-       "type": "string"
-      },
-      {
-       "type": "array",
-       "minItems": 1,
-       "items": {
-        "$ref": "#/definitions/track"
-       }
-      }
-     ]
-    },
-    "rows": {
-     "description": "The first row tracks (CSS grid-template-rows): an integer (lines), \"Nfr\", auto (minmax(min-content, max-content)), min-content, max-content or \"minmax(a, b)\".",
-     "oneOf": [
-      {
-       "type": "string"
-      },
-      {
-       "type": "array",
-       "items": {
-        "$ref": "#/definitions/track"
-       }
-      }
-     ]
-    },
-    "auto_rows": {
-     "$ref": "#/definitions/track",
-     "description": "Rows past layout.rows (CSS grid-auto-rows; default auto)."
-    },
-    "gap": {
-     "type": "integer",
-     "minimum": 0,
-     "default": 2,
-     "description": "Spaces between columns (column-gap)."
-    },
-    "row_gap": {
-     "type": "integer",
-     "minimum": 0,
-     "default": 1,
-     "description": "Blank lines between rows (row-gap)."
-    },
-    "areas": {
-     "type": "array",
-     "items": {
-      "type": "string"
-     },
-     "description": "Named areas (CSS grid-template-areas): one string per row, names separated by spaces, \".\" for an empty cell; each name must be a rectangle. Panels go into one with show.area."
-    }
-   }
+  "style": {
+   "$ref": "#/definitions/style",
+   "description": "The dashboard's style sheet (author origin): above setup({ style }), below a panel's own style. The grid is dashboard { grid-template-columns, ... }; see :help dbdash-css."
   },
   "panels": {
    "type": "array",
    "minItems": 1,
-   "description": "Charts placed left to right, wrapping into rows (see show.span).",
+   "description": "Charts in a CSS grid (style dashboard { grid-template-* }, panel { grid-* }).",
    "items": {
     "$ref": "#/definitions/panel"
    }
@@ -188,6 +105,137 @@
     "url"
    ],
    "additionalProperties": false,
+   "allOf": [
+    {
+     "if": {
+      "required": [
+       "url"
+      ],
+      "properties": {
+       "url": {
+        "pattern": "^sqlite3?://"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "options": {
+        "propertyNames": {
+         "enum": [
+          "lib_path",
+          "readonly",
+          "create"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "required": [
+       "url"
+      ],
+      "properties": {
+       "url": {
+        "pattern": "^exec://"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "options": {
+        "propertyNames": {
+         "enum": [
+          "interpreter",
+          "capture",
+          "delimiter",
+          "ok_codes",
+          "cwd",
+          "env",
+          "stdin"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "required": [
+       "url"
+      ],
+      "properties": {
+       "url": {
+        "pattern": "^luastream://"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "options": {
+        "propertyNames": {
+         "enum": [
+          "cwd",
+          "delimiter"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "required": [
+       "url"
+      ],
+      "properties": {
+       "url": {
+        "pattern": "^webhook://"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "options": {
+        "propertyNames": {
+         "enum": [
+          "tokens",
+          "delimiter",
+          "stream_types",
+          "max_body",
+          "max_connections",
+          "timeout",
+          "allowed_origins",
+          "allowed_hosts"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "required": [
+       "url"
+      ],
+      "properties": {
+       "url": {
+        "not": {
+         "pattern": "^(sqlite3?|exec|luastream|webhook)://"
+        }
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "options": {
+        "maxProperties": 0
+       }
+      }
+     }
+    }
+   ],
    "properties": {
     "type": {
      "description": "Database type; inferred from the URL scheme when omitted.",
@@ -215,7 +263,7 @@
     },
     "url": {
      "type": "string",
-     "description": "Connection URL: <scheme>://[user[:password]@]host[:port][/database][?param=value&...]\nUser names and passwords are percent-decoded (write @ as %40, : as %3A).\n${NAME} is replaced by the environment variable NAME ($${ for a literal ${).\nWithout a password in the URL: password_cmd, then\nstdpath(\"data\")/dbdash/passwords.json (see :help dbdash-passwords).\n\nSQLite      sqlite:///absolute/path.db                (or sqlite3://)\n            sqlite://relative/to/this/config.db\n            sqlite:///:memory:\nPostgreSQL  postgres://user:pass@host:5432/db        (or postgresql://)\n            auth: cleartext, md5, SCRAM-SHA-256; ?options=-c%20search_path%3Dapp\nMySQL       mysql://user:pass@host:3306/db           (or mariadb://)\n            auth: mysql_native_password, caching_sha2_password\nRedis       redis://[user]:pass@host:6379/0          (rediss:// = TLS)\nMongoDB     mongodb://user:pass@host:27017/db?authSource=admin\n            mongodb://user:pass@h1:27017,h2:27017/db?readPreference=secondaryPreferred\n            mongodb+srv://user:pass@cluster0.example.net/db   (SRV + TXT lookup,\n            defaults to tls=verify-full; ?dns=host:port picks the name server)\n            ?authMechanism=SCRAM-SHA-256|SCRAM-SHA-1\nCassandra   cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_QUORUM\n            (or cql://)\nSQL Server  mssql://user:pass@host:1433/db            (or sqlserver://)\n            with TLS: TLS negotiated inside TDS; &encrypt=strict for TDS 8\nLua         lua://   query.sql is Lua code returning rows (:help dbdash-lua)\nHTTP        https://user:pass@api.example.com/v1?key=value   (or http://)\n            query.sql describes the request (:help dbdash-http); https\n            defaults to tls=verify-full; other ?parameters go to the server\n\nPush sources: data arrives instead of being queried (:help dbdash-push)\nLua stream  luastream://   query.sql is Lua whose print() / io.write() output is\n            the data (:help dbdash-luastream)\nScript      exec://        query.sql is a script; its output is the data\n            (:help dbdash-exec)\nWebhook     webhook://127.0.0.1:8765/path   an HTTP endpoint; query.sql is an\n            OpenAPI document (:help dbdash-webhook)\n\nCommon parameters:\n  tls=disable|require|pin|verify-ca|verify-full   (default disable)\n  fingerprint=sha256:AB:CD:...                    (required for tls=pin)\n  ca=path/to/ca.pem                              (verify-*: trusted CAs instead of\n                                                  the system store; relative to\n                                                  this config file)\n  tls_host=name                                  (name to verify instead of host)\n  connect_timeout=10s   timeout=30s              (defaults: setup)\n  application_name=dbdash.nvim",
+     "description": "Connection URL:\n  <scheme>://[user[:password]@]host[:port][/database][?k=v]\nUser names and passwords are percent-decoded (write @ as %40, :\nas %3A). ${NAME} is replaced by the environment variable NAME\n($${ for a literal ${). Without a password in the URL:\npassword_cmd, then stdpath(\"data\")/dbdash/passwords.json (see\n:help dbdash-passwords).\n\nSQLite      sqlite:///absolute/path.db     (or sqlite3://)\n            sqlite://relative/to/this/config.db\n            sqlite:///:memory:\nPostgreSQL  postgres://user:pass@host:5432/db  (or postgresql://)\n            auth: cleartext, md5, SCRAM-SHA-256;\n            ?options=-c%20search_path%3Dapp\nMySQL       mysql://user:pass@host:3306/db     (or mariadb://)\n            auth: mysql_native_password, caching_sha2_password\nRedis       redis://[user]:pass@host:6379/0    (rediss://: TLS)\nMongoDB     mongodb://user:pass@host:27017/db?authSource=admin\n            mongodb://user:pass@h1:27017,h2:27017/db\n              ?readPreference=secondaryPreferred\n            mongodb+srv://user:pass@cluster0.example.net/db\n              (SRV + TXT lookup, defaults to tls=verify-full;\n              ?dns=host:port picks the name server)\n            ?authMechanism=SCRAM-SHA-256|SCRAM-SHA-1\nCassandra   cassandra://user:pass@host:9042/keyspace (or cql://)\n              ?consistency=LOCAL_QUORUM\nSQL Server  mssql://user:pass@host:1433/db     (or sqlserver://)\n            with TLS: TLS negotiated inside TDS;\n            &encrypt=strict for TDS 8\nLua         lua://   query.sql is Lua code returning rows\n            (:help dbdash-lua)\nHTTP        https://user:pass@api.example.com/v1?key=value\n            (or http://) query.sql is a curl command\n            (:help dbdash-http); https defaults to\n            tls=verify-full; other ?parameters go to the server\n\nPush sources: data arrives instead of being queried\n(:help dbdash-push)\nLua stream  luastream://   query.sql is Lua whose print() /\n            io.write() output is the data\n            (:help dbdash-luastream)\nScript      exec://   query.sql is a script; its output is the\n            data (:help dbdash-exec)\nWebhook     webhook://127.0.0.1:8765/path   an HTTP endpoint;\n            query.sql is an OpenAPI document\n            (:help dbdash-webhook)\n\nCommon parameters:\n  tls=disable|require|pin|verify-ca|verify-full\n                                       (default disable)\n  fingerprint=sha256:AB:CD:...         (required for tls=pin)\n  ca=path/to/ca.pem                    (verify-*: trusted CAs\n                                        instead of the system\n                                        store; relative to this\n                                        config file)\n  tls_host=name                        (name to verify instead of\n                                        host)\n  connect_timeout=10s   timeout=30s    (defaults: setup)\n  application_name=dbdash.nvim",
      "examples": [
       "sqlite:///:memory:",
       "sqlite://data/app.db",
@@ -224,7 +272,7 @@
       "redis://:secret@cache:6379/0",
       "mongodb+srv://reader:secret@cluster0.example.net/shop",
       "cassandra://cassandra:cassandra@127.0.0.1:9042/metrics",
-      "mssql://sa:Secret1@sqlhost:1433/master?tls=pin&fingerprint=sha256:AB:...",
+      "mssql://sa:pw@sqlhost/master?tls=pin&fingerprint=sha256:AB:",
       "lua://",
       "https://api.example.com/v1?api_key=${API_KEY}",
       "luastream://",
@@ -253,7 +301,7 @@
     },
     "options": {
      "type": "object",
-     "description": "Driver options.",
+     "description": "Driver options: each driver reads its own (SQLite, exec://, luastream://, webhook://); the other databases take none. An unknown one is an error.",
      "properties": {
       "lib_path": {
        "type": "string",
@@ -428,16 +476,16 @@
   },
   "query": {
    "type": "object",
-   "description": "The query; sql is required except for http(s):// (an empty request GETs the URL) and webhook:// (empty: POST or PUT of anything).",
+   "description": "The query; sql is required except for webhook:// (empty: POST or PUT of anything). For http(s):// it is a curl command (curl alone GETs the URL).",
    "additionalProperties": false,
    "properties": {
     "sql": {
      "type": "string",
-     "description": "Query template (Jinja2, see :help dbdash-templates): arguments are\n{{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta, e.g.\nrun records with ids, times and results: meta.run (meta.run.kind: \"refresh\" or\n\"callback\"; meta.run.depth: 0 in a refresh, n in a callback), meta.runs,\nmeta.prev, meta.prev_ok (the last successful refresh, its rows in\nmeta.prev_ok.result): :help dbdash-runs), and\n{% set args.<name> = value %} sets an argument (:help dbdash-assign-args). Lua\nruns in {% lua %} ... {% endlua %} blocks and in modules imported with\n{% import 'x.lua' as h %} (:help dbdash-template-lua), with args, meta, store and\nthe dbdash.* helpers (dbdash.run(args): this query again with other arguments);\na config with Lua is trusted once, with the files it imports (:help dbdash-lua).\nIts language depends on the database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\": {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)\n  lua://         Lua code returning rows (see \"Result format\" at the top\n                 of this file, :help dbdash-result), or a value that\n                 query.transform turns into rows; it sees args, meta,\n                 store and dbdash.system/query/sleep/run (:help\n                 dbdash-lua)\n  luastream://   Lua code whose print() / io.write() output is cut into\n                 items (dbdash.emit(value) passes one as it is)\n  exec://        a script run by database.options.interpreter\n  webhook://     an OpenAPI 3.1 document (YAML or JSON) describing the\n                 requests it accepts (empty: POST or PUT of anything)\n  http(s)://     a JSON request description (empty: GET the URL):\n                 {\"method\": \"POST\", \"path\": \"/search\", \"query\": {...},\n                  \"headers\": {...}, \"cookies\": \"a=1; b=2\" | \"cookies.txt\",\n                  \"body\": {...} | \"text\", \"form\": {...}, \"redirects\": 5}\n                 JSON responses are decoded, other bodies stay text; the\n                 result must be rows (\"Result format\", :help\n                 dbdash-result): a JSON list of objects or {\"columns\",\n                 \"rows\"} shows directly, anything else needs\n                 query.transform (:help dbdash-http)"
+     "description": "Query template (Jinja2, see :help dbdash-templates): arguments\n  are\n{{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta,\n  e.g.\nrun records with ids, times and results: meta.run (meta.run.kind:\n  \"refresh\"\n    or\n\"callback\"; meta.run.depth: 0 in a refresh, n in a callback),\n  meta.runs,\nmeta.prev, meta.prev_ok (the last successful refresh, its rows in\nmeta.prev_ok.result): :help dbdash-runs), and\n{% set args.<name> = value %} sets an argument (:help\n  dbdash-assign-args).\n    Lua\nruns in {% lua %} ... {% endlua %} blocks and in modules imported\n  with\n{% import 'x.lua' as h %} (:help dbdash-template-lua), with args,\n  meta, store\n    and\nthe dbdash.* helpers (dbdash.run(args): this query again with\n  other\n    arguments);\na config with Lua is trusted once, with the files it imports\n  (:help\n    dbdash-lua).\nIts language depends on the database:\n  SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)\n  Redis          one command, e.g. HGETALL \"user:1001\"\n  MongoDB        a JSON document:\n                 {\"collection\": \"orders\", \"operation\": \"find\",\n                  \"filter\": {...}, \"projection\": {...}, \"sort\":\n                    {...},\n                  \"limit\": 100, \"flatten\": 1}\n                 operation: find | aggregate (pipeline) | count |\n                 distinct (field) | command (command)\n  lua://         Lua code returning rows (see \"Result format\" at\n                 the\n                   top\n                 of this file, :help dbdash-result), or a value\n                   that\n                 query.transform turns into rows; it sees args,\n                   meta,\n                 store and dbdash.system/query/sleep/run (:help\n                 dbdash-lua)\n  luastream://   Lua code whose print() / io.write() output is\n                 cut\n                   into\n                 items (dbdash.emit(value) passes one as it is)\n  exec://        a script run by database.options.interpreter\n  webhook://     an OpenAPI 3.1 document (YAML or JSON)\n                 describing\n                   the\n                 requests it accepts (empty: POST or PUT of\n                   anything)\n  http(s)://     a curl command whose URL is a path under\n                 database.url\n                 (curl alone: GET the URL), with curl's options\n                   and\n                 defaults, e.g.\n                   curl -X POST /search -H 'X-Token: t' -G \\\n                     --data-urlencode q=x -b jar.txt -c jar.txt \\\n                     --json '{\"limit\": 5}' -L\n                 (query.autoescape writes {{ }} values as shell\n                   words;\n                 -c writes a cookie file next to the config);\n                 JSON responses are decoded, other bodies stay\n                   text;\n                     the\n                 result must be rows (\"Result format\", :help\n                 dbdash-result): a JSON list of objects or\n                   {\"columns\",\n                 \"rows\"} shows directly, anything else needs\n                 query.transform (:help dbdash-http)"
     },
     "transform": {
      "type": "string",
-     "description": "Lua code that reshapes the result of any database before it is shown (after the\nsame template as query.sql - args, meta, {% lua %}, .lua imports - without\nautoescape; :help dbdash-transform). Every query goes:\nquery -> transform -> rows check. It gets\n  rs        SQL and other databases: { columns (names), types, rows (nil for\n            NULL) }; lua://: the script's value; http(s)://: the decoded body;\n            push sources: one item (text, or what dbdash.emit() or a request\n            gave; :help dbdash-push)\n  response  http(s)://: { status, reason, headers, body, url }\n  stream    exec://: \"stdout\" or \"stderr\", the stream the item came from\n  params    webhook://: { path, query, header, cookie }, converted\n  request   webhook://: { method, path, operation_id, content_type, headers }\n  args      the arguments, meta the metadata, store the panel's table kept while\n            the dashboard runs, and the dbdash.* helpers (dbdash.run(args)\n            runs this panel's query again with other arguments)\nand returns rows (see \"Result format\" at the top of this file, :help\ndbdash-result). Configs with Lua ask for trust first (:help dbdash-lua)."
+     "description": "Lua code that reshapes the result of any database before it is\n  shown (after\n    the\nsame template as query.sql - args, meta, {% lua %}, .lua imports\n  - without\nautoescape; :help dbdash-transform). Every query goes:\nquery -> transform -> rows check. It gets\n  rs        SQL and other databases: { columns (names), types,\n            rows (nil\n              for\n            NULL) }; lua://: the script's value; http(s)://: the\n              decoded\n                body;\n            push sources: one item (text, or what dbdash.emit()\n              or a\n                request\n            gave; :help dbdash-push)\n  response  http(s)://: { status, reason, headers, body, url }\n  stream    exec://: \"stdout\" or \"stderr\", the stream the item\n            came\n              from\n  params    webhook://: { path, query, header, cookie },\n            converted\n  request   webhook://: { method, path, operation_id,\n            content_type, headers\n              }\n  args      the arguments, meta the metadata, store the panel's\n            table kept\n              while\n            the dashboard runs, and the dbdash.* helpers\n              (dbdash.run(args)\n            runs this panel's query again with other arguments)\nand returns rows (see \"Result format\" at the top of this file,\n  :help\ndbdash-result). Configs with Lua ask for trust first (:help\n  dbdash-lua)."
     },
     "args": {
      "type": "array",
@@ -482,6 +530,10 @@
     },
     "show": {
      "$ref": "#/definitions/show"
+    },
+    "style": {
+     "$ref": "#/definitions/style",
+     "description": "This panel's style sheet (inline origin): its rules match only in this panel and win over the dashboard's (e.g. panel { grid-column: \"span 2\" }, chart { renderer: vertical })."
     }
    }
   },
@@ -500,10 +552,8 @@
        "type": "string"
       },
       "label": {
-       "type": "string"
-      },
-      "color": {
-       "$ref": "#/definitions/color"
+       "type": "string",
+       "description": "The legend label; series.<label> in style sheets."
       }
      }
     }
@@ -523,7 +573,12 @@
   },
   "color": {
    "type": "string",
-   "description": "Hex (\"#3498db\"), a color name (\"blue\", \"bright_blue\"), a style (\"bold blue on black\"), or an existing highlight group (\"DiagnosticOk\")."
+   "description": "Hex (\"#3498db\"), a color name (\"blue\", \"bright_blue\"), or an existing highlight group (\"DiagnosticOk\")."
+  },
+  "class": {
+   "type": "string",
+   "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$",
+   "description": "A class name for style sheets (.<class>); success, info, warning and danger are colored by default."
   },
   "show": {
    "type": "object",
@@ -560,73 +615,10 @@
      "$ref": "#/definitions/duration",
      "description": "Refresh interval of this chart (default the top-level show.interval, then the top-level interval, else 30s from setup defaults.interval). At least 1s."
     },
-    "show_countdown": {
-     "type": "boolean",
-     "default": false,
-     "description": "This chart's own countdown to its next refresh."
-    },
     "refresh_hidden": {
      "type": "boolean",
      "default": false,
      "description": "Keep refreshing this chart while the dashboard is not visible (paused, see dashboard.pause_hidden in setup): thresholds and errors still notify."
-    },
-    "countdown_format": {
-     "type": "string",
-     "default": "Next update: {time}s",
-     "description": "{time} is replaced by the seconds left, {clock} by m:ss (default: setup defaults.countdown_format)."
-    },
-    "renderer": {
-     "type": "string",
-     "description": "Style for the chart type (the first one is the default):\n  table: box          line: canvas, asciichart     scatter/area/bubble: canvas\n  bar: horizontal, vertical    histogram: horizontal, vertical\n  boxplot: boxdraw, vertical    heatmap: halfblock, block    pie: bar, circle\n  stat: big           text: plain\nCustom styles registered with setup({ register = ... }) are accepted too."
-    },
-    "canvas": {
-     "type": "string",
-     "description": "Pixel canvas for canvas styles: braille (default), quadrant, block, halfblock, ascii."
-    },
-    "palette": {
-     "type": "string",
-     "description": "Series colors: theme (default, follows the colorscheme) or tableau."
-    },
-    "width": {
-     "type": "integer",
-     "minimum": 20,
-     "description": "Maximum chart width (default the window)."
-    },
-    "height": {
-     "type": "integer",
-     "minimum": 3,
-     "description": "Plot rows (default: setup defaults.height, else 15)."
-    },
-    "span": {
-     "type": "integer",
-     "minimum": 1,
-     "default": 1,
-     "description": "Grid columns this panel spans."
-    },
-    "row_span": {
-     "type": "integer",
-     "minimum": 1,
-     "default": 1,
-     "description": "Grid rows this panel spans."
-    },
-    "row": {
-     "type": "integer",
-     "minimum": 1,
-     "description": "Grid row of this panel (CSS grid-row; 1-based)."
-    },
-    "column": {
-     "type": "integer",
-     "minimum": 1,
-     "description": "Grid column of this panel (CSS grid-column; 1-based)."
-    },
-    "area": {
-     "type": "string",
-     "description": "A name of layout.areas to place this panel in (CSS grid-area)."
-    },
-    "min_height": {
-     "type": "integer",
-     "minimum": 1,
-     "description": "Smallest plot rows in a grid before it scrolls (default: setup defaults.min_height, else 8)."
     },
     "args_show": {
      "description": "Show argument values above this chart: true for the arguments its query reads (and its own query.args; not those with show: false), or a list of names.",
@@ -643,442 +635,6 @@
      ],
      "default": false
     },
-    "style": {
-     "type": "object",
-     "description": "Styles, after CSS (:help dbdash-css); every chart type takes the common ones:\n  color, background, title_style, title_align, header_style, axis_style,\n  label_style, legend_style, value_style, null_style, border_style, border,\n  panel_border, padding, justify, align, ellipsis, show_title, show_axes\nChart options:\n  table      border, header_style, border_style, title_style, show_lines, null_text,\n             wrap (true: long cells wrap at spaces; \"char\": anywhere; false: one\n             line cut with \"…\"), cell_width / cell_height (every column's width\n             and most lines per cell; a cell still too long ends with \"…\")\n  area       stacked\n  bar        color, show_values\n  histogram  color, show_values\n  boxplot    show_outliers, show_means\n  heatmap    show_values (block renderer)\n  pie        show_labels, show_values, show_percentages\n  text       separator (\" \"), null_text (\"\"), wrap (true: at spaces; \"char\":\n             anywhere; false cuts long lines), title_style",
-     "properties": {
-      "color": {
-       "type": "string",
-       "description": "The data's color (CSS color): bars, the first series, stat value, text."
-      },
-      "background": {
-       "type": "string",
-       "description": "The panel's background color (CSS background-color)."
-      },
-      "title_style": {
-       "type": "string",
-       "description": "Title color and attributes, e.g. \"bold #e5c07b\"."
-      },
-      "title_align": {
-       "enum": [
-        "left",
-        "center",
-        "right"
-       ],
-       "description": "Title position (CSS text-align)."
-      },
-      "header_style": {
-       "type": "string",
-       "description": "Table header color."
-      },
-      "axis_style": {
-       "type": "string",
-       "description": "Tick labels."
-      },
-      "label_style": {
-       "type": "string",
-       "description": "Axis titles and category labels."
-      },
-      "legend_style": {
-       "type": "string",
-       "description": "Legend labels."
-      },
-      "value_style": {
-       "type": "string",
-       "description": "Value labels (bars, pie)."
-      },
-      "null_style": {
-       "type": "string",
-       "description": "NULL cells."
-      },
-      "border_style": {
-       "type": "string",
-       "description": "Border color (CSS border-color)."
-      },
-      "border": {
-       "description": "Plot and table border line (CSS border-style): single, rounded, heavy, double, dashed, ascii, none; true / false.",
-       "oneOf": [
-        {
-         "type": "boolean"
-        },
-        {
-         "enum": [
-          "single",
-          "rounded",
-          "heavy",
-          "double",
-          "dashed",
-          "ascii",
-          "none"
-         ]
-        }
-       ]
-      },
-      "panel_border": {
-       "description": "A box around the whole panel, the title in its top line (CSS border on the panel).",
-       "oneOf": [
-        {
-         "type": "boolean"
-        },
-        {
-         "enum": [
-          "single",
-          "rounded",
-          "heavy",
-          "double",
-          "dashed",
-          "ascii",
-          "none"
-         ]
-        }
-       ]
-      },
-      "padding": {
-       "description": "Space inside the panel (CSS padding): N, [vertical, horizontal], [top, horizontal, bottom] or [top, right, bottom, left].",
-       "oneOf": [
-        {
-         "type": "integer",
-         "minimum": 0
-        },
-        {
-         "type": "array",
-         "minItems": 1,
-         "maxItems": 4,
-         "items": {
-          "type": "integer",
-          "minimum": 0
-         }
-        }
-       ]
-      },
-      "justify": {
-       "enum": [
-        "start",
-        "center",
-        "end",
-        "stretch"
-       ],
-       "description": "Where the chart sits across its cell (CSS justify-self)."
-      },
-      "align": {
-       "enum": [
-        "start",
-        "center",
-        "end"
-       ],
-       "description": "Where the chart sits down its cell (CSS align-self)."
-      },
-      "ellipsis": {
-       "type": "string",
-       "description": "What marks cut text (CSS text-overflow; default \"…\")."
-      },
-      "show_title": {
-       "type": "boolean",
-       "description": "false hides the title (CSS display: none)."
-      },
-      "show_axes": {
-       "type": "boolean",
-       "description": "false hides tick labels and axis titles."
-      },
-      "wrap": {
-       "description": "Long text wraps at spaces (true), anywhere (\"char\") or is cut (false).",
-       "oneOf": [
-        {
-         "type": "boolean"
-        },
-        {
-         "const": "char"
-        }
-       ]
-      },
-      "cell_width": {
-       "type": "integer",
-       "minimum": 1,
-       "description": "table: every column's width."
-      },
-      "cell_height": {
-       "type": "integer",
-       "minimum": 1,
-       "description": "table: most lines per cell."
-      },
-      "cell_padding": {
-       "type": "integer",
-       "minimum": 0,
-       "description": "table: spaces each side of a cell (default 1)."
-      },
-      "vertical_align": {
-       "enum": [
-        "top",
-        "middle",
-        "bottom"
-       ],
-       "description": "table: a short cell in a taller row."
-      },
-      "striped": {
-       "type": "string",
-       "description": "table: background of every other row (CSS :nth-child(even))."
-      },
-      "stacked": {
-       "description": "area: stack the series (true), or stack them to 100% (percent).",
-       "oneOf": [
-        {
-         "type": "boolean"
-        },
-        {
-         "const": "percent"
-        }
-       ]
-      },
-      "group": {
-       "enum": [
-        "grouped",
-        "stacked"
-       ],
-       "description": "bar: several series side by side (default) or stacked."
-      },
-      "bar_width": {
-       "type": "integer",
-       "minimum": 1,
-       "description": "bar: columns (vertical) or lines (horizontal) per bar."
-      },
-      "bar_gap": {
-       "type": "integer",
-       "minimum": 0,
-       "description": "bar: columns or lines between categories."
-      },
-      "top": {
-       "type": "integer",
-       "minimum": 1,
-       "description": "bar: keep the first N bars (after sort); pie: the first N slices and one for the rest."
-      },
-      "value_position": {
-       "enum": [
-        "end",
-        "inside"
-       ],
-       "description": "bar: the value after / above the bar (end) or inside its end."
-      },
-      "cumulative": {
-       "type": "boolean",
-       "description": "histogram: add the bins up."
-      },
-      "whiskers": {
-       "description": "boxplot: whiskers at 1.5 IQR (iqr, default), the extremes (minmax), or two percentiles ([5, 95]).",
-       "oneOf": [
-        {
-         "enum": [
-          "iqr",
-          "minmax"
-         ]
-        },
-        {
-         "type": "array",
-         "minItems": 2,
-         "maxItems": 2,
-         "items": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100
-         }
-        }
-       ]
-      },
-      "color_scale": {
-       "type": "array",
-       "minItems": 1,
-       "items": {
-        "type": "string",
-        "pattern": "^#[0-9a-fA-F]{6}$"
-       },
-       "description": "heatmap: the colors from low to high, \"#rrggbb\" (ECharts visualMap inRange.color)."
-      },
-      "color_steps": {
-       "type": "array",
-       "description": "heatmap: piecewise colors; a value takes the color of the highest step it reaches.",
-       "items": {
-        "type": "object",
-        "properties": {
-         "value": {
-          "type": "number"
-         },
-         "color": {
-          "$ref": "#/definitions/color"
-         }
-        }
-       }
-      },
-      "scale_min": {
-       "type": "number",
-       "description": "heatmap: the low end of the colors (default the smallest value)."
-      },
-      "scale_max": {
-       "type": "number",
-       "description": "heatmap: the high end of the colors (default the largest value)."
-      },
-      "donut": {
-       "type": "number",
-       "minimum": 0,
-       "maximum": 0.9,
-       "description": "pie (circle): the hole, a fraction of the radius (Chart.js cutout); 0.5+ shows the total."
-      },
-      "half": {
-       "type": "boolean",
-       "description": "pie (circle): the upper half only (Chart.js circumference: 180)."
-      },
-      "other_label": {
-       "type": "string",
-       "description": "pie: the slice of what style.top leaves out (default \"Other\")."
-      },
-      "text_align": {
-       "enum": [
-        "left",
-        "center",
-        "right"
-       ],
-       "description": "text: the lines' alignment (CSS text-align)."
-      },
-      "max_lines": {
-       "type": "integer",
-       "minimum": 1,
-       "description": "text: show the first N lines, then how many more."
-      },
-      "line_numbers": {
-       "type": "boolean",
-       "description": "text: number the rows."
-      },
-      "reverse": {
-       "type": "boolean",
-       "description": "text: the last row first (newest on top)."
-      },
-      "highlight": {
-       "type": "array",
-       "description": "text: color the lines matching a Vim regex (the first rule that matches wins).",
-       "items": {
-        "type": "object",
-        "properties": {
-         "pattern": {
-          "type": "string"
-         },
-         "color": {
-          "$ref": "#/definitions/color"
-         }
-        }
-       }
-      },
-      "normalize": {
-       "enum": [
-        "count",
-        "percent",
-        "density"
-       ],
-       "description": "histogram: counts, shares of all values, or density."
-      },
-      "trend_line": {
-       "const": "linear",
-       "description": "scatter, bubble, line: a dashed least-squares line per series."
-      },
-      "point": {
-       "type": "string",
-       "description": "scatter, bubble: a character for every point instead of a dot."
-      },
-      "size_range": {
-       "type": "array",
-       "minItems": 2,
-       "maxItems": 2,
-       "items": {
-        "type": "number",
-        "minimum": 0
-       },
-       "description": "bubble: smallest and largest radius, in canvas pixels."
-      },
-      "caption": {
-       "enum": [
-        "top",
-        "bottom"
-       ],
-       "description": "Where the title goes (CSS caption-side; default top)."
-      },
-      "sort": {
-       "description": "table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last. bar: asc or desc by value.",
-       "oneOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "object",
-         "properties": {
-          "column": {
-           "type": "string"
-          },
-          "order": {
-           "enum": [
-            "asc",
-            "desc"
-           ]
-          }
-         }
-        }
-       ]
-      },
-      "max_rows_shown": {
-       "type": "integer",
-       "minimum": 1,
-       "description": "table: show the first N rows, then how many more."
-      },
-      "row_thresholds": {
-       "type": "object",
-       "description": "table: color whole rows by one column's value (AG Grid rowStyle).",
-       "properties": {
-        "column": {
-         "type": "string"
-        },
-        "steps": {
-         "$ref": "#/definitions/thresholds"
-        },
-        "below": {
-         "type": "boolean",
-         "description": "Steps apply at or below their value."
-        }
-       }
-      }
-     }
-    },
-    "colors": {
-     "description": "Series / slice colors, by position (list) or by category name (mapping).",
-     "oneOf": [
-      {
-       "type": "array",
-       "items": {
-        "$ref": "#/definitions/color"
-       }
-      },
-      {
-       "type": "object",
-       "additionalProperties": {
-        "$ref": "#/definitions/color"
-       }
-      }
-     ]
-    },
-    "legend": {
-     "oneOf": [
-      {
-       "type": "boolean"
-      },
-      {
-       "type": "object",
-       "properties": {
-        "show": {
-         "type": "boolean"
-        },
-        "position": {
-         "type": "string",
-         "description": "right (default) or bottom."
-        }
-       }
-      }
-     ]
-    },
     "axes": {
      "type": "object",
      "properties": {
@@ -1087,6 +643,151 @@
       },
       "y_axis": {
        "$ref": "#/definitions/axis"
+      }
+     }
+    },
+    "stacked": {
+     "description": "area: stack the series (true), or stack them to 100% (percent); bar: segments on top of each other (true).",
+     "oneOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "const": "percent"
+      }
+     ]
+    },
+    "sort": {
+     "description": "table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last. bar, pie: asc or desc by value.",
+     "oneOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "column": {
+         "type": "string"
+        },
+        "order": {
+         "enum": [
+          "asc",
+          "desc"
+         ]
+        }
+       }
+      }
+     ]
+    },
+    "top": {
+     "type": "integer",
+     "minimum": 1,
+     "description": "bar: keep the first N bars (after sort); pie: the first N slices and one for the rest."
+    },
+    "other_label": {
+     "type": "string",
+     "description": "pie: the slice of what top leaves out (default \"Other\"; styled as series.other)."
+    },
+    "cumulative": {
+     "type": "boolean",
+     "description": "histogram: add the bins up."
+    },
+    "normalize": {
+     "enum": [
+      "count",
+      "percent",
+      "density"
+     ],
+     "description": "histogram: counts, shares of all values, or density."
+    },
+    "whiskers": {
+     "description": "boxplot: whiskers at 1.5 IQR (iqr, default), the extremes (minmax), or two percentiles ([5, 95]).",
+     "oneOf": [
+      {
+       "enum": [
+        "iqr",
+        "minmax"
+       ]
+      },
+      {
+       "type": "array",
+       "minItems": 2,
+       "maxItems": 2,
+       "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+       }
+      }
+     ]
+    },
+    "scale_min": {
+     "type": "number",
+     "description": "heatmap: the value at the low end of the colors (default the smallest value)."
+    },
+    "scale_max": {
+     "type": "number",
+     "description": "heatmap: the value at the high end of the colors (default the largest value)."
+    },
+    "trend_line": {
+     "const": "linear",
+     "description": "scatter, bubble, line: a dashed least-squares line per series."
+    },
+    "size_range": {
+     "type": "array",
+     "minItems": 2,
+     "maxItems": 2,
+     "items": {
+      "type": "number",
+      "minimum": 0
+     },
+     "description": "bubble: smallest and largest radius, in canvas pixels."
+    },
+    "span_gaps": {
+     "type": "boolean",
+     "default": true,
+     "description": "line, area: false: a NULL breaks the line (Chart.js spanGaps)."
+    },
+    "separator": {
+     "type": "string",
+     "description": "text: between the cells of a row (default \" \")."
+    },
+    "reverse": {
+     "type": "boolean",
+     "description": "text: the last row first (newest on top)."
+    },
+    "highlight": {
+     "type": "array",
+     "description": "text: give lines that match a Vim regex a class (line.<class> in style; default warning); the first rule that matches wins.",
+     "items": {
+      "type": "object",
+      "required": [
+       "pattern"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "pattern": {
+        "type": "string"
+       },
+       "class": {
+        "$ref": "#/definitions/class"
+       }
+      }
+     }
+    },
+    "row_thresholds": {
+     "type": "object",
+     "description": "table: a class on whole rows by one column's value (AG Grid rowStyle); row.<class> in style.",
+     "properties": {
+      "column": {
+       "type": "string"
+      },
+      "steps": {
+       "$ref": "#/definitions/thresholds"
+      },
+      "below": {
+       "type": "boolean",
+       "description": "Steps apply at or below their value."
       }
      }
     },
@@ -1106,41 +807,6 @@
      "type": "array",
      "items": {
       "$ref": "#/definitions/series"
-     }
-    },
-    "line_style": {
-     "type": "object",
-     "properties": {
-      "fill_area": {
-       "type": "boolean"
-      },
-      "show_points": {
-       "type": "boolean"
-      },
-      "stepped": {
-       "description": "Steps instead of slopes (Chart.js stepped): true (= before), before, after, middle.",
-       "oneOf": [
-        {
-         "type": "boolean"
-        },
-        {
-         "enum": [
-          "before",
-          "after",
-          "middle"
-         ]
-        }
-       ]
-      },
-      "point": {
-       "type": "string",
-       "description": "A character marking every point (Chart.js pointStyle), e.g. \"●\", \"×\"."
-      },
-      "span_gaps": {
-       "type": "boolean",
-       "default": true,
-       "description": "false: a NULL breaks the line (Chart.js spanGaps)."
-      }
      }
     },
     "mark_lines": {
@@ -1178,8 +844,9 @@
        "label": {
         "type": "string"
        },
-       "color": {
-        "$ref": "#/definitions/color"
+       "class": {
+        "$ref": "#/definitions/class",
+        "description": "A class on the line: mark.<class> in style colors it."
        }
       }
      }
@@ -1271,23 +938,6 @@
      "default": 20,
      "description": "stat: how many refreshes the sparkline shows."
     },
-    "color_mode": {
-     "enum": [
-      "value",
-      "background",
-      "none"
-     ],
-     "default": "value",
-     "description": "stat: color the digits, reverse them (background), or none (Grafana colorMode)."
-    },
-    "text_size": {
-     "enum": [
-      "big",
-      "normal"
-     ],
-     "default": "big",
-     "description": "stat: block digits or one line."
-    },
     "value_columns": {
      "type": "array",
      "description": "stat: several values side by side, each a column name or { column, label, format, unit, prefix }.",
@@ -1322,19 +972,9 @@
       ]
      }
     },
-    "delta": {
-     "type": "boolean",
-     "default": true,
-     "description": "stat: show the change since the previous refresh."
-    },
-    "sparkline": {
-     "type": "boolean",
-     "default": true,
-     "description": "stat: show the last 20 values."
-    },
     "thresholds": {
      "$ref": "#/definitions/thresholds",
-     "description": "stat: color the value by thresholds; notify: true notifies when the value rises to a step."
+     "description": "stat: a class on the value by thresholds (value.<class> in style); notify: true notifies when the value rises to a step."
     },
     "thresholds_below": {
      "type": "boolean",
@@ -1383,13 +1023,9 @@
           "type": "string",
           "description": "Python format of numbers, e.g. \"{:,.2f}\", \"{:.1%}\"."
          },
-         "style": {
-          "type": "string",
-          "description": "Color of the column's cells."
-         },
          "thresholds": {
           "$ref": "#/definitions/thresholds",
-          "description": "Color the cells of this column by value (notify works as for stat)."
+          "description": "A class on the cells of this column by value (cell.<class> in style; notify works as for stat)."
          },
          "thresholds_below": {
           "type": "boolean",
@@ -1517,7 +1153,7 @@
   },
   "thresholds": {
    "type": "array",
-   "description": "Steps from least to most severe; a value at or above a step's value (at or below with thresholds_below) reaches it and the most severe step reached wins.",
+   "description": "Steps from least to most severe; a value at or above a step's value (at or below with thresholds_below) reaches it and the most severe step reached wins: its class goes on the element (value, cell, row). The default sheet colors success, info, warning and danger.",
    "items": {
     "type": "object",
     "required": [
@@ -1528,8 +1164,8 @@
      "value": {
       "type": "number"
      },
-     "color": {
-      "$ref": "#/definitions/color"
+     "class": {
+      "$ref": "#/definitions/class"
      },
      "notify": {
       "type": "boolean",
@@ -1564,14 +1200,353 @@
      "minimum": 2,
      "description": "About how many ticks (Chart.js ticks.count)."
     },
-    "grid": {
-     "type": "boolean",
-     "default": false,
-     "description": "Grid lines at the ticks (Chart.js grid.display)."
-    },
     "format": {
      "type": "string",
      "description": "Python format, e.g. \"{:,.0f}\" or \"{:.1%}\"."
+    }
+   }
+  },
+  "style": {
+   "type": "object",
+   "description": "A style sheet (:help dbdash-css): selector -> properties, as in CSS.\n  Selectors:\n    an\nelement (dashboard, header, header-title, countdown, panel,\n  panel-title, args,\n    error,\nchart, title, subtitle, plot, axis, axis-title, label, legend,\n  legend-item,\n    grid,\nmark, series, point, bar, value, percent, unit, stat, delta,\n  sparkline,\n    table,\nheader, row, cell, rule, lines, line, line-number, outlier, mean,\n  ...; a\n    chart's\ncontent has one element per item: a row, a cell, a bar, a legend\n  item, ...),\n    #id,\n.class, [attr] / [attr=value],\n:nth-child(odd | even | N), :first-child, :last-child, descendants\n  (\"panel\n    title\"),\n::part(name) and comma lists. Later and more specific rules win;\n  style sheets\n    cascade\ndefault < setup({ style }) < the dashboard's style < a panel's style\n  < :DbDashStyle.",
+   "additionalProperties": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+     "color": {
+      "$ref": "#/definitions/color",
+      "description": "Text color (inherited)."
+     },
+     "background-color": {
+      "$ref": "#/definitions/color"
+     },
+     "font-weight": {
+      "enum": [
+       "normal",
+       "bold"
+      ]
+     },
+     "font-style": {
+      "enum": [
+       "normal",
+       "italic"
+      ]
+     },
+     "text-decoration": {
+      "enum": [
+       "none",
+       "underline",
+       "undercurl",
+       "line-through"
+      ]
+     },
+     "palette": {
+      "type": "string",
+      "description": "Series colors: theme (default, follows the colorscheme) or tableau (inherited)."
+     },
+     "display": {
+      "enum": [
+       "block",
+       "none"
+      ],
+      "description": "none hides the element (countdown, legend, value, point, mean, line-number, rule, ... are hidden by default)."
+     },
+     "content": {
+      "type": "string",
+      "description": "Generated text: countdown (\"Next update: {time}s\"; {time}, {clock}), description-icon (\"ⓘ\"), cell.null (\"NULL\"), point (a marker)."
+     },
+     "text-align": {
+      "enum": [
+       "start",
+       "left",
+       "center",
+       "right"
+      ]
+     },
+     "vertical-align": {
+      "enum": [
+       "top",
+       "middle",
+       "bottom"
+      ]
+     },
+     "white-space": {
+      "enum": [
+       "normal",
+       "nowrap"
+      ],
+      "description": "nowrap: one line, cut with text-overflow."
+     },
+     "word-break": {
+      "enum": [
+       "normal",
+       "break-all"
+      ],
+      "description": "break-all: wrap anywhere, not only at spaces."
+     },
+     "text-overflow": {
+      "type": "string",
+      "description": "What marks cut text: ellipsis (\"…\"), clip (nothing) or a string."
+     },
+     "line-clamp": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "table: rows shown; text chart: lines shown (then how many more)."
+     },
+     "font-size": {
+      "enum": [
+       "normal",
+       "big"
+      ],
+      "description": "stat value: block digits (big, the default) or one line."
+     },
+     "caption-side": {
+      "enum": [
+       "top",
+       "bottom"
+      ],
+      "description": "title, panel-title: above or under the chart."
+     },
+     "border": {
+      "description": "Border line: single, rounded, heavy, double, dashed, ascii, rich (tables: heavy header), none; true / false.",
+      "oneOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "enum": [
+         "single",
+         "rounded",
+         "heavy",
+         "double",
+         "dashed",
+         "ascii",
+         "rich",
+         "none"
+        ]
+       }
+      ]
+     },
+     "border-color": {
+      "$ref": "#/definitions/color"
+     },
+     "padding": {
+      "description": "N, [vertical, horizontal], [top, horizontal, bottom] or [top, right, bottom, left].",
+      "oneOf": [
+       {
+        "type": "integer",
+        "minimum": 0
+       },
+       {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 4,
+        "items": {
+         "type": "integer",
+         "minimum": 0
+        }
+       }
+      ]
+     },
+     "width": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "cell: column width; bar: columns / lines per bar."
+     },
+     "max-width": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "chart: the widest it gets."
+     },
+     "height": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "plot: plot rows; cell: most lines per cell."
+     },
+     "min-height": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "plot: smallest plot rows in a grid before it scrolls (default 8)."
+     },
+     "grid-template-columns": {
+      "description": "dashboard: column tracks: N equal columns, \"1fr 2fr 30\", \"repeat(3, 1fr)\" or a list; tracks are an integer, \"N%\", \"Nfr\", auto or \"minmax(a, b)\".",
+      "oneOf": [
+       {
+        "type": "integer",
+        "minimum": 1
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+         "$ref": "#/definitions/track"
+        }
+       }
+      ]
+     },
+     "grid-template-rows": {
+      "description": "dashboard: the first row tracks (an integer, Nfr, auto, min-content, max-content, minmax(a, b)).",
+      "oneOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "array",
+        "items": {
+         "$ref": "#/definitions/track"
+        }
+       }
+      ]
+     },
+     "grid-auto-rows": {
+      "$ref": "#/definitions/track",
+      "description": "dashboard: rows past the declared ones (default auto)."
+     },
+     "grid-template-areas": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "dashboard: named areas, one string per row (\"a a b\"), \".\" for an empty cell."
+     },
+     "column-gap": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "dashboard: spaces between columns (default 2)."
+     },
+     "row-gap": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "dashboard: blank lines between rows (default 1)."
+     },
+     "grid-area": {
+      "type": "string",
+      "description": "panel: a name of grid-template-areas."
+     },
+     "grid-row": {
+      "description": "panel: N, \"span M\" or \"N / span M\".",
+      "oneOf": [
+       {
+        "type": "integer",
+        "minimum": 1
+       },
+       {
+        "type": "string",
+        "pattern": "^(\\d+|span \\d+|\\d+ */ *span \\d+)$"
+       }
+      ]
+     },
+     "grid-column": {
+      "description": "panel: N, \"span M\" or \"N / span M\".",
+      "oneOf": [
+       {
+        "type": "integer",
+        "minimum": 1
+       },
+       {
+        "type": "string",
+        "pattern": "^(\\d+|span \\d+|\\d+ */ *span \\d+)$"
+       }
+      ]
+     },
+     "justify-self": {
+      "enum": [
+       "start",
+       "center",
+       "end",
+       "stretch"
+      ],
+      "description": "panel: where the chart sits across its cell."
+     },
+     "align-self": {
+      "enum": [
+       "start",
+       "center",
+       "end",
+       "stretch"
+      ],
+      "description": "panel: where the chart sits down its cell."
+     },
+     "renderer": {
+      "type": "string",
+      "description": "chart: how the type is drawn (the first one is the default):\n  table: box          line: canvas, asciichart\n                      scatter/area/bubble:\n                        canvas\n  bar: horizontal, vertical    histogram: horizontal, vertical\n  boxplot: boxdraw, vertical    heatmap: halfblock, block\n                                pie: bar,\n                                  circle\n  stat: big           text: plain\nRenderers registered with setup({ register = ... }) are\n  accepted\n    too."
+     },
+     "canvas": {
+      "type": "string",
+      "description": "chart: the pixel canvas: braille (default), quadrant, block, halfblock, ascii."
+     },
+     "curve": {
+      "enum": [
+       "linear",
+       "step",
+       "step-before",
+       "step-after",
+       "step-middle"
+      ],
+      "description": "series: steps instead of slopes (Chart.js stepped)."
+     },
+     "fill": {
+      "type": "boolean",
+      "description": "series: fill down to zero (lines)."
+     },
+     "hole": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.9,
+      "description": "chart (pie circle): the hole, a fraction of the radius; 0.5+ shows the total."
+     },
+     "angle": {
+      "enum": [
+       180,
+       360
+      ],
+      "description": "chart (pie circle): 180 draws the upper half."
+     },
+     "gap": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "bar: columns or lines between categories."
+     },
+     "position": {
+      "enum": [
+       "right",
+       "bottom",
+       "end",
+       "inside"
+      ],
+      "description": "legend: right or bottom; value: end or inside the bar."
+     },
+     "color-scale": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+       "type": "string",
+       "pattern": "^#[0-9a-fA-F]{6}$"
+      },
+      "description": "chart (heatmap): the colors from low to high, \"#rrggbb\" (ECharts visualMap inRange.color)."
+     },
+     "color-steps": {
+      "type": "array",
+      "description": "chart (heatmap): piecewise colors; a value takes the color of the highest step it reaches.",
+      "items": {
+       "type": "object",
+       "required": [
+        "value",
+        "color"
+       ],
+       "properties": {
+        "value": {
+         "type": "number"
+        },
+        "color": {
+         "$ref": "#/definitions/color"
+        }
+       }
+      }
+     }
     }
    }
   }

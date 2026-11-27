@@ -5,8 +5,6 @@
   "url": "sqlite:///:memory:"
  },
  "interval": "10m",
- "show_countdown": true,
- "countdown_format": "all in {clock}",
  "args": [
   {
    "name": "hours",
@@ -17,13 +15,21 @@
  ],
  "show": {
   "interval": "60s",
-  "show_countdown": true,
-  "countdown_format": "{time}s",
   "args_show": true
  },
- "layout": {
-  "columns": 2,
-  "gap": 3
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2,
+   "column-gap": 3
+  },
+  "header countdown": {
+   "display": "block",
+   "content": "all in {clock}"
+  },
+  "countdown": {
+   "display": "block",
+   "content": "{time}s"
+  }
  },
  "panels": [
   {
@@ -36,8 +42,12 @@
     "description": "Random visits for each of the last **{{ args.hours }}** hours, from\n`{{ meta.db_type }}` (panel {{ meta.panel_index }}, every {{ meta.interval // 1000 }}s).\n",
     "x_column": "hour",
     "y_column": "visits",
-    "interval": "10s",
-    "span": 2
+    "interval": "10s"
+   },
+   "style": {
+    "panel": {
+     "grid-column": "span 2"
+    }
    }
   },
   {
@@ -46,11 +56,15 @@
    },
    "show": {
     "type": "pie",
-    "renderer": "circle",
     "title": "Headcount",
     "description": "A round pie (`renderer: circle`) of the headcount per department.\n",
     "label_column": "dept",
     "value_column": "people"
+   },
+   "style": {
+    "chart": {
+     "renderer": "circle"
+    }
    }
   },
   {
@@ -83,7 +97,7 @@
     "url": "https://api.github.com"
    },
    "query": {
-    "sql": "{\n  \"path\": \"/repos/neovim/neovim/contributors\",\n  \"query\": {\"per_page\": 8},\n  \"headers\": {\"Accept\": \"application/vnd.github+json\"}\n}\n"
+    "sql": "curl /repos/neovim/neovim/contributors -G -d per_page=8 \\\n  -H 'Accept: application/vnd.github+json'\n"
    },
    "show": {
     "type": "bar",
@@ -91,10 +105,14 @@
     "description": "Commits of the top 8 contributors to\n[neovim/neovim](https://github.com/neovim/neovim), from `{{ meta.db_url }}`.\nUnauthenticated API calls are limited to 60 an hour, hence the 10m interval.\n",
     "x_column": "login",
     "y_column": "contributions",
-    "span": 2,
-    "interval": "10m",
-    "style": {
-     "show_values": true
+    "interval": "10m"
+   },
+   "style": {
+    "panel": {
+     "grid-column": "span 2"
+    },
+    "value": {
+     "display": "block"
     }
    }
   }

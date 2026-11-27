@@ -1,14 +1,16 @@
 {
  "title": "Histogram",
- "description": "A histogram counts the values of `value_column` in bins. `bins` sets how many\n(default: Sturges' rule), `bin_width` and `bin_range` fix them. Horizontal by default;\n`renderer: vertical` draws columns. See `:help dbdash-chart-types`.\n",
+ "description": "A histogram counts the values of `value_column` in bins. `bins` sets how many\n(default: Sturges' rule), `bin_width` and `bin_range` fix them. Horizontal by default;\n`chart { renderer: vertical }` draws columns. See `:help dbdash-charts`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "show": {
   "interval": "5m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -17,11 +19,13 @@
    },
    "show": {
     "type": "histogram",
-    "title": "horizontal (default): bins, color",
-    "description": "Horizontal bars, one per bin, labeled `[from, to)`; `bins: 10` asks for ten bins (the\ndefault follows Sturges' rule); `style.color` colors them.\n",
+    "title": "horizontal (default): bins, series { color }",
+    "description": "Horizontal bars, one per bin, labeled `[from, to)`; `bins: 10` asks for ten bins (the\ndefault follows Sturges' rule); the rule `series { color }` colors them.\n",
     "value_column": "score",
-    "bins": 10,
-    "style": {
+    "bins": 10
+   },
+   "style": {
+    "series": {
      "color": "#c678dd"
     }
    }
@@ -32,13 +36,17 @@
    },
    "show": {
     "type": "histogram",
-    "renderer": "vertical",
-    "title": "renderer: vertical, show_values: false",
-    "description": "Columns labeled with their lower edge (`:DbDashStyle histogram vertical`);\n`show_values: false` hides the counts.\n",
+    "title": "chart { renderer: vertical }, value { display: none }",
+    "description": "Columns labeled with their lower edge (`:DbDashStyle histogram vertical`);\n`value { display: none }` hides the counts.\n",
     "value_column": "score",
-    "bins": 12,
-    "style": {
-     "show_values": false
+    "bins": 12
+   },
+   "style": {
+    "chart": {
+     "renderer": "vertical"
+    },
+    "value": {
+     "display": "none"
     }
    }
   },
@@ -64,19 +72,21 @@
    },
    "show": {
     "type": "histogram",
-    "renderer": "vertical",
     "title": "normalize: percent, cumulative",
     "description": "`normalize: percent` shows each bin's share of all values (`density`: per unit of the\nvalue); `cumulative` adds the bins up, so the last one is 100%.\n",
     "value_column": "score",
     "bin_width": 10,
-    "style": {
-     "normalize": "percent",
-     "cumulative": true
-    },
     "axes": {
      "y_axis": {
       "format": "{:.0f}%"
      }
+    },
+    "normalize": "percent",
+    "cumulative": true
+   },
+   "style": {
+    "chart": {
+     "renderer": "vertical"
     }
    }
   },
@@ -87,7 +97,7 @@
    "show": {
     "type": "histogram",
     "title": "mark_lines: mean, a limit",
-    "description": "`mark_lines` are values of the data: the bin each falls in is colored and labeled\n(here the mean, and a pass mark of 60).\n",
+    "description": "`mark_lines` are values of the data: the bin each falls in is colored and labeled\n(here the mean, and a pass mark of 60 with `class: pass`, colored by `mark.pass`).\n",
     "value_column": "score",
     "bin_width": 10,
     "mark_lines": [
@@ -97,9 +107,14 @@
      {
       "value": 60,
       "label": "pass",
-      "color": "#98c379"
+      "class": "pass"
      }
     ]
+   },
+   "style": {
+    "mark.pass": {
+     "color": "#98c379"
+    }
    }
   }
  ]

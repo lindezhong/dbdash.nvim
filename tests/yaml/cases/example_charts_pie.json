@@ -1,14 +1,16 @@
 {
  "title": "Pie chart",
- "description": "A pie chart shows each row's share: `label_column` names the slices, `value_column`\nsizes them (positive values only). The default style is one proportional bar with a\nlegend; `renderer: circle` draws a round pie. See `:help dbdash-chart-types`.\n",
+ "description": "A pie chart shows each row's share: `label_column` names the slices, `value_column`\nsizes them (positive values only). The default renderer is one proportional bar with a\nlegend; `chart { renderer: circle }` draws a round pie. See `:help dbdash-charts`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "show": {
   "interval": "5m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -17,48 +19,29 @@
    },
    "show": {
     "type": "pie",
-    "title": "bar (default): colors by position",
-    "description": "One bar split in proportion, the legend under it with the value and the percentage.\n`colors` as a list colors the slices in order.\n",
+    "title": "bar (default): series:nth-child(N) colors",
+    "description": "One bar split in proportion, the legend under it with the value and the percentage.\n`series:nth-child(N) { color }` colors the slices in order.\n",
     "label_column": "dept",
-    "value_column": "budget",
-    "colors": [
-     "#e06c75",
-     "#61afef",
-     "#98c379",
-     "#e5c07b",
-     "#c678dd",
-     "#56b6c2"
-    ]
-   }
-  },
-  {
-   "query": {
-    "sql": "SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310\nUNION ALL SELECT 'Marketing', 180 UNION ALL SELECT 'Research', 260\nUNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40\n"
+    "value_column": "budget"
    },
-   "show": {
-    "type": "pie",
-    "renderer": "circle",
-    "title": "renderer: circle, palette: tableau",
-    "description": "A round pie on a braille canvas, the legend beside it (`legend.position: bottom` puts\nit under); `palette: tableau` instead of the colorscheme's colors.\n",
-    "label_column": "dept",
-    "value_column": "budget",
-    "palette": "tableau"
-   }
-  },
-  {
-   "query": {
-    "sql": "SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310\nUNION ALL SELECT 'Marketing', 180 UNION ALL SELECT 'Research', 260\nUNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40\n"
-   },
-   "show": {
-    "type": "pie",
-    "renderer": "circle",
-    "title": "donut, format",
-    "description": "`donut: 0.6` leaves a hole of 60% of the radius (Chart.js `cutout`) and writes the\ntotal in it; `format` is the Python format of the values (\"{:,} k\").\n",
-    "label_column": "dept",
-    "value_column": "budget",
-    "format": "{:,} k",
-    "style": {
-     "donut": 0.6
+   "style": {
+    "series:nth-child(1)": {
+     "color": "#e06c75"
+    },
+    "series:nth-child(2)": {
+     "color": "#61afef"
+    },
+    "series:nth-child(3)": {
+     "color": "#98c379"
+    },
+    "series:nth-child(4)": {
+     "color": "#e5c07b"
+    },
+    "series:nth-child(5)": {
+     "color": "#c678dd"
+    },
+    "series:nth-child(6)": {
+     "color": "#56b6c2"
     }
    }
   },
@@ -68,16 +51,55 @@
    },
    "show": {
     "type": "pie",
-    "renderer": "circle",
-    "title": "half, legend: bottom",
-    "description": "`half: true` draws the upper half (Chart.js `circumference: 180`, a gauge-like pie);\nthe legend goes `bottom`.\n",
+    "title": "chart { renderer: circle, palette: tableau }",
+    "description": "A round pie on a braille canvas, the legend beside it (`legend { position: bottom }`\nputs it under); `palette: tableau` instead of the colorscheme's colors.\n",
+    "label_column": "dept",
+    "value_column": "budget"
+   },
+   "style": {
+    "chart": {
+     "renderer": "circle",
+     "palette": "tableau"
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310\nUNION ALL SELECT 'Marketing', 180 UNION ALL SELECT 'Research', 260\nUNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40\n"
+   },
+   "show": {
+    "type": "pie",
+    "title": "chart { hole }, format",
+    "description": "`chart { hole: 0.6 }` leaves a hole of 60% of the radius (a doughnut, Chart.js\n`cutout`) and writes the total in it; `format` is the Python format of the values\n(\"{:,} k\").\n",
     "label_column": "dept",
     "value_column": "budget",
+    "format": "{:,} k"
+   },
+   "style": {
+    "chart": {
+     "renderer": "circle",
+     "hole": 0.6
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT 'Engineering' AS dept, 420 AS budget UNION ALL SELECT 'Sales', 310\nUNION ALL SELECT 'Marketing', 180 UNION ALL SELECT 'Research', 260\nUNION ALL SELECT 'Support', 90 UNION ALL SELECT 'HR', 40\n"
+   },
+   "show": {
+    "type": "pie",
+    "title": "chart { angle: 180 }, legend { position: bottom }",
+    "description": "`chart { angle: 180 }` draws the upper half (Chart.js `circumference: 180`, a\ngauge-like pie); `legend { position: bottom }` puts the legend under it.\n",
+    "label_column": "dept",
+    "value_column": "budget"
+   },
+   "style": {
+    "chart": {
+     "renderer": "circle",
+     "angle": 180
+    },
     "legend": {
      "position": "bottom"
-    },
-    "style": {
-     "half": true
     }
    }
   },
@@ -88,14 +110,12 @@
    "show": {
     "type": "pie",
     "title": "sort, top, other_label",
-    "description": "`sort: desc` orders the slices by size, `top: 3` keeps the three largest and puts the\nrest in one slice named by `other_label` (default \"Other\").\n",
+    "description": "`sort: desc` orders the slices by size, `top: 3` keeps the three largest and puts the\nrest in one slice named by `other_label` (default \"Other\"; styled as `series.other`).\n",
     "label_column": "dept",
     "value_column": "budget",
-    "style": {
-     "sort": "desc",
-     "top": 3,
-     "other_label": "Rest"
-    }
+    "sort": "desc",
+    "top": 3,
+    "other_label": "Rest"
    }
   },
   {
@@ -104,18 +124,20 @@
    },
    "show": {
     "type": "pie",
-    "title": "colors by name, legend parts",
-    "description": "`colors` as a mapping colors slices by name; `show_labels`, `show_values` and\n`show_percentages` pick the legend's columns.\n",
+    "title": "series.<name> colors, legend parts",
+    "description": "`series.<name> { color }` colors slices by name; `label`, `value` and `percent {\ndisplay: none }` leave a column out of the legend.\n",
     "label_column": "dept",
-    "value_column": "budget",
-    "colors": {
-     "Engineering": "#61afef",
-     "Sales": "#98c379"
+    "value_column": "budget"
+   },
+   "style": {
+    "series.Engineering": {
+     "color": "#61afef"
     },
-    "style": {
-     "show_labels": true,
-     "show_values": false,
-     "show_percentages": true
+    "series.Sales": {
+     "color": "#98c379"
+    },
+    "value": {
+     "display": "none"
     }
    }
   }

@@ -16,7 +16,8 @@
     "default": 10
    }
   ],
-  "sql": "{\n  \"path\": \"/repos/{{ args.repo }}/releases\",\n  \"query\": {\"per_page\": {{ args.count }}},\n  \"headers\": {\"Accept\": \"application/vnd.github+json\"}\n}\n",
+  "autoescape": true,
+  "sql": "curl /repos/{{ args.repo }}/releases -G \\\n  -d per_page={{ args.count }} \\\n  -H 'Accept: application/vnd.github+json'\n",
   "transform": "local out = {}\nfor _, r in ipairs(rs) do\n  local downloads = 0\n  for _, a in ipairs(r.assets or {}) do\n    downloads = downloads + (a.download_count or 0)\n  end\n  out[#out + 1] = {\n    release = r.tag_name,\n    published = (r.published_at or \"\"):sub(1, 10),\n    downloads = downloads,\n    prerelease = r.prerelease,\n  }\nend\nreturn { columns = { \"release\", \"published\", \"downloads\", \"prerelease\" }, rows = out }\n"
  },
  "show": {

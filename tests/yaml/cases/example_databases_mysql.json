@@ -5,14 +5,17 @@
   "url": "mysql://dbdash:dbdash_pw@127.0.0.1:13306/dbdash_test",
   "type": "mariadb"
  },
- "show": {
-  "style": {
-   "panel_border": "rounded",
-   "border_style": "#e5c07b"
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "panel": {
+   "border": "rounded",
+   "border-color": "#e5c07b"
+  },
+  "table": {
+   "border-color": "#e5c07b"
   }
- },
- "layout": {
-  "columns": 2
  },
  "panels": [
   {
@@ -47,8 +50,12 @@
     "type": "table",
     "title": "SHOW GLOBAL STATUS",
     "description": "A few server counters from `SHOW GLOBAL STATUS` (a SHOW statement works like a\nquery).\n",
-    "interval": "10s",
-    "span": 2
+    "interval": "10s"
+   },
+   "style": {
+    "panel": {
+     "grid-column": "span 2"
+    }
    }
   }
  ]

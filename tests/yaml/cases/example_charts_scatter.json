@@ -1,14 +1,16 @@
 {
  "title": "Scatter plot",
- "description": "A scatter plot puts one point per row at (`x_column`, `y_column`); `color_column`\nsplits the points into colored groups (`colors` by name). See `:help dbdash-chart-types`.\n",
+ "description": "A scatter plot puts one point per row at (`x_column`, `y_column`); `color_column`\nsplits the points into groups, colored by `series.<group>` rules. See\n`:help dbdash-charts`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "show": {
   "interval": "5m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -17,33 +19,23 @@
    },
    "show": {
     "type": "scatter",
-    "title": "color_column, colors, x_label / y_label (canvas: braille)",
-    "description": "`color_column` makes one group per value, colored by `colors` (a mapping by name, or a\nlist by position); `x_label` / `y_label` title the axes.\n",
+    "title": "color_column, series colors, x_label / y_label (canvas: braille)",
+    "description": "`color_column` makes one group per value, colored by `series.<name>` rules (or\n`series:nth-child(N)` by position); `x_label` / `y_label` title the axes.\n",
     "x_column": "ad_spend",
     "y_column": "sales",
     "color_column": "margin",
-    "colors": {
-     "High": "#98c379",
-     "Medium": "#e5c07b",
-     "Low": "#e06c75"
-    },
     "x_label": "Advertising",
     "y_label": "Sales"
-   }
-  },
-  {
-   "query": {
-    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),\nd AS (SELECT 10 + (i * 37) % 90 AS ad_spend, i % 3 AS k FROM n)\nSELECT ad_spend, ad_spend * 2 + abs(random() % 60) AS sales,\n       CASE k WHEN 0 THEN 'High' WHEN 1 THEN 'Medium' ELSE 'Low' END AS margin\nFROM d\n"
    },
-   "show": {
-    "type": "scatter",
-    "title": "style: point, trend_line: linear",
-    "description": "`point` draws each point as a character (Chart.js `pointStyle`); `trend_line: linear`\nadds a dashed least-squares line per group (ECharts regression).\n",
-    "x_column": "ad_spend",
-    "y_column": "sales",
-    "style": {
-     "point": "●",
-     "trend_line": "linear"
+   "style": {
+    "series.High": {
+     "color": "#98c379"
+    },
+    "series.Medium": {
+     "color": "#e5c07b"
+    },
+    "series.Low": {
+     "color": "#e06c75"
     }
    }
   },
@@ -53,17 +45,31 @@
    },
    "show": {
     "type": "scatter",
-    "title": "axes: grid, ticks; mark_lines",
-    "description": "`axes.*.grid` draws grid lines at the ticks, `ticks` asks for about that many ticks;\n`mark_lines` adds reference lines: the mean sales, and x = 50.\n",
+    "title": "trend_line: linear, point { content }",
+    "description": "`point { content: \"●\" }` draws each point as a character (Chart.js `pointStyle`);\n`trend_line: linear` adds a dashed least-squares line per group (ECharts regression).\n",
+    "x_column": "ad_spend",
+    "y_column": "sales",
+    "trend_line": "linear"
+   },
+   "style": {
+    "point": {
+     "content": "●"
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),\nd AS (SELECT 10 + (i * 37) % 90 AS ad_spend, i % 3 AS k FROM n)\nSELECT ad_spend, ad_spend * 2 + abs(random() % 60) AS sales,\n       CASE k WHEN 0 THEN 'High' WHEN 1 THEN 'Medium' ELSE 'Low' END AS margin\nFROM d\n"
+   },
+   "show": {
+    "type": "scatter",
+    "title": "grid lines, axes ticks; mark_lines",
+    "description": "`grid.x` / `grid.y { display: block }` draw grid lines at the ticks (Chart.js\n`grid.display`), `axes.x_axis.ticks` asks for about that many ticks; `mark_lines`\nadds reference lines: the mean sales, and x = 50.\n",
     "x_column": "ad_spend",
     "y_column": "sales",
     "axes": {
      "x_axis": {
-      "grid": true,
       "ticks": 5
-     },
-     "y_axis": {
-      "grid": true
      }
     },
     "mark_lines": [
@@ -76,6 +82,14 @@
       "label": "budget"
      }
     ]
+   },
+   "style": {
+    "grid.x": {
+     "display": "block"
+    },
+    "grid.y": {
+     "display": "block"
+    }
    }
   },
   {
@@ -106,12 +120,16 @@
    },
    "show": {
     "type": "scatter",
-    "title": "canvas: quadrant",
-    "description": "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
-    "canvas": "quadrant",
+    "title": "chart { canvas: quadrant }",
+    "description": "`chart { canvas: quadrant }`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
     "x_column": "ad_spend",
     "y_column": "sales",
     "color_column": "margin"
+   },
+   "style": {
+    "chart": {
+     "canvas": "quadrant"
+    }
    }
   },
   {
@@ -120,12 +138,16 @@
    },
    "show": {
     "type": "scatter",
-    "title": "canvas: block",
-    "description": "`canvas: block`: one full block per pixel: coarse but bold.",
-    "canvas": "block",
+    "title": "chart { canvas: block }",
+    "description": "`chart { canvas: block }`: one full block per pixel: coarse but bold.",
     "x_column": "ad_spend",
     "y_column": "sales",
     "color_column": "margin"
+   },
+   "style": {
+    "chart": {
+     "canvas": "block"
+    }
    }
   },
   {
@@ -134,12 +156,16 @@
    },
    "show": {
     "type": "scatter",
-    "title": "canvas: halfblock",
-    "description": "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄).",
-    "canvas": "halfblock",
+    "title": "chart { canvas: halfblock }",
+    "description": "`chart { canvas: halfblock }`: 1 x 2 pixels per character (▀ ▄).",
     "x_column": "ad_spend",
     "y_column": "sales",
     "color_column": "margin"
+   },
+   "style": {
+    "chart": {
+     "canvas": "halfblock"
+    }
    }
   },
   {
@@ -148,12 +174,16 @@
    },
    "show": {
     "type": "scatter",
-    "title": "canvas: ascii",
-    "description": "`canvas: ascii`: plain ASCII, for any terminal or font.",
-    "canvas": "ascii",
+    "title": "chart { canvas: ascii }",
+    "description": "`chart { canvas: ascii }`: plain ASCII, for any terminal or font.",
     "x_column": "ad_spend",
     "y_column": "sales",
     "color_column": "margin"
+   },
+   "style": {
+    "chart": {
+     "canvas": "ascii"
+    }
    }
   }
  ]

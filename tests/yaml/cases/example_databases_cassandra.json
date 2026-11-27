@@ -5,14 +5,17 @@
   "url": "cql://cassandra:cassandra@127.0.0.1:19042/system?consistency=ONE",
   "type": "cassandra"
  },
- "show": {
-  "style": {
-   "panel_border": "rounded",
-   "border_style": "#56b6c2"
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "panel": {
+   "border": "rounded",
+   "border-color": "#56b6c2"
+  },
+  "table": {
+   "border-color": "#56b6c2"
   }
- },
- "layout": {
-  "columns": 2
  },
  "panels": [
   {
@@ -48,8 +51,12 @@
     "description": "Tables per keyspace: CQL has no GROUP BY across partitions here, so\n`query.transform` counts the rows of `system_schema.tables` in Lua.\n",
     "x_column": "keyspace",
     "y_column": "tables",
-    "interval": "1m",
-    "span": 2
+    "interval": "1m"
+   },
+   "style": {
+    "panel": {
+     "grid-column": "span 2"
+    }
    }
   }
  ]

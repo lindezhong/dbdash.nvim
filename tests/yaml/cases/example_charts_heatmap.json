@@ -1,14 +1,16 @@
 {
  "title": "Heat map",
- "description": "A heat map colors a grid: `x_column` across, `y_column` down, `value_column` the color.\nThe default style packs two rows into one line (half blocks); `renderer: block` gives\nevery row a line and can write the values. See `:help dbdash-chart-types`.\n",
+ "description": "A heat map colors a grid: `x_column` across, `y_column` down, `value_column` the color.\nThe default renderer packs two rows into one line (half blocks); `chart { renderer:\nblock }` gives every row a line and can write the values. See `:help dbdash-charts`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "show": {
   "interval": "5m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -30,43 +32,23 @@
    },
    "show": {
     "type": "heatmap",
-    "renderer": "block",
-    "title": "renderer: block, show_values, format",
-    "description": "`renderer: block` gives every row its own line; `show_values` writes each value in its\ncell (black or white, whichever reads better), in the Python `axes.y_axis.format`.\n",
+    "title": "renderer: block, value { display: block }, format",
+    "description": "`chart { renderer: block }` gives every row its own line; `value { display: block }`\nwrites each value in its cell (black or white, whichever reads better), in the Python\n`axes.y_axis.format`.\n",
     "x_column": "hour",
     "y_column": "day",
     "value_column": "requests",
-    "style": {
-     "show_values": true
-    },
     "axes": {
      "y_axis": {
       "format": "{:.0f}"
      }
     }
-   }
-  },
-  {
-   "query": {
-    "sql": "WITH RECURSIVE d(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM d WHERE n < 5),\nh(n) AS (SELECT 8 UNION ALL SELECT n + 1 FROM h WHERE n < 18)\nSELECT 'Day ' || d.n AS day, printf('%02d', h.n) AS hour,\n       abs((d.n * 7 + h.n * 13) % 50) AS requests\nFROM d, h\n"
    },
-   "show": {
-    "type": "heatmap",
-    "renderer": "block",
-    "title": "color_scale, scale_min, scale_max",
-    "description": "Your own colors from low to high (`color_scale`, \"#rrggbb\" stops, ECharts\n`inRange.color`) over a fixed range (`scale_min` / `scale_max`): values outside take the\nend colors.\n",
-    "x_column": "hour",
-    "y_column": "day",
-    "value_column": "requests",
-    "style": {
-     "color_scale": [
-      "#1e2030",
-      "#61afef",
-      "#e5c07b",
-      "#e06c75"
-     ],
-     "scale_min": 0,
-     "scale_max": 60
+   "style": {
+    "chart": {
+     "renderer": "block"
+    },
+    "value": {
+     "display": "block"
     }
    }
   },
@@ -76,15 +58,42 @@
    },
    "show": {
     "type": "heatmap",
-    "renderer": "block",
-    "title": "color_steps (piecewise), legend: false",
-    "description": "`color_steps` colors by thresholds instead of a gradient (ECharts piecewise\nvisualMap): a value takes the color of the highest step it reaches. `legend: false`\nhides the scale.\n",
+    "title": "color-scale, scale_min, scale_max",
+    "description": "Your own colors from low to high (`chart { color-scale }`, \"#rrggbb\" stops, ECharts\n`inRange.color`) over a fixed range of the data (`scale_min` / `scale_max`): values\noutside take the end colors.\n",
     "x_column": "hour",
     "y_column": "day",
     "value_column": "requests",
-    "legend": false,
-    "style": {
-     "color_steps": [
+    "scale_min": 0,
+    "scale_max": 60
+   },
+   "style": {
+    "chart": {
+     "renderer": "block",
+     "color-scale": [
+      "#1e2030",
+      "#61afef",
+      "#e5c07b",
+      "#e06c75"
+     ]
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "WITH RECURSIVE d(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM d WHERE n < 5),\nh(n) AS (SELECT 8 UNION ALL SELECT n + 1 FROM h WHERE n < 18)\nSELECT 'Day ' || d.n AS day, printf('%02d', h.n) AS hour,\n       abs((d.n * 7 + h.n * 13) % 50) AS requests\nFROM d, h\n"
+   },
+   "show": {
+    "type": "heatmap",
+    "title": "color-steps (piecewise), legend { display: none }",
+    "description": "`chart { color-steps }` colors by thresholds instead of a gradient (ECharts piecewise\nvisualMap): a value takes the color of the highest step it reaches. `legend {\ndisplay: none }` hides the scale.\n",
+    "x_column": "hour",
+    "y_column": "day",
+    "value_column": "requests"
+   },
+   "style": {
+    "chart": {
+     "renderer": "block",
+     "color-steps": [
       {
        "value": 0,
        "color": "#98c379"
@@ -98,6 +107,9 @@
        "color": "#e06c75"
       }
      ]
+    },
+    "legend": {
+     "display": "none"
     }
    }
   }

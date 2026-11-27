@@ -20,11 +20,9 @@ description: |
   `exec://`: a script whose output is the data, one item per line (or delimiter). Runs
   a script, so it asks for trust first. See `:help dbdash-exec`.
 
-show:
-  style: { panel_border: single, padding: [0, 1] }
-
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
+  panel: { border: single, padding: [0, 1] }
 
 panels:
   - database:

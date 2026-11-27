@@ -105,9 +105,11 @@ T["help tags build and lines fit in 78 columns"] = function()
   end
   vim.cmd("helptags " .. vim.fn.fnameescape(dir .. "/doc")) -- raises on duplicate tags
   local long = {}
-  for i, l in ipairs(vim.split(DOC, "\n")) do
-    if vim.fn.strdisplaywidth(l) > 78 then
-      long[#long + 1] = i
+  for _, f in ipairs({ "dbdash.txt", "dbdash-schema.txt" }) do
+    for i, l in ipairs(vim.fn.readfile("doc/" .. f)) do
+      if vim.fn.strdisplaywidth(l) > 78 then
+        long[#long + 1] = ("%s:%d"):format(f, i)
+      end
     end
   end
   eq(long, {})

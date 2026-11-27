@@ -8,7 +8,7 @@ title: "Bubble chart"
 description: |
   A bubble chart is a scatter plot with sizes: (`x_column`, `y_column`) per row, the
   circle's area by `size_column`, groups by `color_column`, a text by `label_column`.
-  See `:help dbdash-chart-types`.
+  See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"
@@ -16,8 +16,8 @@ database:
 show:
   interval: 5m
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -34,17 +34,20 @@ panels:
       type: bubble
       title: "size, color and label columns (canvas: braille)"
       description: |
-        `size_column` sets each circle's area, `color_column` groups and colors the bubbles
-        (`colors` by name), `label_column` writes a text next to each.
+        `size_column` sets each circle's area, `color_column` groups the bubbles (colored by
+        `series.<group>` rules), `label_column` writes a text next to each.
       x_column: revenue
       y_column: margin
       size_column: cap
       color_column: class
       label_column: company
-      colors: { Large: "#61afef", Mid: "#98c379", Small: "#e5c07b" }
       axes:
         x_axis: { title: "Revenue" }
         y_axis: { title: "Margin %" }
+    style:
+      "series.Large": { color: "#61afef" }
+      "series.Mid": { color: "#98c379" }
+      "series.Small": { color: "#e5c07b" }
   - query:
       sql: |
         SELECT company, revenue, margin, cap,
@@ -57,15 +60,18 @@ panels:
         )
     show:
       type: bubble
-      title: "style: size_range, point, trend_line"
+      title: "size_range, trend_line, point { content }"
       description: |
         `size_range: [min, max]` is the smallest and largest radius in canvas pixels (Chart.js
-        `radius`); `point` marks each center with a character; `trend_line: linear` fits a
-        dashed line through the centers.
+        `radius`); `trend_line: linear` fits a dashed line through the centers; the style
+        rule `point { content: "+" }` marks each center with a character.
       x_column: revenue
       y_column: margin
       size_column: cap
-      style: { size_range: [2, 10], point: "+", trend_line: linear }
+      size_range: [2, 10]
+      trend_line: linear
+    style:
+      point: { content: "+" }
   - query:
       sql: |
         SELECT company, revenue, margin, cap,
@@ -78,13 +84,14 @@ panels:
         )
     show:
       type: bubble
-      title: "canvas: quadrant"
-      description: "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts."
-      canvas: quadrant
+      title: "chart { canvas: quadrant }"
+      description: "`chart { canvas: quadrant }`: 2 x 2 pixels per character (▗▄▖), works in most fonts."
       x_column: revenue
       y_column: margin
       size_column: cap
       color_column: class
+    style:
+      chart: { canvas: quadrant }
   - query:
       sql: |
         SELECT company, revenue, margin, cap,
@@ -97,13 +104,14 @@ panels:
         )
     show:
       type: bubble
-      title: "canvas: block"
-      description: "`canvas: block`: one full block per pixel: coarse but bold."
-      canvas: block
+      title: "chart { canvas: block }"
+      description: "`chart { canvas: block }`: one full block per pixel: coarse but bold."
       x_column: revenue
       y_column: margin
       size_column: cap
       color_column: class
+    style:
+      chart: { canvas: block }
   - query:
       sql: |
         SELECT company, revenue, margin, cap,
@@ -116,13 +124,14 @@ panels:
         )
     show:
       type: bubble
-      title: "canvas: halfblock"
-      description: "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄)."
-      canvas: halfblock
+      title: "chart { canvas: halfblock }"
+      description: "`chart { canvas: halfblock }`: 1 x 2 pixels per character (▀ ▄)."
       x_column: revenue
       y_column: margin
       size_column: cap
       color_column: class
+    style:
+      chart: { canvas: halfblock }
   - query:
       sql: |
         SELECT company, revenue, margin, cap,
@@ -135,10 +144,11 @@ panels:
         )
     show:
       type: bubble
-      title: "canvas: ascii"
-      description: "`canvas: ascii`: plain ASCII, for any terminal or font."
-      canvas: ascii
+      title: "chart { canvas: ascii }"
+      description: "`chart { canvas: ascii }`: plain ASCII, for any terminal or font."
       x_column: revenue
       y_column: margin
       size_column: cap
       color_column: class
+    style:
+      chart: { canvas: ascii }

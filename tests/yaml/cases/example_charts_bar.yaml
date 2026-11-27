@@ -3,13 +3,13 @@
 # Bar chart: every renderer and option, one panel each (press K on a panel). Options
 # follow Chart.js / ECharts bars: horizontal or vertical, several series grouped or
 # stacked, widths and gaps, sorting, the first N, value labels, the baseline and
-# reference lines.
+# reference lines. Data options are in show, appearance in style (:help dbdash-css).
 
 title: "Bar chart"
 description: |
   A bar chart shows one value per category: `x_column` names the bars, `y_column` (or
   `y_columns`, or `series_column` for long data) gives their lengths. Horizontal by
-  default; `renderer: vertical` draws columns. See `:help dbdash-chart-types`.
+  default; `chart { renderer: vertical }` draws columns. See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"
@@ -17,8 +17,8 @@ database:
 show:
   interval: 5m
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -29,13 +29,14 @@ panels:
         UNION ALL SELECT 'Food', 700, 650
     show:
       type: bar
-      title: "horizontal (default): color, show_values"
+      title: "horizontal (default): series { color }"
       description: |
-        Horizontal bars, one line each, the value after the bar (`show_values`, default on);
-        `style.color` colors every bar (CSS `color`).
+        Horizontal bars, one line each, the value after the bar (`value { display: none }`
+        hides it); `series { color }` colors every bar.
       x_column: category
       y_column: sales
-      style: { color: "#61afef", show_values: true }
+    style:
+      series: { color: "#61afef" }
   - query:
       sql: |
         SELECT 'Electronics' AS category, 920 AS sales, 1100 AS target
@@ -44,13 +45,14 @@ panels:
         UNION ALL SELECT 'Food', 700, 650
     show:
       type: bar
-      renderer: vertical
-      title: "renderer: vertical"
+      title: "chart { renderer: vertical }"
       description: |
-        `renderer: vertical` draws columns with ⅛-cell tops, the value above each. Try it on
-        any bar chart with `:DbDashStyle bar vertical`.
+        `chart { renderer: vertical }` draws columns with ⅛-cell tops, the value above each.
+        Try it on any bar chart with `:DbDashStyle bar vertical`.
       x_column: category
       y_column: sales
+    style:
+      chart: { renderer: vertical }
   - query:
       sql: |
         SELECT 'Electronics' AS category, 920 AS sales, 1100 AS target
@@ -62,11 +64,15 @@ panels:
       title: "y_columns: grouped (side by side)"
       description: |
         Several `y_columns` draw one bar per series in each category, side by side (Chart.js
-        grouped bars, the default `style.group`), with a legend.
+        grouped bars, the default), with a legend; `series.Sales` and `series.Target` color
+        them by label.
       x_column: category
       y_columns:
-        - { column: sales, label: "Sales", color: "#61afef" }
-        - { column: target, label: "Target", color: "#5c6370" }
+        - { column: sales, label: Sales }
+        - { column: target, label: Target }
+    style:
+      "series.Sales": { color: "#61afef" }
+      "series.Target": { color: "#5c6370" }
   - query:
       sql: |
         SELECT q AS quarter, r AS region, 100 + abs(random() % 200) AS sales
@@ -74,17 +80,17 @@ panels:
              (SELECT 'EU' AS r UNION ALL SELECT 'US' UNION ALL SELECT 'APAC')
     show:
       type: bar
-      renderer: vertical
-      title: "series_column, group: stacked"
+      title: "series_column, stacked: true"
       description: |
         Long data (one row per quarter and region) with `series_column`, stacked
-        (`style.group: stacked`, Chart.js `stacked: true`): the column is the total, the
-        value above it too. `palette: tableau` colors the regions.
+        (`stacked: true`, as in Chart.js): the column is the total, the value above it too.
+        `chart { palette: tableau }` colors the regions.
       x_column: quarter
       y_column: sales
       series_column: region
-      palette: tableau
-      style: { group: stacked }
+      stacked: true
+    style:
+      chart: { renderer: vertical, palette: tableau }
   - query:
       sql: |
         SELECT 'Electronics' AS category, 920 AS sales, 1100 AS target
@@ -93,14 +99,17 @@ panels:
         UNION ALL SELECT 'Food', 700, 650
     show:
       type: bar
-      title: "sort: desc, top: 4, value_position: inside"
+      title: "sort: desc, top: 4, value { position: inside }"
       description: |
         `sort` orders the bars by value (`asc` / `desc`; the total when stacked), `top` keeps
-        the first N (ECharts `dataZoom` without the zoom), `value_position: inside` writes the
-        value inside the end of the bar (ECharts `label.position: insideRight`).
+        the first N (ECharts `dataZoom` without the zoom), `value { position: inside }`
+        writes the value inside the end of the bar (ECharts `label.position: insideRight`).
       x_column: category
       y_column: sales
-      style: { sort: desc, top: 4, value_position: inside }
+      sort: desc
+      top: 4
+    style:
+      value: { position: inside }
   - query:
       sql: |
         SELECT 'Electronics' AS category, 920 AS sales, 1100 AS target
@@ -109,14 +118,15 @@ panels:
         UNION ALL SELECT 'Food', 700, 650
     show:
       type: bar
-      renderer: vertical
-      title: "bar_width, bar_gap"
+      title: "bar { width, gap }"
       description: |
-        `bar_width` is the columns per bar and `bar_gap` the columns between categories
+        `bar { width }` is the columns per bar and `gap` the columns between categories
         (Chart.js `barThickness`, `categoryPercentage`); horizontal bars take them in lines.
       x_column: category
       y_column: sales
-      style: { bar_width: 2, bar_gap: 4 }
+    style:
+      chart: { renderer: vertical }
+      bar: { width: 2, gap: 4 }
   - query:
       sql: |
         SELECT 'Electronics' AS category, 920 AS sales, 1100 AS target
@@ -127,15 +137,18 @@ panels:
       type: bar
       title: "mark_lines, axes.y_axis: min_value, max_value"
       description: |
-        Reference lines on the value axis (ECharts `markLine`): a goal and the `mean`. The
-        value axis runs from `min_value` to `max_value` (the bars' baseline and end).
+        Reference lines on the value axis (ECharts `markLine`): a goal and the `mean`; a
+        line's `class` styles it (`mark.goal { color }`). The value axis runs from
+        `min_value` to `max_value` (the bars' baseline and end).
       x_column: category
       y_column: sales
       axes:
         y_axis: { min_value: 0, max_value: 1200 }
       mark_lines:
-        - { value: 800, label: "goal", color: "#98c379" }
+        - { value: 800, label: "goal", class: goal }
         - { value: mean }
+    style:
+      mark.goal: { color: "#98c379" }
   - query:
       sql: |
         SELECT 'Mon' AS day, 12 AS delta UNION ALL SELECT 'Tue', -8 UNION ALL SELECT 'Wed', 5

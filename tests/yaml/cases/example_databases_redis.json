@@ -4,14 +4,17 @@
  "database": {
   "url": "redis://:dbdash_pw@127.0.0.1:16379/0"
  },
- "show": {
-  "style": {
-   "panel_border": "rounded",
-   "border_style": "#e06c75"
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "panel": {
+   "border": "rounded",
+   "border-color": "#e06c75"
+  },
+  "table": {
+   "border-color": "#e06c75"
   }
- },
- "layout": {
-  "columns": 2
  },
  "panels": [
   {

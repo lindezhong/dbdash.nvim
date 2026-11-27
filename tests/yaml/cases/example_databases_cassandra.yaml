@@ -14,11 +14,10 @@ database:
   url: "cql://cassandra:cassandra@127.0.0.1:19042/system?consistency=ONE"
   type: cassandra
 
-show:
-  style: { panel_border: rounded, border_style: "#56b6c2" }
-
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
+  panel: { border: rounded, border-color: "#56b6c2" }
+  table: { border-color: "#56b6c2" }
 
 panels:
   - query:
@@ -58,4 +57,5 @@ panels:
       x_column: keyspace
       y_column: tables
       interval: 1m
-      span: 2
+    style:
+      panel: { grid-column: span 2 }

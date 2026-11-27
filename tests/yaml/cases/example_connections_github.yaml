@@ -1,10 +1,12 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# https:// - query.sql describes an HTTP request as JSON (here a GET with parameters; empty
-# means a GET of the URL). Like every query, the result then goes through query.transform
-# and must be rows: the GitHub API returns a list of releases with nested assets, so the
-# transform picks the fields and sums the downloads. dbdash asks whether you trust this
-# file first, because of the transform (:help dbdash-http, :help dbdash-transform).
+# https:// - query.sql is a curl command: a path under database.url, -G sending the data
+# as URL parameters, a header (:help dbdash-http). With query.autoescape, {{ ... }} values
+# become shell-quoted words, so a value cannot break the command. Like every query, the
+# result then goes through query.transform and must be rows: the GitHub API returns a list
+# of releases with nested assets, so the transform picks the fields and sums the
+# downloads. dbdash asks whether you trust this file first, because of the transform
+# (:help dbdash-http, :help dbdash-transform).
 # Try: :DbDashStart http.yaml repo=folke/lazy.nvim
 
 description: |
@@ -22,12 +24,11 @@ query:
     - name: count
       type: int
       default: 10
+  autoescape: true # {{ ... }} values are shell-quoted words of the command
   sql: |
-    {
-      "path": "/repos/{{ args.repo }}/releases",
-      "query": {"per_page": {{ args.count }}},
-      "headers": {"Accept": "application/vnd.github+json"}
-    }
+    curl /repos/{{ args.repo }}/releases -G \
+      -d per_page={{ args.count }} \
+      -H 'Accept: application/vnd.github+json'
   transform: |
     local out = {}
     for _, r in ipairs(rs) do

@@ -1,14 +1,16 @@
 {
  "title": "Line chart",
- "description": "A line chart draws one or more series over an x axis: `x_column` and `y_column` (or\n`y_columns`, or `series_column` for long data). The default style is a braille canvas;\n`canvas` picks another pixel grid and `renderer: asciichart` draws box lines.\nSee `:help dbdash-chart-types`.\n",
+ "description": "A line chart draws one or more series over an x axis: `x_column` and `y_column` (or\n`y_columns`, or `series_column` for long data). The default is a braille canvas; the\nstyle rule `chart { canvas }` picks another pixel grid and `chart { renderer: asciichart }`\ndraws box lines.\nSee `:help dbdash-charts`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "show": {
   "interval": "5m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -18,29 +20,22 @@
    "show": {
     "type": "line",
     "title": "y_columns, legend, axes (canvas: braille, the default)",
-    "description": "Three series from `y_columns`, each with a `label` and a `color`; the legend sits on\nthe `right` (default) or `bottom`; `axes.y_axis` sets a title, `min_value` and a\nPython `format` for the tick labels. Braille draws 2 x 4 dots per character.\n",
+    "description": "Three series from `y_columns`, each with a `label`, colored by `series.<label>`\nrules; the legend sits on the `right` (default) or `bottom` (`legend { position }`);\n`axes.y_axis` sets a title, `min_value` and a Python `format` for the tick labels.\nBraille draws 2 x 4 dots per character.\n",
     "x_column": "hour",
     "y_columns": [
      {
       "column": "visits",
-      "label": "All",
-      "color": "#61afef"
+      "label": "All"
      },
      {
       "column": "mobile",
-      "label": "Mobile",
-      "color": "#e06c75"
+      "label": "Mobile"
      },
      {
       "column": "desktop",
-      "label": "Desktop",
-      "color": "#98c379"
+      "label": "Desktop"
      }
     ],
-    "legend": {
-     "show": true,
-     "position": "right"
-    },
     "axes": {
      "x_axis": {
       "title": "Hour"
@@ -50,9 +45,22 @@
       "min_value": 0,
       "format": "{:,.0f}"
      }
+    }
+   },
+   "style": {
+    "series.All": {
+     "color": "#61afef"
     },
-    "show_countdown": true,
-    "countdown_format": "Next update: {time}s"
+    "series.Mobile": {
+     "color": "#e06c75"
+    },
+    "series.Desktop": {
+     "color": "#98c379"
+    },
+    "countdown": {
+     "display": "block",
+     "content": "Next update: {time}s"
+    }
    }
   },
   {
@@ -61,11 +69,15 @@
    },
    "show": {
     "type": "line",
-    "title": "canvas: quadrant",
-    "description": "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
-    "canvas": "quadrant",
+    "title": "chart { canvas: quadrant }",
+    "description": "`chart { canvas: quadrant }`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
     "x_column": "hour",
     "y_column": "visits"
+   },
+   "style": {
+    "chart": {
+     "canvas": "quadrant"
+    }
    }
   },
   {
@@ -74,11 +86,15 @@
    },
    "show": {
     "type": "line",
-    "title": "canvas: block",
-    "description": "`canvas: block`: one full block per pixel (coarse but bold).",
-    "canvas": "block",
+    "title": "chart { canvas: block }",
+    "description": "`chart { canvas: block }`: one full block per pixel (coarse but bold).",
     "x_column": "hour",
     "y_column": "visits"
+   },
+   "style": {
+    "chart": {
+     "canvas": "block"
+    }
    }
   },
   {
@@ -87,11 +103,15 @@
    },
    "show": {
     "type": "line",
-    "title": "canvas: halfblock",
-    "description": "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄).",
-    "canvas": "halfblock",
+    "title": "chart { canvas: halfblock }",
+    "description": "`chart { canvas: halfblock }`: 1 x 2 pixels per character (▀ ▄).",
     "x_column": "hour",
     "y_column": "visits"
+   },
+   "style": {
+    "chart": {
+     "canvas": "halfblock"
+    }
    }
   },
   {
@@ -100,11 +120,15 @@
    },
    "show": {
     "type": "line",
-    "title": "canvas: ascii",
-    "description": "`canvas: ascii`: plain ASCII characters, for any terminal or font.",
-    "canvas": "ascii",
+    "title": "chart { canvas: ascii }",
+    "description": "`chart { canvas: ascii }`: plain ASCII characters, for any terminal or font.",
     "x_column": "hour",
     "y_column": "visits"
+   },
+   "style": {
+    "chart": {
+     "canvas": "ascii"
+    }
    }
   },
   {
@@ -113,11 +137,15 @@
    },
    "show": {
     "type": "line",
-    "title": "renderer: asciichart",
-    "description": "`renderer: asciichart` draws the line with box characters (╭─╯) instead of a pixel\ncanvas. Try it on any line chart with `:DbDashStyle line asciichart`.\n",
-    "renderer": "asciichart",
+    "title": "chart { renderer: asciichart }",
+    "description": "`chart { renderer: asciichart }` draws the line with box characters (╭─╯) instead of a\npixel canvas. Try it on any line chart with `:DbDashStyle line asciichart`.\n",
     "x_column": "hour",
     "y_column": "visits"
+   },
+   "style": {
+    "chart": {
+     "renderer": "asciichart"
+    }
    }
   },
   {
@@ -127,11 +155,15 @@
    "show": {
     "type": "line",
     "title": "series_column: long data",
-    "description": "Long data (one row per x and series) with `series_column`: one line per value of\n`region`, colored from the `palette` (`tableau` here; `theme` follows the\ncolorscheme).\n",
+    "description": "Long data (one row per x and series) with `series_column`: one line per value of\n`region`, colored from the palette (`chart { palette: tableau }` here; `theme`\nfollows the colorscheme); `legend { position: bottom }` puts the legend below.\n",
     "x_column": "day",
     "y_column": "orders",
-    "series_column": "region",
-    "palette": "tableau",
+    "series_column": "region"
+   },
+   "style": {
+    "chart": {
+     "palette": "tableau"
+    },
     "legend": {
      "position": "bottom"
     }
@@ -143,13 +175,17 @@
    },
    "show": {
     "type": "line",
-    "title": "line_style: fill_area, show_points",
-    "description": "`fill_area` fills under the line (Chart.js `fill`); `show_points` marks every point.",
+    "title": "series { fill }, point { display: block }",
+    "description": "`series { fill: true }` fills under the line (Chart.js `fill`); `point { display: block }` marks every point.",
     "x_column": "x",
-    "y_column": "y",
-    "line_style": {
-     "fill_area": true,
-     "show_points": true
+    "y_column": "y"
+   },
+   "style": {
+    "series": {
+     "fill": true
+    },
+    "point": {
+     "display": "block"
     }
    }
   },
@@ -159,12 +195,14 @@
    },
    "show": {
     "type": "line",
-    "title": "line_style.stepped",
-    "description": "Steps instead of slopes (Chart.js `stepped`): `true` / `before` (the value changes\nat the start), `after`, `middle`. Good for states and counters.\n",
+    "title": "series { curve: step-after }",
+    "description": "Steps instead of slopes (Chart.js `stepped`): `curve: step` / `step-before` (the\nvalue changes at the start), `step-after`, `step-middle`. Good for states and\ncounters.\n",
     "x_column": "t",
-    "y_column": "level",
-    "line_style": {
-     "stepped": "after"
+    "y_column": "level"
+   },
+   "style": {
+    "series": {
+     "curve": "step-after"
     }
    }
   },
@@ -174,13 +212,16 @@
    },
    "show": {
     "type": "line",
-    "title": "line_style: point, span_gaps: false",
-    "description": "`point` marks each point with a character (Chart.js `pointStyle`); `span_gaps:\nfalse` leaves a gap where the value is NULL instead of joining across it.\n",
+    "title": "point { content }, span_gaps: false",
+    "description": "`point { display: block, content: \"●\" }` marks each point with a character (Chart.js\n`pointStyle`); `span_gaps: false` leaves a gap where the value is NULL instead of\njoining across it.\n",
     "x_column": "t",
     "y_column": "v",
-    "line_style": {
-     "point": "●",
-     "span_gaps": false
+    "span_gaps": false
+   },
+   "style": {
+    "point": {
+     "display": "block",
+     "content": "●"
     }
    }
   },
@@ -190,20 +231,26 @@
    },
    "show": {
     "type": "line",
-    "title": "axes: scale: log, ticks, grid",
+    "title": "axes: scale: log, ticks; grid lines",
     "subtitle": "users per month, log scale",
-    "description": "A log y axis (Chart.js `type: logarithmic`) for growth over orders of magnitude;\n`ticks` asks for about that many x ticks, `grid` draws grid lines at the ticks.\n`subtitle` adds a muted line under the title.\n",
+    "description": "A log y axis (Chart.js `type: logarithmic`) for growth over orders of magnitude;\n`ticks` asks for about that many x ticks, `grid.x` / `grid.y { display: block }` draw\ngrid lines at the ticks.\n`subtitle` adds a muted line under the title.\n",
     "x_column": "month",
     "y_column": "users",
     "axes": {
      "x_axis": {
-      "ticks": 6,
-      "grid": true
+      "ticks": 6
      },
      "y_axis": {
-      "scale": "log",
-      "grid": true
+      "scale": "log"
      }
+    }
+   },
+   "style": {
+    "grid.x": {
+     "display": "block"
+    },
+    "grid.y": {
+     "display": "block"
     }
    }
   },
@@ -214,14 +261,14 @@
    "show": {
     "type": "line",
     "title": "mark_lines, mark_points",
-    "description": "Reference lines (ECharts `markLine`): a fixed value with a label, or `mean`, `min`,\n`max` of the data, on the `y` (default) or `x` axis. `mark_points` labels each\nseries' `max` and `min` (ECharts `markPoint`).\n",
+    "description": "Reference lines (ECharts `markLine`): a fixed value with a label, or `mean`, `min`,\n`max` of the data, on the `y` (default) or `x` axis; a line's `class` styles it\n(`mark.slo { color }`). `mark_points` labels each series' `max` and `min` (ECharts\n`markPoint`).\n",
     "x_column": "hour",
     "y_column": "latency",
     "mark_lines": [
      {
       "value": 90,
       "label": "SLO 90 ms",
-      "color": "#e06c75"
+      "class": "slo"
      },
      {
       "value": "mean"
@@ -236,6 +283,11 @@
      "max",
      "min"
     ]
+   },
+   "style": {
+    "mark.slo": {
+     "color": "#e06c75"
+    }
    }
   },
   {
@@ -244,15 +296,23 @@
    },
    "show": {
     "type": "line",
-    "title": "x_label, y_label, height, width, legend: false",
-    "description": "`x_label` / `y_label` are short for the axis titles; `height` fixes the plot rows,\n`width` caps the chart width; `legend: false` hides the legend.\n",
+    "title": "x_label, y_label; plot height, chart max-width, no legend",
+    "description": "`x_label` / `y_label` are short for the axis titles; `plot { height }` fixes the plot\nrows, `chart { max-width }` caps the chart width; `legend { display: none }` hides\nthe legend.\n",
     "x_column": "hour",
     "y_column": "visits",
     "x_label": "hour of day",
-    "y_label": "visits",
-    "height": 6,
-    "width": 60,
-    "legend": false
+    "y_label": "visits"
+   },
+   "style": {
+    "plot": {
+     "height": 6
+    },
+    "chart": {
+     "max-width": 60
+    },
+    "legend": {
+     "display": "none"
+    }
    }
   }
  ]

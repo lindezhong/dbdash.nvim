@@ -1,114 +1,197 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# webhook:// - an HTTP endpoint described by an OpenAPI 3.1 document in query.sql
-# (:help dbdash-webhook, dbdash-webhook-security, dbdash-push). Try:
+# webhook:// - HTTP endpoints described by OpenAPI 3.1 documents in query.sql
+# (:help dbdash-webhook, dbdash-webhook-security, dbdash-push). Two panels, each its own
+# endpoint:
+#   left   GET  127.0.0.1:8765/hooks/ping     no token: the query parameters are the item
+#   right  POST 127.0.0.1:8766/hooks/...      a token (bearer, API key header or Basic):
+#                                             NDJSON events, forms and log lines
+# K on a panel shows curl commands that send it data.
 #
-#   # application/x-ndjson: one item per line, each checked against the Event schema
-#   curl -H "Authorization: Bearer demo-token" -H "Content-Type: application/x-ndjson" \
-#        -H "X-Request-Id: r1" --cookie "region=eu" \
-#        --data-binary $'{"user": "ann", "action": "login"}\n{"user": "bob", "action": "purchase", "amount": 9.5}\n' \
-#        http://127.0.0.1:8765/hooks/events/web
-#   # no body: the query parameters are the item (and the reply is the documented example)
-#   curl "http://127.0.0.1:8765/hooks/ping?n=3&tags=a,b"
-#   # a form (urlencoded or multipart) is one item
-#   curl -H "Authorization: Bearer demo-token" -d "user=cat&action=logout" http://127.0.0.1:8765/hooks/forms
-#   curl -H "Authorization: Bearer demo-token" -F user=dan -F action=login http://127.0.0.1:8765/hooks/forms
-#   # text/x-log is streamed too (options.stream_types): one item per line
-#   curl -H "Authorization: Bearer demo-token" -H "Content-Type: text/x-log" \
-#        --data-binary $'eve login\nfay logout\n' http://127.0.0.1:8765/hooks/logs
-#
-# Rejected requests get application/problem+json (401 without the token, 400 for an
-# invalid event, 403 for an Origin not in allowed_origins, ...). A real token belongs in the
-# environment: tokens: { bearer: "${EVENTS_TOKEN}" }. The document's paths are appended to
-# the URL's path (/hooks).
+# Tokens: a document's security schemes (components.securitySchemes) name the ways a
+# request may prove itself and `security` lists the alternatives; database.options.tokens
+# gives the accepted credentials of each scheme by name (a list accepts several, to rotate
+# them). A real token belongs in the environment, not in this file:
+#   tokens: { bearer: "${EVENTS_TOKEN}" }      then: EVENTS_TOKEN=... nvim
+# An endpoint on 127.0.0.1 may go without a token (the left one); on another address
+# every operation needs one. Rejected requests get application/problem+json (401 without
+# a valid credential, 400 for an invalid item, 403 for an Origin not in allowed_origins).
+# The documents' paths are appended to the URL's path (/hooks).
 
 title: "webhook://"
 description: |
-  `webhook://`: an HTTP endpoint described by OpenAPI 3.1; every accepted request is an
-  item. See `:help dbdash-webhook` and the curl commands in the file.
+  `webhook://`: HTTP endpoints described by OpenAPI 3.1; every accepted request is an
+  item, shown as a row. Two endpoints run while the dashboard does: a **GET without a
+  token** (left, port 8765) and a **POST with a token** (right, port 8766). Press `K` on
+  a panel for the curl commands that send it data. See `:help dbdash-webhook`.
 
-database:
-  url: "webhook://127.0.0.1:8765/hooks"
-  options:
-    tokens: { bearer: "demo-token" }
-    delimiter: "\n"
-    stream_types: ["text/x-log"]
-    max_body: "1MB"
-    max_connections: 8
-    timeout: 5s
-    allowed_origins: ["http://localhost:3000"]   # a local web app may post from a browser
-    allowed_hosts: ["dashboard.local"]
+style:
+  dashboard: { grid-template-columns: 2 }
 
-query:
-  sql: |
-    openapi: 3.1.0
-    info: { title: events, version: "1" }
-    security: [ { bearer: [] } ]
-    paths:
-      /events/{source}:
-        post:
-          operationId: events
-          parameters:
-            - { name: source, in: path, required: true, schema: { type: string, enum: [web, app] } }
-            - { name: X-Request-Id, in: header, schema: { type: string } }
-            - { name: region, in: cookie, schema: { type: string, default: "us" } }
-          requestBody:
-            required: true
-            content:
-              application/x-ndjson:
-                schema: { $ref: "openapi/events.schema.yaml#/Event" }
-          responses: { "202": { description: queued } }
-      /ping:
-        get:
-          operationId: ping
-          security: []
-          parameters:
-            - { name: n, in: query, schema: { type: integer, minimum: 0, default: 1 } }
-            - { name: tags, in: query, style: form, explode: false, schema: { type: array, items: { type: string } } }
-          responses:
-            "200":
-              description: pong
-              content: { application/json: { example: { pong: true } } }
-      /forms:
-        post:
-          operationId: forms
-          requestBody:
-            content:
-              application/x-www-form-urlencoded: { schema: { $ref: "openapi/events.schema.yaml#/Event" } }
-              multipart/form-data: { schema: { $ref: "openapi/events.schema.yaml#/Event" } }
-          responses: { "202": { description: queued } }
-      /logs:
-        post:
-          operationId: logs
-          requestBody:
-            content:
-              text/x-log: { schema: { type: string, pattern: "^\\w+ \\w+$" } }
-          responses: { "202": { description: queued } }
-    components:
-      securitySchemes:
-        bearer: { type: http, scheme: bearer }
-  transform: |
-    -- rs: one item; params: { path, query, header, cookie }; request: method, path,
-    -- operation_id, content_type, headers (without credentials).
-    store.events = store.events or {}
-    local what
-    if request.operation_id == "ping" then
-      what = ("ping n=%d tags=%s"):format(rs.n, table.concat(rs.tags or {}, "+"))
-    elseif request.operation_id == "logs" then
-      what = rs
-    else
-      what = ("%s %s%s"):format(rs.user, rs.action, rs.amount and (" " .. rs.amount) or "")
-    end
-    local from = params.path.source or request.operation_id
-    local region = params.cookie.region or ""
-    table.insert(store.events, 1, { os.date("%H:%M:%S"), from, region, what })
-    while #store.events > 12 do table.remove(store.events) end
-    return { columns = { "at", "from", "region", "event" }, rows = store.events }
+panels:
+  # GET, no token ---------------------------------------------------------------------
+  - id: get
+    database:
+      url: "webhook://127.0.0.1:8765/hooks"
+    query:
+      sql: |
+        openapi: 3.1.0
+        info: { title: ping, version: "1" }
+        paths:
+          /ping:
+            get:
+              operationId: ping
+              parameters:
+                - { name: user, in: query, schema: { type: string, default: "anonymous" } }
+                - { name: n, in: query, schema: { type: integer, minimum: 0, default: 1 } }
+                - { name: tags, in: query, style: form, explode: false, schema: { type: array, items: { type: string } } }
+              responses:
+                "200":
+                  description: pong
+                  content: { application/json: { example: { pong: true } } }
+      transform: |
+        -- rs: the item, here the query parameters, converted by their schemas (n is a
+        -- number, tags a list, defaults filled in)
+        store.rows = store.rows or {}
+        table.insert(store.rows, 1, { os.date("%H:%M:%S"), rs.user, rs.n, table.concat(rs.tags or {}, ",") })
+        while #store.rows > 10 do table.remove(store.rows) end
+        return { columns = { "at", "user", "n", "tags" }, rows = store.rows }
+    show:
+      type: table
+      title: "GET, no token (:8765)"
+      interval: 1s
+      description: |
+        A **GET without a token**: no body, so the query parameters are the item, checked
+        and converted by the document (`n` must be a number, `tags` is a comma list,
+        missing ones take their defaults). It listens on 127.0.0.1 only, so it may go
+        without a token. Send some:
+        ```sh
+        curl "http://127.0.0.1:8765/hooks/ping?user=ann&n=3&tags=a,b"
+        curl "http://127.0.0.1:8765/hooks/ping"
+        ```
+        The reply is the document's example, `{"pong": true}`. An invalid parameter is
+        refused with 400 and nothing is added:
+        ```sh
+        curl -i "http://127.0.0.1:8765/hooks/ping?n=many"
+        ```
 
-show:
-  type: table
-  title: "Events pushed over HTTP"
-  description: |
-    The events posted to the endpoints (see the curl commands at the top of the file):
-    parameters, bodies and the operation of each request, the newest first.
-  interval: 1s
+  # POST, with a token ----------------------------------------------------------------
+  - id: post
+    database:
+      url: "webhook://127.0.0.1:8766/hooks"
+      options:
+        tokens:                       # the accepted credentials, by security scheme name
+          bearer: ["demo-token", "demo-token-2"]   # a list: either is accepted (rotation)
+          apikey: "demo-key"
+          basic: "demo:secret"                       # user:password
+        delimiter: "\n"
+        stream_types: ["text/x-log"]
+        max_body: "1MB"
+        max_connections: 8
+        timeout: 5s
+        allowed_origins: ["http://localhost:3000"]   # a local web app may post from a browser
+        allowed_hosts: ["dashboard.local"]
+    query:
+      sql: |
+        openapi: 3.1.0
+        info: { title: events, version: "1" }
+        # any one of these: a bearer token, an API key header, Basic user:password
+        security: [ { bearer: [] }, { apikey: [] }, { basic: [] } ]
+        paths:
+          /events/{source}:
+            post:
+              operationId: events
+              parameters:
+                - { name: source, in: path, required: true, schema: { type: string, enum: [web, app] } }
+                - { name: X-Request-Id, in: header, schema: { type: string } }
+                - { name: region, in: cookie, schema: { type: string, default: "us" } }
+              requestBody:
+                required: true
+                content:
+                  application/x-ndjson:
+                    schema: { $ref: "openapi/events.schema.yaml#/Event" }
+              responses: { "202": { description: queued } }
+          /forms:
+            post:
+              operationId: forms
+              requestBody:
+                content:
+                  application/x-www-form-urlencoded: { schema: { $ref: "openapi/events.schema.yaml#/Event" } }
+                  multipart/form-data: { schema: { $ref: "openapi/events.schema.yaml#/Event" } }
+              responses: { "202": { description: queued } }
+          /logs:
+            post:
+              operationId: logs
+              requestBody:
+                content:
+                  text/x-log: { schema: { type: string, pattern: "^\\w+ \\w+$" } }
+              responses: { "202": { description: queued } }
+        components:
+          securitySchemes:
+            bearer: { type: http, scheme: bearer }               # Authorization: Bearer <token>
+            apikey: { type: apiKey, in: header, name: X-API-Key } # X-API-Key: <key>
+            basic: { type: http, scheme: basic }                 # Authorization: Basic (curl -u)
+      transform: |
+        -- rs: one item; params: { path, query, header, cookie }; request: method, path,
+        -- operation_id, content_type, headers (without credentials).
+        store.events = store.events or {}
+        local what
+        if request.operation_id == "logs" then
+          what = rs
+        else
+          what = ("%s %s%s"):format(rs.user, rs.action, rs.amount and (" " .. rs.amount) or "")
+        end
+        local from = params.path.source or request.operation_id
+        local region = params.cookie.region or ""
+        table.insert(store.events, 1, { os.date("%H:%M:%S"), from, region, what })
+        while #store.events > 10 do table.remove(store.events) end
+        return { columns = { "at", "from", "region", "event" }, rows = store.events }
+    show:
+      type: table
+      title: "POST, with a token (:8766)"
+      interval: 1s
+      description: |
+        A **POST with a token**: every request needs a credential, any one of the three
+        ways the document's `security` lists (`database.options.tokens` holds the values):
+        ```sh
+        # a bearer token (either of the two in the list)
+        curl -H "Authorization: Bearer demo-token" -d "user=cat&action=logout" \
+             http://127.0.0.1:8766/hooks/forms
+        # an API key header
+        curl -H "X-API-Key: demo-key" -d "user=cat&action=logout" \
+             http://127.0.0.1:8766/hooks/forms
+        # Basic user:password
+        curl -u demo:secret -d "user=cat&action=logout" http://127.0.0.1:8766/hooks/forms
+        # no credential, or a wrong one: 401 with WWW-Authenticate
+        curl -i -d "user=cat&action=logout" http://127.0.0.1:8766/hooks/forms
+        ```
+        Keep a real token out of the file: `tokens: { bearer: "${EVENTS_TOKEN}" }` reads it
+        from the environment (start Neovim with `EVENTS_TOKEN=...`), and senders use
+        `-H "Authorization: Bearer $EVENTS_TOKEN"`. Tokens are compared in constant time
+        and never shown in `request`, errors or replies.
+
+        **Events**, one JSON object per line (`application/x-ndjson`), each checked
+        against the Event schema; the path picks the source (`web` or `app`):
+        ```sh
+        curl -H "Authorization: Bearer demo-token" \
+             -H "Content-Type: application/x-ndjson" \
+             -H "X-Request-Id: r1" --cookie "region=eu" \
+             --data-binary $'{"user": "ann", "action": "login"}\n{"user": "bob", "action": "purchase", "amount": 9.5}\n' \
+             http://127.0.0.1:8766/hooks/events/web
+        ```
+
+        **A form** (urlencoded or multipart) is one item:
+        ```sh
+        curl -H "Authorization: Bearer demo-token" \
+             -F user=dan -F action=login http://127.0.0.1:8766/hooks/forms
+        ```
+
+        **Log lines** (`text/x-log`): one item per line:
+        ```sh
+        curl -H "Authorization: Bearer demo-token" -H "Content-Type: text/x-log" \
+             --data-binary $'eve login\nfay logout\n' http://127.0.0.1:8766/hooks/logs
+        ```
+
+        A request the document does not allow gets `application/problem+json`: 401
+        without a valid credential, 400 for an invalid event (try `"action": 1`), 403 for
+        an `Origin` other than `http://localhost:3000`. See `:help dbdash-webhook-security`.

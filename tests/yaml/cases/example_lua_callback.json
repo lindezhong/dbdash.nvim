@@ -14,12 +14,16 @@
   }
  ],
  "show": {
-  "args_show": true,
-  "show_countdown": true,
-  "countdown_format": "{time}s"
+  "args_show": true
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "countdown": {
+   "display": "block",
+   "content": "{time}s"
+  }
  },
  "panels": [
   {
@@ -76,8 +80,12 @@
     "description": "`store` keeps the last 20 values; the line shows them.\n",
     "x_column": "at",
     "y_column": "orders",
-    "interval": "2s",
-    "span": 2
+    "interval": "2s"
+   },
+   "style": {
+    "panel": {
+     "grid-column": "span 2"
+    }
    }
   },
   {
@@ -90,8 +98,12 @@
    "show": {
     "type": "table",
     "title": "Run records of the previous refresh (meta.prev_runs)",
-    "description": "`meta.prev_runs`: the run records of the previous refresh (ids, kinds, times,\nresults).\n",
-    "span": 2
+    "description": "`meta.prev_runs`: the run records of the previous refresh (ids, kinds, times,\nresults).\n"
+   },
+   "style": {
+    "panel": {
+     "grid-column": "span 2"
+    }
    }
   },
   {

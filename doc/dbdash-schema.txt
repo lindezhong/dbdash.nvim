@@ -4,55 +4,88 @@ Generated from `example/dbdash.schema.yaml` by `make doc`; edit that file, not
 this one. Editors with yaml-language-server use it to validate and complete
 configs (|dbdash-examples|). Every field has a tag:
 
-  dbdash-schema-<field>          top-level fields, e.g. |dbdash-schema-panels|
-  dbdash-schema-def-<name>       a definition, e.g. |dbdash-schema-def-show|
-  dbdash-schema-<name>.<field>   its fields, e.g. |dbdash-schema-show.interval|
+  dbdash-schema-<field>         top-level fields, e.g. |dbdash-schema-panels|
+  dbdash-schema-def-<name>      a definition, e.g. |dbdash-schema-def-show|
+  dbdash-schema-<name>.<field>  its fields, e.g. |dbdash-schema-show.interval|
 
 ==============================================================================
                                                                *dbdash-schema*
 
 >yaml
-  # JSON Schema (draft-07, written in YAML) for dbdash.nvim dashboard configs.
+  # JSON Schema (draft-07, written in YAML) for dbdash.nvim dashboard
+  #   configs.
   #
-  # Editors with yaml-language-server pick it up from a modeline at the top of a config:
+  # Editors with yaml-language-server pick it up from a modeline at the top
+  #   of a
+  #     config:
   #   # yaml-language-server: $schema=./dbdash.schema.yaml
   #
-  # The sidebar (:DbDash) does not list *.schema.yaml files (default sidebar.exclude).
+  # The sidebar (:DbDash) does not list *.schema.yaml files (default
+  #   sidebar.exclude).
   #
   # Defaults below marked "setup" can be changed for all configs with
   # require("dbdash").setup({ defaults = { ... } }); see :help dbdash-setup.
   #
-  # Result format (:help dbdash-result) - referred to by query.sql (lua://, http(s)://, the
-  # push sources) and query.transform below. Every query goes: query -> query.transform (if
-  # any) -> a check that the result is rows. SQL databases, Redis, MongoDB and Cassandra
-  # return rows; a lua:// script, an HTTP response (decoded JSON), an item of a push source
-  # (luastream://, exec://, webhook://: JSON text) and a transform must return one of:
-  #   { columns = { "a", "b" }, rows = { { 1, "x" } } }        rows by position
+  # Result format (:help dbdash-result) - referred to by query.sql (lua://,
+  #   http(s)://,
+  #     the
+  # push sources) and query.transform below. Every query goes: query ->
+  #   query.transform
+  #     (if
+  # any) -> a check that the result is rows. SQL databases, Redis, MongoDB
+  #   and
+  #     Cassandra
+  # return rows; a lua:// script, an HTTP response (decoded JSON), an item of
+  #   a push
+  #     source
+  # (luastream://, exec://, webhook://: JSON text) and a transform must
+  #   return one
+  #     of:
+  #   { columns = { "a", "b" }, rows = { { 1, "x" } } }        rows by
+  #   position
   #   { columns = { "a", "b" }, rows = { { a = 1, b = "x" } } } rows by name
-  #   { { a = 1, b = "x" }, ... }                               records (columns sorted by
-  #                                                             name, or a columns list)
-  # In JSON: [{"a": 1}] or {"columns": ["a"], "rows": [[1]]}. nil / null is NULL; column
-  # types follow the first non-NULL value; query.max_rows applies. Anything else (an
-  # object such as {"data": [...]}, a number, text) is an error that suggests a transform.
+  #   { { a = 1, b = "x" }, ... }                               records
+  #   (columns sorted
+  #     by
+  #                                                             name, or a
+  #   columns
+  #     list)
+  # In JSON: [{"a": 1}] or {"columns": ["a"], "rows": [[1]]}. nil / null is
+  #   NULL;
+  #     column
+  # types follow the first non-NULL value; query.max_rows applies. Anything
+  #   else
+  #     (an
+  # object such as {"data": [...]}, a number, text) is an error that suggests
+  #   a transform.
   $schema: "http://json-schema.org/draft-07/schema#"
   $id: "dbdash.schema.yaml"
   title: dbdash.nvim dashboard
   description: >-
-    One dashboard: either a single chart (database / query / show) or several panels
-    (panels). Top-level bare fields (interval, args, style) are dashboard-wide; the top-level
-    database, query and show are the panels' defaults (without panels: the only panel). All
-    appearance is in style sheets (style, panels[].style). See :help dbdash-config.
+    One dashboard: either a single chart (database / query / show) or several
+    panels (panels). Top-level bare fields (interval, args, style) are
+    dashboard-wide; the top-level database, query and show are the panels'
+    defaults (without panels: the only panel). All appearance is in style
+    sheets (style, panels[].style). See :help dbdash-config.
   type: object
   if: { required: [panels] }
   then:
-    # With panels the top-level query and show are defaults: fields describing one chart
+    # With panels the top-level query and show are defaults: fields
+    #   describing one
+    #     chart
     # belong in each panel.
     properties:
       query:
         properties: { sql: false, transform: false, args: false }
       show:
         properties:
-          { type: false, title: false, subtitle: false, description: false, column_list: false, x_label: false, y_label: false }
+          type: false
+          title: false
+          subtitle: false
+          description: false
+          column_list: false
+          x_label: false
+          y_label: false
         patternProperties: { "_columns?$": false }
   else:
     required: [database] # query too, except for webhook://
@@ -62,67 +95,74 @@ configs (|dbdash-examples|). Every field has a tag:
     database:
       $ref: "#/definitions/database"
       description: >-
-        The database of a single chart; with panels, the default of every panel that does not
-        set its own (replaced as a whole by a panel's database; optional when every panel sets
-        one).
+        The database of a single chart; with panels, the default of every
+        panel that does not set its own (replaced as a whole by a panel's
+        database; optional when every panel sets one).
 <
                                                    *dbdash-schema-query* >yaml
     query:
       $ref: "#/definitions/query"
-      description: The single chart's query; with panels, defaults of every panel's query (timeout, max_rows, autoescape).
+      description: >-
+        The single chart's query; with panels, defaults of every panel's
+        query (timeout, max_rows, autoescape).
 <
                                                     *dbdash-schema-show* >yaml
     show:
       $ref: "#/definitions/show"
       description: >-
-        The single chart's show; with panels, defaults of every panel's show (interval,
-        args_show, refresh_hidden, axes, ...), merged key by key.
+        The single chart's show; with panels, defaults of every panel's show
+        (interval, args_show, refresh_hidden, axes, ...), merged key by key.
 <
                                                 *dbdash-schema-interval* >yaml
     interval:
       $ref: "#/definitions/duration"
       description: >-
-        Global refresh: when it elapses every panel refreshes and the panels' own timers
-        restart. Also the last default of show.interval (after the top-level show.interval).
-        At least 1s.
+        Global refresh: when it elapses every panel refreshes and the panels'
+        own timers restart. Also the last default of show.interval (after the
+        top-level show.interval). At least 1s.
 <
                                                    *dbdash-schema-title* >yaml
     title:
       type: string
       description: >-
-        The dashboard's title: on the header line above the charts, in notifications and
-        :DbDashStatus, and meta.dashboard_title.
+        The dashboard's title: on the header line above the charts, in
+        notifications and :DbDashStatus, and meta.dashboard_title.
 <
                                              *dbdash-schema-description* >yaml
     description:
       type: string
       description: >-
-        The dashboard's description: a template (the shared args; meta without panel fields;
-        it cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe;
-        ⓘ in the header says there is one.
+        The dashboard's description: a template (the shared args; meta
+        without panel fields; it cannot assign arguments) whose result is
+        Markdown, shown by K / :DbDashDescribe; ⓘ in the header says there is
+        one.
 <
                                                     *dbdash-schema-args* >yaml
     args:
       type: array
       description: >-
-        Shared arguments: every panel can use them. A panel's query.args are its own (only that
-        panel sees them) and shadow a shared argument of the same name there. On the command
-        line name=value sets every argument of that name, <panel id>.name=value one panel's
-        own (a local name nothing else has is plain name too).
+        Shared arguments: every panel can use them. A panel's query.args are
+        its own (only that panel sees them) and shadow a shared argument of
+        the same name there. On the command line name=value sets every
+        argument of that name, <panel id>.name=value one panel's own (a local
+        name nothing else has is plain name too).
       items: { $ref: "#/definitions/arg" }
 <
                                                    *dbdash-schema-style* >yaml
     style:
       $ref: "#/definitions/style"
       description: >-
-        The dashboard's style sheet (author origin): above setup({ style }), below a panel's
-        own style. The grid is dashboard { grid-template-columns, ... }; see :help dbdash-css.
+        The dashboard's style sheet (author origin): above setup({ style }),
+        below a panel's own style. The grid is dashboard {
+        grid-template-columns, ... }; see :help dbdash-css.
 <
                                                   *dbdash-schema-panels* >yaml
     panels:
       type: array
       minItems: 1
-      description: Charts in a CSS grid (style dashboard { grid-template-* }, panel { grid-* }).
+      description: >-
+        Charts in a CSS grid (style dashboard { grid-template-* }, panel {
+        grid-* }).
       items: { $ref: "#/definitions/panel" }
   additionalProperties: false
 
@@ -130,10 +170,13 @@ configs (|dbdash-examples|). Every field has a tag:
 <
                                             *dbdash-schema-def-duration* >yaml
     duration:
-      description: 'Seconds as a number, or a string with a unit: "500ms", "30s", "5m", "1h".'
+      description: >-
+        Seconds as a number, or a string with a unit: "500ms", "30s", "5m",
+        "1h".
       oneOf:
         - { type: number, minimum: 0 }
-        - { type: string, pattern: "^\\s*\\d+(\\.\\d+)?\\s*(ms|s|m|h)?\\s*$" }
+        - type: string
+          pattern: "^\\s*\\d+(\\.\\d+)?\\s*(ms|s|m|h)?\\s*$"
 
 <
                                             *dbdash-schema-def-database* >yaml
@@ -141,61 +184,154 @@ configs (|dbdash-examples|). Every field has a tag:
       type: object
       required: [url]
       additionalProperties: false
+      # Each driver reads its own options (an unknown one is an error when
+      #   the
+      #     config
+      # loads), by the URL's scheme; databases without options take none.
+      allOf:
+        - if:
+            required: [url]
+            properties: { url: { pattern: "^sqlite3?://" } }
+          then:
+            properties:
+<
+                                        *dbdash-schema-database.options* >yaml
+              options:
+                propertyNames: { enum: [lib_path, readonly, create] }
+        - if:
+            required: [url]
+            properties: { url: { pattern: "^exec://" } }
+          then:
+            properties:
+              options:
+                propertyNames:
+                  enum:
+                    - interpreter
+                    - capture
+                    - delimiter
+                    - ok_codes
+                    - cwd
+                    - env
+                    - stdin
+        - if:
+            required: [url]
+            properties: { url: { pattern: "^luastream://" } }
+          then:
+            properties:
+              options: { propertyNames: { enum: [cwd, delimiter] } }
+        - if:
+            required: [url]
+            properties: { url: { pattern: "^webhook://" } }
+          then:
+            properties:
+              options:
+                propertyNames:
+                  enum:
+                    - tokens
+                    - delimiter
+                    - stream_types
+                    - max_body
+                    - max_connections
+                    - timeout
+                    - allowed_origins
+                    - allowed_hosts
+        - if:
+            required: [url]
+            properties:
+<
+                                            *dbdash-schema-database.url* >yaml
+              url:
+                not: { pattern: "^(sqlite3?|exec|luastream|webhook)://" }
+          then:
+            properties:
+              options: { maxProperties: 0 }
       properties:
 <
                                            *dbdash-schema-database.type* >yaml
         type:
-          description: Database type; inferred from the URL scheme when omitted.
-          enum: [sqlite, sqlite3, postgres, postgresql, mysql, mariadb, redis, rediss, mongodb, cassandra, cql, mssql, sqlserver, lua, http, https, luastream, exec, webhook]
-<
-                                            *dbdash-schema-database.url* >yaml
+          description: >-
+            Database type; inferred from the URL scheme when omitted.
+          enum:
+            - sqlite
+            - sqlite3
+            - postgres
+            - postgresql
+            - mysql
+            - mariadb
+            - redis
+            - rediss
+            - mongodb
+            - cassandra
+            - cql
+            - mssql
+            - sqlserver
+            - lua
+            - http
+            - https
+            - luastream
+            - exec
+            - webhook
         url:
           type: string
           description: |-
-            Connection URL: <scheme>://[user[:password]@]host[:port][/database][?param=value&...]
-            User names and passwords are percent-decoded (write @ as %40, : as %3A).
-            ${NAME} is replaced by the environment variable NAME ($${ for a literal ${).
-            Without a password in the URL: password_cmd, then
-            stdpath("data")/dbdash/passwords.json (see :help dbdash-passwords).
+            Connection URL:
+              <scheme>://[user[:password]@]host[:port][/database][?k=v]
+            User names and passwords are percent-decoded (write @ as %40, :
+            as %3A). ${NAME} is replaced by the environment variable NAME
+            ($${ for a literal ${). Without a password in the URL:
+            password_cmd, then stdpath("data")/dbdash/passwords.json (see
+            :help dbdash-passwords).
 
-            SQLite      sqlite:///absolute/path.db                (or sqlite3://)
+            SQLite      sqlite:///absolute/path.db     (or sqlite3://)
                         sqlite://relative/to/this/config.db
                         sqlite:///:memory:
-            PostgreSQL  postgres://user:pass@host:5432/db        (or postgresql://)
-                        auth: cleartext, md5, SCRAM-SHA-256; ?options=-c%20search_path%3Dapp
-            MySQL       mysql://user:pass@host:3306/db           (or mariadb://)
+            PostgreSQL  postgres://user:pass@host:5432/db  (or postgresql://)
+                        auth: cleartext, md5, SCRAM-SHA-256;
+                        ?options=-c%20search_path%3Dapp
+            MySQL       mysql://user:pass@host:3306/db     (or mariadb://)
                         auth: mysql_native_password, caching_sha2_password
-            Redis       redis://[user]:pass@host:6379/0          (rediss:// = TLS)
+            Redis       redis://[user]:pass@host:6379/0    (rediss://: TLS)
             MongoDB     mongodb://user:pass@host:27017/db?authSource=admin
-                        mongodb://user:pass@h1:27017,h2:27017/db?readPreference=secondaryPreferred
-                        mongodb+srv://user:pass@cluster0.example.net/db   (SRV + TXT lookup,
-                        defaults to tls=verify-full; ?dns=host:port picks the name server)
+                        mongodb://user:pass@h1:27017,h2:27017/db
+                          ?readPreference=secondaryPreferred
+                        mongodb+srv://user:pass@cluster0.example.net/db
+                          (SRV + TXT lookup, defaults to tls=verify-full;
+                          ?dns=host:port picks the name server)
                         ?authMechanism=SCRAM-SHA-256|SCRAM-SHA-1
-            Cassandra   cassandra://user:pass@host:9042/keyspace?consistency=LOCAL_QUORUM
-                        (or cql://)
-            SQL Server  mssql://user:pass@host:1433/db            (or sqlserver://)
-                        with TLS: TLS negotiated inside TDS; &encrypt=strict for TDS 8
-            Lua         lua://   query.sql is Lua code returning rows (:help dbdash-lua)
-            HTTP        https://user:pass@api.example.com/v1?key=value   (or http://)
-                        query.sql is a curl command (:help dbdash-http); https
-                        defaults to tls=verify-full; other ?parameters go to the server
+            Cassandra   cassandra://user:pass@host:9042/keyspace (or cql://)
+                          ?consistency=LOCAL_QUORUM
+            SQL Server  mssql://user:pass@host:1433/db     (or sqlserver://)
+                        with TLS: TLS negotiated inside TDS;
+                        &encrypt=strict for TDS 8
+            Lua         lua://   query.sql is Lua code returning rows
+                        (:help dbdash-lua)
+            HTTP        https://user:pass@api.example.com/v1?key=value
+                        (or http://) query.sql is a curl command
+                        (:help dbdash-http); https defaults to
+                        tls=verify-full; other ?parameters go to the server
 
-            Push sources: data arrives instead of being queried (:help dbdash-push)
-            Lua stream  luastream://   query.sql is Lua whose print() / io.write() output is
-                        the data (:help dbdash-luastream)
-            Script      exec://        query.sql is a script; its output is the data
-                        (:help dbdash-exec)
-            Webhook     webhook://127.0.0.1:8765/path   an HTTP endpoint; query.sql is an
-                        OpenAPI document (:help dbdash-webhook)
+            Push sources: data arrives instead of being queried
+            (:help dbdash-push)
+            Lua stream  luastream://   query.sql is Lua whose print() /
+                        io.write() output is the data
+                        (:help dbdash-luastream)
+            Script      exec://   query.sql is a script; its output is the
+                        data (:help dbdash-exec)
+            Webhook     webhook://127.0.0.1:8765/path   an HTTP endpoint;
+                        query.sql is an OpenAPI document
+                        (:help dbdash-webhook)
 
             Common parameters:
-              tls=disable|require|pin|verify-ca|verify-full   (default disable)
-              fingerprint=sha256:AB:CD:...                    (required for tls=pin)
-              ca=path/to/ca.pem                              (verify-*: trusted CAs instead of
-                                                              the system store; relative to
-                                                              this config file)
-              tls_host=name                                  (name to verify instead of host)
-              connect_timeout=10s   timeout=30s              (defaults: setup)
+              tls=disable|require|pin|verify-ca|verify-full
+                                                   (default disable)
+              fingerprint=sha256:AB:CD:...         (required for tls=pin)
+              ca=path/to/ca.pem                    (verify-*: trusted CAs
+                                                    instead of the system
+                                                    store; relative to this
+                                                    config file)
+              tls_host=name                        (name to verify instead of
+                                                    host)
+              connect_timeout=10s   timeout=30s    (defaults: setup)
               application_name=dbdash.nvim
           examples:
             - "sqlite:///:memory:"
@@ -205,7 +341,7 @@ configs (|dbdash-examples|). Every field has a tag:
             - "redis://:secret@cache:6379/0"
             - "mongodb+srv://reader:secret@cluster0.example.net/shop"
             - "cassandra://cassandra:cassandra@127.0.0.1:9042/metrics"
-            - "mssql://sa:Secret1@sqlhost:1433/master?tls=pin&fingerprint=sha256:AB:..."
+            - "mssql://sa:pw@sqlhost/master?tls=pin&fingerprint=sha256:AB:"
             - "lua://"
             - "https://api.example.com/v1?api_key=${API_KEY}"
             - "luastream://"
@@ -215,112 +351,151 @@ configs (|dbdash-examples|). Every field has a tag:
                                    *dbdash-schema-database.password_cmd* >yaml
         password_cmd:
           description: >-
-            Command printing the password (first line), used when the URL has none. A string
-            runs through sh -c (cmd /c on Windows); a list runs directly. It runs in Neovim's
-            current directory.
+            Command printing the password (first line), used when the URL has
+            none. A string runs through sh -c (cmd /c on Windows); a list
+            runs directly. It runs in Neovim's current directory.
           oneOf:
             - { type: string, minLength: 1 }
             - { type: array, minItems: 1, items: { type: string } }
           examples: ["pass show db/app"]
-<
-                                        *dbdash-schema-database.options* >yaml
         options:
           type: object
-          description: Driver options.
+          description: >-
+            Driver options: each driver reads its own (SQLite, exec://,
+            luastream://, webhook://); the other databases take none. An
+            unknown one is an error.
           properties:
 <
                                *dbdash-schema-database.options.lib_path* >yaml
-            lib_path: { type: string, description: "SQLite: path of the libsqlite3 library to load." }
+            lib_path:
+              type: string
+              description: "SQLite: path of the libsqlite3 library to load."
 <
                                *dbdash-schema-database.options.readonly* >yaml
-            readonly: { type: boolean, description: "SQLite: open the file read-only." }
+            readonly:
+              type: boolean
+              description: "SQLite: open the file read-only."
 <
                                  *dbdash-schema-database.options.create* >yaml
-            create: { type: boolean, description: "SQLite: create the file when it does not exist (default false)." }
+            create:
+              type: boolean
+              description: >-
+                SQLite: create the file when it does not exist (default
+                false).
 <
                               *dbdash-schema-database.options.delimiter* >yaml
             delimiter:
               type: string
               minLength: 1
-              description: 'Push sources: what separates items in the output or a streamed request body (default "\n"; a "\r" before it is dropped).'
+              description: >-
+                Push sources: what separates items in the output or a
+                streamed request body (default "\n"; a "\r" before it is
+                dropped).
 <
                                     *dbdash-schema-database.options.cwd* >yaml
             cwd:
               type: string
-              description: "exec:// and luastream://: the working directory (default: this config file's directory; relative to it)."
+              description: >-
+                exec:// and luastream://: the working directory (default:
+                this config file's directory; relative to it).
 <
                             *dbdash-schema-database.options.interpreter* >yaml
             interpreter:
               type: array
               minItems: 1
               items: { type: string }
-              description: 'exec://: the program running the script, the script being its last argument (default ["sh", "-c"], ["cmd.exe", "/d", "/s", "/c"] on Windows).'
-              examples: [["bash", "-c"], ["python3", "-c"], ["pwsh", "-Command"]]
+              description: >-
+                exec://: the program running the script, the script being its
+                last argument (default ["sh", "-c"], ["cmd.exe", "/d", "/s",
+                "/c"] on Windows).
+              examples:
+                - ["bash", "-c"]
+                - ["python3", "-c"]
+                - ["pwsh", "-Command"]
 <
                                 *dbdash-schema-database.options.capture* >yaml
             capture:
               enum: [stdout, stderr, both]
-              description: "exec://: which output is the data (default stdout); each item knows its stream."
+              description: >-
+                exec://: which output is the data (default stdout); each item
+                knows its stream.
 <
                                *dbdash-schema-database.options.ok_codes* >yaml
             ok_codes:
               type: array
               minItems: 1
               items: { type: integer }
-              description: "exec://: exit codes that end normally (default [0]); others fail with the end of stderr."
+              description: >-
+                exec://: exit codes that end normally (default [0]); others
+                fail with the end of stderr.
 <
                                     *dbdash-schema-database.options.env* >yaml
             env:
               type: object
               additionalProperties: { type: [string, number, boolean] }
-              description: "exec://: environment variables added to Neovim's."
+              description: >-
+                exec://: environment variables added to Neovim's.
 <
                                   *dbdash-schema-database.options.stdin* >yaml
             stdin:
               type: string
-              description: "exec://: text written to the script's stdin (then closed)."
+              description: >-
+                exec://: text written to the script's stdin (then closed).
 <
                                  *dbdash-schema-database.options.tokens* >yaml
             tokens:
               type: object
               description: >-
-                webhook://: the credentials of the OpenAPI document's security schemes, by scheme
-                name: a token (http bearer, apiKey), "user:password" (http basic), or a list of them.
-                Use ${NAME} to read them from the environment.
+                webhook://: the credentials of the OpenAPI document's
+                security schemes, by scheme name: a token (http bearer,
+                apiKey), "user:password" (http basic), or a list of them. Use
+                ${NAME} to read them from the environment.
 <
                            *dbdash-schema-database.options.stream_types* >yaml
             stream_types:
               type: array
               items: { type: string }
-              description: "webhook://: more media types whose bodies are cut into items at the delimiter."
+              description: >-
+                webhook://: more media types whose bodies are cut into items
+                at the delimiter.
 <
                                *dbdash-schema-database.options.max_body* >yaml
             max_body:
               type: [string, integer]
-              description: 'webhook://: the largest request body (default "10MB"; larger ones get 413).'
+              description: >-
+                webhook://: the largest request body (default "10MB"; larger
+                ones get 413).
 <
                         *dbdash-schema-database.options.max_connections* >yaml
             max_connections:
               type: integer
               minimum: 1
-              description: "webhook://: connections at the same time (default 16; more are closed)."
+              description: >-
+                webhook://: connections at the same time (default 16; more
+                are closed).
 <
                                 *dbdash-schema-database.options.timeout* >yaml
             timeout:
               $ref: "#/definitions/duration"
-              description: "webhook://: time to send the headers and each part of the body (default 10s; then 408)."
+              description: >-
+                webhook://: time to send the headers and each part of the
+                body (default 10s; then 408).
 <
                         *dbdash-schema-database.options.allowed_origins* >yaml
             allowed_origins:
               type: array
               items: { type: string }
-              description: "webhook://: Origin values accepted (browsers send one; default none). Requests without an Origin are accepted."
+              description: >-
+                webhook://: Origin values accepted (browsers send one;
+                default none). Requests without an Origin are accepted.
 <
                           *dbdash-schema-database.options.allowed_hosts* >yaml
             allowed_hosts:
               type: array
               items: { type: string }
-              description: "webhook://: more Host names accepted besides the listening address and localhost."
+              description: >-
+                webhook://: more Host names accepted besides the listening
+                address and localhost.
 
 <
                                                  *dbdash-schema-def-arg* >yaml
@@ -337,19 +512,23 @@ configs (|dbdash-examples|). Every field has a tag:
         name:
           type: string
           pattern: "^[A-Za-z_][A-Za-z0-9_]*$"
-          description: Argument name, used as args.<name> in templates and Lua code.
+          description: >-
+            Argument name, used as args.<name> in templates and Lua code.
 <
                                                 *dbdash-schema-arg.type* >yaml
         type:
           enum: [string, number, int, boolean, list, map]
           default: string
           description: >-
-            How command-line / prompt input is parsed: list "a,b,c", map "k:v,k2:v2", boolean
-            true/false/1/0/yes/no. Escape , and : with a backslash or quotes.
+            How command-line / prompt input is parsed: list "a,b,c", map
+            "k:v,k2:v2", boolean true/false/1/0/yes/no. Escape , and : with a
+            backslash or quotes.
 <
                                              *dbdash-schema-arg.default* >yaml
         default:
-          description: Value when nothing else sets it (an argument without a value is none).
+          description: >-
+            Value when nothing else sets it (an argument without a value is
+            none).
 <
                                             *dbdash-schema-arg.required* >yaml
         required:
@@ -361,7 +540,9 @@ configs (|dbdash-examples|). Every field has a tag:
         show:
           type: boolean
           default: true
-          description: Include the argument in show.args_show lines (when args_show is true).
+          description: >-
+            Include the argument in show.args_show lines (when args_show is
+            true).
 <
                                          *dbdash-schema-arg.description* >yaml
         description: { type: string }
@@ -376,8 +557,9 @@ configs (|dbdash-examples|). Every field has a tag:
     query:
       type: object
       description: >-
-        The query; sql is required except for webhook:// (empty: POST or PUT of anything).
-        For http(s):// it is a curl command (curl alone GETs the URL).
+        The query; sql is required except for webhook:// (empty: POST or PUT
+        of anything). For http(s):// it is a curl command (curl alone GETs
+        the URL).
       additionalProperties: false
       properties:
 <
@@ -385,47 +567,77 @@ configs (|dbdash-examples|). Every field has a tag:
         sql:
           type: string
           description: |-
-            Query template (Jinja2, see :help dbdash-templates): arguments are
-            {{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta, e.g.
-            run records with ids, times and results: meta.run (meta.run.kind: "refresh" or
-            "callback"; meta.run.depth: 0 in a refresh, n in a callback), meta.runs,
+            Query template (Jinja2, see :help dbdash-templates): arguments
+              are
+            {{ args.<name> }}, metadata {{ meta.<name> }} (:help dbdash-meta,
+              e.g.
+            run records with ids, times and results: meta.run (meta.run.kind:
+              "refresh"
+                or
+            "callback"; meta.run.depth: 0 in a refresh, n in a callback),
+              meta.runs,
             meta.prev, meta.prev_ok (the last successful refresh, its rows in
             meta.prev_ok.result): :help dbdash-runs), and
-            {% set args.<name> = value %} sets an argument (:help dbdash-assign-args). Lua
-            runs in {% lua %} ... {% endlua %} blocks and in modules imported with
-            {% import 'x.lua' as h %} (:help dbdash-template-lua), with args, meta, store and
-            the dbdash.* helpers (dbdash.run(args): this query again with other arguments);
-            a config with Lua is trusted once, with the files it imports (:help dbdash-lua).
+            {% set args.<name> = value %} sets an argument (:help
+              dbdash-assign-args).
+                Lua
+            runs in {% lua %} ... {% endlua %} blocks and in modules imported
+              with
+            {% import 'x.lua' as h %} (:help dbdash-template-lua), with args,
+              meta, store
+                and
+            the dbdash.* helpers (dbdash.run(args): this query again with
+              other
+                arguments);
+            a config with Lua is trusted once, with the files it imports
+              (:help
+                dbdash-lua).
             Its language depends on the database:
               SQL databases  SQL (T-SQL for SQL Server, CQL for Cassandra)
               Redis          one command, e.g. HGETALL "user:1001"
               MongoDB        a JSON document:
                              {"collection": "orders", "operation": "find",
-                              "filter": {...}, "projection": {...}, "sort": {...},
+                              "filter": {...}, "projection": {...}, "sort":
+                                {...},
                               "limit": 100, "flatten": 1}
                              operation: find | aggregate (pipeline) | count |
                              distinct (field) | command (command)
-              lua://         Lua code returning rows (see "Result format" at the top
-                             of this file, :help dbdash-result), or a value that
-                             query.transform turns into rows; it sees args, meta,
+              lua://         Lua code returning rows (see "Result format" at
+                             the
+                               top
+                             of this file, :help dbdash-result), or a value
+                               that
+                             query.transform turns into rows; it sees args,
+                               meta,
                              store and dbdash.system/query/sleep/run (:help
                              dbdash-lua)
-              luastream://   Lua code whose print() / io.write() output is cut into
+              luastream://   Lua code whose print() / io.write() output is
+                             cut
+                               into
                              items (dbdash.emit(value) passes one as it is)
               exec://        a script run by database.options.interpreter
-              webhook://     an OpenAPI 3.1 document (YAML or JSON) describing the
-                             requests it accepts (empty: POST or PUT of anything)
-              http(s)://     a curl command whose URL is a path under database.url
-                             (curl alone: GET the URL), with curl's options and
+              webhook://     an OpenAPI 3.1 document (YAML or JSON)
+                             describing
+                               the
+                             requests it accepts (empty: POST or PUT of
+                               anything)
+              http(s)://     a curl command whose URL is a path under
+                             database.url
+                             (curl alone: GET the URL), with curl's options
+                               and
                              defaults, e.g.
                                curl -X POST /search -H 'X-Token: t' -G \
                                  --data-urlencode q=x -b jar.txt -c jar.txt \
                                  --json '{"limit": 5}' -L
-                             (query.autoescape writes {{ }} values as shell words;
+                             (query.autoescape writes {{ }} values as shell
+                               words;
                              -c writes a cookie file next to the config);
-                             JSON responses are decoded, other bodies stay text; the
+                             JSON responses are decoded, other bodies stay
+                               text;
+                                 the
                              result must be rows ("Result format", :help
-                             dbdash-result): a JSON list of objects or {"columns",
+                             dbdash-result): a JSON list of objects or
+                               {"columns",
                              "rows"} shows directly, anything else needs
                              query.transform (:help dbdash-http)
 <
@@ -433,55 +645,81 @@ configs (|dbdash-examples|). Every field has a tag:
         transform:
           type: string
           description: |-
-            Lua code that reshapes the result of any database before it is shown (after the
-            same template as query.sql - args, meta, {% lua %}, .lua imports - without
+            Lua code that reshapes the result of any database before it is
+              shown (after
+                the
+            same template as query.sql - args, meta, {% lua %}, .lua imports
+              - without
             autoescape; :help dbdash-transform). Every query goes:
             query -> transform -> rows check. It gets
-              rs        SQL and other databases: { columns (names), types, rows (nil for
-                        NULL) }; lua://: the script's value; http(s)://: the decoded body;
-                        push sources: one item (text, or what dbdash.emit() or a request
+              rs        SQL and other databases: { columns (names), types,
+                        rows (nil
+                          for
+                        NULL) }; lua://: the script's value; http(s)://: the
+                          decoded
+                            body;
+                        push sources: one item (text, or what dbdash.emit()
+                          or a
+                            request
                         gave; :help dbdash-push)
               response  http(s)://: { status, reason, headers, body, url }
-              stream    exec://: "stdout" or "stderr", the stream the item came from
-              params    webhook://: { path, query, header, cookie }, converted
-              request   webhook://: { method, path, operation_id, content_type, headers }
-              args      the arguments, meta the metadata, store the panel's table kept while
-                        the dashboard runs, and the dbdash.* helpers (dbdash.run(args)
+              stream    exec://: "stdout" or "stderr", the stream the item
+                        came
+                          from
+              params    webhook://: { path, query, header, cookie },
+                        converted
+              request   webhook://: { method, path, operation_id,
+                        content_type, headers
+                          }
+              args      the arguments, meta the metadata, store the panel's
+                        table kept
+                          while
+                        the dashboard runs, and the dbdash.* helpers
+                          (dbdash.run(args)
                         runs this panel's query again with other arguments)
-            and returns rows (see "Result format" at the top of this file, :help
-            dbdash-result). Configs with Lua ask for trust first (:help dbdash-lua).
+            and returns rows (see "Result format" at the top of this file,
+              :help
+            dbdash-result). Configs with Lua ask for trust first (:help
+              dbdash-lua).
 <
                                               *dbdash-schema-query.args* >yaml
         args:
           type: array
           description: >-
-            This chart's own arguments (only its templates see them); one with the name of a
-            shared (top-level) argument shadows it here.
+            This chart's own arguments (only its templates see them); one
+            with the name of a shared (top-level) argument shadows it here.
           items: { $ref: "#/definitions/arg" }
 <
                                         *dbdash-schema-query.autoescape* >yaml
         autoescape:
           type: boolean
           default: false
-          description: "Render {{ x }} as SQL literals of the database's dialect (| safe opts out)."
+          description: >-
+            Render {{ x }} as SQL literals of the database's dialect (| safe
+            opts out).
 <
                                           *dbdash-schema-query.max_rows* >yaml
         max_rows:
           type: integer
           minimum: 1
           default: 10000
-          description: Rows read at most (default 10000, setup defaults.max_rows).
+          description: >-
+            Rows read at most (default 10000, setup defaults.max_rows).
 <
                                            *dbdash-schema-query.timeout* >yaml
         timeout:
           $ref: "#/definitions/duration"
-          description: Query timeout (default the URL's timeout, else 30s from setup defaults.timeout).
+          description: >-
+            Query timeout (default the URL's timeout, else 30s from setup
+            defaults.timeout).
 
 <
                                                *dbdash-schema-def-panel* >yaml
     panel:
       type: object
-      description: One chart; query is required except for http(s):// (a GET of the URL) and webhook://.
+      description: >-
+        One chart; query is required except for http(s):// (a GET of the URL)
+        and webhook://.
       additionalProperties: false
       properties:
 <
@@ -490,15 +728,15 @@ configs (|dbdash-examples|). Every field has a tag:
           type: string
           pattern: "^[A-Za-z_][A-Za-z0-9_]*$"
           description: >-
-            Name of the panel for its local arguments on the command line (<id>.name=value);
-            default its number (1, 2, ...).
+            Name of the panel for its local arguments on the command line
+            (<id>.name=value); default its number (1, 2, ...).
 <
                                           *dbdash-schema-panel.database* >yaml
         database:
           $ref: "#/definitions/database"
           description: >-
-            This panel's database; default the top-level database (replaced as a whole). A
-            panel needs one of the two.
+            This panel's database; default the top-level database (replaced
+            as a whole). A panel needs one of the two.
 <
                                              *dbdash-schema-panel.query* >yaml
         query: { $ref: "#/definitions/query" }
@@ -510,8 +748,9 @@ configs (|dbdash-examples|). Every field has a tag:
         style:
           $ref: "#/definitions/style"
           description: >-
-            This panel's style sheet (inline origin): its rules match only in this panel and
-            win over the dashboard's (e.g. panel { grid-column: "span 2" }, chart { renderer: vertical }).
+            This panel's style sheet (inline origin): its rules match only in
+            this panel and win over the dashboard's (e.g. panel {
+            grid-column: "span 2" }, chart { renderer: vertical }).
 
 <
                                               *dbdash-schema-def-series* >yaml
@@ -526,12 +765,17 @@ configs (|dbdash-examples|). Every field has a tag:
             column: { type: string }
 <
                                             *dbdash-schema-series.label* >yaml
-            label: { type: string, description: "The legend label; series.<label> in style sheets." }
+            label:
+              type: string
+              description: >-
+                The legend label; series.<label> in style sheets.
 
 <
                                                *dbdash-schema-def-track* >yaml
     track:
-      description: 'A grid track: an integer, "N%", "Nfr", auto, min-content, max-content or "minmax(a, b)".'
+      description: >-
+        A grid track: an integer, "N%", "Nfr", auto, min-content, max-content
+        or "minmax(a, b)".
       oneOf:
         - { type: integer, minimum: 0 }
         - { type: string }
@@ -541,15 +785,17 @@ configs (|dbdash-examples|). Every field has a tag:
     color:
       type: string
       description: >-
-        Hex ("#3498db"), a color name ("blue", "bright_blue"), or an existing highlight group
-        ("DiagnosticOk").
+        Hex ("#3498db"), a color name ("blue", "bright_blue"), or an existing
+        highlight group ("DiagnosticOk").
 
 <
                                                *dbdash-schema-def-class* >yaml
     class:
       type: string
       pattern: "^[A-Za-z_][A-Za-z0-9_-]*$"
-      description: "A class name for style sheets (.<class>); success, info, warning and danger are colored by default."
+      description: >-
+        A class name for style sheets (.<class>); success, info, warning and
+        danger are colored by default.
 
 <
                                                 *dbdash-schema-def-show* >yaml
@@ -559,44 +805,62 @@ configs (|dbdash-examples|). Every field has a tag:
 <
                                                *dbdash-schema-show.type* >yaml
         type:
-          enum: [table, line, area, bar, histogram, boxplot, heatmap, bubble, pie, scatter, stat, text]
+          enum:
+            - table
+            - line
+            - area
+            - bar
+            - histogram
+            - boxplot
+            - heatmap
+            - bubble
+            - pie
+            - scatter
+            - stat
+            - text
           default: table
 <
                                               *dbdash-schema-show.title* >yaml
         title: { type: string }
 <
                                            *dbdash-schema-show.subtitle* >yaml
-        subtitle: { type: string, description: "A muted line under the title (Chart.js subtitle)." }
+        subtitle:
+          type: string
+          description: "A muted line under the title (Chart.js subtitle)."
 <
                                         *dbdash-schema-show.description* >yaml
         description:
           type: string
           description: >-
-            This chart's description: a template (args, meta, as its query sees them; it
-            cannot assign arguments) whose result is Markdown, shown by K / :DbDashDescribe;
-            ⓘ after the panel's title (in a one-chart dashboard: in the header) says there is
-            one. With panels, it belongs in each panel.
+            This chart's description: a template (args, meta, as its query
+            sees them; it cannot assign arguments) whose result is Markdown,
+            shown by K / :DbDashDescribe; ⓘ after the panel's title (in a
+            one-chart dashboard: in the header) says there is one. With
+            panels, it belongs in each panel.
 <
                                            *dbdash-schema-show.interval* >yaml
         interval:
           $ref: "#/definitions/duration"
           description: >-
-            Refresh interval of this chart (default the top-level show.interval, then the
-            top-level interval, else 30s from setup defaults.interval). At least 1s.
+            Refresh interval of this chart (default the top-level
+            show.interval, then the top-level interval, else 30s from setup
+            defaults.interval). At least 1s.
 <
                                      *dbdash-schema-show.refresh_hidden* >yaml
         refresh_hidden:
           type: boolean
           default: false
           description: >-
-            Keep refreshing this chart while the dashboard is not visible (paused, see
-            dashboard.pause_hidden in setup): thresholds and errors still notify.
+            Keep refreshing this chart while the dashboard is not visible
+            (paused, see dashboard.pause_hidden in setup): thresholds and
+            errors still notify.
 <
                                           *dbdash-schema-show.args_show* >yaml
         args_show:
           description: >-
-            Show argument values above this chart: true for the arguments its query reads (and
-            its own query.args; not those with show: false), or a list of names.
+            Show argument values above this chart: true for the arguments its
+            query reads (and its own query.args; not those with show: false),
+            or a list of names.
           oneOf:
             - type: boolean
             - { type: array, items: { type: string } }
@@ -615,14 +879,19 @@ configs (|dbdash-examples|). Every field has a tag:
 <
                                             *dbdash-schema-show.stacked* >yaml
         stacked:
-          description: "area: stack the series (true), or stack them to 100% (percent); bar: segments on top of each other (true)."
+          description: >-
+            area: stack the series (true), or stack them to 100% (percent);
+            bar: segments on top of each other (true).
           oneOf:
             - type: boolean
             - const: percent
 <
                                                *dbdash-schema-show.sort* >yaml
         sort:
-          description: 'table: order the rows (DataTables order): a column name, or { column, order: asc | desc }; NULLs last. bar, pie: asc or desc by value.'
+          description: >-
+            table: order the rows (DataTables order): a column name, or {
+            column, order: asc | desc }; NULLs last. bar, pie: asc or desc by
+            value.
           oneOf:
             - type: string
             - type: object
@@ -635,32 +904,61 @@ configs (|dbdash-examples|). Every field has a tag:
                 order: { enum: [asc, desc] }
 <
                                                 *dbdash-schema-show.top* >yaml
-        top: { type: integer, minimum: 1, description: "bar: keep the first N bars (after sort); pie: the first N slices and one for the rest." }
+        top:
+          type: integer
+          minimum: 1
+          description: >-
+            bar: keep the first N bars (after sort); pie: the first N slices
+            and one for the rest.
 <
                                         *dbdash-schema-show.other_label* >yaml
-        other_label: { type: string, description: 'pie: the slice of what top leaves out (default "Other"; styled as series.other).' }
+        other_label:
+          type: string
+          description: >-
+            pie: the slice of what top leaves out (default "Other"; styled as
+            series.other).
 <
                                          *dbdash-schema-show.cumulative* >yaml
-        cumulative: { type: boolean, description: "histogram: add the bins up." }
+        cumulative:
+          type: boolean
+          description: "histogram: add the bins up."
 <
                                           *dbdash-schema-show.normalize* >yaml
-        normalize: { enum: [count, percent, density], description: "histogram: counts, shares of all values, or density." }
+        normalize:
+          enum: [count, percent, density]
+          description: "histogram: counts, shares of all values, or density."
 <
                                            *dbdash-schema-show.whiskers* >yaml
         whiskers:
-          description: "boxplot: whiskers at 1.5 IQR (iqr, default), the extremes (minmax), or two percentiles ([5, 95])."
+          description: >-
+            boxplot: whiskers at 1.5 IQR (iqr, default), the extremes
+            (minmax), or two percentiles ([5, 95]).
           oneOf:
             - enum: [iqr, minmax]
-            - { type: array, minItems: 2, maxItems: 2, items: { type: number, minimum: 0, maximum: 100 } }
+            - type: array
+              minItems: 2
+              maxItems: 2
+              items: { type: number, minimum: 0, maximum: 100 }
 <
                                           *dbdash-schema-show.scale_min* >yaml
-        scale_min: { type: number, description: "heatmap: the value at the low end of the colors (default the smallest value)." }
+        scale_min:
+          type: number
+          description: >-
+            heatmap: the value at the low end of the colors (default the
+            smallest value).
 <
                                           *dbdash-schema-show.scale_max* >yaml
-        scale_max: { type: number, description: "heatmap: the value at the high end of the colors (default the largest value)." }
+        scale_max:
+          type: number
+          description: >-
+            heatmap: the value at the high end of the colors (default the
+            largest value).
 <
                                          *dbdash-schema-show.trend_line* >yaml
-        trend_line: { const: linear, description: "scatter, bubble, line: a dashed least-squares line per series." }
+        trend_line:
+          const: linear
+          description: >-
+            scatter, bubble, line: a dashed least-squares line per series.
 <
                                          *dbdash-schema-show.size_range* >yaml
         size_range:
@@ -668,21 +966,32 @@ configs (|dbdash-examples|). Every field has a tag:
           minItems: 2
           maxItems: 2
           items: { type: number, minimum: 0 }
-          description: "bubble: smallest and largest radius, in canvas pixels."
+          description: >-
+            bubble: smallest and largest radius, in canvas pixels.
 <
                                           *dbdash-schema-show.span_gaps* >yaml
-        span_gaps: { type: boolean, default: true, description: "line, area: false: a NULL breaks the line (Chart.js spanGaps)." }
+        span_gaps:
+          type: boolean
+          default: true
+          description: >-
+            line, area: false: a NULL breaks the line (Chart.js spanGaps).
 <
                                           *dbdash-schema-show.separator* >yaml
-        separator: { type: string, description: 'text: between the cells of a row (default " ").' }
+        separator:
+          type: string
+          description: 'text: between the cells of a row (default " ").'
 <
                                             *dbdash-schema-show.reverse* >yaml
-        reverse: { type: boolean, description: "text: the last row first (newest on top)." }
+        reverse:
+          type: boolean
+          description: "text: the last row first (newest on top)."
 <
                                           *dbdash-schema-show.highlight* >yaml
         highlight:
           type: array
-          description: "text: give lines that match a Vim regex a class (line.<class> in style; default warning); the first rule that matches wins."
+          description: >-
+            text: give lines that match a Vim regex a class (line.<class> in
+            style; default warning); the first rule that matches wins.
           items:
             type: object
             required: [pattern]
@@ -698,7 +1007,9 @@ configs (|dbdash-examples|). Every field has a tag:
                                      *dbdash-schema-show.row_thresholds* >yaml
         row_thresholds:
           type: object
-          description: "table: a class on whole rows by one column's value (AG Grid rowStyle); row.<class> in style."
+          description: >-
+            table: a class on whole rows by one column's value (AG Grid
+            rowStyle); row.<class> in style.
           properties:
 <
                               *dbdash-schema-show.row_thresholds.column* >yaml
@@ -708,7 +1019,9 @@ configs (|dbdash-examples|). Every field has a tag:
             steps: { $ref: "#/definitions/thresholds" }
 <
                                *dbdash-schema-show.row_thresholds.below* >yaml
-            below: { type: boolean, description: "Steps apply at or below their value." }
+            below:
+              type: boolean
+              description: "Steps apply at or below their value."
 <
                                             *dbdash-schema-show.x_label* >yaml
         x_label: { type: string }
@@ -730,13 +1043,21 @@ configs (|dbdash-examples|). Every field has a tag:
                                          *dbdash-schema-show.mark_lines* >yaml
         mark_lines:
           type: array
-          description: "Reference lines (ECharts markLine): a value, or mean / min / max of the data."
+          description: >-
+            Reference lines (ECharts markLine): a value, or mean / min / max
+            of the data.
           items:
             type: object
             properties:
 <
                                    *dbdash-schema-show.mark_lines.value* >yaml
-              value: { anyOf: [{ type: number }, { enum: [mean, average, min, max] }, { type: string }], description: "A number, mean, min, max, or (x axis) a category." }
+              value:
+                anyOf:
+                  - { type: number }
+                  - { enum: [mean, average, min, max] }
+                  - { type: string }
+                description: >-
+                  A number, mean, min, max, or (x axis) a category.
 <
                                     *dbdash-schema-show.mark_lines.axis* >yaml
               axis: { enum: [x, y], default: y }
@@ -745,16 +1066,25 @@ configs (|dbdash-examples|). Every field has a tag:
               label: { type: string }
 <
                                    *dbdash-schema-show.mark_lines.class* >yaml
-              class: { $ref: "#/definitions/class", description: "A class on the line: mark.<class> in style colors it." }
+              class:
+                $ref: "#/definitions/class"
+                description: >-
+                  A class on the line: mark.<class> in style colors it.
 <
                                         *dbdash-schema-show.mark_points* >yaml
         mark_points:
           type: array
-          description: "Mark each series' max / min point with its value (ECharts markPoint)."
+          description: >-
+            Mark each series' max / min point with its value (ECharts
+            markPoint).
           items: { enum: [max, min] }
 <
                                        *dbdash-schema-show.value_column* >yaml
-        value_column: { type: string, description: "histogram, boxplot, heatmap, pie; stat: the value (default the first numeric column)." }
+        value_column:
+          type: string
+          description: >-
+            histogram, boxplot, heatmap, pie; stat: the value (default the
+            first numeric column).
 <
                                     *dbdash-schema-show.category_column* >yaml
         category_column: { type: string }
@@ -772,7 +1102,11 @@ configs (|dbdash-examples|). Every field has a tag:
         bins: { type: integer, minimum: 1 }
 <
                                           *dbdash-schema-show.bin_width* >yaml
-        bin_width: { type: number, exclusiveMinimum: 0, description: "histogram: the width of every bin (Vega-Lite bin.step)." }
+        bin_width:
+          type: number
+          exclusiveMinimum: 0
+          description: >-
+            histogram: the width of every bin (Vega-Lite bin.step).
 <
                                           *dbdash-schema-show.bin_range* >yaml
         bin_range:
@@ -780,38 +1114,57 @@ configs (|dbdash-examples|). Every field has a tag:
           minItems: 2
           maxItems: 2
           items: { type: number }
-          description: "histogram: where the bins start and end (Vega-Lite bin.extent)."
+          description: >-
+            histogram: where the bins start and end (Vega-Lite bin.extent).
 <
                                              *dbdash-schema-show.format* >yaml
         format:
           type: string
-          description: 'stat and pie: Python format of the values, e.g. "{:,}", "{:.1f}", "{:.1%}", "{:.0f} ms".'
+          description: >-
+            stat and pie: Python format of the values, e.g. "{:,}", "{:.1f}",
+            "{:.1%}", "{:.0f} ms".
 <
                                                *dbdash-schema-show.unit* >yaml
-        unit: { type: string, description: "stat: text shown after the value." }
+        unit:
+          type: string
+          description: "stat: text shown after the value."
 <
                                              *dbdash-schema-show.prefix* >yaml
-        prefix: { type: string, description: 'stat: text shown before the value, e.g. "$".' }
+        prefix:
+          type: string
+          description: 'stat: text shown before the value, e.g. "$".'
 <
                                               *dbdash-schema-show.label* >yaml
-        label: { type: string, description: "stat: a muted line under the value." }
+        label:
+          type: string
+          description: "stat: a muted line under the value."
 <
                                              *dbdash-schema-show.reduce* >yaml
         reduce:
           enum: [first, last, mean, min, max, sum, count]
           default: first
-          description: "stat: which value of the rows (Grafana reduceOptions.calcs)."
+          description: >-
+            stat: which value of the rows (Grafana reduceOptions.calcs).
 <
                                          *dbdash-schema-show.delta_mode* >yaml
-        delta_mode: { enum: [percent, absolute], default: percent, description: "stat: the change as a percentage or an amount." }
+        delta_mode:
+          enum: [percent, absolute]
+          default: percent
+          description: "stat: the change as a percentage or an amount."
 <
                                    *dbdash-schema-show.sparkline_length* >yaml
-        sparkline_length: { type: integer, minimum: 2, default: 20, description: "stat: how many refreshes the sparkline shows." }
+        sparkline_length:
+          type: integer
+          minimum: 2
+          default: 20
+          description: "stat: how many refreshes the sparkline shows."
 <
                                       *dbdash-schema-show.value_columns* >yaml
         value_columns:
           type: array
-          description: "stat: several values side by side, each a column name or { column, label, format, unit, prefix }."
+          description: >-
+            stat: several values side by side, each a column name or {
+            column, label, format, unit, prefix }.
           items:
             oneOf:
               - type: string
@@ -837,15 +1190,23 @@ configs (|dbdash-examples|). Every field has a tag:
                                          *dbdash-schema-show.thresholds* >yaml
         thresholds:
           $ref: "#/definitions/thresholds"
-          description: "stat: a class on the value by thresholds (value.<class> in style); notify: true notifies when the value rises to a step."
+          description: >-
+            stat: a class on the value by thresholds (value.<class> in
+            style); notify: true notifies when the value rises to a step.
 <
                                    *dbdash-schema-show.thresholds_below* >yaml
-        thresholds_below: { type: boolean, default: false, description: "Thresholds apply at or below their value (lower is worse)." }
+        thresholds_below:
+          type: boolean
+          default: false
+          description: >-
+            Thresholds apply at or below their value (lower is worse).
 <
                                         *dbdash-schema-show.column_list* >yaml
         column_list:
           type: array
-          description: Table (and text) columns to show, in order (all columns when omitted).
+          description: >-
+            Table (and text) columns to show, in order (all columns when
+            omitted).
           items:
             oneOf:
               - type: string
@@ -860,32 +1221,52 @@ configs (|dbdash-examples|). Every field has a tag:
                   alias: { type: string }
 <
                                   *dbdash-schema-show.column_list.width* >yaml
-                  width: { type: integer, minimum: 1, description: "Column width (cells wrap inside it)." }
+                  width:
+                    type: integer
+                    minimum: 1
+                    description: "Column width (cells wrap inside it)."
 <
                                  *dbdash-schema-show.column_list.height* >yaml
-                  height: { type: integer, minimum: 1, description: "Most lines a cell takes; longer ends with …" }
+                  height:
+                    type: integer
+                    minimum: 1
+                    description: >-
+                      Most lines a cell takes; longer ends with …
 <
                                   *dbdash-schema-show.column_list.align* >yaml
-                  align: { enum: [left, center, right], description: "Text alignment (default: numbers right)." }
+                  align:
+                    enum: [left, center, right]
+                    description: "Text alignment (default: numbers right)."
 <
                                  *dbdash-schema-show.column_list.format* >yaml
-                  format: { type: string, description: 'Python format of numbers, e.g. "{:,.2f}", "{:.1%}".' }
+                  format:
+                    type: string
+                    description: >-
+                      Python format of numbers, e.g. "{:,.2f}", "{:.1%}".
 <
                              *dbdash-schema-show.column_list.thresholds* >yaml
                   thresholds:
                     $ref: "#/definitions/thresholds"
-                    description: A class on the cells of this column by value (cell.<class> in style; notify works as for stat).
+                    description: >-
+                      A class on the cells of this column by value
+                      (cell.<class> in style; notify works as for stat).
 <
                        *dbdash-schema-show.column_list.thresholds_below* >yaml
                   thresholds_below: { type: boolean, default: false }
       allOf:
-        - if: { properties: { type: { enum: [line, area, bar] } }, required: [type] }
+        - if:
+            properties: { type: { enum: [line, area, bar] } }
+            required: [type]
           then:
             required: [x_column]
             anyOf: [{ required: [y_column] }, { required: [y_columns] }]
-        - if: { properties: { type: { enum: [scatter, bubble] } }, required: [type] }
+        - if:
+            properties: { type: { enum: [scatter, bubble] } }
+            required: [type]
           then: { required: [x_column, y_column] }
-        - if: { properties: { type: { enum: [histogram, boxplot] } }, required: [type] }
+        - if:
+            properties: { type: { enum: [histogram, boxplot] } }
+            required: [type]
           then: { required: [value_column] }
         - if: { properties: { type: { const: heatmap } }, required: [type] }
           then: { required: [x_column, y_column, value_column] }
@@ -897,10 +1278,10 @@ configs (|dbdash-examples|). Every field has a tag:
     thresholds:
       type: array
       description: >-
-        Steps from least to most severe; a value at or above a step's value (at or below with
-        thresholds_below) reaches it and the most severe step reached wins: its class goes on
-        the element (value, cell, row). The default sheet colors success, info, warning and
-        danger.
+        Steps from least to most severe; a value at or above a step's value
+        (at or below with thresholds_below) reaches it and the most severe
+        step reached wins: its class goes on the element (value, cell, row).
+        The default sheet colors success, info, warning and danger.
       items:
         type: object
         required: [value]
@@ -914,7 +1295,10 @@ configs (|dbdash-examples|). Every field has a tag:
           class: { $ref: "#/definitions/class" }
 <
                                        *dbdash-schema-thresholds.notify* >yaml
-          notify: { type: boolean, default: false, description: "vim.notify once when the value rises to this step." }
+          notify:
+            type: boolean
+            default: false
+            description: "vim.notify once when the value rises to this step."
 
 <
                                                 *dbdash-schema-def-axis* >yaml
@@ -932,36 +1316,64 @@ configs (|dbdash-examples|). Every field has a tag:
         max_value: { type: number }
 <
                                               *dbdash-schema-axis.scale* >yaml
-        scale: { enum: [linear, log], default: linear, description: "log: one tick per power of ten (Chart.js type: logarithmic)." }
+        scale:
+          enum: [linear, log]
+          default: linear
+          description: >-
+            log: one tick per power of ten (Chart.js type: logarithmic).
 <
                                               *dbdash-schema-axis.ticks* >yaml
-        ticks: { type: integer, minimum: 2, description: "About how many ticks (Chart.js ticks.count)." }
+        ticks:
+          type: integer
+          minimum: 2
+          description: "About how many ticks (Chart.js ticks.count)."
 <
                                              *dbdash-schema-axis.format* >yaml
-        format: { type: string, description: 'Python format, e.g. "{:,.0f}" or "{:.1%}".' }
+        format:
+          type: string
+          description: 'Python format, e.g. "{:,.0f}" or "{:.1%}".'
 
 <
                                                *dbdash-schema-def-style* >yaml
     style:
       type: object
       description: |-
-        A style sheet (:help dbdash-css): selector -> properties, as in CSS. Selectors: an
-        element (dashboard, header, header-title, countdown, panel, panel-title, args, error,
-        chart, title, subtitle, plot, axis, axis-title, label, legend, legend-item, grid,
-        mark, series, point, bar, value, percent, unit, stat, delta, sparkline, table,
-        header, row, cell, rule, lines, line, line-number, outlier, mean, ...; a chart's
-        content has one element per item: a row, a cell, a bar, a legend item, ...), #id,
+        A style sheet (:help dbdash-css): selector -> properties, as in CSS.
+          Selectors:
+            an
+        element (dashboard, header, header-title, countdown, panel,
+          panel-title, args,
+            error,
+        chart, title, subtitle, plot, axis, axis-title, label, legend,
+          legend-item,
+            grid,
+        mark, series, point, bar, value, percent, unit, stat, delta,
+          sparkline,
+            table,
+        header, row, cell, rule, lines, line, line-number, outlier, mean,
+          ...; a
+            chart's
+        content has one element per item: a row, a cell, a bar, a legend
+          item, ...),
+            #id,
         .class, [attr] / [attr=value],
-        :nth-child(odd | even | N), :first-child, :last-child, descendants ("panel title"),
-        ::part(name) and comma lists. Later and more specific rules win; style sheets cascade
-        default < setup({ style }) < the dashboard's style < a panel's style < :DbDashStyle.
+        :nth-child(odd | even | N), :first-child, :last-child, descendants
+          ("panel
+            title"),
+        ::part(name) and comma lists. Later and more specific rules win;
+          style sheets
+            cascade
+        default < setup({ style }) < the dashboard's style < a panel's style
+          < :DbDashStyle.
       additionalProperties:
         type: object
         additionalProperties: false
         properties:
 <
                                              *dbdash-schema-style.color* >yaml
-          color: { $ref: "#/definitions/color", description: "Text color (inherited)." }
+          color:
+            $ref: "#/definitions/color"
+            description: "Text color (inherited)."
 <
                                   *dbdash-schema-style.background-color* >yaml
           background-color: { $ref: "#/definitions/color" }
@@ -973,16 +1385,30 @@ configs (|dbdash-examples|). Every field has a tag:
           font-style: { enum: [normal, italic] }
 <
                                    *dbdash-schema-style.text-decoration* >yaml
-          text-decoration: { enum: [none, underline, undercurl, line-through] }
+          text-decoration:
+            enum: [none, underline, undercurl, line-through]
 <
                                            *dbdash-schema-style.palette* >yaml
-          palette: { type: string, description: "Series colors: theme (default, follows the colorscheme) or tableau (inherited)." }
+          palette:
+            type: string
+            description: >-
+              Series colors: theme (default, follows the colorscheme) or
+              tableau (inherited).
 <
                                            *dbdash-schema-style.display* >yaml
-          display: { enum: [block, none], description: "none hides the element (countdown, legend, value, point, mean, line-number, rule, ... are hidden by default)." }
+          display:
+            enum: [block, none]
+            description: >-
+              none hides the element (countdown, legend, value, point, mean,
+              line-number, rule, ... are hidden by default).
 <
                                            *dbdash-schema-style.content* >yaml
-          content: { type: string, description: 'Generated text: countdown ("Next update: {time}s"; {time}, {clock}), description-icon ("ⓘ"), cell.null ("NULL"), point (a marker).' }
+          content:
+            type: string
+            description: >-
+              Generated text: countdown ("Next update: {time}s"; {time},
+              {clock}), description-icon ("ⓘ"), cell.null ("NULL"), point (a
+              marker).
 <
                                         *dbdash-schema-style.text-align* >yaml
           text-align: { enum: [start, left, center, right] }
@@ -991,148 +1417,254 @@ configs (|dbdash-examples|). Every field has a tag:
           vertical-align: { enum: [top, middle, bottom] }
 <
                                        *dbdash-schema-style.white-space* >yaml
-          white-space: { enum: [normal, nowrap], description: "nowrap: one line, cut with text-overflow." }
+          white-space:
+            enum: [normal, nowrap]
+            description: "nowrap: one line, cut with text-overflow."
 <
                                         *dbdash-schema-style.word-break* >yaml
-          word-break: { enum: [normal, break-all], description: "break-all: wrap anywhere, not only at spaces." }
+          word-break:
+            enum: [normal, break-all]
+            description: "break-all: wrap anywhere, not only at spaces."
 <
                                      *dbdash-schema-style.text-overflow* >yaml
-          text-overflow: { type: string, description: 'What marks cut text: ellipsis ("…"), clip (nothing) or a string.' }
+          text-overflow:
+            type: string
+            description: >-
+              What marks cut text: ellipsis ("…"), clip (nothing) or a
+              string.
 <
                                         *dbdash-schema-style.line-clamp* >yaml
-          line-clamp: { type: integer, minimum: 1, description: "table: rows shown; text chart: lines shown (then how many more)." }
+          line-clamp:
+            type: integer
+            minimum: 1
+            description: >-
+              table: rows shown; text chart: lines shown (then how many
+              more).
 <
                                          *dbdash-schema-style.font-size* >yaml
-          font-size: { enum: [normal, big], description: "stat value: block digits (big, the default) or one line." }
+          font-size:
+            enum: [normal, big]
+            description: >-
+              stat value: block digits (big, the default) or one line.
 <
                                       *dbdash-schema-style.caption-side* >yaml
-          caption-side: { enum: [top, bottom], description: "title, panel-title: above or under the chart." }
+          caption-side:
+            enum: [top, bottom]
+            description: "title, panel-title: above or under the chart."
 <
                                             *dbdash-schema-style.border* >yaml
           border:
-            description: "Border line: single, rounded, heavy, double, dashed, ascii, rich (tables: heavy header), none; true / false."
+            description: >-
+              Border line: single, rounded, heavy, double, dashed, ascii,
+              rich (tables: heavy header), none; true / false.
             oneOf:
               - type: boolean
-              - enum: [single, rounded, heavy, double, dashed, ascii, rich, none]
+              - enum:
+                  - single
+                  - rounded
+                  - heavy
+                  - double
+                  - dashed
+                  - ascii
+                  - rich
+                  - none
 <
                                       *dbdash-schema-style.border-color* >yaml
           border-color: { $ref: "#/definitions/color" }
 <
                                            *dbdash-schema-style.padding* >yaml
           padding:
-            description: "N, [vertical, horizontal], [top, horizontal, bottom] or [top, right, bottom, left]."
+            description: >-
+              N, [vertical, horizontal], [top, horizontal, bottom] or [top,
+              right, bottom, left].
             oneOf:
               - { type: integer, minimum: 0 }
-              - { type: array, minItems: 1, maxItems: 4, items: { type: integer, minimum: 0 } }
+              - type: array
+                minItems: 1
+                maxItems: 4
+                items: { type: integer, minimum: 0 }
 <
                                              *dbdash-schema-style.width* >yaml
-          width: { type: integer, minimum: 1, description: "cell: column width; bar: columns / lines per bar." }
+          width:
+            type: integer
+            minimum: 1
+            description: "cell: column width; bar: columns / lines per bar."
 <
                                          *dbdash-schema-style.max-width* >yaml
-          max-width: { type: integer, minimum: 1, description: "chart: the widest it gets." }
+          max-width:
+            type: integer
+            minimum: 1
+            description: "chart: the widest it gets."
 <
                                             *dbdash-schema-style.height* >yaml
-          height: { type: integer, minimum: 1, description: "plot: plot rows; cell: most lines per cell." }
+          height:
+            type: integer
+            minimum: 1
+            description: "plot: plot rows; cell: most lines per cell."
 <
                                         *dbdash-schema-style.min-height* >yaml
-          min-height: { type: integer, minimum: 1, description: "plot: smallest plot rows in a grid before it scrolls (default 8)." }
+          min-height:
+            type: integer
+            minimum: 1
+            description: >-
+              plot: smallest plot rows in a grid before it scrolls (default
+              8).
 <
                              *dbdash-schema-style.grid-template-columns* >yaml
           grid-template-columns:
-            description: 'dashboard: column tracks: N equal columns, "1fr 2fr 30", "repeat(3, 1fr)" or a list; tracks are an integer, "N%", "Nfr", auto or "minmax(a, b)".'
+            description: >-
+              dashboard: column tracks: N equal columns, "1fr 2fr 30",
+              "repeat(3, 1fr)" or a list; tracks are an integer, "N%", "Nfr",
+              auto or "minmax(a, b)".
             oneOf:
               - { type: integer, minimum: 1 }
               - { type: string }
-              - { type: array, minItems: 1, items: { $ref: "#/definitions/track" } }
+              - type: array
+                minItems: 1
+                items: { $ref: "#/definitions/track" }
 <
                                 *dbdash-schema-style.grid-template-rows* >yaml
           grid-template-rows:
-            description: "dashboard: the first row tracks (an integer, Nfr, auto, min-content, max-content, minmax(a, b))."
+            description: >-
+              dashboard: the first row tracks (an integer, Nfr, auto,
+              min-content, max-content, minmax(a, b)).
             oneOf:
               - { type: string }
               - { type: array, items: { $ref: "#/definitions/track" } }
 <
                                     *dbdash-schema-style.grid-auto-rows* >yaml
-          grid-auto-rows: { $ref: "#/definitions/track", description: "dashboard: rows past the declared ones (default auto)." }
+          grid-auto-rows:
+            $ref: "#/definitions/track"
+            description: >-
+              dashboard: rows past the declared ones (default auto).
 <
                                *dbdash-schema-style.grid-template-areas* >yaml
           grid-template-areas:
             type: array
             items: { type: string }
-            description: 'dashboard: named areas, one string per row ("a a b"), "." for an empty cell.'
+            description: >-
+              dashboard: named areas, one string per row ("a a b"), "." for
+              an empty cell.
 <
                                         *dbdash-schema-style.column-gap* >yaml
-          column-gap: { type: integer, minimum: 0, description: "dashboard: spaces between columns (default 2)." }
+          column-gap:
+            type: integer
+            minimum: 0
+            description: "dashboard: spaces between columns (default 2)."
 <
                                            *dbdash-schema-style.row-gap* >yaml
-          row-gap: { type: integer, minimum: 0, description: "dashboard: blank lines between rows (default 1)." }
+          row-gap:
+            type: integer
+            minimum: 0
+            description: "dashboard: blank lines between rows (default 1)."
 <
                                          *dbdash-schema-style.grid-area* >yaml
-          grid-area: { type: string, description: "panel: a name of grid-template-areas." }
+          grid-area:
+            type: string
+            description: "panel: a name of grid-template-areas."
 <
                                           *dbdash-schema-style.grid-row* >yaml
           grid-row:
             description: 'panel: N, "span M" or "N / span M".'
             oneOf:
               - { type: integer, minimum: 1 }
-              - { type: string, pattern: "^(\\d+|span \\d+|\\d+ */ *span \\d+)$" }
+              - type: string
+                pattern: "^(\\d+|span \\d+|\\d+ */ *span \\d+)$"
 <
                                        *dbdash-schema-style.grid-column* >yaml
           grid-column:
             description: 'panel: N, "span M" or "N / span M".'
             oneOf:
               - { type: integer, minimum: 1 }
-              - { type: string, pattern: "^(\\d+|span \\d+|\\d+ */ *span \\d+)$" }
+              - type: string
+                pattern: "^(\\d+|span \\d+|\\d+ */ *span \\d+)$"
 <
                                       *dbdash-schema-style.justify-self* >yaml
-          justify-self: { enum: [start, center, end, stretch], description: "panel: where the chart sits across its cell." }
+          justify-self:
+            enum: [start, center, end, stretch]
+            description: "panel: where the chart sits across its cell."
 <
                                         *dbdash-schema-style.align-self* >yaml
-          align-self: { enum: [start, center, end, stretch], description: "panel: where the chart sits down its cell." }
+          align-self:
+            enum: [start, center, end, stretch]
+            description: "panel: where the chart sits down its cell."
 <
                                           *dbdash-schema-style.renderer* >yaml
           renderer:
             type: string
             description: |-
               chart: how the type is drawn (the first one is the default):
-                table: box          line: canvas, asciichart     scatter/area/bubble: canvas
+                table: box          line: canvas, asciichart
+                                    scatter/area/bubble:
+                                      canvas
                 bar: horizontal, vertical    histogram: horizontal, vertical
-                boxplot: boxdraw, vertical    heatmap: halfblock, block    pie: bar, circle
+                boxplot: boxdraw, vertical    heatmap: halfblock, block
+                                              pie: bar,
+                                                circle
                 stat: big           text: plain
-              Renderers registered with setup({ register = ... }) are accepted too.
+              Renderers registered with setup({ register = ... }) are
+                accepted
+                  too.
 <
                                             *dbdash-schema-style.canvas* >yaml
-          canvas: { type: string, description: "chart: the pixel canvas: braille (default), quadrant, block, halfblock, ascii." }
+          canvas:
+            type: string
+            description: >-
+              chart: the pixel canvas: braille (default), quadrant, block,
+              halfblock, ascii.
 <
                                              *dbdash-schema-style.curve* >yaml
-          curve: { enum: [linear, step, step-before, step-after, step-middle], description: "series: steps instead of slopes (Chart.js stepped)." }
+          curve:
+            enum: [linear, step, step-before, step-after, step-middle]
+            description: >-
+              series: steps instead of slopes (Chart.js stepped).
 <
                                               *dbdash-schema-style.fill* >yaml
-          fill: { type: boolean, description: "series: fill down to zero (lines)." }
+          fill:
+            type: boolean
+            description: "series: fill down to zero (lines)."
 <
                                               *dbdash-schema-style.hole* >yaml
-          hole: { type: number, minimum: 0, maximum: 0.9, description: "chart (pie circle): the hole, a fraction of the radius; 0.5+ shows the total." }
+          hole:
+            type: number
+            minimum: 0
+            maximum: 0.9
+            description: >-
+              chart (pie circle): the hole, a fraction of the radius; 0.5+
+              shows the total.
 <
                                              *dbdash-schema-style.angle* >yaml
-          angle: { enum: [180, 360], description: "chart (pie circle): 180 draws the upper half." }
+          angle:
+            enum: [180, 360]
+            description: "chart (pie circle): 180 draws the upper half."
 <
                                                *dbdash-schema-style.gap* >yaml
-          gap: { type: integer, minimum: 0, description: "bar: columns or lines between categories." }
+          gap:
+            type: integer
+            minimum: 0
+            description: "bar: columns or lines between categories."
 <
                                           *dbdash-schema-style.position* >yaml
-          position: { enum: [right, bottom, end, inside], description: "legend: right or bottom; value: end or inside the bar." }
+          position:
+            enum: [right, bottom, end, inside]
+            description: >-
+              legend: right or bottom; value: end or inside the bar.
 <
                                        *dbdash-schema-style.color-scale* >yaml
           color-scale:
             type: array
             minItems: 1
             items: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
-            description: 'chart (heatmap): the colors from low to high, "#rrggbb" (ECharts visualMap inRange.color).'
+            description: >-
+              chart (heatmap): the colors from low to high, "#rrggbb"
+              (ECharts visualMap inRange.color).
 <
                                        *dbdash-schema-style.color-steps* >yaml
           color-steps:
             type: array
-            description: "chart (heatmap): piecewise colors; a value takes the color of the highest step it reaches."
+            description: >-
+              chart (heatmap): piecewise colors; a value takes the color of
+              the highest step it reaches.
             items:
               type: object
               required: [value, color]

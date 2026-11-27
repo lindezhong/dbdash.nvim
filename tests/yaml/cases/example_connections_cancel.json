@@ -12,16 +12,16 @@
    "description": "How long the query sleeps"
   }
  ],
- "show": {
-  "style": {
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "panel": {
    "padding": [
     0,
     1
    ]
   }
- },
- "layout": {
-  "columns": 2
  },
  "panels": [
   {

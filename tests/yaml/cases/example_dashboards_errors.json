@@ -1,0 +1,50 @@
+{
+ "title": "Errors",
+ "description": "A query that fails now and then, backing off, and a source that sends a bad item now and\nthen. The last good result stays on screen with the error above it. See\n`:help dbdash-errors`.\n",
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "panel": {
+   "border": "single",
+   "padding": [
+    0,
+    1
+   ]
+  },
+  "countdown": {
+   "display": "block",
+   "content": "{time}s"
+  }
+ },
+ "panels": [
+  {
+   "database": {
+    "url": "sqlite:///:memory:"
+   },
+   "query": {
+    "sql": "{% if meta.refresh_count % 6 >= 3 %}\nSELECT * FROM table_that_does_not_exist\n{% else %}\nSELECT {{ meta.refresh_count }} AS refresh, strftime('%H:%M:%S', 'now', 'localtime') AS at\n{% endif %}\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "Fails 3 times in 6, backing off",
+    "description": "Refreshes 3, 4 and 5 of every six fail: the error shows above the last good result\nand the next tries wait 2 and then 4 intervals.\n",
+    "interval": "2s"
+   }
+  },
+  {
+   "database": {
+    "url": "luastream://"
+   },
+   "query": {
+    "sql": "for i = 1, 600 do\n  if i % 5 == 0 then\n    print(\"not json \" .. i)     -- this item fails; the next ones go on\n  else\n    print(vim.json.encode({ { item = i, at = os.date(\"%H:%M:%S\") } }))\n  end\n  dbdash.sleep(1000)\nend\n"
+   },
+   "show": {
+    "type": "table",
+    "title": "Every fifth item is bad",
+    "description": "Without `query.transform` an item must be JSON rows: every fifth one is not, so it\nfails on its own and the source goes on.\n",
+    "interval": "1s"
+   }
+  }
+ ]
+}

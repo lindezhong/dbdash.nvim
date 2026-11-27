@@ -1,14 +1,16 @@
 {
  "title": "Bubble chart",
- "description": "A bubble chart is a scatter plot with sizes: (`x_column`, `y_column`) per row, the\ncircle's area by `size_column`, groups by `color_column`, a text by `label_column`.\nSee `:help dbdash-chart-types`.\n",
+ "description": "A bubble chart is a scatter plot with sizes: (`x_column`, `y_column`) per row, the\ncircle's area by `size_column`, groups by `color_column`, a text by `label_column`.\nSee `:help dbdash-charts`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "show": {
   "interval": "5m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -18,17 +20,12 @@
    "show": {
     "type": "bubble",
     "title": "size, color and label columns (canvas: braille)",
-    "description": "`size_column` sets each circle's area, `color_column` groups and colors the bubbles\n(`colors` by name), `label_column` writes a text next to each.\n",
+    "description": "`size_column` sets each circle's area, `color_column` groups the bubbles (colored by\n`series.<group>` rules), `label_column` writes a text next to each.\n",
     "x_column": "revenue",
     "y_column": "margin",
     "size_column": "cap",
     "color_column": "class",
     "label_column": "company",
-    "colors": {
-     "Large": "#61afef",
-     "Mid": "#98c379",
-     "Small": "#e5c07b"
-    },
     "axes": {
      "x_axis": {
       "title": "Revenue"
@@ -37,26 +34,16 @@
       "title": "Margin %"
      }
     }
-   }
-  },
-  {
-   "query": {
-    "sql": "SELECT company, revenue, margin, cap,\n       CASE WHEN cap > 800 THEN 'Large' WHEN cap > 400 THEN 'Mid' ELSE 'Small' END AS class\nFROM (\n  SELECT 'Apple' AS company, 80 AS revenue, 25 AS margin, 1400 AS cap\n  UNION ALL SELECT 'Google', 70, 22, 1100 UNION ALL SELECT 'Tesla', 30, 35, 600\n  UNION ALL SELECT 'Netflix', 20, 15, 250 UNION ALL SELECT 'Adobe', 25, 40, 300\n  UNION ALL SELECT 'Meta', 50, 30, 700\n)\n"
    },
-   "show": {
-    "type": "bubble",
-    "title": "style: size_range, point, trend_line",
-    "description": "`size_range: [min, max]` is the smallest and largest radius in canvas pixels (Chart.js\n`radius`); `point` marks each center with a character; `trend_line: linear` fits a\ndashed line through the centers.\n",
-    "x_column": "revenue",
-    "y_column": "margin",
-    "size_column": "cap",
-    "style": {
-     "size_range": [
-      2,
-      10
-     ],
-     "point": "+",
-     "trend_line": "linear"
+   "style": {
+    "series.Large": {
+     "color": "#61afef"
+    },
+    "series.Mid": {
+     "color": "#98c379"
+    },
+    "series.Small": {
+     "color": "#e5c07b"
     }
    }
   },
@@ -66,13 +53,21 @@
    },
    "show": {
     "type": "bubble",
-    "title": "canvas: quadrant",
-    "description": "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
-    "canvas": "quadrant",
+    "title": "size_range, trend_line, point { content }",
+    "description": "`size_range: [min, max]` is the smallest and largest radius in canvas pixels (Chart.js\n`radius`); `trend_line: linear` fits a dashed line through the centers; the style\nrule `point { content: \"+\" }` marks each center with a character.\n",
     "x_column": "revenue",
     "y_column": "margin",
     "size_column": "cap",
-    "color_column": "class"
+    "size_range": [
+     2,
+     10
+    ],
+    "trend_line": "linear"
+   },
+   "style": {
+    "point": {
+     "content": "+"
+    }
    }
   },
   {
@@ -81,13 +76,17 @@
    },
    "show": {
     "type": "bubble",
-    "title": "canvas: block",
-    "description": "`canvas: block`: one full block per pixel: coarse but bold.",
-    "canvas": "block",
+    "title": "chart { canvas: quadrant }",
+    "description": "`chart { canvas: quadrant }`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
     "x_column": "revenue",
     "y_column": "margin",
     "size_column": "cap",
     "color_column": "class"
+   },
+   "style": {
+    "chart": {
+     "canvas": "quadrant"
+    }
    }
   },
   {
@@ -96,13 +95,17 @@
    },
    "show": {
     "type": "bubble",
-    "title": "canvas: halfblock",
-    "description": "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄).",
-    "canvas": "halfblock",
+    "title": "chart { canvas: block }",
+    "description": "`chart { canvas: block }`: one full block per pixel: coarse but bold.",
     "x_column": "revenue",
     "y_column": "margin",
     "size_column": "cap",
     "color_column": "class"
+   },
+   "style": {
+    "chart": {
+     "canvas": "block"
+    }
    }
   },
   {
@@ -111,13 +114,36 @@
    },
    "show": {
     "type": "bubble",
-    "title": "canvas: ascii",
-    "description": "`canvas: ascii`: plain ASCII, for any terminal or font.",
-    "canvas": "ascii",
+    "title": "chart { canvas: halfblock }",
+    "description": "`chart { canvas: halfblock }`: 1 x 2 pixels per character (▀ ▄).",
     "x_column": "revenue",
     "y_column": "margin",
     "size_column": "cap",
     "color_column": "class"
+   },
+   "style": {
+    "chart": {
+     "canvas": "halfblock"
+    }
+   }
+  },
+  {
+   "query": {
+    "sql": "SELECT company, revenue, margin, cap,\n       CASE WHEN cap > 800 THEN 'Large' WHEN cap > 400 THEN 'Mid' ELSE 'Small' END AS class\nFROM (\n  SELECT 'Apple' AS company, 80 AS revenue, 25 AS margin, 1400 AS cap\n  UNION ALL SELECT 'Google', 70, 22, 1100 UNION ALL SELECT 'Tesla', 30, 35, 600\n  UNION ALL SELECT 'Netflix', 20, 15, 250 UNION ALL SELECT 'Adobe', 25, 40, 300\n  UNION ALL SELECT 'Meta', 50, 30, 700\n)\n"
+   },
+   "show": {
+    "type": "bubble",
+    "title": "chart { canvas: ascii }",
+    "description": "`chart { canvas: ascii }`: plain ASCII, for any terminal or font.",
+    "x_column": "revenue",
+    "y_column": "margin",
+    "size_column": "cap",
+    "color_column": "class"
+   },
+   "style": {
+    "chart": {
+     "canvas": "ascii"
+    }
    }
   }
  ]

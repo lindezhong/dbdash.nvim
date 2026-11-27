@@ -8,7 +8,7 @@ title: "Box plot"
 description: |
   A box plot summarizes `value_column` per `category_column`: the box spans the first to
   the third quartile with the median inside, whiskers reach the furthest values within
-  1.5 IQR, and points beyond are outliers. See `:help dbdash-chart-types`.
+  1.5 IQR, and points beyond are outliers. See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"
@@ -16,8 +16,8 @@ database:
 show:
   interval: 5m
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -30,12 +30,16 @@ panels:
       type: boxplot
       title: "boxdraw (default): outliers, means"
       description: |
-        One box per service; `show_outliers` (default on) marks values past the whiskers with •,
-        `show_means` marks the mean with +. `colors` sets one color per category.
+        One box per service; outliers past the whiskers show as • (`outlier { display: none }`
+        hides them), `mean { display: block }` marks the mean with +. `series.<category>`
+        rules color the boxes.
       category_column: service
       value_column: ms
-      colors: { api: "#61afef", web: "#98c379", db: "#e5c07b" }
-      style: { show_outliers: true, show_means: true }
+    style:
+      "series.api": { color: "#61afef" }
+      "series.web": { color: "#98c379" }
+      "series.db": { color: "#e5c07b" }
+      mean: { display: block }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)
@@ -44,15 +48,16 @@ panels:
         FROM n
     show:
       type: boxplot
-      renderer: vertical
-      title: "renderer: vertical"
+      title: "chart { renderer: vertical }"
       description: |
-        `renderer: vertical` draws upright boxes, one column per category, with a value axis on
-        the left (`:DbDashStyle boxplot vertical`).
+        `chart { renderer: vertical }` draws upright boxes, one column per category, with a
+        value axis on the left (`:DbDashStyle boxplot vertical`).
       category_column: service
       value_column: ms
       axes:
         y_axis: { title: "ms" }
+    style:
+      chart: { renderer: vertical }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)
@@ -61,14 +66,16 @@ panels:
         FROM n
     show:
       type: boxplot
-      title: "whiskers: minmax, show_values"
+      title: "whiskers: minmax, value { display: block }"
       description: |
-        `whiskers: minmax` reaches the smallest and largest values (no outliers);
-        `[5, 95]` would use two percentiles. `show_values` writes q1, the median and q3 under
-        each box.
+        `whiskers: minmax` reaches the smallest and largest values (no outliers); `[5, 95]`
+        would use two percentiles. `value { display: block }` writes q1, the median and q3
+        under each box.
       category_column: service
       value_column: ms
-      style: { whiskers: minmax, show_values: true }
+      whiskers: minmax
+    style:
+      value: { display: block }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)
@@ -82,4 +89,4 @@ panels:
         Without `category_column` all values make one box. `whiskers: [10, 90]` puts the
         whiskers at the 10th and 90th percentiles; the rest are outliers.
       value_column: ms
-      style: { whiskers: [10, 90] }
+      whiskers: [10, 90]

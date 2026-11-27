@@ -1,14 +1,14 @@
 # yaml-language-server: $schema=../dbdash.schema.yaml
 #
-# A grid laid out by hand, like CSS Grid (:help dbdash-layout):
-#   layout.columns   grid-template-columns: "Nfr" shares, fixed widths, "N%"
-#   layout.rows      grid-template-rows: auto, fixed lines, "Nfr", minmax(a, b)
-#   layout.areas     grid-template-areas: named rectangles, "." for an empty cell
-#   show.area        grid-area: a panel goes into a named area
-#   show.row / column / span / row_span   grid-row / grid-column
+# A grid laid out by hand with CSS Grid properties in the style sheet (:help dbdash-layout):
+#   dashboard { grid-template-columns }   "Nfr" shares, fixed widths, "N%"
+#   dashboard { grid-template-rows }      auto, fixed lines, "Nfr", minmax(a, b)
+#   dashboard { grid-template-areas }     named rectangles, "." for an empty cell
+#   panel { grid-area }                   a panel goes into a named area
+#   panel { grid-row, grid-column }       N, "span M" or "N / span M"
 # Panels without a place flow into the next free cells. Rows get at least their
-# panels' min-content (show.min_height), then share the window; a grid taller than the
-# window scrolls instead of squeezing the charts.
+# panels' min-content (plot { min-height }), then share the window; a grid taller than
+# the window scrolls instead of squeezing the charts.
 
 title: "Grid layout"
 description: |
@@ -21,16 +21,17 @@ database:
 
 interval: 1m
 
-layout:
-  columns: "2fr 1fr 24"            # two shares of what is left, then 24 columns
-  rows: [auto, 9, "minmax(10, 1fr)"]
-  auto_rows: auto
-  gap: 2
-  row_gap: 1
-  areas:
-    - "trend trend kpi"
-    - "table share kpi"
-    - "wide  wide  wide"
+style:
+  dashboard:
+    grid-template-columns: "2fr 1fr 24"
+    grid-template-rows: [auto, 9, "minmax(10, 1fr)"]
+    grid-auto-rows: auto
+    column-gap: 2
+    row-gap: 1
+    grid-template-areas:
+      - "trend trend kpi"
+      - "table share kpi"
+      - "wide  wide  wide"
 
 panels:
   - query:
@@ -38,61 +39,62 @@ panels:
         WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
         SELECT printf('%02d', n) AS hour, 50 + abs(random() % 100) AS visits FROM h
     show:
-      area: trend
       type: line
       title: "trend: area across two columns, row auto"
       description: |
-        `show.area: trend` puts this panel in the **trend** area (CSS `grid-area`), which
-        spans the first two columns. Its row is `auto`: at least the plot's
-        `min_height` (6 rows here, 8 by default), growing up to its full height (15) when
-        the window has room.
+        `panel { grid-area: trend }` puts this panel in the **trend** area, which spans the
+        first two columns. Its row is `auto`: at least the plot's `min-height` (6 rows
+        here, 8 by default), growing up to its full height (15) when the window has room.
       x_column: hour
       y_column: visits
-      min_height: 6                  # the smallest plot before the grid scrolls (default 8)
+    style:
+      panel: { grid-area: trend }
+      plot: { min-height: 6 }
 
   - query:
       sql: SELECT abs(random() % 5000) AS orders
     show:
-      area: kpi
       type: stat
       title: "kpi: two rows"
       description: |
         The **kpi** area is two rows tall (CSS `grid-row: span 2`) in the fixed
-        24-column track (`columns: "2fr 1fr 24"`).
+        24-column track (`grid-template-columns: "2fr 1fr 24"`).
       format: "{:,}"
+    style:
+      panel: { grid-area: kpi }
 
   - query:
       sql: |
         SELECT 'North' AS region, 120 AS sales UNION ALL SELECT 'South', 80
         UNION ALL SELECT 'East', 95 UNION ALL SELECT 'West', 60
     show:
-      area: table
       type: table
       title: "table: a fixed row of 9 lines"
       description: |
         The second row is `9` lines (a fixed track, like `grid-template-rows: ... 9 ...`):
         a fixed row keeps its size whatever the window.
+    style:
+      panel: { grid-area: table }
 
   - query:
       sql: |
         SELECT 'IT' AS dept, 42 AS people UNION ALL SELECT 'HR', 7
         UNION ALL SELECT 'R&D', 120
     show:
-      area: share
       type: pie
       title: "share"
       description: "The **share** area: the `1fr` column of the second row."
       label_column: dept
       value_column: people
+    style:
+      panel: { grid-area: share }
 
   - query:
       sql: |
         WITH RECURSIVE d(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM d WHERE n < 30)
         SELECT n AS day, abs(random() % 100) AS load FROM d
     show:
-      area: wide
       type: bar
-      renderer: vertical
       title: "wide: minmax(10, 1fr) fills the rest of the window"
       description: |
         The third row is `minmax(10, 1fr)`: at least 10 lines, and whatever the window has
@@ -100,20 +102,20 @@ panels:
         with the window.
       x_column: day
       y_column: load
+    style:
+      panel: { grid-area: wide }
+      chart: { renderer: vertical }
 
   - query:
       sql: SELECT datetime('now') AS now
     show:
-      row: 4
-      column: 2
-      span: 2
-      row_span: 2
       type: table
       title: "rows 4-5, columns 2-3: placed by position"
       description: |
-        `row: 4`, `column: 2`, `span: 2`, `row_span: 2` (CSS
-        `grid-row: 4 / span 2; grid-column: 2 / span 2`). Rows 4 and 5 are past
-        `layout.rows`, so they use `auto_rows`.
+        `panel { grid-row: "4 / span 2", grid-column: "2 / span 2" }`. Rows 4 and 5 are
+        past `grid-template-rows`, so they use `grid-auto-rows`.
+    style:
+      panel: { grid-row: "4 / span 2", grid-column: "2 / span 2" }
 
   - query:
       sql: SELECT 'flows into the first free cell' AS note

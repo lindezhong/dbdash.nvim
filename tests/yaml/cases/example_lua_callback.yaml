@@ -37,11 +37,10 @@ args:
 
 show:
   args_show: true
-  show_countdown: true
-  countdown_format: "{time}s"
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
+  countdown: { display: block, content: "{time}s" }
 
 panels:
   - query:
@@ -122,7 +121,8 @@ panels:
       x_column: at
       y_column: orders
       interval: 2s
-      span: 2
+    style:
+      panel: { grid-column: span 2 }
 
   - database: { url: "lua://" }
     query:
@@ -146,7 +146,8 @@ panels:
       description: |
         `meta.prev_runs`: the run records of the previous refresh (ids, kinds, times,
         results).
-      span: 2
+    style:
+      panel: { grid-column: span 2 }
 
   - database: { url: "lua://" }
     query:

@@ -1,7 +1,7 @@
 {
- "description": "A SQLite file next to the config (`sqlite://dbdash-example.db`): created on the first\nrun, a row added every refresh. See `:help dbdash-databases`.\n",
+ "description": "A SQLite file next to the config (`sqlite://.dbdash-example.db`): created on the first\nrun, a row added every refresh. See `:help dbdash-databases`.\n",
  "database": {
-  "url": "sqlite://dbdash-example.db",
+  "url": "sqlite://.dbdash-example.db",
   "options": {
    "create": true
   }
@@ -15,8 +15,12 @@
   "description": "Each refresh inserts a sample and the chart shows the last ones (newest first in the\nquery, ordered by time on the axis).\n",
   "interval": "5s",
   "x_column": "at",
-  "y_column": "value",
-  "show_countdown": true,
-  "countdown_format": "{time}s"
+  "y_column": "value"
+ },
+ "style": {
+  "countdown": {
+   "display": "block",
+   "content": "{time}s"
+  }
  }
 }

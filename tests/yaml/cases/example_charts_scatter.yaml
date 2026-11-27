@@ -7,7 +7,8 @@
 title: "Scatter plot"
 description: |
   A scatter plot puts one point per row at (`x_column`, `y_column`); `color_column`
-  splits the points into colored groups (`colors` by name). See `:help dbdash-chart-types`.
+  splits the points into groups, colored by `series.<group>` rules. See
+  `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"
@@ -15,8 +16,8 @@ database:
 show:
   interval: 5m
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -28,16 +29,19 @@ panels:
         FROM d
     show:
       type: scatter
-      title: "color_column, colors, x_label / y_label (canvas: braille)"
+      title: "color_column, series colors, x_label / y_label (canvas: braille)"
       description: |
-        `color_column` makes one group per value, colored by `colors` (a mapping by name, or a
-        list by position); `x_label` / `y_label` title the axes.
+        `color_column` makes one group per value, colored by `series.<name>` rules (or
+        `series:nth-child(N)` by position); `x_label` / `y_label` title the axes.
       x_column: ad_spend
       y_column: sales
       color_column: margin
-      colors: { High: "#98c379", Medium: "#e5c07b", Low: "#e06c75" }
       x_label: "Advertising"
       y_label: "Sales"
+    style:
+      "series.High": { color: "#98c379" }
+      "series.Medium": { color: "#e5c07b" }
+      "series.Low": { color: "#e06c75" }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),
@@ -47,13 +51,15 @@ panels:
         FROM d
     show:
       type: scatter
-      title: "style: point, trend_line: linear"
+      title: "trend_line: linear, point { content }"
       description: |
-        `point` draws each point as a character (Chart.js `pointStyle`); `trend_line: linear`
-        adds a dashed least-squares line per group (ECharts regression).
+        `point { content: "●" }` draws each point as a character (Chart.js `pointStyle`);
+        `trend_line: linear` adds a dashed least-squares line per group (ECharts regression).
       x_column: ad_spend
       y_column: sales
-      style: { point: "●", trend_line: linear }
+      trend_line: linear
+    style:
+      point: { content: "●" }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),
@@ -63,18 +69,21 @@ panels:
         FROM d
     show:
       type: scatter
-      title: "axes: grid, ticks; mark_lines"
+      title: "grid lines, axes ticks; mark_lines"
       description: |
-        `axes.*.grid` draws grid lines at the ticks, `ticks` asks for about that many ticks;
-        `mark_lines` adds reference lines: the mean sales, and x = 50.
+        `grid.x` / `grid.y { display: block }` draw grid lines at the ticks (Chart.js
+        `grid.display`), `axes.x_axis.ticks` asks for about that many ticks; `mark_lines`
+        adds reference lines: the mean sales, and x = 50.
       x_column: ad_spend
       y_column: sales
       axes:
-        x_axis: { grid: true, ticks: 5 }
-        y_axis: { grid: true }
+        x_axis: { ticks: 5 }
       mark_lines:
         - { value: mean }
         - { value: 50, axis: x, label: "budget" }
+    style:
+      "grid.x": { display: block }
+      "grid.y": { display: block }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 30)
@@ -101,12 +110,13 @@ panels:
         FROM d
     show:
       type: scatter
-      title: "canvas: quadrant"
-      description: "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts."
-      canvas: quadrant
+      title: "chart { canvas: quadrant }"
+      description: "`chart { canvas: quadrant }`: 2 x 2 pixels per character (▗▄▖), works in most fonts."
       x_column: ad_spend
       y_column: sales
       color_column: margin
+    style:
+      chart: { canvas: quadrant }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),
@@ -116,12 +126,13 @@ panels:
         FROM d
     show:
       type: scatter
-      title: "canvas: block"
-      description: "`canvas: block`: one full block per pixel: coarse but bold."
-      canvas: block
+      title: "chart { canvas: block }"
+      description: "`chart { canvas: block }`: one full block per pixel: coarse but bold."
       x_column: ad_spend
       y_column: sales
       color_column: margin
+    style:
+      chart: { canvas: block }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),
@@ -131,12 +142,13 @@ panels:
         FROM d
     show:
       type: scatter
-      title: "canvas: halfblock"
-      description: "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄)."
-      canvas: halfblock
+      title: "chart { canvas: halfblock }"
+      description: "`chart { canvas: halfblock }`: 1 x 2 pixels per character (▀ ▄)."
       x_column: ad_spend
       y_column: sales
       color_column: margin
+    style:
+      chart: { canvas: halfblock }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40),
@@ -146,9 +158,10 @@ panels:
         FROM d
     show:
       type: scatter
-      title: "canvas: ascii"
-      description: "`canvas: ascii`: plain ASCII, for any terminal or font."
-      canvas: ascii
+      title: "chart { canvas: ascii }"
+      description: "`chart { canvas: ascii }`: plain ASCII, for any terminal or font."
       x_column: ad_spend
       y_column: sales
       color_column: margin
+    style:
+      chart: { canvas: ascii }

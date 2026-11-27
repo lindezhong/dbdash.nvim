@@ -85,7 +85,8 @@ defaults: >lua
       max_callback_depth = 10,  -- dbdash.run() nesting, |dbdash-callback|
     },
     push = {               -- push sources (exec://, luastream://, webhook://)
-      max_queue = 1000,    -- items waiting per panel; more drop the oldest
+      max_queue = nil,     -- items waiting per panel: unlimited; a number
+                           -- keeps only the newest (|dbdash-push|)
       max_record = "1MB",  -- longest item; longer ones are cut there
     },
   })
@@ -119,12 +120,25 @@ a quadrant canvas, plots 10 rows high and the countdown in every header: >lua
 
 Errors                                                         *dbdash-errors*
 
-A config file that does not load (invalid YAML or fields) is reported with
-its line and column, and the dashboard does not start. When a refresh
-fails, the error has a phase: template (the query template), connect,
-tls, auth, query (the database rejected the query, e.g. a SQL syntax
-error, or the result is not rows, |dbdash-result|), transform (the
-`query.transform` script failed or did not return rows), timeout
+A config file is checked when it loads, with everything that can be known
+then: the YAML, the fields and their types, the arguments, the database
+(its type or URL scheme, the URL's ${NAME} variables and parameters, the
+driver's `database.options`: an unknown option is an error), the chart
+types, the style sheets (properties, renderer, canvas and palette names),
+the thresholds and the grid. A problem is reported with its line and
+column, and the dashboard does not start: >
+  config error: board.yaml:7:9: unknown chart type 'radar'
+<
+What depends on templates is checked when it runs (the rendered SQL, curl
+command or OpenAPI document). Every error reads the same way: the driver,
+the phase, where (a file and line, for templates and Lua) and why: >
+  sqlite query error: no such table: orders [SQLITE_1]
+  template error: board.yaml:11: 'missing' is undefined
+<
+When a refresh fails, the error has a phase: template (the query
+template), connect, tls, auth, query (the database rejected the query, e.g.
+a SQL syntax error, or the result is not rows, |dbdash-result|), transform
+(the `query.transform` script failed or did not return rows), timeout
 (`connect_timeout` + `timeout` elapsed; the query is stopped on the server
 too, |dbdash-cancel|) or decode. Then:
 
@@ -133,11 +147,12 @@ too, |dbdash-cancel|) or decode. Then:
 - `errors.notify = "once"` notifies when an error first appears or changes,
   "always" on every failure, "never" not at all (it still shows in the
   dashboard and in |:DbDashStatus|);
-- consecutive failures back off: after the n-th the next try waits
-  interval x 2^(n-1), at most interval x `errors.backoff` (1x, 2x, 4x,
-  8x, 8x...). The status shows "retrying" and |:DbDashStatus| the count
+- consecutive failures of a database back off: after the n-th the next try
+  waits interval x 2^(n-1), at most interval x `errors.backoff` (1x, 2x,
+  4x, 8x, 8x...). The status shows "retrying" and |:DbDashStatus| the count
   and the next try; the top-level interval (|dbdash-interval|) skips a panel
-  that is backing off;
+  that is backing off. A source that sends data (|dbdash-push|) does not
+  back off: a failed item is that item only, the next one replaces it;
 - `r` / |:DbDashRestart| tries again right away;
 - the first successful refresh clears the error and returns to the normal
   interval.
@@ -416,11 +431,20 @@ vertical-align, text-overflow }`, `cell.null { content }`, `rule`
 
 Refresh intervals                                            *dbdash-interval*
 
-The top-level `interval` refreshes every panel when it elapses and restarts
-their timers. A panel refreshes on `show.interval`: its own, else the
-top-level `show.interval`, else the top-level `interval`, else `defaults` in
-|dbdash-setup| (30s). A panel whose interval is the top-level one (or longer)
-simply refreshes with everything else. >yaml
+`show.interval` is a panel's period: the panel shows new data at most once
+per period. A database is queried once per period (a refresh that comes
+while its query still runs is skipped). A source that sends data
+(|dbdash-push|) sends whenever it has something: the first new result of a
+period shows at once, a later one at the start of the next period, so a
+fast source does not redraw for every item.
+
+A panel's interval is its own `show.interval`, else the top-level
+`show.interval`, else the top-level `interval`, else `defaults` in
+|dbdash-setup| (30s). The top-level `interval` is a refresh of every panel
+at once: when it elapses every panel gets a new period, and each one's own
+count starts again from there (a panel's deadline and the top-level one at
+the same moment are one refresh). A panel whose interval is the top-level
+one or longer only ever refreshes with everything else. >yaml
   interval: 10m        # every panel, every 10 minutes
   show:
     interval: 1m       # each panel's default
@@ -920,8 +944,12 @@ element, for one panel, a dashboard or (setup) every dashboard: >lua
 <
 A chart renderer is a table `{ render = fn }` where `fn(resultset, show,
 ctx)` returns `{ lines, hl }`; `ctx.css` gives the computed style of the
-chart's parts (`ctx.css:get("plot")`, `ctx.css:hl("series", { index = 1 })`);
-see lua/dbdash/render/ for the canvas, ticks, frame and palette interfaces.
+chart's parts (`ctx.css:get("plot")`, `ctx.css:hl("series", { index = 1 })`).
+A canvas has `new` and `px_per_char`, ticks `ticks` and `limits`, a palette
+`color`, a frame `render`, `plot_size` and `apply_style`: one missing is an
+error when it is registered. The interfaces are in
+lua/dbdash/render/types.lua. Names in style sheets (`renderer`, `canvas`,
+`palette`) are checked when a config loads.
 
 The YAML parser supports a subset: block and flow collections, quoted and
 plain scalars, block scalars, comments. Anchors, tags and multiple documents
@@ -1712,6 +1740,10 @@ plus:
   dbdash.null           NULL in returned rows (nil works too)
   dbdash.safe(s)        (templates) output s as is, even with autoescape
 
+example/lua_globals.lua declares these names for lua-language-server: add its
+directory to `workspace.library` to get completion and checks in your configs'
+Lua.
+
                                                                 *dbdash-store*
 `store` is a table each panel keeps for as long as its dashboard runs: every
 Lua of the panel sees the same one (`{% lua %}` blocks, imported `.lua`
@@ -1724,7 +1756,9 @@ when the dashboard is started again (it is not saved in sessions): >lua
 `dbdash.run(args)` runs the panel's whole pipeline again (`query.sql`
 template, query, `query.transform`, rows check) with `args` merged over the
 current arguments, and returns the rows as `{ columns, types, rows }`; every
-Lua of the panel can call it. In that run `meta.run.kind` is "callback"
+Lua of the panel can call it. In a push panel (|dbdash-push|) there is no
+query to run: it takes the current item again through `query.transform`
+with those arguments. In that run `meta.run.kind` is "callback"
 ("refresh" in a refresh), so the template can call back only from the
 refresh: >jinja
   {% lua %}
@@ -1942,18 +1976,22 @@ instead of being queried on an interval. All three work the same way:
   at `database.options.delimiter` (default a newline; a "\r" before it is
   dropped, empty items are skipped, items longer than `push.max_record` are
   cut there). One item is passed at a time.
-- Items wait in the panel's queue (at most `push.max_queue`; when it is full
-  the oldest is dropped). One consumer takes them in order, one at a time,
-  each a run of kind "push" (|dbdash-runs|): `query.transform` gets the item
-  as `rs` (text, or the value `dbdash.emit()` or a request gave), plus
-  `stream`, `params` or `request` where the source gives them, and returns
-  rows. Without a transform an item must be JSON rows (|dbdash-result|).
-  `store`, `meta.prev`, `meta.prev_ok` and `meta.refresh_count` follow each
-  item; `dbdash.run(args)` runs the transform on the same item with other
-  arguments.
-- The panel is drawn on its `show.interval` when something is new, so a fast
-  source does not redraw for every item. A hidden dashboard keeps taking
-  items and draws when it is shown again.
+- Items wait in the panel's queue (unlimited by default: a source that keeps
+  sending faster than `query.transform` takes the items makes it grow; with
+  `push.max_queue` set, a full queue drops the oldest). One consumer takes
+  them in order, one at a time, each a run of kind "push" (|dbdash-runs|):
+  `query.transform` gets the item as `rs` (text, or the value `dbdash.emit()`
+  or a request gave), plus `stream`, `params` or `request` where the source
+  gives them, and returns rows. Without a transform an item must be JSON
+  rows (|dbdash-result|). `store`, `meta.prev`, `meta.prev_ok` and
+  `meta.refresh_count` follow each item; `dbdash.run(args)` runs the
+  transform on the same item with other arguments (|dbdash-callback|).
+- The panel shows new data at most once per `show.interval`
+  (|dbdash-interval|): the first item of a period at once, the latest of the
+  others at the next one. A hidden dashboard keeps taking items and draws
+  when it is shown again.
+- A failed item (its transform failed, or it is not rows) shows its error;
+  the source goes on and the next item replaces it.
 - The source starts with the dashboard, and again with `r`, |:DbDashRestart|
   and changed arguments (`query.sql` is rendered then, with the arguments of
   that moment). Timer refreshes do not start it.
@@ -2206,15 +2244,25 @@ require("dbdash").query({url}, {query}, {opts}, {callback})
     once, on the main loop. Returns a handle: `handle:cancel(reason)` stops
     the query (|dbdash-cancel|). Push sources (|dbdash-push|) cannot be
     queried this way: they run as a panel's stream.
-require("dbdash.db").register({driver})        add a database driver
-    {driver} has `name`, `schemes` (default { name }), `connect(info)`
-    returning a connection with `execute(query, opts)`, `close()` and
-    `server_version()`, and optionally `capabilities`, `dialect`,
-    `parse_url(info)`, `cancel(conn, info)` (stop the running query on the
-    server, |dbdash-cancel|) and `produce(info, query, ctx)` (a push source:
-    `ctx.writer(delimiter)` or `ctx.emit(value)` passes items until it
-    returns; set `capabilities.push`). See lua/dbdash/db/init.lua for the
-    exact types.
+require("dbdash.db").register({driver})        add a data source
+    {driver} has a `name`, `schemes` (default { name }) and one of:
+    - `connect(info)`: a database. It returns a connection with
+      `execute(query, opts)` (a result set), `close()` and optionally
+      `server_version()`; dbdash queries it once per period, with timeouts
+      and backing off after failures. Optionally `cancel(conn, info)` stops
+      the running query on the server (|dbdash-cancel|).
+    - `produce(info, query, ctx)`: a source that sends data. `ctx.emit(value)`
+      passes one item, `ctx.writer(delimiter)` returns a function whose text
+      is cut into items, `ctx.set_status(text)` and `ctx.on_stop(fn)`; it
+      runs until it returns.
+    Optionally `options`: the `database.options` it reads, by name, each a
+    type name ("string", "integer", "boolean", "map", "list") or a function
+    returning an error message; a config with another option is an error.
+    Also `dialect` (how template values are written,
+    |dbdash-template-dialects|),
+    `parse_url(info)` and `query_optional` (a config may leave `query.sql`
+    out). A driver without `name`, or with both or neither of `connect` and
+    `produce`, is an error. The types are in lua/dbdash/db/types.lua.
 
                                                         *dbdash-session-state*
 require("dbdash").mksession({file})

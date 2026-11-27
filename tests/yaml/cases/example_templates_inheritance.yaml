@@ -27,8 +27,8 @@ args:
     type: int
     default: 20
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -88,7 +88,8 @@ panels:
         A loop over mappings sorted with `sort(attribute=...)`, grouped and drawn as bars.
       x_column: rank
       y_column: players
-      span: 2
+    style:
+      panel: { grid-column: span 2 }
 
   - query:
       sql: |

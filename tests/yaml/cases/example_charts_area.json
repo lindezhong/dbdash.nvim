@@ -1,14 +1,25 @@
 {
  "title": "Area chart",
- "description": "An area chart fills under each series: `x_column` and `y_columns` (or `y_column`,\n`series_column`). `style.stacked` piles the series up, `stacked: percent` scales every\nx to 100%. See `:help dbdash-chart-types`.\n",
+ "description": "An area chart fills under each series: `x_column` and `y_columns` (or `y_column`,\n`series_column`). `stacked: true` piles the series up, `stacked: percent` scales every\nx to 100%. Colors are style rules: `series.<label> { color }` here, for every panel.\nSee `:help dbdash-charts` and `:help dbdash-css`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "show": {
   "interval": "5m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "series.Desktop": {
+   "color": "#61afef"
+  },
+  "series.Mobile": {
+   "color": "#e06c75"
+  },
+  "series.Tablet": {
+   "color": "#98c379"
+  }
  },
  "panels": [
   {
@@ -17,29 +28,24 @@
    },
    "show": {
     "type": "area",
-    "title": "style.stacked: true (canvas: braille)",
+    "title": "stacked: true (canvas braille)",
     "description": "`stacked: true` piles the series up, each on the one before (ECharts `stack`); the\ntop line is the total. Braille draws 2 x 4 dots per character.\n",
     "x_column": "month",
     "y_columns": [
      {
       "column": "desktop",
-      "label": "Desktop",
-      "color": "#61afef"
+      "label": "Desktop"
      },
      {
       "column": "mobile",
-      "label": "Mobile",
-      "color": "#e06c75"
+      "label": "Mobile"
      },
      {
       "column": "tablet",
-      "label": "Tablet",
-      "color": "#98c379"
+      "label": "Tablet"
      }
     ],
-    "style": {
-     "stacked": true
-    }
+    "stacked": true
    }
   },
   {
@@ -48,35 +54,30 @@
    },
    "show": {
     "type": "area",
-    "title": "style.stacked: percent",
+    "title": "stacked: percent",
     "description": "`stacked: percent` scales every month to 100% (a 100% stacked area): the share of each\nseries, not its size.\n",
     "x_column": "month",
     "y_columns": [
      {
       "column": "desktop",
-      "label": "Desktop",
-      "color": "#61afef"
+      "label": "Desktop"
      },
      {
       "column": "mobile",
-      "label": "Mobile",
-      "color": "#e06c75"
+      "label": "Mobile"
      },
      {
       "column": "tablet",
-      "label": "Tablet",
-      "color": "#98c379"
+      "label": "Tablet"
      }
     ],
-    "style": {
-     "stacked": "percent"
-    },
     "axes": {
      "y_axis": {
       "max_value": 100,
       "format": "{:.0f}%"
      }
-    }
+    },
+    "stacked": "percent"
    }
   },
   {
@@ -91,18 +92,15 @@
     "y_columns": [
      {
       "column": "desktop",
-      "label": "Desktop",
-      "color": "#61afef"
+      "label": "Desktop"
      },
      {
       "column": "mobile",
-      "label": "Mobile",
-      "color": "#e06c75"
+      "label": "Mobile"
      },
      {
       "column": "tablet",
-      "label": "Tablet",
-      "color": "#98c379"
+      "label": "Tablet"
      }
     ],
     "axes": {
@@ -119,11 +117,15 @@
    },
    "show": {
     "type": "area",
-    "title": "canvas: quadrant",
-    "description": "`canvas: quadrant`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
-    "canvas": "quadrant",
+    "title": "chart { canvas: quadrant }",
+    "description": "`chart { canvas: quadrant }`: 2 x 2 pixels per character (▗▄▖), works in most fonts.",
     "x_column": "month",
     "y_column": "mobile"
+   },
+   "style": {
+    "chart": {
+     "canvas": "quadrant"
+    }
    }
   },
   {
@@ -132,11 +134,15 @@
    },
    "show": {
     "type": "area",
-    "title": "canvas: block",
-    "description": "`canvas: block`: one full block per pixel: coarse but bold.",
-    "canvas": "block",
+    "title": "chart { canvas: block }",
+    "description": "`chart { canvas: block }`: one full block per pixel: coarse but bold.",
     "x_column": "month",
     "y_column": "mobile"
+   },
+   "style": {
+    "chart": {
+     "canvas": "block"
+    }
    }
   },
   {
@@ -145,11 +151,15 @@
    },
    "show": {
     "type": "area",
-    "title": "canvas: halfblock",
-    "description": "`canvas: halfblock`: 1 x 2 pixels per character (▀ ▄).",
-    "canvas": "halfblock",
+    "title": "chart { canvas: halfblock }",
+    "description": "`chart { canvas: halfblock }`: 1 x 2 pixels per character (▀ ▄).",
     "x_column": "month",
     "y_column": "mobile"
+   },
+   "style": {
+    "chart": {
+     "canvas": "halfblock"
+    }
    }
   },
   {
@@ -158,11 +168,15 @@
    },
    "show": {
     "type": "area",
-    "title": "canvas: ascii",
-    "description": "`canvas: ascii`: plain ASCII, for any terminal or font.",
-    "canvas": "ascii",
+    "title": "chart { canvas: ascii }",
+    "description": "`chart { canvas: ascii }`: plain ASCII, for any terminal or font.",
     "x_column": "month",
     "y_column": "mobile"
+   },
+   "style": {
+    "chart": {
+     "canvas": "ascii"
+    }
    }
   }
  ]

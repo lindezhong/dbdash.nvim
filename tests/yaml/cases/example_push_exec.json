@@ -1,17 +1,17 @@
 {
  "title": "exec://",
  "description": "`exec://`: a script whose output is the data, one item per line (or delimiter). Runs\na script, so it asks for trust first. See `:help dbdash-exec`.\n",
- "show": {
-  "style": {
-   "panel_border": "single",
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "panel": {
+   "border": "single",
    "padding": [
     0,
     1
    ]
   }
- },
- "layout": {
-  "columns": 2
  },
  "panels": [
   {

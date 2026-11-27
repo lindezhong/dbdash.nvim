@@ -20,8 +20,10 @@
    "default": 20
   }
  ],
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -53,8 +55,12 @@
     "title": "Players per rank (a loop over sorted mappings)",
     "description": "A loop over mappings sorted with `sort(attribute=...)`, grouped and drawn as bars.\n",
     "x_column": "rank",
-    "y_column": "players",
-    "span": 2
+    "y_column": "players"
+   },
+   "style": {
+    "panel": {
+     "grid-column": "span 2"
+    }
    }
   },
   {

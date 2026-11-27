@@ -1,14 +1,16 @@
 {
  "title": "Bar chart",
- "description": "A bar chart shows one value per category: `x_column` names the bars, `y_column` (or\n`y_columns`, or `series_column` for long data) gives their lengths. Horizontal by\ndefault; `renderer: vertical` draws columns. See `:help dbdash-chart-types`.\n",
+ "description": "A bar chart shows one value per category: `x_column` names the bars, `y_column` (or\n`y_columns`, or `series_column` for long data) gives their lengths. Horizontal by\ndefault; `chart { renderer: vertical }` draws columns. See `:help dbdash-charts`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "show": {
   "interval": "5m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -17,13 +19,14 @@
    },
    "show": {
     "type": "bar",
-    "title": "horizontal (default): color, show_values",
-    "description": "Horizontal bars, one line each, the value after the bar (`show_values`, default on);\n`style.color` colors every bar (CSS `color`).\n",
+    "title": "horizontal (default): series { color }",
+    "description": "Horizontal bars, one line each, the value after the bar (`value { display: none }`\nhides it); `series { color }` colors every bar.\n",
     "x_column": "category",
-    "y_column": "sales",
-    "style": {
-     "color": "#61afef",
-     "show_values": true
+    "y_column": "sales"
+   },
+   "style": {
+    "series": {
+     "color": "#61afef"
     }
    }
   },
@@ -33,11 +36,15 @@
    },
    "show": {
     "type": "bar",
-    "renderer": "vertical",
-    "title": "renderer: vertical",
-    "description": "`renderer: vertical` draws columns with ⅛-cell tops, the value above each. Try it on\nany bar chart with `:DbDashStyle bar vertical`.\n",
+    "title": "chart { renderer: vertical }",
+    "description": "`chart { renderer: vertical }` draws columns with ⅛-cell tops, the value above each.\nTry it on any bar chart with `:DbDashStyle bar vertical`.\n",
     "x_column": "category",
     "y_column": "sales"
+   },
+   "style": {
+    "chart": {
+     "renderer": "vertical"
+    }
    }
   },
   {
@@ -47,20 +54,26 @@
    "show": {
     "type": "bar",
     "title": "y_columns: grouped (side by side)",
-    "description": "Several `y_columns` draw one bar per series in each category, side by side (Chart.js\ngrouped bars, the default `style.group`), with a legend.\n",
+    "description": "Several `y_columns` draw one bar per series in each category, side by side (Chart.js\ngrouped bars, the default), with a legend; `series.Sales` and `series.Target` color\nthem by label.\n",
     "x_column": "category",
     "y_columns": [
      {
       "column": "sales",
-      "label": "Sales",
-      "color": "#61afef"
+      "label": "Sales"
      },
      {
       "column": "target",
-      "label": "Target",
-      "color": "#5c6370"
+      "label": "Target"
      }
     ]
+   },
+   "style": {
+    "series.Sales": {
+     "color": "#61afef"
+    },
+    "series.Target": {
+     "color": "#5c6370"
+    }
    }
   },
   {
@@ -69,15 +82,17 @@
    },
    "show": {
     "type": "bar",
-    "renderer": "vertical",
-    "title": "series_column, group: stacked",
-    "description": "Long data (one row per quarter and region) with `series_column`, stacked\n(`style.group: stacked`, Chart.js `stacked: true`): the column is the total, the\nvalue above it too. `palette: tableau` colors the regions.\n",
+    "title": "series_column, stacked: true",
+    "description": "Long data (one row per quarter and region) with `series_column`, stacked\n(`stacked: true`, as in Chart.js): the column is the total, the value above it too.\n`chart { palette: tableau }` colors the regions.\n",
     "x_column": "quarter",
     "y_column": "sales",
     "series_column": "region",
-    "palette": "tableau",
-    "style": {
-     "group": "stacked"
+    "stacked": true
+   },
+   "style": {
+    "chart": {
+     "renderer": "vertical",
+     "palette": "tableau"
     }
    }
   },
@@ -87,14 +102,16 @@
    },
    "show": {
     "type": "bar",
-    "title": "sort: desc, top: 4, value_position: inside",
-    "description": "`sort` orders the bars by value (`asc` / `desc`; the total when stacked), `top` keeps\nthe first N (ECharts `dataZoom` without the zoom), `value_position: inside` writes the\nvalue inside the end of the bar (ECharts `label.position: insideRight`).\n",
+    "title": "sort: desc, top: 4, value { position: inside }",
+    "description": "`sort` orders the bars by value (`asc` / `desc`; the total when stacked), `top` keeps\nthe first N (ECharts `dataZoom` without the zoom), `value { position: inside }`\nwrites the value inside the end of the bar (ECharts `label.position: insideRight`).\n",
     "x_column": "category",
     "y_column": "sales",
-    "style": {
-     "sort": "desc",
-     "top": 4,
-     "value_position": "inside"
+    "sort": "desc",
+    "top": 4
+   },
+   "style": {
+    "value": {
+     "position": "inside"
     }
    }
   },
@@ -104,14 +121,18 @@
    },
    "show": {
     "type": "bar",
-    "renderer": "vertical",
-    "title": "bar_width, bar_gap",
-    "description": "`bar_width` is the columns per bar and `bar_gap` the columns between categories\n(Chart.js `barThickness`, `categoryPercentage`); horizontal bars take them in lines.\n",
+    "title": "bar { width, gap }",
+    "description": "`bar { width }` is the columns per bar and `gap` the columns between categories\n(Chart.js `barThickness`, `categoryPercentage`); horizontal bars take them in lines.\n",
     "x_column": "category",
-    "y_column": "sales",
-    "style": {
-     "bar_width": 2,
-     "bar_gap": 4
+    "y_column": "sales"
+   },
+   "style": {
+    "chart": {
+     "renderer": "vertical"
+    },
+    "bar": {
+     "width": 2,
+     "gap": 4
     }
    }
   },
@@ -122,7 +143,7 @@
    "show": {
     "type": "bar",
     "title": "mark_lines, axes.y_axis: min_value, max_value",
-    "description": "Reference lines on the value axis (ECharts `markLine`): a goal and the `mean`. The\nvalue axis runs from `min_value` to `max_value` (the bars' baseline and end).\n",
+    "description": "Reference lines on the value axis (ECharts `markLine`): a goal and the `mean`; a\nline's `class` styles it (`mark.goal { color }`). The value axis runs from\n`min_value` to `max_value` (the bars' baseline and end).\n",
     "x_column": "category",
     "y_column": "sales",
     "axes": {
@@ -135,12 +156,17 @@
      {
       "value": 800,
       "label": "goal",
-      "color": "#98c379"
+      "class": "goal"
      },
      {
       "value": "mean"
      }
     ]
+   },
+   "style": {
+    "mark.goal": {
+     "color": "#98c379"
+    }
    }
   },
   {

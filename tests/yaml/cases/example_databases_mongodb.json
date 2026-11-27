@@ -10,14 +10,17 @@
    "default": "eu"
   }
  ],
- "show": {
-  "style": {
-   "panel_border": "rounded",
-   "border_style": "#98c379"
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  },
+  "panel": {
+   "border": "rounded",
+   "border-color": "#98c379"
+  },
+  "table": {
+   "border-color": "#98c379"
   }
- },
- "layout": {
-  "columns": 2
  },
  "panels": [
   {

@@ -1,14 +1,16 @@
 {
  "title": "Box plot",
- "description": "A box plot summarizes `value_column` per `category_column`: the box spans the first to\nthe third quartile with the median inside, whiskers reach the furthest values within\n1.5 IQR, and points beyond are outliers. See `:help dbdash-chart-types`.\n",
+ "description": "A box plot summarizes `value_column` per `category_column`: the box spans the first to\nthe third quartile with the median inside, whiskers reach the furthest values within\n1.5 IQR, and points beyond are outliers. See `:help dbdash-charts`.\n",
  "database": {
   "url": "sqlite:///:memory:"
  },
  "show": {
   "interval": "5m"
  },
- "layout": {
-  "columns": 2
+ "style": {
+  "dashboard": {
+   "grid-template-columns": 2
+  }
  },
  "panels": [
   {
@@ -18,17 +20,22 @@
    "show": {
     "type": "boxplot",
     "title": "boxdraw (default): outliers, means",
-    "description": "One box per service; `show_outliers` (default on) marks values past the whiskers with •,\n`show_means` marks the mean with +. `colors` sets one color per category.\n",
+    "description": "One box per service; outliers past the whiskers show as • (`outlier { display: none }`\nhides them), `mean { display: block }` marks the mean with +. `series.<category>`\nrules color the boxes.\n",
     "category_column": "service",
-    "value_column": "ms",
-    "colors": {
-     "api": "#61afef",
-     "web": "#98c379",
-     "db": "#e5c07b"
+    "value_column": "ms"
+   },
+   "style": {
+    "series.api": {
+     "color": "#61afef"
     },
-    "style": {
-     "show_outliers": true,
-     "show_means": true
+    "series.web": {
+     "color": "#98c379"
+    },
+    "series.db": {
+     "color": "#e5c07b"
+    },
+    "mean": {
+     "display": "block"
     }
    }
   },
@@ -38,9 +45,8 @@
    },
    "show": {
     "type": "boxplot",
-    "renderer": "vertical",
-    "title": "renderer: vertical",
-    "description": "`renderer: vertical` draws upright boxes, one column per category, with a value axis on\nthe left (`:DbDashStyle boxplot vertical`).\n",
+    "title": "chart { renderer: vertical }",
+    "description": "`chart { renderer: vertical }` draws upright boxes, one column per category, with a\nvalue axis on the left (`:DbDashStyle boxplot vertical`).\n",
     "category_column": "service",
     "value_column": "ms",
     "axes": {
@@ -48,6 +54,11 @@
       "title": "ms"
      }
     }
+   },
+   "style": {
+    "chart": {
+     "renderer": "vertical"
+    }
    }
   },
   {
@@ -56,13 +67,15 @@
    },
    "show": {
     "type": "boxplot",
-    "title": "whiskers: minmax, show_values",
-    "description": "`whiskers: minmax` reaches the smallest and largest values (no outliers);\n`[5, 95]` would use two percentiles. `show_values` writes q1, the median and q3 under\neach box.\n",
+    "title": "whiskers: minmax, value { display: block }",
+    "description": "`whiskers: minmax` reaches the smallest and largest values (no outliers); `[5, 95]`\nwould use two percentiles. `value { display: block }` writes q1, the median and q3\nunder each box.\n",
     "category_column": "service",
     "value_column": "ms",
-    "style": {
-     "whiskers": "minmax",
-     "show_values": true
+    "whiskers": "minmax"
+   },
+   "style": {
+    "value": {
+     "display": "block"
     }
    }
   },
@@ -75,12 +88,10 @@
     "title": "one box (no category), whiskers: [10, 90]",
     "description": "Without `category_column` all values make one box. `whiskers: [10, 90]` puts the\nwhiskers at the 10th and 90th percentiles; the rest are outliers.\n",
     "value_column": "ms",
-    "style": {
-     "whiskers": [
-      10,
-      90
-     ]
-    }
+    "whiskers": [
+     10,
+     90
+    ]
    }
   }
  ]

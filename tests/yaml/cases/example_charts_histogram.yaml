@@ -8,7 +8,7 @@ title: "Histogram"
 description: |
   A histogram counts the values of `value_column` in bins. `bins` sets how many
   (default: Sturges' rule), `bin_width` and `bin_range` fix them. Horizontal by default;
-  `renderer: vertical` draws columns. See `:help dbdash-chart-types`.
+  `chart { renderer: vertical }` draws columns. See `:help dbdash-charts`.
 
 database:
   url: "sqlite:///:memory:"
@@ -16,8 +16,8 @@ database:
 show:
   interval: 5m
 
-layout:
-  columns: 2
+style:
+  dashboard: { grid-template-columns: 2 }
 
 panels:
   - query:
@@ -27,13 +27,14 @@ panels:
         FROM n
     show:
       type: histogram
-      title: "horizontal (default): bins, color"
+      title: "horizontal (default): bins, series { color }"
       description: |
         Horizontal bars, one per bin, labeled `[from, to)`; `bins: 10` asks for ten bins (the
-        default follows Sturges' rule); `style.color` colors them.
+        default follows Sturges' rule); the rule `series { color }` colors them.
       value_column: score
       bins: 10
-      style: { color: "#c678dd" }
+    style:
+      series: { color: "#c678dd" }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 200)
@@ -41,14 +42,15 @@ panels:
         FROM n
     show:
       type: histogram
-      renderer: vertical
-      title: "renderer: vertical, show_values: false"
+      title: "chart { renderer: vertical }, value { display: none }"
       description: |
         Columns labeled with their lower edge (`:DbDashStyle histogram vertical`);
-        `show_values: false` hides the counts.
+        `value { display: none }` hides the counts.
       value_column: score
       bins: 12
-      style: { show_values: false }
+    style:
+      chart: { renderer: vertical }
+      value: { display: none }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 200)
@@ -70,16 +72,18 @@ panels:
         FROM n
     show:
       type: histogram
-      renderer: vertical
       title: "normalize: percent, cumulative"
       description: |
         `normalize: percent` shows each bin's share of all values (`density`: per unit of the
         value); `cumulative` adds the bins up, so the last one is 100%.
       value_column: score
       bin_width: 10
-      style: { normalize: percent, cumulative: true }
       axes:
         y_axis: { format: "{:.0f}%" }
+      normalize: percent
+      cumulative: true
+    style:
+      chart: { renderer: vertical }
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 200)
@@ -90,9 +94,11 @@ panels:
       title: "mark_lines: mean, a limit"
       description: |
         `mark_lines` are values of the data: the bin each falls in is colored and labeled
-        (here the mean, and a pass mark of 60).
+        (here the mean, and a pass mark of 60 with `class: pass`, colored by `mark.pass`).
       value_column: score
       bin_width: 10
       mark_lines:
         - { value: mean }
-        - { value: 60, label: "pass", color: "#98c379" }
+        - { value: 60, label: "pass", class: pass }
+    style:
+      mark.pass: { color: "#98c379" }
