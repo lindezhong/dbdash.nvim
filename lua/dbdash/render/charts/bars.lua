@@ -155,18 +155,9 @@ M.mark_group = mark_group
 ---@field legend table?
 ---@field legend_position string?
 
----Horizontal bars: one row (or bar_width rows) per bar, labels on the left, values after.
----@param bars dbdash.render.Bar[]
----@param o dbdash.render.charts.bars.HorizontalOpts
-function M.horizontal(ctx, bars, o)
-  local stacked = o.stacked
-  local thick = math.max(1, o.bar_width or 1)
-  local gap = math.max(
-    0,
-    o.bar_gap or ((not stacked and #(bars[1] and segments(bars[1]) or {}) > 1) and 1 or 0)
-  )
-  local minv, maxv, all = value_range(bars, stacked, o.axes)
-  -- The rows: every segment (grouped) or bar (stacked), `thick` lines each.
+---The rows of horizontal bars: every segment (grouped) or bar (stacked), `thick` lines
+---each, `gap` blank rows between bars.
+local function bar_rows(bars, stacked, thick, gap)
   local rows = {}
   for bi, b in ipairs(bars) do
     if bi > 1 then
@@ -185,6 +176,130 @@ function M.horizontal(ctx, bars, o)
       end
     end
   end
+  return rows
+end
+
+---One row of horizontal bars (`g`: { zero, span, room, stacked }): its segments from the
+---zero column (negative ones to the left), then its value after the bar or inside its end.
+---@return string line
+local function bar_line(ctx, g, r, i, text, o, hl)
+  local line = ""
+  local cursor_pos, cursor_neg = g.zero, g.zero
+  local cells = {} -- { start, text, group }
+  for _, s in ipairs(r.segs) do
+    local len = g.span > 0 and math.abs(s.value) / g.span * g.room or 0
+    local bar = hbar(len, o.fine, o.glyph)
+    local bw = W.width(bar)
+    local start
+    if s.value < 0 then
+      start = math.max(0, (g.stacked and cursor_neg or g.zero) - bw)
+      cursor_neg = start
+    else
+      start = g.stacked and cursor_pos or g.zero
+      cursor_pos = start + bw
+    end
+    cells[#cells + 1] = { start, bar, s.group }
+  end
+  table.sort(cells, function(a, b)
+    return a[1] < b[1]
+  end)
+  local pos = 0
+  for _, c in ipairs(cells) do
+    if c[1] > pos then
+      line = line .. string.rep(" ", c[1] - pos)
+      pos = c[1]
+    end
+    local before = #line
+    line = line .. c[2]
+    hl[#hl + 1] = { row = i - 1, col_s = before, col_e = #line, group = c[3] }
+    pos = pos + W.width(c[2])
+  end
+  local vg = o.show_values and r.first and text and value_group(ctx, r.segs[1])
+  if not vg then
+    return line
+  end
+  if o.inside and pos >= W.width(text) + 1 then
+    -- the value inside the end of the bar (ECharts label.position: insideRight)
+    local keep = W.truncate(line, pos - W.width(text) - 1, "")
+    line = keep .. " " .. text
+    hl[#hl + 1] = { row = i - 1, col_s = #keep, col_e = #line, group = vg, priority = 110 }
+  else
+    local before = #line
+    line = line .. " " .. text
+    hl[#hl + 1] = { row = i - 1, col_s = before + 1, col_e = #line, group = vg }
+  end
+  return line
+end
+
+---A column of ┆ at column `c` down the bar lines: after a shorter line, or over a blank.
+local function mark_column(lines, hl, c, group)
+  for i = 1, #lines do
+    local l = lines[i]
+    local w = W.width(l)
+    if w <= c then
+      local add = string.rep(" ", c - w) .. "┆"
+      hl[#hl + 1] = { row = i - 1, col_s = #l + #add - #"┆", col_e = #l + #add, group = group }
+      lines[i] = l .. add
+    elseif W.width(W.truncate(l, c, "")) == c then
+      -- over a blank (or the end of a value): replace the cell at c
+      local head = W.truncate(l, c, "")
+      local rest = l:sub(#head + 1)
+      local ch = rest:match("^[%z\1-\127\194-\244][\128-\191]*") or ""
+      if ch == " " then
+        lines[i] = head .. "┆" .. rest:sub(2)
+        for _, h in ipairs(hl) do
+          if h.row == i - 1 and h.col_s > #head then
+            h.col_s, h.col_e = h.col_s + #"┆" - 1, h.col_e + #"┆" - 1
+          end
+        end
+        hl[#hl + 1] = { row = i - 1, col_s = #head, col_e = #head + #"┆", group = group }
+      end
+    end
+  end
+end
+
+---Reference lines of horizontal bars: a column of ┆ at each value, their labels on a line
+---below the bars (added to `lines`; returns whether it was).
+local function horizontal_marks(ctx, lines, hl, marks, col_of)
+  table.sort(marks, function(a, b)
+    return a.value < b.value
+  end)
+  local label_line, label_hl = "", {}
+  for _, m in ipairs(marks) do
+    local c = col_of(m.value)
+    local group = mark_group(ctx, m)
+    mark_column(lines, hl, c, group)
+    if m.label then
+      local at = math.max(
+        W.width(label_line) + (label_line ~= "" and 1 or 0),
+        c - math.floor(W.width(m.label) / 2)
+      )
+      local before = label_line .. string.rep(" ", at - W.width(label_line))
+      label_line = before .. m.label
+      label_hl[#label_hl + 1] = { col_s = #before, col_e = #label_line, group = group }
+    end
+  end
+  if label_line == "" then
+    return false
+  end
+  lines[#lines + 1] = label_line
+  for _, h in ipairs(label_hl) do
+    hl[#hl + 1] = { row = #lines - 1, col_s = h.col_s, col_e = h.col_e, group = h.group }
+  end
+  return true
+end
+
+---Horizontal bars: one row (or bar_width rows) per bar, labels on the left, values after.
+---@param bars dbdash.render.Bar[]
+---@param o dbdash.render.charts.bars.HorizontalOpts
+function M.horizontal(ctx, bars, o)
+  local stacked = o.stacked
+  local gap = math.max(
+    0,
+    o.bar_gap or ((not stacked and #(bars[1] and segments(bars[1]) or {}) > 1) and 1 or 0)
+  )
+  local minv, maxv, all = value_range(bars, stacked, o.axes)
+  local rows = bar_rows(bars, stacked, math.max(1, o.bar_width or 1), gap)
   local labels, vw, texts = {}, 0, {}
   for i, r in ipairs(rows) do
     labels[i] = r.label or ""
@@ -212,62 +327,18 @@ function M.horizontal(ctx, bars, o)
     spec.ylabels[i] = W.truncate(l, math.max(8, math.floor(ctx.width / 3)))
   end
   local cols = ctx.frame.plot_size(ctx, spec)
-  local room = cols - ((o.show_values and not o.inside) and (vw + 1) or 0)
-  local span = maxv - minv
+  local g = {
+    stacked = stacked,
+    span = maxv - minv,
+    room = cols - ((o.show_values and not o.inside) and (vw + 1) or 0),
+  }
   local function col_of(v)
-    return span > 0 and math.floor((v - minv) / span * room + 0.5) or 0
+    return g.span > 0 and math.floor((v - minv) / g.span * g.room + 0.5) or 0
   end
-  local zero = col_of(math.max(minv, math.min(0, maxv)))
+  g.zero = col_of(math.max(minv, math.min(0, maxv)))
   local lines, hl, yticks = {}, {}, {}
   for i, r in ipairs(rows) do
-    local line = ""
-    if r.segs then
-      local cursor_pos, cursor_neg = zero, zero
-      local cells = {} -- { start, text, group }
-      for _, s in ipairs(r.segs) do
-        local len = span > 0 and math.abs(s.value) / span * room or 0
-        local bar = hbar(len, o.fine, o.glyph)
-        local bw = W.width(bar)
-        local start
-        if s.value < 0 then
-          start = math.max(0, (stacked and cursor_neg or zero) - bw)
-          cursor_neg = start
-        else
-          start = stacked and cursor_pos or zero
-          cursor_pos = start + bw
-        end
-        cells[#cells + 1] = { start, bar, s.group }
-      end
-      table.sort(cells, function(a, b)
-        return a[1] < b[1]
-      end)
-      local pos = 0
-      for _, c in ipairs(cells) do
-        if c[1] > pos then
-          line = line .. string.rep(" ", c[1] - pos)
-          pos = c[1]
-        end
-        local before = #line
-        line = line .. c[2]
-        hl[#hl + 1] = { row = i - 1, col_s = before, col_e = #line, group = c[3] }
-        pos = pos + W.width(c[2])
-      end
-      local vg = o.show_values and r.first and texts[i] and value_group(ctx, r.segs[1])
-      if vg then
-        local t = texts[i]
-        if o.inside and pos >= W.width(t) + 1 then
-          -- the value inside the end of the bar (ECharts label.position: insideRight)
-          local keep = W.truncate(line, pos - W.width(t) - 1, "")
-          line = keep .. " " .. t
-          hl[#hl + 1] = { row = i - 1, col_s = #keep, col_e = #line, group = vg, priority = 110 }
-        else
-          local before = #line
-          line = line .. " " .. t
-          hl[#hl + 1] = { row = i - 1, col_s = before + 1, col_e = #line, group = vg }
-        end
-      end
-    end
-    lines[i] = line
+    lines[i] = r.segs and bar_line(ctx, g, r, i, texts[i], o, hl) or ""
     if labels[i] ~= "" then
       yticks[#yticks + 1] = { row = i - 1, label = spec.ylabels[i] }
     end
@@ -278,57 +349,116 @@ function M.horizontal(ctx, bars, o)
       lines[i] = l .. string.rep(" ", math.max(0, cols - W.width(l)))
     end
   end
-  -- Reference lines: a column of ┆ at the value, their labels on a line below the bars.
-  local marks = mark_values(o.marks, all)
-  table.sort(marks, function(a, b)
-    return a.value < b.value
-  end)
-  local label_line, label_hl = "", {}
-  for _, m in ipairs(marks) do
-    local c = col_of(m.value)
-    local group = mark_group(ctx, m)
-    for i = 1, #lines do
-      local l = lines[i]
-      local w = W.width(l)
-      if w <= c then
-        local add = string.rep(" ", c - w) .. "┆"
-        hl[#hl + 1] = { row = i - 1, col_s = #l + #add - #"┆", col_e = #l + #add, group = group }
-        lines[i] = l .. add
-      elseif W.width(W.truncate(l, c, "")) == c then
-        -- over a blank (or the end of a value): replace the cell at c
-        local head = W.truncate(l, c, "")
-        local rest = l:sub(#head + 1)
-        local ch = rest:match("^[%z\1-\127\194-\244][\128-\191]*") or ""
-        if ch == " " then
-          lines[i] = head .. "┆" .. rest:sub(2)
-          for _, h in ipairs(hl) do
-            if h.row == i - 1 and h.col_s > #head then
-              h.col_s, h.col_e = h.col_s + #"┆" - 1, h.col_e + #"┆" - 1
-            end
-          end
-          hl[#hl + 1] = { row = i - 1, col_s = #head, col_e = #head + #"┆", group = group }
-        end
-      end
-    end
-    if m.label then
-      local at = math.max(
-        W.width(label_line) + (label_line ~= "" and 1 or 0),
-        c - math.floor(W.width(m.label) / 2)
-      )
-      local before = label_line .. string.rep(" ", at - W.width(label_line))
-      label_line = before .. m.label
-      label_hl[#label_hl + 1] = { col_s = #before, col_e = #label_line, group = group }
-    end
-  end
-  if label_line ~= "" then
-    lines[#lines + 1] = label_line
-    for _, h in ipairs(label_hl) do
-      hl[#hl + 1] = { row = #lines - 1, col_s = h.col_s, col_e = h.col_e, group = h.group }
-    end
+  if horizontal_marks(ctx, lines, hl, mark_values(o.marks, all), col_of) then
     spec.min_rows = #lines
   end
   spec.yticks = yticks
   return ctx.frame.render(ctx, spec, { lines = lines, hl = hl })
+end
+
+---@class dbdash.render.charts.bars.Grid cells of vertical bars, row 0 at the top
+---@field rows integer
+---@field cols integer
+---@field cells table<integer, table<integer, string>>
+---@field groups table<integer, string> highlight of cell r * cols + c
+
+local function new_grid(rows, cols)
+  local g = { rows = rows, cols = cols, cells = {}, groups = {} }
+  for r = 0, rows - 1 do
+    g.cells[r] = {}
+  end
+  return g
+end
+
+---Fill column c from `from` (rows of height, float) to `to`: full blocks, an eighth on top.
+local function fill(g, c, from, to, group)
+  local rows = g.rows
+  local full_from, full_to = math.floor(from + 0.5), math.floor(to)
+  for k = full_from, full_to - 1 do
+    if k >= 0 and k < rows then
+      g.cells[rows - 1 - k][c] = "█"
+      g.groups[(rows - 1 - k) * g.cols + c] = group
+    end
+  end
+  local rest = math.floor((to - full_to) * 8 + 0.5)
+  if rest > 0 and full_to < rows and full_to >= full_from then
+    g.cells[rows - 1 - full_to][c] = EIGHTHS_V[rest]
+    g.groups[(rows - 1 - full_to) * g.cols + c] = group
+  end
+end
+
+local function put_text(g, r, start, text, group)
+  local k = 0
+  for ch in W.chars(text) do
+    if start + k < g.cols and start + k >= 0 then
+      g.cells[r][start + k] = ch
+      g.groups[r * g.cols + start + k] = group
+    end
+    k = k + 1
+  end
+end
+
+---A value over (or, inside, at the top of) a bar `width` cells wide at column `at`, the
+---bar's top at height `to`: only when that cell is free (inside: over the bar).
+local function put_value(g, o, text, at, to, room, group)
+  local r = o.inside and (g.rows - math.floor(to))
+    or (g.rows - 1 - math.min(math.ceil(to), g.rows - 1))
+  if W.width(text) <= room and r >= 0 and r < g.rows and (o.inside or not g.cells[r][at]) then
+    put_text(g, r, at, text, group)
+  end
+end
+
+---Bar i of vertical bars (`v`: { slot, bw, height_of, lo, stacked }): its segments side
+---by side (grouped) or on top of each other (stacked), with their values. Returns the
+---column of its center.
+local function vertical_bar(ctx, g, v, i, b, o)
+  local bw, lo = v.bw, v.lo
+  local segs = segments(b)
+  local width_all = v.stacked and bw or bw * #segs
+  local c0 = (i - 1) * v.slot + math.floor((v.slot - width_all) / 2)
+  local top_h, total = v.height_of(math.max(lo, 0)), 0
+  for si, s in ipairs(segs) do
+    local start_c = v.stacked and c0 or (c0 + (si - 1) * bw)
+    local base = v.stacked and top_h or v.height_of(math.max(lo, 0))
+    local to = v.stacked and v.height_of(total + s.value) or v.height_of(s.value)
+    for c = start_c, start_c + bw - 1 do
+      if c < g.cols then
+        fill(g, c, base, to, s.group)
+      end
+    end
+    total = total + s.value
+    top_h = to
+    local vg = o.show_values and not v.stacked and value_group(ctx, s)
+    if vg then
+      local text = fmt.value(s.value, o.value_format)
+      put_value(g, o, text, start_c + math.floor((bw - W.width(text)) / 2), to, bw + 1, vg)
+    end
+  end
+  local svg = o.show_values and v.stacked and value_group(ctx, segs[1])
+  if svg then
+    local text = fmt.value(total, o.value_format)
+    put_value(g, o, text, c0 + math.floor((bw - W.width(text)) / 2), top_h, v.slot, svg)
+  end
+  return c0 + math.floor(width_all / 2)
+end
+
+---The grid as lines with highlights.
+local function grid_lines(g)
+  local lines, hl = {}, {}
+  for r = 0, g.rows - 1 do
+    local parts, pos = {}, 0
+    for c = 0, g.cols - 1 do
+      local ch = g.cells[r][c] or " "
+      local group = g.groups[r * g.cols + c]
+      if group then
+        hl[#hl + 1] = { row = r, col_s = pos, col_e = pos + #ch, group = group }
+      end
+      parts[#parts + 1] = ch
+      pos = pos + #ch
+    end
+    lines[#lines + 1] = table.concat(parts)
+  end
+  return lines, hl
 end
 
 ---Vertical bars: columns with eighth-block tops, category labels below.
@@ -350,117 +480,41 @@ function M.vertical(ctx, bars, o)
   spec.yticks, spec.ylabels = C.y_ticks(ctx, lo, hi, rows, o.value_format)
   local cols
   cols, rows = ctx.frame.plot_size(ctx, spec)
-  local n = math.max(#bars, 1)
   local nseg = (not stacked and bars[1]) and #segments(bars[1]) or 1
-  local slot = math.max(1, math.floor(cols / n))
-  local cat_gap = o.bar_gap or (slot > 2 and 1 or 0)
-  local inner = math.max(1, slot - cat_gap)
-  local bw = o.bar_width and math.max(1, math.min(o.bar_width, math.floor(inner / nseg)))
-    or math.max(1, math.floor(inner / nseg))
-  local grid = {}
-  for r = 0, rows - 1 do
-    grid[r] = {}
-  end
-  local hl_cells = {}
-  local function height_of(v)
-    return hi > lo and math.max(0, v - lo) / (hi - lo) * rows or 0
-  end
-  ---Fill column c from `from` (rows of height, float) to `to`.
-  local function fill(c, from, to, group)
-    local full_from, full_to = math.floor(from + 0.5), math.floor(to)
-    for k = full_from, full_to - 1 do
-      if k >= 0 and k < rows then
-        grid[rows - 1 - k][c] = "█"
-        hl_cells[(rows - 1 - k) * cols + c] = group
-      end
-    end
-    local rest = math.floor((to - full_to) * 8 + 0.5)
-    if rest > 0 and full_to < rows and full_to >= full_from then
-      grid[rows - 1 - full_to][c] = EIGHTHS_V[rest]
-      hl_cells[(rows - 1 - full_to) * cols + c] = group
-    end
-  end
-  local function put_text(r, start, text, group)
-    local k = 0
-    for ch in W.chars(text) do
-      if start + k < cols and start + k >= 0 then
-        grid[r][start + k] = ch
-        hl_cells[r * cols + start + k] = group
-      end
-      k = k + 1
-    end
-  end
+  local slot = math.max(1, math.floor(cols / math.max(#bars, 1)))
+  local inner = math.max(1, slot - (o.bar_gap or (slot > 2 and 1 or 0)))
+  local v = {
+    slot = slot,
+    lo = lo,
+    stacked = stacked,
+    bw = o.bar_width and math.max(1, math.min(o.bar_width, math.floor(inner / nseg)))
+      or math.max(1, math.floor(inner / nseg)),
+    height_of = function(x)
+      return hi > lo and math.max(0, x - lo) / (hi - lo) * rows or 0
+    end,
+  }
+  local g = new_grid(rows, cols)
   local centers = {}
   for i, b in ipairs(bars) do
-    local segs = segments(b)
-    local width_all = stacked and bw or bw * #segs
-    local c0 = (i - 1) * slot + math.floor((slot - width_all) / 2)
-    centers[i] = c0 + math.floor(width_all / 2)
-    local top_h, total = height_of(math.max(lo, 0)), 0
-    for si, s in ipairs(segs) do
-      local start_c = stacked and c0 or (c0 + (si - 1) * bw)
-      local base = stacked and top_h or height_of(math.max(lo, 0))
-      local to = stacked and height_of(total + s.value) or height_of(s.value)
-      for c = start_c, start_c + bw - 1 do
-        if c < cols then
-          fill(c, base, to, s.group)
-        end
-      end
-      total = total + s.value
-      top_h = to
-      local vg = o.show_values and not stacked and value_group(ctx, s)
-      if vg then
-        local text = fmt.value(s.value, o.value_format)
-        local r = o.inside and (rows - math.floor(to))
-          or (rows - 1 - math.min(math.ceil(to), rows - 1))
-        local at = start_c + math.floor((bw - W.width(text)) / 2)
-        -- above the bar only when that cell is free (inside: over the bar)
-        if W.width(text) <= bw + 1 and r >= 0 and r < rows and (o.inside or not grid[r][at]) then
-          put_text(r, at, text, vg)
-        end
-      end
-    end
-    local svg = o.show_values and stacked and value_group(ctx, segs[1])
-    if svg then
-      local text = fmt.value(total, o.value_format)
-      local r = o.inside and (rows - math.floor(top_h))
-        or (rows - 1 - math.min(math.ceil(top_h), rows - 1))
-      local at = c0 + math.floor((bw - W.width(text)) / 2)
-      if W.width(text) <= slot and r >= 0 and r < rows and (o.inside or not grid[r][at]) then
-        put_text(r, at, text, svg)
-      end
-    end
+    centers[i] = vertical_bar(ctx, g, v, i, b, o)
   end
   -- Reference lines: a row of ┄ at the value over the empty cells, the label at the end.
   for _, m in ipairs(mark_values(o.marks, all)) do
-    local r = rows - 1 - math.floor(height_of(m.value))
+    local r = rows - 1 - math.floor(v.height_of(m.value))
     if r >= 0 and r < rows then
       local group = mark_group(ctx, m)
       for c = 0, cols - 1 do
-        if not grid[r][c] then
-          grid[r][c] = "┄"
-          hl_cells[r * cols + c] = group
+        if not g.cells[r][c] then
+          g.cells[r][c] = "┄"
+          g.groups[r * cols + c] = group
         end
       end
       if m.label then
-        put_text(r, cols - W.width(m.label), m.label, group)
+        put_text(g, r, cols - W.width(m.label), m.label, group)
       end
     end
   end
-  local lines, hl = {}, {}
-  for r = 0, rows - 1 do
-    local parts, pos = {}, 0
-    for c = 0, cols - 1 do
-      local ch = grid[r][c] or " "
-      local g = hl_cells[r * cols + c]
-      if g then
-        hl[#hl + 1] = { row = r, col_s = pos, col_e = pos + #ch, group = g }
-      end
-      parts[#parts + 1] = ch
-      pos = pos + #ch
-    end
-    lines[#lines + 1] = table.concat(parts)
-  end
+  local lines, hl = grid_lines(g)
   -- Label every bar, truncated to its slot; with very narrow slots, label every k-th bar.
   spec.xticks = {}
   local every = slot >= 4 and 1 or math.ceil(4 / slot)
