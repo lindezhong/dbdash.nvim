@@ -64,13 +64,13 @@ function M.with_title(out, title, subtitle, width, chart_type, css)
     w = math.max(w, W.width(l))
   end
   w = math.min(math.max(w, 1), width)
-  local box = require("dbdash.render.box")
+  local output = require("dbdash.render.output")
   local tc = css:get("title")
   local function line_of(text, part)
     local c = css:get(part)
     local align = c["text-align"] ~= "start" and c["text-align"]
       or (LEFT_TITLES[chart_type] and "left" or "center")
-    local line, s, e = box.title_line(text, w, align, require("dbdash.css").ellipsis(c))
+    local line, s, e = output.title_line(text, w, align, require("dbdash.css").ellipsis(c))
     return {
       lines = { (line:gsub("%s+$", "")) },
       hl = { { row = 0, col_s = s, col_e = e, group = css:hl(part) } },
@@ -80,7 +80,7 @@ function M.with_title(out, title, subtitle, width, chart_type, css)
   if subtitle and css:get("subtitle").display ~= "none" then
     parts[#parts + 1] = line_of(subtitle, "subtitle")
   end
-  local stack = require("dbdash.render.output").stack
+  local stack = output.stack
   if tc["caption-side"] == "bottom" then
     return stack(vim.list_extend({ out }, parts))
   end

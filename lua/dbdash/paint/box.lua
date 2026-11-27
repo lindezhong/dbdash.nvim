@@ -12,7 +12,7 @@ local borders = require("dbdash.render.borders")
 
 local M = {}
 
----@class dbdash.render.BoxSettings
+---@class dbdash.paint.BoxSettings
 ---@field pad integer[]
 ---@field border table?
 ---@field border_group string
@@ -27,7 +27,7 @@ local M = {}
 ---border-color), background-color, justify-self / align-self, and its title part's
 ---color, text-align and text-overflow.
 ---@param css dbdash.css.Scope? the panel's element (default: a panel of its own)
----@return dbdash.render.BoxSettings
+---@return dbdash.paint.BoxSettings
 function M.settings(css)
   css = css or require("dbdash.css").scope(nil, nil)
   local c = css.node.tag == "panel" and css:get() or css:get("panel")
@@ -57,15 +57,8 @@ function M.inner(s, width, height)
     math.max(height - s.pad[1] - s.pad[3] - b, 1)
 end
 
----A title line of `width` cells: `text` aligned left, center or right.
----@return string line, integer col_s, integer col_e byte range of the text
-function M.title_line(text, width, align, ellipsis)
-  local t = W.truncate(text, width, ellipsis)
-  local gap = math.max(0, width - W.width(t))
-  local lead = align == "center" and math.floor(gap / 2) or (align == "right" and gap or 0)
-  local line = string.rep(" ", lead) .. t
-  return line, lead, lead + #t
-end
+---A title line (render/output.lua).
+M.title_line = require("dbdash.render.output").title_line
 
 local function shift(out, cols, rows)
   local lines, hl = {}, {}

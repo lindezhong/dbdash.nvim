@@ -1,8 +1,8 @@
 -- Painting (Servo's display list builder): fragments become painted layers in painting
 -- order. A panel fragment paints its rows (title, arguments), its chart raster, then its
--- box: padding, border (with the title in it), background (render/box.lua's wrap). The
+-- box: padding, border (with the title in it), background (paint/box.lua's wrap). The
 -- view's display list is the header, then each panel's layer at its position.
-local box = require("dbdash.render.box")
+local box = require("dbdash.paint.box")
 local stack = require("dbdash.render.output").stack
 
 local M = {}

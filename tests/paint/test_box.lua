@@ -1,5 +1,5 @@
--- The CSS-like box around a chart (render/box.lua) and the part styles (render/init.lua).
-local box = require("dbdash.render.box")
+-- The CSS-like box around a chart (paint/box.lua) and the part styles (render/init.lua).
+local box = require("dbdash.paint.box")
 local render = require("dbdash.render")
 local resultset = require("dbdash.db.resultset")
 local eq = MiniTest.expect.equality

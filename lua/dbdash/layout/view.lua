@@ -2,14 +2,14 @@
 -- dashboard's document and computed styles:
 --   view     the header block, then the panels: one block (a one-chart dashboard) or the
 --            grid formatting context (layout/grid.lua)
---   panel    a block box (padding, border: render/box.lua settings) stacking its rows:
+--   panel    a block box (padding, border: paint/box.lua settings) stacking its rows:
 --            the title line (inline: title, ⓘ, error), the subtitle, the argument line,
 --            and the chart
 --   chart    a replaced element: laid out at the size it gets; its raster comes from the
 --            chart code (layout/replaced.lua)
 -- The result is a tree of fragments; painting them is paint/init.lua's job.
 local W = require("dbdash.util.width")
-local box = require("dbdash.render.box")
+local box = require("dbdash.paint.box")
 local css = require("dbdash.css")
 local replaced = require("dbdash.layout.replaced")
 

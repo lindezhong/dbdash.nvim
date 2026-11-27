@@ -213,23 +213,13 @@ function M.render(rs, show, ctx)
   if #subs == 1 and subs[1] == show then
     return one(rs, show, ctx, ctx.history, 1)
   end
-  local outs, cells, x, gap = {}, {}, 0, 4
+  local outs, gap = {}, 4
   local w = math.max(8, math.floor((ctx.width - gap * (#subs - 1)) / #subs))
   for i, sub in ipairs(subs) do
     local sctx = setmetatable({ width = w }, { __index = ctx })
     outs[i] = one(rs, sub, sctx, i == 1 and ctx.history or {}, i)
-    cells[i] = { x = x, width = w, y = 0, height = #outs[i].lines }
-    x = x + w + gap
   end
-  local h = 0
-  for _, c in ipairs(cells) do
-    h = math.max(h, c.height)
-  end
-  for _, c in ipairs(cells) do
-    c.height = h
-  end
-  local out = require("dbdash.compositor").compose(cells, outs)
-  return { lines = out.lines, hl = out.hl }
+  return require("dbdash.render.output").beside(outs, w, gap)
 end
 
 return M

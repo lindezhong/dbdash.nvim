@@ -164,7 +164,7 @@ view/dashboard.request_render  one frame for every request within 20 ms; none wh
   frame: css/style.restyle          cascade, styles shared by key, dirty subtrees only
          layout/view.reflow         grid tracks, panel sizes, a layout cache
            layout/replaced.raster   a chart is a replaced element: render.render draws it
-         paint.view                 a display list (render/box: borders and padding)
+         paint.view                 a display list (paint/box: borders and padding)
          compositor.compose         layers into lines
          view/buffer.draw           changed lines and extmarks
          update_status              the status line from the document's data: countdowns,
