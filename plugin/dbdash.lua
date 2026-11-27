@@ -200,9 +200,9 @@ vim.api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
 vim.api.nvim_create_autocmd("ColorScheme", {
   group = group,
   callback = function()
-    require("dbdash.render.highlight").setup()
+    require("dbdash.css.hl").setup()
   end,
 })
 
-require("dbdash.render.highlight").setup()
+require("dbdash.css.hl").setup()
 require("dbdash").set_mappings()

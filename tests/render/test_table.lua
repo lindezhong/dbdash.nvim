@@ -89,7 +89,7 @@ T["unknown chart types are reported in place of the chart"] = function()
 end
 
 T["highlight specs"] = function()
-  local hl = require("dbdash.render.highlight")
+  local hl = require("dbdash.css.hl")
   eq(hl.parse("bold blue"), { bold = true, fg = "blue" })
   eq(hl.parse("#3498db on black"), { fg = "#3498db", bg = "black" })
   eq(hl.parse("bright_blue"), { fg = "lightblue" })

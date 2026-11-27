@@ -1,5 +1,5 @@
 -- Tableau 10 palette (fixed colors, independent of the colorscheme).
-local highlight = require("dbdash.render.highlight")
+local highlight = require("dbdash.css.hl")
 
 local M = { name = "tableau" }
 

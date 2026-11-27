@@ -118,7 +118,7 @@ end
 ---Fill the sidebar buffer with the tree; b:dbdash_sidebar_nodes maps line numbers to
 ---{ path, dir } nodes.
 function M.render(buf)
-  require("dbdash.render.highlight").setup()
+  require("dbdash.css.hl").setup()
   local sched = require("dbdash.scheduler")
   local root = M.dir()
   local lines = vim.deepcopy(M.HEADER)

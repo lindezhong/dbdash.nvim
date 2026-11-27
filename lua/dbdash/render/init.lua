@@ -1,6 +1,6 @@
 -- Render entry point: resolves the chart style through the registry, builds the render
 -- context and runs the style. Chart styles are pure functions (rs, show, ctx) -> Output.
-local highlight = require("dbdash.render.highlight")
+local highlight = require("dbdash.css.hl")
 local registry = require("dbdash.render.registry")
 local W = require("dbdash.util.width")
 
