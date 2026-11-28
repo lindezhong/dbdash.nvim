@@ -57,13 +57,19 @@ function M.types()
         local t = require("dbdash.render.charts." .. name)
         check_type(name, t)
         types[name] = t
-        if t.style then
-          require("dbdash.css").add_ua(t.style)
-        end
+        require("dbdash.css").add_ua("chart/" .. name, t.style)
       end
     end
   end
   return types
+end
+
+---Find the chart types again (the runtimepath changed: a plugin added, a test's directory).
+function M.forget()
+  for name in pairs(types or {}) do
+    require("dbdash.css").add_ua("chart/" .. name, nil)
+  end
+  types = nil
 end
 
 ---A chart type by name; nil when there is none.

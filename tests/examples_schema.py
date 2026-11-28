@@ -14,7 +14,8 @@ schema = yaml.safe_load((root / "dbdash.schema.yaml").read_text(encoding="utf-8"
 jsonschema.Draft7Validator.check_schema(schema)
 validator = jsonschema.Draft7Validator(schema)
 
-files = [pathlib.Path(f) for f in sys.argv[1:]] or sorted(p for p in root.glob("*/*.yaml") if not p.name.endswith(".schema.yaml"))
+# example/extend/ uses a driver and a chart type of its own: the schema knows the built-in ones
+files = [pathlib.Path(f) for f in sys.argv[1:]] or sorted(p for p in root.glob("*/*.yaml") if not p.name.endswith(".schema.yaml") and p.parent.name != "extend")
 bad = 0
 for f in files:
     errors = sorted(validator.iter_errors(yaml.safe_load(f.read_text(encoding="utf-8"))), key=lambda e: list(e.path))

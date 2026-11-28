@@ -237,4 +237,36 @@ T["every chart type's example shows all of its renderers (and canvases)"] = func
   eq(absent, {})
 end
 
+-- The schema (example/dbdash.schema.yaml, for editors) says what the plugin has: the chart
+-- types (render/charts/<type>/) and the drivers' schemes (db/drivers/<name>/) found.
+T["the schema lists the chart types and the drivers' schemes found"] = function()
+  local schema = require("dbdash.yaml").parse_file("example/dbdash.schema.yaml")
+  local defs = schema.definitions
+  local function sorted(list)
+    local out = vim.deepcopy(list)
+    table.sort(out)
+    return out
+  end
+  eq(sorted(defs.show.properties.type.enum), require("dbdash.render.registry").type_names())
+  local schemes = {}
+  for _, d in ipairs(require("dbdash.db").drivers()) do
+    for _, sc in ipairs(d.schemes) do
+      if sc:match("^[%w]+$") then -- (mongodb+srv is a form of mongodb's URL, not a type)
+        schemes[#schemes + 1] = sc
+      end
+    end
+  end
+  eq(sorted(defs.database.properties.type.enum), sorted(schemes))
+end
+
+T["every chart type has its example"] = function()
+  local absent = {}
+  for _, t in ipairs(require("dbdash.render.registry").type_names()) do
+    if vim.fn.filereadable("example/charts/" .. t .. ".yaml") == 0 then
+      absent[#absent + 1] = t
+    end
+  end
+  eq(absent, {})
+end
+
 return T

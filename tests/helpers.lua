@@ -241,4 +241,23 @@ function M.close_http_servers()
   http_servers = {}
 end
 
+---Run `fn` with example/extend on the runtimepath (a driver and a chart type of the
+---user's: ARCHITECTURE.md#extending), as a user's ~/.config/nvim would have them; then
+---without it again.
+function M.with_extend(fn)
+  local dir = vim.fn.getcwd() .. "/example/extend"
+  local forget = function()
+    require("dbdash.render.registry").forget()
+    require("dbdash.config.validators").forget()
+  end
+  vim.opt.runtimepath:prepend(dir)
+  forget()
+  local ok, err = pcall(fn)
+  vim.opt.runtimepath:remove(dir)
+  forget()
+  if not ok then
+    error(err, 0)
+  end
+end
+
 return M

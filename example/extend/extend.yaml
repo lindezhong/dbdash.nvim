@@ -1,0 +1,34 @@
+# A driver and a chart type of your own (:help dbdash-extend). They are directories on the
+# runtimepath, found as the built-in ones are, nothing to register:
+#   lua/dbdash/db/drivers/numbers/      init.lua (the driver), validate.lua (its checks)
+#   lua/dbdash/render/charts/progress/  init.lua (the type), bar.lua (its renderer),
+#                                       validate.lua (its checks)
+# Put such directories under ~/.config/nvim/ (its lua/ is on the runtimepath), or add this
+# directory to try them:
+#   :set runtimepath+=example/extend   (from the plugin's directory)
+#   :DbDashStart example/extend/extend.yaml
+# A config error names the validator that found it, e.g. with step: 0
+#   extend.yaml:20:24: [db numbers] step must be positive, not 0
+# No $schema line here: the schema describes the built-in types and drivers only.
+
+title: "Extending dbdash"
+description: |
+  A driver (`numbers://`: the rows `n = 1..N`) and a chart type (`progress`: a bar per row)
+  written outside the plugin, in directories on the runtimepath. See `:help dbdash-extend`.
+
+database:
+  url: "numbers://"
+  options: { step: 7 }
+
+query:
+  sql: "{{ args.count }}"
+  args: [{ name: count, type: int, default: 8 }]
+
+show:
+  type: progress
+  title: "n x 7 out of 70"
+  description: "`show.type: progress` (render/charts/progress/), its own `label_column`, `value_column` and `max`."
+  label_column: label
+  value_column: value
+  max: 70
+  interval: 1h

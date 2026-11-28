@@ -28,52 +28,65 @@ end, vim.fn.globpath("example", "*/*.yaml", false, true))
 table.sort(files)
 
 ---Databases that need `make it-up` (docker) or the network: only with DBDASH_IT.
-local LOCAL = { sqlite = true, lua = true, luastream = true, exec = true, webhook = true }
+local LOCAL =
+  { sqlite = true, lua = true, luastream = true, exec = true, webhook = true, numbers = true }
+
+local function run_example(f)
+  local cfg, err = config.load(f)
+  eq(err, nil)
+  assert(cfg)
+  for _, p in ipairs(cfg.panels) do
+    -- Examples run anywhere, except the ones on the docker services (make it-up) or the
+    -- network: only with DBDASH_IT.
+    if not LOCAL[p.database.type] then
+      h.require_it()
+    end
+  end
+  require("dbdash.view.dashboard").start(f, { no_show = true })
+  local d = assert(sched.get(sched.normalize(f)), "dashboard did not start")
+  ---A webhook panel waits for requests: listening is enough.
+  local function waiting(p)
+    return p.cfg.database.type == "webhook"
+      and not p.state.error
+      and (p.state.source or ""):match("^listening") ~= nil
+  end
+  vim.wait(30000, function()
+    for _, p in ipairs(d.panels) do
+      if not waiting(p) and (not (p.state.result or p.state.error) or p.running) then
+        return false
+      end
+    end
+    return true
+  end, 10)
+  for _, p in ipairs(d.panels) do
+    if p.state.error then
+      error(f .. ": " .. sched.format_error(p.state.error))
+    end
+    if waiting(p) then
+      goto continue
+    end
+    local rs = assert(p.state.result, f .. ": no result")
+    eq(rs.row_count > 0, true)
+    local out = render.render(rs, p.cfg.show, { width = 100, height = 30 })
+    for _, hl in ipairs(out.hl) do
+      if hl.group == "DbDashError" or hl.group == "DbDashWarn" then
+        error(f .. ": " .. out.lines[hl.row + 1])
+      end
+    end
+    ::continue::
+  end
+end
 
 for _, f in ipairs(files) do
   T[f:gsub("^example/", "")] = function()
-    local cfg, err = config.load(f)
-    eq(err, nil)
-    assert(cfg)
-    for _, p in ipairs(cfg.panels) do
-      -- Examples run anywhere, except the ones on the docker services (make it-up) or the
-      -- network: only with DBDASH_IT.
-      if not LOCAL[p.database.type] then
-        h.require_it()
-      end
-    end
-    require("dbdash.view.dashboard").start(f, { no_show = true })
-    local d = assert(sched.get(sched.normalize(f)), "dashboard did not start")
-    ---A webhook panel waits for requests: listening is enough.
-    local function waiting(p)
-      return p.cfg.database.type == "webhook"
-        and not p.state.error
-        and (p.state.source or ""):match("^listening") ~= nil
-    end
-    vim.wait(30000, function()
-      for _, p in ipairs(d.panels) do
-        if not waiting(p) and (not (p.state.result or p.state.error) or p.running) then
-          return false
-        end
-      end
-      return true
-    end, 10)
-    for _, p in ipairs(d.panels) do
-      if p.state.error then
-        error(f .. ": " .. sched.format_error(p.state.error))
-      end
-      if waiting(p) then
-        goto continue
-      end
-      local rs = assert(p.state.result, f .. ": no result")
-      eq(rs.row_count > 0, true)
-      local out = render.render(rs, p.cfg.show, { width = 100, height = 30 })
-      for _, hl in ipairs(out.hl) do
-        if hl.group == "DbDashError" or hl.group == "DbDashWarn" then
-          error(f .. ": " .. out.lines[hl.row + 1])
-        end
-      end
-      ::continue::
+    if f:match("^example/extend/") then
+      -- a driver and a chart type of the user's: on the runtimepath, as the example says
+      h.with_extend(function()
+        run_example(f)
+        sched.stop(sched.normalize(f))
+      end)
+    else
+      run_example(f)
     end
   end
 end
@@ -174,57 +187,63 @@ T["examples on SQLite use no math functions (a build option)"] = function()
 end
 
 T["every example dashboard and panel has a description that renders"] = function()
-  for _, f in ipairs(files) do
-    local cfg = assert(config.load(f))
-    eq({ f, type(cfg.description) == "string" and cfg.description ~= "" }, { f, true })
-    for i, p in ipairs(cfg.panels) do
-      eq(
-        { f, i, type(p.show.description) == "string" and p.show.description ~= "" },
-        { f, i, true }
-      )
-    end
-    require("dbdash.view.dashboard").start(f, { no_show = true })
-    local d = assert(sched.get(sched.normalize(f)))
-    local results = {}
-    local function collect(key)
-      return function(err, text)
-        results[key] = err and ("ERROR " .. tostring(type(err) == "table" and err.message or err))
-          or text
+  -- example/extend's driver and chart type are on the runtimepath, as it says
+  h.with_extend(function()
+    for _, f in ipairs(files) do
+      local cfg = assert(config.load(f))
+      eq({ f, type(cfg.description) == "string" and cfg.description ~= "" }, { f, true })
+      for i, p in ipairs(cfg.panels) do
+        eq(
+          { f, i, type(p.show.description) == "string" and p.show.description ~= "" },
+          { f, i, true }
+        )
       end
+      require("dbdash.view.dashboard").start(f, { no_show = true })
+      local d = assert(sched.get(sched.normalize(f)))
+      local results = {}
+      local function collect(key)
+        return function(err, text)
+          results[key] = err and ("ERROR " .. tostring(type(err) == "table" and err.message or err))
+            or text
+        end
+      end
+      d:describe_async(collect("dashboard"))
+      for i, p in ipairs(d.panels) do
+        p:describe_async(collect(i))
+      end
+      vim.wait(5000, function()
+        return vim.tbl_count(results) == #d.panels + 1
+      end, 10)
+      for key, text in pairs(results) do
+        eq(
+          { f, key, text:match("^ERROR") == nil and text or text },
+          { f, key, text:match("^ERROR") and "(no error)" or text }
+        )
+      end
+      sched.stop(d.path)
     end
-    d:describe_async(collect("dashboard"))
-    for i, p in ipairs(d.panels) do
-      p:describe_async(collect(i))
-    end
-    vim.wait(5000, function()
-      return vim.tbl_count(results) == #d.panels + 1
-    end, 10)
-    for key, text in pairs(results) do
-      eq(
-        { f, key, text:match("^ERROR") == nil and text or text },
-        { f, key, text:match("^ERROR") and "(no error)" or text }
-      )
-    end
-    sched.stop(d.path)
-  end
+  end)
 end
 
 T["examples cover every chart type and alternative style"] = function()
-  local seen = {}
-  for _, f in ipairs(files) do
-    local d = require("dbdash.dashboard.document").from_config(assert(config.load(f)))
-    for _, p in ipairs(d.panels) do
-      local chart = require("dbdash.css.style").get(p.chart_node)
-      local renderer, canvas = require("dbdash.render.registry").resolve(p.cfg.show.type, chart)
-      seen[p.cfg.show.type .. "/" .. renderer] = true
-      seen["canvas/" .. canvas] = seen["canvas/" .. canvas] or renderer == "canvas"
+  -- example/extend's driver and chart type are on the runtimepath, as it says
+  h.with_extend(function()
+    local seen = {}
+    for _, f in ipairs(files) do
+      local d = require("dbdash.dashboard.document").from_config(assert(config.load(f)))
+      for _, p in ipairs(d.panels) do
+        local chart = require("dbdash.css.style").get(p.chart_node)
+        local renderer, canvas = require("dbdash.render.registry").resolve(p.cfg.show.type, chart)
+        seen[p.cfg.show.type .. "/" .. renderer] = true
+        seen["canvas/" .. canvas] = seen["canvas/" .. canvas] or renderer == "canvas"
+      end
     end
-  end
-  for t, def in pairs(require("dbdash.render.registry").types()) do
-    for _, r in ipairs(def.renderers) do
-      eq({ t .. "/" .. r, seen[t .. "/" .. r] }, { t .. "/" .. r, true })
+    for t, def in pairs(require("dbdash.render.registry").types()) do
+      for _, r in ipairs(def.renderers) do
+        eq({ t .. "/" .. r, seen[t .. "/" .. r] }, { t .. "/" .. r, true })
+      end
     end
-  end
+  end)
 end
 
 ---The Python command that can run tests/examples_schema.py (python3, python or py -3 with

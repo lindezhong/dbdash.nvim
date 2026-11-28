@@ -85,6 +85,11 @@ function M.list()
   return found
 end
 
+---Find the validators again (the runtimepath changed: a plugin added, a test's directory).
+function M.forget()
+  found = nil
+end
+
 ---Run every validator on the whole config `cfg` (each checks, and completes, its part).
 ---@param cfg dbdash.Config
 ---@param ctx dbdash.config.Ctx

@@ -15,13 +15,14 @@ local hl = require("dbdash.css.hl")
 local M = {}
 
 local ua_rules
-local ua_added = {} -- rules added to the UA sheet (M.add_ua), in the order added
+local ua_added = {} -- rules added to the UA sheet (M.add_ua), by who added them
 
----Add rules to the UA sheet: the default style of a chart type's parts (render/registry
----adds each type's `style`; css knows no chart type).
----@param rules table<string, table> selector -> properties
-function M.add_ua(rules)
-  ua_added[#ua_added + 1] = rules
+---Add (or replace) rules of the UA sheet: the default style of a chart type's parts
+---(render/registry adds each type's `style` under its name; css knows no chart type).
+---@param key string who adds them (a chart type)
+---@param rules table<string, table>? selector -> properties (nil: none any more)
+function M.add_ua(key, rules)
+  ua_added[key] = rules
   ua_rules = nil
 end
 
@@ -29,8 +30,10 @@ end
 function M.ua()
   if not ua_rules then
     local ua = vim.deepcopy(require("dbdash.css.ua"))
-    for _, rules in ipairs(ua_added) do
-      for sel, props in pairs(rules) do
+    local adders = vim.tbl_keys(ua_added)
+    table.sort(adders)
+    for _, key in ipairs(adders) do
+      for sel, props in pairs(ua_added[key]) do
         ua[sel] = props
       end
     end
