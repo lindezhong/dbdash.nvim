@@ -1,6 +1,6 @@
 -- Heat map with "▀": foreground colors the upper cell, background the lower one, so each
 -- character row shows two y values.
-local C = require("dbdash.render.charts.common")
+local C = require("dbdash.render.charts.lib.common")
 local H = require("dbdash.render.charts.heatmap.common")
 local W = require("dbdash.util.width")
 

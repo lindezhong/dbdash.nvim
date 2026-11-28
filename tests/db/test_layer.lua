@@ -1,6 +1,5 @@
 local db = require("dbdash.db")
 local url = require("dbdash.db.url")
-local dialect = require("dbdash.template.dialect")
 local resultset = require("dbdash.db.resultset")
 local async = require("dbdash.util.async")
 local map = require("dbdash.util.map")
@@ -66,7 +65,8 @@ T["url: invalid input"] = function()
 end
 
 T["dialect: strings and identifiers"] = function()
-  local pg, my, ms = dialect.get("postgres"), dialect.get("mysql"), dialect.get("mssql")
+  local pg, my, ms =
+    db.driver("postgres").dialect, db.driver("mysql").dialect, db.driver("mssql").dialect
   eq(pg.quote_string("it's \\ ok"), "'it''s \\ ok'")
   eq(my.quote_string("it's \\ ok\n"), "'it''s \\\\ ok\\n'")
   eq(ms.quote_string("中文"), "N'中文'")
@@ -78,7 +78,9 @@ T["dialect: strings and identifiers"] = function()
 end
 
 T["dialect: literals"] = function()
-  local pg, ms, mongo = dialect.get("postgres"), dialect.get("mssql"), dialect.get("mongodb")
+  require("dbdash.template.filters") -- the JSON of template values (mongodb's literals)
+  local pg, ms, mongo =
+    db.driver("postgres").dialect, db.driver("mssql").dialect, db.driver("mongodb").dialect
   eq(pg.literal(vim.NIL), "NULL")
   eq(pg.literal(true), "TRUE")
   eq(ms.literal(false), "0")
@@ -112,7 +114,7 @@ end
 
 -- Fake driver to exercise the DriverManager contract.
 local log = {}
-db.register({
+db.add({
   name = "fake",
   schemes = { "fake" },
   connect = function(info)
@@ -213,7 +215,7 @@ end
 
 T["register: a driver has connect or produce, one of them"] = function()
   local function err(d)
-    local ok, e = pcall(db.register, d)
+    local ok, e = pcall(db.add, d)
     eq(ok, false)
     return e
   end

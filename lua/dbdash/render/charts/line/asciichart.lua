@@ -1,7 +1,7 @@
 -- Line chart drawn with box-drawing characters (after asciichart):
 --   ╭─╮
 --  ─╯ ╰──
-local C = require("dbdash.render.charts.common")
+local C = require("dbdash.render.charts.lib.common")
 local nn = require("dbdash.util.null").nn
 
 local M = { name = "asciichart" }
@@ -89,7 +89,7 @@ function M.render(rs, show, ctx)
   spec.yticks, spec.ylabels = C.y_ticks(ctx, ylo, yhi, rows, axes.yformat)
   local cols
   cols, rows = ctx.frame.plot_size(ctx, spec)
-  local g = require("dbdash.render.charts.grid").new(rows, cols)
+  local g = require("dbdash.render.charts.lib.grid").new(rows, cols)
   local n = #rs.rows
   local function col_of(i)
     return n == 1 and 0 or math.floor((i - 1) * (cols - 1) / (n - 1) + 0.5)

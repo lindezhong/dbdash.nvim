@@ -1,12 +1,11 @@
 -- SQL filters/globals: their outputs, and how they differ between dialects.
 local template = require("dbdash.template")
-local dialect = require("dbdash.template.dialect")
 local yaml = require("dbdash.yaml")
 local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()
 
 local function render(src, vars, db, autoescape)
-  local env = template.env(dialect.get(db or "sqlite"), autoescape)
+  local env = template.env(require("dbdash.db").driver(db or "sqlite").dialect, autoescape)
   local out, err = template.render(src, vars or {}, { env = env })
   if err then
     return "ERR " .. err.kind .. ": " .. err.message

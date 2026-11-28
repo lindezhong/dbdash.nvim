@@ -14,6 +14,8 @@ local M = {}
 ---panel p.node and p.chart_node.
 ---@param d table the dashboard
 function M.dashboard(d)
+  -- the chart types (their parts' styles go into the UA sheet the document gets)
+  require("dbdash.render.registry").types()
   local doc = css.document("dashboard")
   d.doc = doc
   d.header_node = doc.root:append(dom.new("header"))

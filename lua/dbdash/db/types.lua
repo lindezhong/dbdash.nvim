@@ -31,8 +31,8 @@
 ---  sends data)
 ---@field name string
 ---@field schemes string[] URL schemes (default { name })
----@field dialect (string|dbdash.template.Dialect)? how template values are written in its queries:
----  a name of template/dialect.lua (default: the driver's name) or a dialect
+---@field dialect dbdash.template.Dialect how template values are written in its queries
+---  (db/dialect.lua: make; without one standard SQL, which db.add sets)
 ---@field capabilities { tls: boolean, sql: boolean, query_language: string }?
 ---@field query_optional boolean? a config may leave query.sql out
 ---@field options table<string, string|fun(v: any): string?>? the database.options it reads

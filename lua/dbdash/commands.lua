@@ -644,7 +644,7 @@ function M.style(fargs)
       end
       declare(p.runtime_style, "chart", "canvas", b)
     else
-      if not registry.DEFAULTS[a] and not registry.names("chart/" .. a .. "/")[1] then
+      if not registry.type(a) then
         return err("unknown chart type '" .. a .. "'")
       end
       p.style.type = a ~= p.cfg.show.type and a or nil
@@ -697,7 +697,7 @@ function M.complete_style(arglead, cmdline)
   local words = vim.split(cmdline:gsub("^%s*%S+%s*", ""), "%s+", { trimempty = true })
   local out
   if #words == 0 or (#words == 1 and arglead ~= "") then
-    out = vim.tbl_keys(registry.DEFAULTS)
+    out = registry.type_names()
     vim.list_extend(out, { "canvas", "reset", "set" })
   elseif words[1] == "set" then
     out = (#words == 2 and arglead == "" or #words == 3 and arglead ~= "")
@@ -707,7 +707,7 @@ function M.complete_style(arglead, cmdline)
     out = registry.names("canvas/")
   else
     out = registry.names("chart/" .. words[1] .. "/")
-    if (registry.DEFAULTS[words[1]] or {}).canvas then
+    if (registry.type(words[1]) or {}).canvas then
       vim.list_extend(out, registry.names("canvas/"))
     end
   end

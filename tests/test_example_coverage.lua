@@ -202,7 +202,8 @@ T["every chart type's example shows all of its renderers (and canvases)"] = func
   local registry = require("dbdash.render.registry")
   local config = require("dbdash.config")
   local absent = {}
-  for t, renderers in pairs(registry.BUILTIN.chart) do
+  for t, def in pairs(registry.types()) do
+    local renderers = def.renderers
     local f = "example/charts/" .. t .. ".yaml"
     local cfg = config.load(f)
     if not cfg then

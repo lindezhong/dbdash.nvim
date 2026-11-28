@@ -1,5 +1,5 @@
 -- Data and legend shared by the pie styles.
-local C = require("dbdash.render.charts.common")
+local C = require("dbdash.render.charts.lib.common")
 local nn = require("dbdash.util.null").nn
 local W = require("dbdash.util.width")
 local fmt = require("dbdash.render.format")

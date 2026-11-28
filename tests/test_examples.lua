@@ -102,7 +102,7 @@ for _, name in ipairs({ "statements", "filters", "tests_functions", "methods", "
     end, 10)
     local tpl = require("dbdash.template")
     local env =
-      tpl.env(require("dbdash.template.dialect").get("sqlite"), false, vim.fn.fnamemodify(f, ":h"))
+      tpl.env(require("dbdash.db").driver("sqlite").dialect, false, vim.fn.fnamemodify(f, ":h"))
     local checked = 0
     for _, p in ipairs(d.panels) do
       eq(p.state.error, nil)
@@ -220,8 +220,8 @@ T["examples cover every chart type and alternative style"] = function()
       seen["canvas/" .. canvas] = seen["canvas/" .. canvas] or renderer == "canvas"
     end
   end
-  for t, renderers in pairs(require("dbdash.render.registry").BUILTIN.chart) do
-    for _, r in ipairs(renderers) do
+  for t, def in pairs(require("dbdash.render.registry").types()) do
+    for _, r in ipairs(def.renderers) do
       eq({ t .. "/" .. r, seen[t .. "/" .. r] }, { t .. "/" .. r, true })
     end
   end

@@ -6,7 +6,7 @@
 --   │  1 │ Alice │
 --   └────┴───────┘
 --
--- The table is laid out from its DOM (render/content/table.lua: table > header, row > cell,
+-- The table is laid out from its DOM (charts/table/content.lua: table > header, row > cell,
 -- built from the result with show.column_list, show.sort and the thresholds' classes);
 -- appearance is each element's computed style:
 --   table   border (rich: heavy header, light body), border-color, line-clamp (rows shown)
@@ -324,7 +324,7 @@ function M.render(rs, _show, ctx)
   local css = ctx.css
   local style = require("dbdash.css.style")
   local content = require("dbdash.render.content")
-  -- the table's DOM (render/content/table.lua), built from the result before styles
+  -- the table's DOM (charts/table/content.lua), built from the result before styles
   local tnode = content.root(css.node)
   if not tnode then
     return { lines = {}, hl = {} } -- nothing built (no result yet)

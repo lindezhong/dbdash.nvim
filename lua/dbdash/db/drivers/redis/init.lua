@@ -11,7 +11,19 @@ local socket = require("dbdash.net.socket")
 local M = {
   name = "redis",
   schemes = { "redis", "rediss" },
-  dialect = "redis",
+  -- Redis commands are tokenized shell-style: double quotes with backslash escapes
+  dialect = require("dbdash.db.dialect").make("redis", {
+    quote_string = function(s)
+      return '"' .. s:gsub('[\\"]', "\\%0"):gsub("\n", "\\n") .. '"'
+    end,
+    quote_ident = function(s)
+      return '"' .. s:gsub('[\\"]', "\\%0") .. '"'
+    end,
+    boolean_literal = function(b)
+      return b and "1" or "0"
+    end,
+    null = '""',
+  }),
   capabilities = { tls = true, sql = false, query_language = "redis-command" },
 }
 

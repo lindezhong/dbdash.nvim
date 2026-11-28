@@ -12,7 +12,7 @@ local T = MiniTest.new_set()
 -- "slow"), cancel (only for scheme cancelfake) and close.
 local log = {}
 local function fake(name, with_cancel)
-  db.register({
+  db.add({
     name = name,
     schemes = { name },
     connect = function(info)

@@ -1,5 +1,5 @@
 -- Heat map with one character row per y value; cells may show their values.
-local C = require("dbdash.render.charts.common")
+local C = require("dbdash.render.charts.lib.common")
 local H = require("dbdash.render.charts.heatmap.common")
 local W = require("dbdash.util.width")
 local fmt = require("dbdash.render.format")

@@ -1,5 +1,5 @@
 -- Bar chart, horizontal bars.
-local bars = require("dbdash.render.charts.bars")
+local bars = require("dbdash.render.charts.lib.bars")
 
 local M = {
   name = "horizontal",

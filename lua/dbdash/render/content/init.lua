@@ -12,22 +12,6 @@ local M = {}
 ---Counters for tests: elements created and reused, builds skipped (nothing changed).
 M.stats = { created = 0, reused = 0, skipped = 0 }
 
-local CHART = "dbdash.render.content.chart"
-local BUILDERS = {
-  table = "dbdash.render.content.table",
-  text = "dbdash.render.content.text",
-  line = CHART,
-  area = CHART,
-  scatter = CHART,
-  bubble = CHART,
-  bar = CHART,
-  histogram = CHART,
-  pie = CHART,
-  boxplot = CHART,
-  heatmap = CHART,
-  stat = CHART,
-}
-
 local function same_list(a, b)
   if #a ~= #b then
     return false
@@ -154,11 +138,13 @@ end
 ---@param show table
 ---@return dbdash.dom.Node? root the content's root element (nil for types without one)
 function M.build(chart, rs, show)
-  local mod = BUILDERS[show.type]
-  if not mod then
+  -- the chart type's parts (render/charts/<type>/init.lua)
+  local t = require("dbdash.render.registry").type(show.type)
+  if not t then
     return nil
   end
-  local key = vim.json.encode(require(mod).key(show))
+  local parts = t.parts
+  local key = vim.json.encode(parts.key(show))
   local built = chart.content
   if built and built.rs == rs and built.key == key and built.type == show.type then
     M.stats.skipped = M.stats.skipped + 1
@@ -172,7 +158,7 @@ function M.build(chart, rs, show)
     chart:set_children({})
     chart.css_parts, chart.content_items, chart.content_sigs = {}, nil, nil
   end
-  local ok, root = pcall(require(mod).build, chart, rs, show)
+  local ok, root = pcall(parts.build, chart, rs, show)
   -- a result the content cannot use (a missing column) is kept: the renderer reports it
   chart.content = { rs = rs, key = key, type = show.type, root = ok and root or nil }
   if not ok then

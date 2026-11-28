@@ -12,7 +12,26 @@ local M = {
   name = "http",
   schemes = { "http", "https" },
   capabilities = { tls = true, sql = false, query_language = "curl" },
-  dialect = "http",
+  -- queries are curl commands: values are shell words (single quotes)
+  dialect = require("dbdash.db.dialect").make("http", {
+    null = "''",
+    quote_string = function(s)
+      return require("dbdash.util.shell").quote(s)
+    end,
+    quote_ident = function(s)
+      return require("dbdash.util.shell").quote(s)
+    end,
+    boolean_literal = function(b)
+      return b and "true" or "false"
+    end,
+    list_literal = function(v, d)
+      local out = {}
+      for i, x in ipairs(v) do
+        out[i] = d.literal(x)
+      end
+      return table.concat(out, " ")
+    end,
+  }),
 }
 
 -- URL parameters dbdash reads itself; the others are sent to the server.

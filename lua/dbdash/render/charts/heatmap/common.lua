@@ -1,5 +1,5 @@
 -- Heat map helpers: grid extraction and a sequential color scale.
-local C = require("dbdash.render.charts.common")
+local C = require("dbdash.render.charts.lib.common")
 local nn = require("dbdash.util.null").nn
 local fmt = require("dbdash.render.format")
 

@@ -5,7 +5,7 @@
 -- Whiskers reach the furthest values within 1.5 IQR (show.whiskers: iqr), the extremes
 -- (minmax), or two percentiles ([5, 95]); values beyond are outliers (outlier { display:
 -- none } hides them). value { display: block } writes q1, the median and q3 under each box.
-local C = require("dbdash.render.charts.common")
+local C = require("dbdash.render.charts.lib.common")
 local nn = require("dbdash.util.null").nn
 
 local M = { name = "boxdraw" }
@@ -165,7 +165,7 @@ function M.render(rs, show, ctx)
     min_rows = rows,
   }
   local cols = ctx.frame.plot_size(ctx, spec)
-  local g = require("dbdash.render.charts.grid").new(rows, cols)
+  local g = require("dbdash.render.charts.lib.grid").new(rows, cols)
   local function col(v)
     return math.floor((v - lo) / (hi - lo) * (cols - 1) + 0.5)
   end

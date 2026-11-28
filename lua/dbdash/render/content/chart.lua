@@ -1,18 +1,14 @@
 -- The content of the plotted chart types as DOM, like an SVG chart's elements (one per
--- item of the data; the pixels, lines and ticks are the raster's, like path data):
---   line, area, scatter, bubble   series[name] (> point: the series' markers), legend >
---                                 legend-item[name], mark[label] (mark_lines)
---   bar, histogram                series[name], bar[category][series] > value, legend >
---                                 legend-item[name], mark[label]
---   pie                           series[name] (a slice; .other), legend > legend-item[name]
---                                 > label, value, percent
---   boxplot                       series[name] (a box) > value, outlier, mean
---   heatmap                       cell[x][y]
---   stat                          stat (one per value) > value, unit, label, delta, sparkline
+-- item of the data; the pixels, lines and ticks are the raster's, like path data). A chart
+-- type (render/charts/<type>/init.lua) gives its model, the items in the order its
+-- renderers draw them; this builds their elements:
+--   series[name] (> point, or > value, outlier, mean for boxes), legend > legend-item[name]
+--   (> label, value, percent for a pie), mark[label], bar[category][series] > value,
+--   cell[x][y], stat > value, unit, label, delta, sparkline.
 -- A series or item named like an identifier also has its name as a class (series.EU).
 -- The elements are kept in chart.content.items for the renderers.
 local content = require("dbdash.render.content")
-local C = require("dbdash.render.charts.common")
+local C = require("dbdash.render.charts.lib.common")
 
 local M = {}
 
@@ -41,10 +37,10 @@ local function named(name, extra)
   return { classes = classes, attrs = { name = tostring(name) } }
 end
 
--- Models: the items of each type, in the order the renderers draw them -----------------
+-- Models' helpers (the chart types' models use them) ------------------------------------
 
----Series names of an xy chart (as render/charts/xy.lua collects them).
-local function xy_series(rs, show)
+---Series names of an xy chart (as render/charts/lib/xy.lua collects them).
+function M.xy_series(rs, show)
   if show.type == "scatter" or show.type == "bubble" then
     local xi = C.col(rs, nn(show.x_column), "x_column")
     local yi = C.col(rs, nn(show.y_column), "y_column")
@@ -73,7 +69,7 @@ local function xy_series(rs, show)
 end
 
 ---Bar chart: series names, and the categories in result order (before sorting).
-local function bar_model(rs, show)
+function M.bar_model(rs, show)
   if nn(show.series_column) then
     local xaxis, long = C.long(rs, show)
     return vim.tbl_map(function(s)
@@ -91,95 +87,6 @@ local function bar_model(rs, show)
   return vim.tbl_map(function(s)
     return s.label
   end, series), cats
-end
-
-local MODELS = {}
-
-function MODELS.xy(rs, show)
-  local names = xy_series(rs, show)
-  return { series = names, legend = names, marks = nn(show.mark_lines) or {} }
-end
-MODELS.line, MODELS.area, MODELS.scatter, MODELS.bubble = MODELS.xy, MODELS.xy, MODELS.xy, MODELS.xy
-
-function MODELS.bar(rs, show)
-  local names, cats = bar_model(rs, show)
-  local bars = {}
-  for _, c in ipairs(cats) do
-    for _, s in ipairs(names) do
-      bars[#bars + 1] = { category = c, series = s }
-    end
-  end
-  return {
-    series = names,
-    legend = #names > 1 and names or {},
-    bars = bars,
-    marks = nn(show.mark_lines) or {},
-  }
-end
-
-function MODELS.histogram(rs, show)
-  local bins = require("dbdash.render.charts.bars").bins(rs, show)
-  local bars = {}
-  for i, b in ipairs(bins) do
-    bars[i] = { category = b.label, series = nn(show.value_column) }
-  end
-  return {
-    series = { nn(show.value_column) },
-    legend = {},
-    bars = bars,
-    marks = nn(show.mark_lines) or {},
-  }
-end
-
-function MODELS.pie(rs, show)
-  local items = require("dbdash.render.charts.pie.common").items(rs, show, nil)
-  local names, other = {}, {}
-  for i, it in ipairs(items) do
-    names[i] = it.label
-    other[i] = it.other or false
-  end
-  return { series = names, other = other, legend = names, pie = true }
-end
-
-function MODELS.boxplot(rs, show)
-  local vi = C.col(rs, nn(show.value_column), "value_column")
-  local ci = nn(show.category_column) and C.col(rs, show.category_column, "category_column")
-  local seen, order = {}, {}
-  for _, row in ipairs(rs.rows) do
-    if C.num(row[vi]) then
-      local cat = ci and C.text(row[ci]) or tostring(nn(show.value_column))
-      if not seen[cat] then
-        seen[cat] = true
-        order[#order + 1] = cat
-      end
-    end
-  end
-  return { series = order, legend = {}, boxes = true }
-end
-
-function MODELS.heatmap(rs, show)
-  local g = require("dbdash.render.charts.heatmap.common").grid(rs, show)
-  local cells = {}
-  for _, y in ipairs(g.ys) do
-    for _, x in ipairs(g.xs) do
-      cells[#cells + 1] = { x = x, y = y }
-    end
-  end
-  return { series = {}, legend = {}, cells = cells }
-end
-
-function MODELS.stat(rs, show)
-  local big = require("dbdash.render.charts.stat.big")
-  local common = require("dbdash.render.charts.stat.common")
-  local stats = {}
-  for i, sub in ipairs(big.values(show)) do
-    local v = common.value(rs, sub)
-    stats[i] = {
-      name = tostring(nn(sub.value_column) or ""),
-      classes = v ~= nil and big.classes(v, sub) or {},
-    }
-  end
-  return { series = {}, legend = {}, stats = stats }
 end
 
 -- Elements ------------------------------------------------------------------------------
@@ -290,9 +197,9 @@ local GROUPS = {
   },
 }
 
+---Build the elements of a model (a chart type's items).
 ---@return dbdash.dom.Node chart
-function M.build(chart, rs, show)
-  local model = MODELS[show.type](rs, show)
+function M.build(chart, model)
   local legend = require("dbdash.css").scope(chart):part("legend")
   local prev, sigs = chart.content_items or {}, chart.content_sigs or {}
   local items, new_sigs = {}, {}
@@ -316,6 +223,18 @@ function M.build(chart, rs, show)
   end
   chart.content_items, chart.content_sigs = items, new_sigs
   return chart
+end
+
+---A chart type's parts (its `parts`: render/content builds them with it) from its model:
+---fun(rs, show) -> { series, legend, marks, bars, cells, stats, ... }.
+---@param model fun(rs: dbdash.db.ResultSet, show: table): table
+function M.parts(model)
+  return {
+    key = M.key,
+    build = function(chart, rs, show)
+      return M.build(chart, model(rs, show))
+    end,
+  }
 end
 
 return M

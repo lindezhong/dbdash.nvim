@@ -4,7 +4,7 @@
 local args = require("dbdash.args")
 local db = require("dbdash.db")
 local template = require("dbdash.template")
-local dialect = require("dbdash.template.dialect")
+local dialect = require("dbdash.db.dialect")
 
 local M = {}
 

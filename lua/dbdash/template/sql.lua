@@ -13,7 +13,7 @@ local NONE = R.NONE
 local raise = errors.raise
 
 local function dialect_of(env)
-  return env.dialect or require("dbdash.template.dialect").get("sqlite")
+  return env.dialect or require("dbdash.db.dialect").standard
 end
 
 local function plain(v)

@@ -8,7 +8,7 @@ local socket = require("dbdash.net.socket")
 local M = {
   name = "postgres",
   schemes = { "postgres", "postgresql" },
-  dialect = "postgres",
+  dialect = require("dbdash.db.dialect").make("postgres", {}),
   capabilities = { tls = true, sql = true, query_language = "sql" },
 }
 

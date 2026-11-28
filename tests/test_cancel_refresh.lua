@@ -8,7 +8,7 @@ local eq = MiniTest.expect.equality
 
 -- A driver whose queries containing "slow" take 2 s; it logs what happens.
 local log = {}
-db.register({
+db.add({
   name = "slowfake",
   schemes = { "slowfake" },
   capabilities = { tls = false, sql = true, query_language = "sql" },

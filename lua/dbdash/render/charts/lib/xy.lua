@@ -7,7 +7,7 @@
 -- Appearance (CSS): series { curve: step | step-before | step-after | step-middle, fill,
 -- color } (series:nth-child(N), series.<name>), point { display, content (a marker
 -- character) }, grid.x / grid.y { display: block } (grid lines).
-local C = require("dbdash.render.charts.common")
+local C = require("dbdash.render.charts.lib.common")
 local W = require("dbdash.util.width")
 local fmt = require("dbdash.render.format")
 

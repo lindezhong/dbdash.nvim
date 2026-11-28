@@ -46,6 +46,7 @@ M.SHEET = {
 ---A document with the UA and M.SHEET, and a chart element of `type` in a panel.
 ---@return dbdash.dom.Document doc, dbdash.dom.Node chart
 function M.chart(type)
+  require("dbdash.render.registry").types() -- the chart types' styles (UA sheet)
   local doc = css.document("dashboard")
   doc:set_sheet("author", assert(parser.sheet(M.SHEET)))
   local panel = doc.root:append(dom.new("panel", { id = "p", classes = { type } }))

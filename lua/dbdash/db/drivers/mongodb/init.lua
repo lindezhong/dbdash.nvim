@@ -16,7 +16,26 @@ local socket = require("dbdash.net.socket")
 local M = {
   name = "mongodb",
   schemes = { "mongodb", "mongodb+srv" },
-  dialect = "mongodb",
+  -- queries are JSON: values are JSON literals
+  dialect = require("dbdash.db.dialect").make("mongodb", {
+    null = "null",
+    quote_string = function(s)
+      return require("dbdash.db.dialect").json(s)
+    end,
+    quote_ident = function(s)
+      require("dbdash.db.dialect").ident_parts(s)
+      return require("dbdash.db.dialect").json(s)
+    end,
+    boolean_literal = function(b)
+      return b and "true" or "false"
+    end,
+    list_literal = function(v)
+      return require("dbdash.db.dialect").json(v)
+    end,
+    map_literal = function(v)
+      return require("dbdash.db.dialect").json(v)
+    end,
+  }),
   capabilities = { tls = true, sql = false, query_language = "mongo-json" },
 }
 

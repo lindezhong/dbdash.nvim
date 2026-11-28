@@ -10,7 +10,7 @@ local socket = require("dbdash.net.socket")
 local M = {
   name = "cassandra",
   schemes = { "cassandra", "cql" },
-  dialect = "cassandra",
+  dialect = require("dbdash.db.dialect").make("cassandra", {}),
   capabilities = { tls = true, sql = true, query_language = "cql" },
 }
 

@@ -1,5 +1,5 @@
 -- Histogram, vertical bars with 1/8-cell precision.
-local bars = require("dbdash.render.charts.bars")
+local bars = require("dbdash.render.charts.lib.bars")
 local fmt = require("dbdash.render.format")
 
 local M = {

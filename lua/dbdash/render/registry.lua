@@ -1,6 +1,8 @@
 -- Registry of render implementations by "category/name" (:help dbdash-styles):
 --   chart/<type>/<renderer>, canvas/<name>, ticks/<name>, frame/<name>, palette/<name>
--- Built-ins load on demand; setup({ register = {...} }) adds or replaces entries.
+-- Built-ins load on demand; setup({ register = {...} }) adds or replaces entries (a
+-- renderer of a chart type, a canvas, ...). Chart types themselves are directories, found
+-- (M.types).
 local M = {}
 
 local items = {}
@@ -16,39 +18,71 @@ local MODULES = {
   palette = "dbdash.render.palette.",
 }
 
--- Built-in default style per chart type (§11.1).
-M.DEFAULTS = {
-  table = { renderer = "box" },
-  line = { renderer = "canvas", canvas = "braille" },
-  scatter = { renderer = "canvas", canvas = "braille" },
-  area = { renderer = "canvas", canvas = "braille" },
-  bubble = { renderer = "canvas", canvas = "braille" },
-  bar = { renderer = "horizontal" },
-  histogram = { renderer = "horizontal" },
-  boxplot = { renderer = "boxdraw" },
-  heatmap = { renderer = "halfblock" },
-  pie = { renderer = "bar" },
-  stat = { renderer = "big" },
-  text = { renderer = "plain" },
-}
+-- Chart types are directories (ARCHITECTURE.md#extending): render/charts/<type>/init.lua
+-- on the runtimepath, built-in or the user's, found by their path.
+local TYPE_DIR = "lua/dbdash/render/charts/%s/init.lua"
+local types -- name -> chart type, once found
 
--- Built-in names, for completion and documentation.
----@type table<string, any> chart: type -> names; the others: names
+---@class dbdash.render.ChartType
+---@field renderers string[] its renderers (charts/<type>/<name>.lua), the first the default
+---@field canvas string? a canvas chart's default canvas
+---@field parts dbdash.render.ChartParts its content as DOM (render/content builds it with it)
+---@field style table<string, table>? the default style of its parts (the UA sheet's)
+
+---@class dbdash.render.ChartParts
+---@field key fun(show: table): table the show fields the content depends on
+---@field build fun(chart: dbdash.dom.Node, rs: dbdash.db.ResultSet, show: table): dbdash.dom.Node?
+
+local function check_type(name, t)
+  if type(t) ~= "table" or type(t.renderers) ~= "table" or not t.renderers[1] then
+    error(("chart type %s: needs renderers (a list, the first the default)"):format(name), 0)
+  end
+  if
+    type(t.parts) ~= "table"
+    or type(t.parts.build) ~= "function"
+    or type(t.parts.key) ~= "function"
+  then
+    error(("chart type %s: needs parts { key, build }"):format(name), 0)
+  end
+end
+
+---Every chart type (found once; their styles go into the UA sheet).
+---@return table<string, dbdash.render.ChartType>
+function M.types()
+  if not types then
+    types = {}
+    for _, f in ipairs(vim.api.nvim_get_runtime_file(TYPE_DIR:format("*"), true)) do
+      local name = vim.fs.basename(vim.fs.dirname(vim.fs.normalize(f)))
+      if not types[name] then
+        local t = require("dbdash.render.charts." .. name)
+        check_type(name, t)
+        types[name] = t
+        if t.style then
+          require("dbdash.css").add_ua(t.style)
+        end
+      end
+    end
+  end
+  return types
+end
+
+---A chart type by name; nil when there is none.
+---@return dbdash.render.ChartType?
+function M.type(name)
+  return M.types()[name]
+end
+
+---The names of the chart types, sorted.
+---@return string[]
+function M.type_names()
+  local out = vim.tbl_keys(M.types())
+  table.sort(out)
+  return out
+end
+
+-- Built-in names of the other categories, for completion and documentation.
+---@type table<string, string[]>
 M.BUILTIN = {
-  chart = {
-    table = { "box" },
-    line = { "canvas", "asciichart" },
-    scatter = { "canvas" },
-    area = { "canvas" },
-    bubble = { "canvas" },
-    bar = { "horizontal", "vertical" },
-    histogram = { "horizontal", "vertical" },
-    boxplot = { "boxdraw", "vertical" },
-    heatmap = { "halfblock", "block" },
-    pie = { "bar", "circle" },
-    stat = { "big" },
-    text = { "plain" },
-  },
   canvas = { "braille", "quadrant", "block", "halfblock", "ascii" },
   ticks = { "nice", "linear" },
   frame = { "unicodeplots" },
@@ -134,17 +168,14 @@ function M.names(prefix)
   for n in pairs(items) do
     add(n)
   end
+  for t, def in pairs(M.types()) do
+    for _, r in ipairs(def.renderers) do
+      add("chart/" .. t .. "/" .. r)
+    end
+  end
   for kind, list in pairs(M.BUILTIN) do
-    if kind == "chart" then
-      for t, rs in pairs(list) do
-        for _, r in ipairs(rs) do
-          add("chart/" .. t .. "/" .. r)
-        end
-      end
-    else
-      for _, n in ipairs(list) do
-        add(kind .. "/" .. n)
-      end
+    for _, n in ipairs(list) do
+      add(kind .. "/" .. n)
     end
   end
   table.sort(out)
@@ -153,14 +184,14 @@ end
 
 ---Effective renderer and canvas: the chart element's computed renderer / canvas (from
 ---style sheets: setup({ style }), the dashboard's, the panel's, :DbDashStyle), else the
----built-in defaults of the type.
+---defaults of the type (its first renderer, its canvas).
 ---@param t string chart type
 ---@param computed table? computed style of the chart element
 ---@return string renderer, string canvas
 function M.resolve(t, computed)
   computed = computed or {}
-  local d = M.DEFAULTS[t] or {}
-  return computed.renderer or d.renderer or "canvas", computed.canvas or d.canvas or "braille"
+  local d = M.type(t) or { renderers = {} }
+  return computed.renderer or d.renderers[1] or "canvas", computed.canvas or d.canvas or "braille"
 end
 
 ---Known names of a kind: "renderer" (of any chart type), "canvas", "ticks", "palette",
@@ -168,7 +199,7 @@ end
 local function known(kind)
   if kind == "renderer" then
     local out = {}
-    for t in pairs(M.BUILTIN.chart) do
+    for t in pairs(M.types()) do
       vim.list_extend(out, M.names("chart/" .. t .. "/"))
     end
     return out
@@ -182,7 +213,7 @@ M.validators = {
   {
     field = "show",
     validate = function(show, ctx, path)
-      if not M.DEFAULTS[show.type] and not M.names("chart/" .. show.type .. "/")[1] then
+      if not M.type(show.type) then
         ctx:fail(path .. ".type", "unknown chart type '%s'", show.type)
       end
     end,

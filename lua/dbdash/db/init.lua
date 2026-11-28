@@ -18,31 +18,10 @@ M.Error = dberr
 local drivers = {} ---@type table<string, dbdash.db.Driver>
 local by_scheme = {} ---@type table<string, dbdash.db.Driver>
 
-local BUILTIN = {
-  sqlite = "dbdash.db.drivers.sqlite",
-  sqlite3 = "dbdash.db.drivers.sqlite",
-  redis = "dbdash.db.drivers.redis",
-  rediss = "dbdash.db.drivers.redis",
-  postgres = "dbdash.db.drivers.postgres",
-  postgresql = "dbdash.db.drivers.postgres",
-  mysql = "dbdash.db.drivers.mysql",
-  mariadb = "dbdash.db.drivers.mysql",
-  cassandra = "dbdash.db.drivers.cassandra",
-  cql = "dbdash.db.drivers.cassandra",
-  mongodb = "dbdash.db.drivers.mongodb",
-  lua = "dbdash.db.drivers.lua",
-  luastream = "dbdash.db.drivers.luastream",
-  exec = "dbdash.db.drivers.exec",
-  webhook = "dbdash.db.drivers.webhook",
-  http = "dbdash.db.drivers.http",
-  https = "dbdash.db.drivers.http",
-  mssql = "dbdash.db.drivers.mssql",
-  sqlserver = "dbdash.db.drivers.mssql",
-}
-
----Register a driver (built-in drivers register lazily on first use).
----@param driver dbdash.db.Driver
-function M.register(driver)
+---Add a driver found in a db/drivers/<name>/ directory (and, for tests, a stand-in): its
+---init.lua's table, completed here (schemes, dialect, capabilities).
+---@param driver table
+function M.add(driver)
   if type(driver) ~= "table" or type(driver.name) ~= "string" then
     error("a driver is a table with a name", 0)
   end
@@ -56,7 +35,7 @@ function M.register(driver)
     )
   end
   driver.schemes = driver.schemes or { driver.name }
-  driver.dialect = driver.dialect or driver.name
+  driver.dialect = driver.dialect or require("dbdash.db.dialect").standard
   driver.capabilities = driver.capabilities or { tls = false, sql = true, query_language = "sql" }
   drivers[driver.name] = driver
   for _, s in ipairs(driver.schemes) do
@@ -64,29 +43,70 @@ function M.register(driver)
   end
 end
 
----Driver by scheme or name; loads built-in drivers on demand.
+-- Drivers are directories (ARCHITECTURE.md#extending): lua/dbdash/db/drivers/<name>/ on the
+-- runtimepath, built-in or the user's, found by their path and loaded when first used.
+local DIR = "lua/dbdash/db/drivers/%s/init.lua"
+
+---The driver of directory `name` (nil: there is none).
+local function load(name)
+  if drivers[name] then
+    return drivers[name]
+  end
+  if #vim.api.nvim_get_runtime_file(DIR:format(name), false) == 0 then
+    return nil
+  end
+  M.add(require("dbdash.db.drivers." .. name))
+  return drivers[name]
+end
+
+---The names of every driver directory on the runtimepath.
+---@return string[]
+function M.names()
+  local out, seen = {}, {}
+  for _, f in ipairs(vim.api.nvim_get_runtime_file(DIR:format("*"), true)) do
+    local name = vim.fs.basename(vim.fs.dirname(vim.fs.normalize(f)))
+    if not seen[name] then
+      seen[name] = true
+      out[#out + 1] = name
+    end
+  end
+  table.sort(out)
+  return out
+end
+
+---Every driver (all of them loaded).
+---@return dbdash.db.Driver[]
+function M.drivers()
+  local out = {}
+  for _, name in ipairs(M.names()) do
+    out[#out + 1] = load(name)
+  end
+  return out
+end
+
+---Driver by scheme or name: the directory of that name, else the driver that lists the
+---scheme (an alias such as postgresql: every driver is loaded once to find it).
 ---@param scheme string
 ---@return dbdash.db.Driver
 function M.driver(scheme)
   scheme = scheme:lower():gsub("%+.*$", "")
-  local d = by_scheme[scheme] or drivers[scheme]
+  local d = by_scheme[scheme] or drivers[scheme] ---@type dbdash.db.Driver?
   if d then
     return d
   end
   if scheme == "oracle" then
     dberr.raise("config", "Oracle is not supported by dbdash.nvim")
   end
-  local mod = BUILTIN[scheme]
-  if mod then
-    local ok, res = pcall(require, mod)
-    if ok then
-      M.register(res)
-      return res
+  if scheme:match("^[%w_]+$") then
+    d = load(scheme)
+    if d then
+      return by_scheme[scheme] or d
     end
-    if type(res) == "string" and res:find("module '" .. mod .. "' not found", 1, true) then
-      dberr.raise("config", ("the %s driver is not implemented yet"):format(scheme))
+    M.drivers()
+    d = by_scheme[scheme]
+    if d then
+      return d
     end
-    error(res, 0)
   end
   return dberr.raise("config", ("no driver for scheme '%s'"):format(scheme))
 end

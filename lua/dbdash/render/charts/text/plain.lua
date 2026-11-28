@@ -37,7 +37,7 @@ function M.render(_rs, _show, ctx)
   local css = ctx.css
   local style = require("dbdash.css.style")
   local hl = require("dbdash.css.hl")
-  -- the lines' DOM (render/content/text.lua), one line element per row
+  -- the lines' DOM (charts/text/content.lua), one line element per row
   local root = require("dbdash.render.content").root(css.node)
   if not root then
     return { lines = {}, hl = {} } -- nothing built (no result yet)
@@ -58,7 +58,7 @@ function M.render(_rs, _show, ctx)
   local body = {} -- { text, group, n, align }
   local nw = numbers and (#tostring(#line_nodes) + 1) or 0
   local width = math.max(ctx.width - nw, 10)
-  local NULL = require("dbdash.render.content.text").NULL
+  local NULL = require("dbdash.render.charts.text.content").NULL
   for n, ln in ipairs(line_nodes) do
     local ls = style.get(ln)
     local text = ln.text or ""

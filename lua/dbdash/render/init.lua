@@ -75,6 +75,7 @@ end
 ---  own with the default sheets and `style` (selector -> properties) as its sheet
 ---@return dbdash.render.Output
 function M.render(rs, show, opts)
+  registry.types() -- the chart types' styles are in the UA sheet before a document has it
   local css = require("dbdash.css").scope(opts.node, show.type, opts.style)
   local ok, res = pcall(function()
     local chart = css:get()

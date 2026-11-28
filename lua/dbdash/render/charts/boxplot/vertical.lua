@@ -7,7 +7,7 @@
 --       │
 --      ─┴─      whisker cap (wlo)
 -- The options are those of boxdraw: show.whiskers; outlier, mean and value elements.
-local C = require("dbdash.render.charts.common")
+local C = require("dbdash.render.charts.lib.common")
 local W = require("dbdash.util.width")
 local boxdraw = require("dbdash.render.charts.boxplot.boxdraw")
 local fmt = require("dbdash.render.format")
@@ -80,7 +80,7 @@ function M.render(rs, show, ctx)
   spec.yticks, spec.ylabels = C.y_ticks(ctx, lo, hi, rows, axes.yformat)
   local cols
   cols, rows = ctx.frame.plot_size(ctx, spec)
-  local g = require("dbdash.render.charts.grid").new(rows, cols)
+  local g = require("dbdash.render.charts.lib.grid").new(rows, cols)
   local function row(v)
     return rows - 1 - math.floor((v - lo) / (hi - lo) * (rows - 1) + 0.5)
   end

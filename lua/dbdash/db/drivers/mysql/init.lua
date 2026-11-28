@@ -10,7 +10,27 @@ local util = require("dbdash.crypto.util")
 local M = {
   name = "mysql",
   schemes = { "mysql", "mariadb" },
-  dialect = "mysql",
+  -- backslash escapes as well as doubled quotes (sql_mode without NO_BACKSLASH_ESCAPES)
+  dialect = require("dbdash.db.dialect").make("mysql", {
+    quote_string = function(s)
+      local esc = {
+        ["\\"] = "\\\\",
+        ["'"] = "''",
+        ["\0"] = "\\0",
+        ["\n"] = "\\n",
+        ["\r"] = "\\r",
+        ["\26"] = "\\Z",
+      }
+      return "'" .. s:gsub("[\\'%z\n\r\26]", esc) .. "'"
+    end,
+    quote_ident = function(s)
+      local parts = require("dbdash.db.dialect").ident_parts(s)
+      for i, p in ipairs(parts) do
+        parts[i] = "`" .. p .. "`"
+      end
+      return table.concat(parts, ".")
+    end,
+  }),
   capabilities = { tls = true, sql = true, query_language = "sql" },
 }
 

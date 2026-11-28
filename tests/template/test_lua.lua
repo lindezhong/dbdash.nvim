@@ -14,7 +14,7 @@ local function render(src, opts)
 end
 
 local function pg_env()
-  return template.env(require("dbdash.template.dialect").get("postgres"), true)
+  return template.env(require("dbdash.db").driver("postgres").dialect, true)
 end
 
 T["a block outputs what it returns; nil outputs nothing"] = function()

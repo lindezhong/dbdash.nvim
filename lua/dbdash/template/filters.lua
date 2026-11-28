@@ -199,6 +199,8 @@ local function to_json(v, indent, level)
   raise("type", "Object of type %s is not JSON serializable", R.typename(v))
 end
 M.to_json = to_json
+-- the dialects of JSON-based query languages write template values with it (db/dialect.lua)
+require("dbdash.db.dialect").json = to_json
 
 local F = {}
 

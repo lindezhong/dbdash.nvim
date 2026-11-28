@@ -10,7 +10,17 @@ local socket = require("dbdash.net.socket")
 local M = {
   name = "mssql",
   schemes = { "mssql", "sqlserver" },
-  dialect = "mssql",
+  -- N'...' for non-ASCII strings, [brackets] for identifiers, 1/0 for booleans
+  dialect = require("dbdash.db.dialect").make("mssql", {
+    quote_string = function(s)
+      local q = require("dbdash.db.dialect").standard_string(s)
+      return s:find("[\128-\255]") and ("N" .. q) or q
+    end,
+    quote_ident = require("dbdash.db.dialect").quoter("[", "]"),
+    boolean_literal = function(b)
+      return b and "1" or "0"
+    end,
+  }),
   capabilities = { tls = true, sql = true, query_language = "sql" },
 }
 

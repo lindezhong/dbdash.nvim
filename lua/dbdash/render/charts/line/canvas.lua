@@ -2,7 +2,7 @@
 local M = {
   name = "canvas",
   render = function(rs, show, ctx)
-    return require("dbdash.render.charts.xy").render(rs, show, ctx, "line")
+    return require("dbdash.render.charts.lib.xy").render(rs, show, ctx, "line")
   end,
 }
 

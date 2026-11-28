@@ -10,7 +10,7 @@
 --   value display: none hides the values; position: inside puts them in the bar end
 --   axes.y_axis.min_value / max_value   the value axis (the baseline of the bars)
 --   mark_lines       reference lines on the value axis (a value, mean, min, max)
-local C = require("dbdash.render.charts.common")
+local C = require("dbdash.render.charts.lib.common")
 local W = require("dbdash.util.width")
 local fmt = require("dbdash.render.format")
 
@@ -138,7 +138,7 @@ local function mark_group(ctx, m)
 end
 M.mark_group = mark_group
 
----@class dbdash.render.charts.bars.HorizontalOpts
+---@class dbdash.render.charts.lib.bars.HorizontalOpts
 ---@field xlabel string?
 ---@field ylabel string?
 ---@field show_values boolean
@@ -290,7 +290,7 @@ end
 
 ---Horizontal bars: one row (or bar_width rows) per bar, labels on the left, values after.
 ---@param bars dbdash.render.Bar[]
----@param o dbdash.render.charts.bars.HorizontalOpts
+---@param o dbdash.render.charts.lib.bars.HorizontalOpts
 function M.horizontal(ctx, bars, o)
   local stacked = o.stacked
   local gap = math.max(
@@ -451,7 +451,7 @@ function M.vertical(ctx, bars, o)
       return hi > lo and math.max(0, x - lo) / (hi - lo) * rows or 0
     end,
   }
-  local g = require("dbdash.render.charts.grid").new(rows, cols)
+  local g = require("dbdash.render.charts.lib.grid").new(rows, cols)
   local centers = {}
   for i, b in ipairs(bars) do
     centers[i] = vertical_bar(ctx, g, v, i, b, o)

@@ -16,23 +16,23 @@ local resultset = require("dbdash.db.resultset")
 local M = {
   name = "sqlite",
   schemes = { "sqlite", "sqlite3" },
-  dialect = "sqlite",
+  dialect = require("dbdash.db.dialect").make("sqlite", {}),
   capabilities = { tls = false, sql = true, query_language = "sql" },
 }
 
 -- Runs in a worker thread (it shares nothing with the main loop: no upvalues): loads
--- sqlite_thread.lua from its source (`code`) there and runs the query. Arguments and
+-- thread.lua (next to this file) from its source (`code`) there and runs the query. Arguments and
 -- result are strings.
 local function worker(code, ...)
-  return assert(loadstring(code, "=sqlite_thread.lua"))().run(...)
+  return assert(loadstring(code, "=sqlite/thread.lua"))().run(...)
 end
 
----The source of sqlite_thread.lua (read once).
+---The source of thread.lua (read once).
 local thread_code
 local function thread_source()
   if not thread_code then
     local here = debug.getinfo(1, "S").source:sub(2)
-    local f = assert(io.open(vim.fs.dirname(here) .. "/sqlite_thread.lua", "rb"))
+    local f = assert(io.open(vim.fs.dirname(here) .. "/thread.lua", "rb"))
     thread_code = f:read("*a")
     f:close()
   end

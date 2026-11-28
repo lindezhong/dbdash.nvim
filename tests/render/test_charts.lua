@@ -439,7 +439,7 @@ T["histogram: bin_width, bin_range, cumulative, percent"] = function()
     rows[i] = { i * 10 - 5 }
   end
   local rs = resultset.new({ { name = "v", type = "integer" } }, rows)
-  local B = require("dbdash.render.charts.bars")
+  local B = require("dbdash.render.charts.lib.bars")
   local bins = B.histogram(
     rs,
     { value_column = "v", bin_width = 25, bin_range = { 0, 100 } },
