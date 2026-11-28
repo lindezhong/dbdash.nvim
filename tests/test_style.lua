@@ -6,7 +6,8 @@ local eq = MiniTest.expect.equality
 local T = MiniTest.new_set()
 
 local function modules()
-  return vim.fn.globpath("lua/dbdash", "**/*.lua", false, true)
+  -- "/" on every system (globpath gives "\\" on Windows): paths compare as written here
+  return vim.tbl_map(vim.fs.normalize, vim.fn.globpath("lua/dbdash", "**/*.lua", false, true))
 end
 
 local function read(path)

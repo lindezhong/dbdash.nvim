@@ -123,6 +123,56 @@ for _, name in ipairs({ "statements", "filters", "tests_functions", "methods", "
   end
 end
 
+-- SQLite's math functions (sin, cos, power, sqrt, ln, log, exp, pi, ...) are a build option
+-- (SQLITE_ENABLE_MATH_FUNCTIONS) that some builds lack, Windows' winsqlite3.dll among them:
+-- the examples on SQLite use arithmetic only.
+T["examples on SQLite use no math functions (a build option)"] = function()
+  local fns = {
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "atan2",
+    "sinh",
+    "cosh",
+    "tanh",
+    "power",
+    "pow",
+    "sqrt",
+    "exp",
+    "ln",
+    "log",
+    "log2",
+    "log10",
+    "pi",
+    "ceil",
+    "ceiling",
+    "floor",
+    "trunc",
+    "degrees",
+    "radians",
+    "mod",
+  }
+  local bad = {}
+  for _, f in ipairs(files) do
+    local text = table.concat(vim.fn.readfile(f), "\n")
+    if text:find("sqlite:", 1, true) then
+      for _, fn in ipairs(fns) do
+        -- a SQL call, not Lua's math.sin( or a word in a comment
+        for pre in text:gmatch("([^%w_%.])" .. fn .. "%s*%(") do
+          if pre then
+            bad[#bad + 1] = f .. ": " .. fn
+            break
+          end
+        end
+      end
+    end
+  end
+  eq(bad, {})
+end
+
 T["every example dashboard and panel has a description that renders"] = function()
   for _, f in ipairs(files) do
     local cfg = assert(config.load(f))

@@ -87,8 +87,12 @@ panels:
   - query:
       sql: |
         WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 30)
-        SELECT power(10, (abs(random() % 400) / 100.0)) AS size_kb,
-               power(10, (abs(random() % 300) / 100.0)) AS ms
+        -- spread over decades: a digit times a random power of ten (arithmetic only)
+        SELECT (1 + abs(random() % 900) / 100.0)
+                 * (CASE abs(random() % 4) WHEN 0 THEN 1 WHEN 1 THEN 10 WHEN 2 THEN 100 ELSE 1000 END)
+                 AS size_kb,
+               (1 + abs(random() % 900) / 100.0)
+                 * (CASE abs(random() % 3) WHEN 0 THEN 1 WHEN 1 THEN 10 ELSE 100 END) AS ms
         FROM n
     show:
       type: scatter

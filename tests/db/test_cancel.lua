@@ -308,12 +308,14 @@ T["it: postgres: a timeout stops the query on the server too"] = function()
       )
     ).rows[1][1]
   end
-  -- The whole query may take connect_timeout + timeout.
+  -- The whole query may take connect_timeout + timeout. The timeout leaves the check time
+  -- to see the query on the server first: each check is a connection of its own, slow over
+  -- a tunnel to the docker host (tests on another machine, README).
   local err = server_stops(
     PG .. "?connect_timeout=1s",
     ("SELECT pg_sleep(30) /* %s */"):format(m),
     running,
-    { timeout = 1500 }
+    { timeout = 5000 }
   )
   eq(err.phase, "timeout")
 end

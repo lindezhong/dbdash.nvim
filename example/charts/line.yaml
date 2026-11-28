@@ -5,6 +5,9 @@
 # axes (titles, limits, format, log scale, ticks), mark_lines / mark_points; style rules
 # draw the rest: series { curve, fill, color }, point, grid lines, the legend. The style
 # rules every chart takes are in css.yaml.
+# The data is made with arithmetic only: SQLite's math functions (sin, power) are a build
+# option some builds lack (Windows' winsqlite3.dll), so the waves rotate (w, c) by a fixed
+# angle each row instead: w is the sine of n / 3.
 
 title: "Line chart"
 description: |
@@ -26,9 +29,10 @@ style:
 panels:
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
-        SELECT printf('%02d:00', n) AS hour, 60 + 40 * sin(n / 3.0) + abs(random() % 20) AS visits,
-               (60 + 40 * sin(n / 3.0)) * 0.6 AS mobile, (60 + 40 * sin(n / 3.0)) * 0.4 AS desktop
+        WITH RECURSIVE h(n, w, c) AS (SELECT 0, 0.0, 1.0 UNION ALL
+          SELECT n + 1, w * 0.944957 + c * 0.327195, c * 0.944957 - w * 0.327195 FROM h WHERE n < 23)
+        SELECT printf('%02d:00', n) AS hour, 60 + 40 * w + abs(random() % 20) AS visits,
+               (60 + 40 * w) * 0.6 AS mobile, (60 + 40 * w) * 0.4 AS desktop
         FROM h
     show:
       type: line
@@ -54,8 +58,9 @@ panels:
 
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
-        SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
+        WITH RECURSIVE h(n, w, c) AS (SELECT 0, 0.0, 1.0 UNION ALL
+          SELECT n + 1, w * 0.944957 + c * 0.327195, c * 0.944957 - w * 0.327195 FROM h WHERE n < 23)
+        SELECT printf('%02d', n) AS hour, 60 + 40 * w AS visits FROM h
     show:
       type: line
       title: "chart { canvas: quadrant }"
@@ -67,8 +72,9 @@ panels:
 
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
-        SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
+        WITH RECURSIVE h(n, w, c) AS (SELECT 0, 0.0, 1.0 UNION ALL
+          SELECT n + 1, w * 0.944957 + c * 0.327195, c * 0.944957 - w * 0.327195 FROM h WHERE n < 23)
+        SELECT printf('%02d', n) AS hour, 60 + 40 * w AS visits FROM h
     show:
       type: line
       title: "chart { canvas: block }"
@@ -80,8 +86,9 @@ panels:
 
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
-        SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
+        WITH RECURSIVE h(n, w, c) AS (SELECT 0, 0.0, 1.0 UNION ALL
+          SELECT n + 1, w * 0.944957 + c * 0.327195, c * 0.944957 - w * 0.327195 FROM h WHERE n < 23)
+        SELECT printf('%02d', n) AS hour, 60 + 40 * w AS visits FROM h
     show:
       type: line
       title: "chart { canvas: halfblock }"
@@ -93,8 +100,9 @@ panels:
 
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
-        SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
+        WITH RECURSIVE h(n, w, c) AS (SELECT 0, 0.0, 1.0 UNION ALL
+          SELECT n + 1, w * 0.944957 + c * 0.327195, c * 0.944957 - w * 0.327195 FROM h WHERE n < 23)
+        SELECT printf('%02d', n) AS hour, 60 + 40 * w AS visits FROM h
     show:
       type: line
       title: "chart { canvas: ascii }"
@@ -106,8 +114,9 @@ panels:
 
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
-        SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
+        WITH RECURSIVE h(n, w, c) AS (SELECT 0, 0.0, 1.0 UNION ALL
+          SELECT n + 1, w * 0.944957 + c * 0.327195, c * 0.944957 - w * 0.327195 FROM h WHERE n < 23)
+        SELECT printf('%02d', n) AS hour, 60 + 40 * w AS visits FROM h
     show:
       type: line
       title: "chart { renderer: asciichart }"
@@ -140,8 +149,9 @@ panels:
 
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 11)
-        SELECT n AS x, 20 + 15 * sin(n / 2.0) AS y FROM h
+        WITH RECURSIVE h(n, w, c) AS (SELECT 0, 0.0, 1.0 UNION ALL
+          SELECT n + 1, w * 0.877583 + c * 0.479426, c * 0.877583 - w * 0.479426 FROM h WHERE n < 11)
+        SELECT n AS x, 20 + 15 * w AS y FROM h
     show:
       type: line
       title: "series { fill }, point { display: block }"
@@ -187,8 +197,8 @@ panels:
 
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 11)
-        SELECT n AS month, round(power(2.4, n)) AS users FROM h
+        WITH RECURSIVE h(n, users) AS (SELECT 0, 1.0 UNION ALL SELECT n + 1, users * 2.4 FROM h WHERE n < 11)
+        SELECT n AS month, round(users) AS users FROM h
     show:
       type: line
       title: "axes: scale: log, ticks; grid lines"
@@ -209,8 +219,9 @@ panels:
 
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
-        SELECT printf('%02d', n) AS hour, 50 + 30 * sin(n / 4.0) + abs(random() % 15) AS latency FROM h
+        WITH RECURSIVE h(n, w, c) AS (SELECT 0, 0.0, 1.0 UNION ALL
+          SELECT n + 1, w * 0.968912 + c * 0.247404, c * 0.968912 - w * 0.247404 FROM h WHERE n < 23)
+        SELECT printf('%02d', n) AS hour, 50 + 30 * w + abs(random() % 15) AS latency FROM h
     show:
       type: line
       title: "mark_lines, mark_points"
@@ -231,8 +242,9 @@ panels:
 
   - query:
       sql: |
-        WITH RECURSIVE h(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM h WHERE n < 23)
-        SELECT printf('%02d', n) AS hour, 60 + 40 * sin(n / 3.0) AS visits FROM h
+        WITH RECURSIVE h(n, w, c) AS (SELECT 0, 0.0, 1.0 UNION ALL
+          SELECT n + 1, w * 0.944957 + c * 0.327195, c * 0.944957 - w * 0.327195 FROM h WHERE n < 23)
+        SELECT printf('%02d', n) AS hour, 60 + 40 * w AS visits FROM h
     show:
       type: line
       title: "x_label, y_label; plot height, chart max-width, no legend"
