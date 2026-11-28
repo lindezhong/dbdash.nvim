@@ -94,8 +94,11 @@ T["validation errors name the field and position"] = function()
     true
   )
   eq(
-    err_of(MINIMAL .. "show:\n  type: radar\n"):find(":7:9: unknown chart type 'radar'", 1, true)
-      ~= nil,
+    err_of(MINIMAL .. "show:\n  type: radar\n"):find(
+      ":7:9: [chart] unknown chart type 'radar'",
+      1,
+      true
+    ) ~= nil,
     true
   )
   eq(err_of(MINIMAL .. "show:\n  interval: soon\n"):find("invalid duration") ~= nil, true)
@@ -213,8 +216,9 @@ T["multi-panel errors point at the panel"] = function()
     true
   )
   eq(
-    err_of(MULTI .. "    show:\n      type: radar\n"):find(":%d+:%d+: unknown chart type 'radar'")
-      ~= nil,
+    err_of(MULTI .. "    show:\n      type: radar\n"):find(
+      ":%d+:%d+: %[chart%] unknown chart type 'radar'"
+    ) ~= nil,
     true
   )
 end
@@ -255,8 +259,8 @@ T["a one-chart config and panels[1] are validated the same way"] = function()
   local e2 = err_of(
     "database: { url: 'sqlite:///:memory:' }\npanels:\n  - query: { sql: x, max_rows: many }\n"
   )
-  eq(e1:match(": (.*)$"), "'query.max_rows' must be a integer")
-  eq(e2:match(": (.*)$"), "'panels[1].query.max_rows' must be a integer")
+  eq(e1:match(": (.*)$"), "[dashboard] 'query.max_rows' must be a integer")
+  eq(e2:match(": (.*)$"), "[dashboard] 'panels[1].query.max_rows' must be a integer")
 end
 
 T["with panels, top-level query and show are defaults"] = function()
@@ -281,7 +285,7 @@ panels:
   local msg = err_of(
     "database: { url: 'sqlite:///:memory:' }\nshow:\n  interval: soon\npanels:\n  - query: { sql: x }\n"
   )
-  eq(msg:find(":3:13: 'panels%[1%]%.show%.interval'") ~= nil, true)
+  eq(msg:find(":3:13: %[dashboard%] 'panels%[1%]%.show%.interval'") ~= nil, true)
 end
 
 T["fields of one chart cannot be top-level defaults"] = function()
@@ -466,7 +470,7 @@ end
 
 T["arg_refs finds the argument names a template or Lua code reads"] = function()
   local function refs(t)
-    local n, all = config.arg_refs(t)
+    local n, all = require("dbdash.args").arg_refs(t)
     local names = vim.tbl_keys(n)
     table.sort(names)
     return { names, all }
@@ -639,7 +643,7 @@ end
 
 T["load-time rules of other modules: renderer names, the URL, driver options"] = function()
   local msg = err_of(MINIMAL .. "style:\n  chart:\n    renderer: nope\n")
-  eq(msg:find(":%d+:%d+: unknown renderer 'nope' %(known: ") ~= nil, true)
+  eq(msg:find(":%d+:%d+: %[chart%] unknown renderer 'nope' %(known: ") ~= nil, true)
   msg = err_of(
     "database: { url: 'postgres://h/db?tls=maybe' }\nquery: { sql: x }\nshow: { type: table }\n"
   )
@@ -649,7 +653,7 @@ T["load-time rules of other modules: renderer names, the URL, driver options"] =
   )
   eq(
     msg:find(
-      ":3:%d+: sqlite://: unknown option database.options.lib %(known: create, lib_path, readonly%)"
+      ":3:%d+: %[db sqlite%] sqlite://: unknown option database.options.lib %(known: create, lib_path, readonly%)"
     ) ~= nil,
     true
   )
@@ -659,23 +663,34 @@ T["load-time rules of other modules: renderer names, the URL, driver options"] =
   eq(msg:find("postgres://: unknown option database.options.lib_path", 1, true) ~= nil, true)
 end
 
-T["validators: config.lua runs every module's rules on its part"] = function()
-  local calls = {}
+T["validators: found on the runtimepath, ordered by after, each given the whole config"] = function()
+  local list = require("dbdash.config.validators").list()
+  local names, at = {}, {}
+  for i, v in ipairs(list) do
+    eq({ v.name, type(v.checks), type(v.validate) }, { v.name, "string", "function" })
+    names[#names + 1] = v.name
+    at[v.name] = i
+  end
+  -- the modules' own and every driver's
+  for _, n in ipairs({ "css", "db", "args", "dashboard", "chart", "grid", "db sqlite", "db http" }) do
+    eq({ n, at[n] ~= nil }, { n, true })
+  end
+  for _, v in ipairs(list) do
+    for _, dep in ipairs(v.after or {}) do
+      eq({ v.name, dep, at[dep] < at[v.name] }, { v.name, dep, true })
+    end
+  end
+  -- each gets the whole config (the same table), and runs once per config
+  local seen = {}
   local restore = {}
-  for _, mod in ipairs(require("dbdash.config.validators")) do
-    local list = require(mod).validators
-    eq({ mod, type(list) == "table" and #list > 0 }, { mod, true })
-    for i, v in ipairs(list) do
-      local key = ("%s#%d(%s)"):format(mod, i, v.field)
-      calls[key] = 0
-      local real = v.validate
-      restore[#restore + 1] = function()
-        v.validate = real
-      end
-      v.validate = function(...)
-        calls[key] = calls[key] + 1
-        return real(...)
-      end
+  for _, v in ipairs(list) do
+    local real = v.validate
+    restore[#restore + 1] = function()
+      v.validate = real
+    end
+    v.validate = function(cfg, ctx)
+      seen[v.name] = cfg
+      return real(cfg, ctx)
     end
   end
   MiniTest.finally(function()
@@ -683,12 +698,22 @@ T["validators: config.lua runs every module's rules on its part"] = function()
       r()
     end
   end)
-  -- a config with every part: arguments, styles, a grid, thresholds, intervals
   local cfg = load(MULTI)
-  eq(cfg ~= nil, true)
-  for key, n in pairs(calls) do
-    eq({ key, n > 0 }, { key, true })
+  for _, n in ipairs(names) do
+    eq({ n, seen[n] == cfg }, { n, true })
   end
+end
+
+T["an error says which validator found it"] = function()
+  eq(err_of(MINIMAL .. "show: { type: radar }\n"):match("%[([%w ]+)%]"), "chart")
+  eq(err_of("database: { url: 'foo://h' }\nquery: { sql: x }\n"):match("%[([%w ]+)%]"), "db")
+  eq(err_of(MINIMAL .. "args: [{ name: 'a b' }]\n"):match("%[([%w ]+)%]"), "args")
+  eq(
+    err_of("database: { url: 'postgres://h/db?tls=maybe' }\nquery: { sql: x }\n"):match(
+      "%[([%w ]+)%]"
+    ),
+    "db postgres"
+  )
 end
 
 -- One failing case per rule of a module (the other cases of this file have more); the

@@ -183,39 +183,4 @@ function Clock:stop()
   end
 end
 
--- The rules of a config's intervals (config/validators.lua): at least a second; a source
--- that sends data has no refresh while hidden to ask for (it keeps receiving, only drawing
--- waits).
-M.validators = {
-  {
-    field = "show",
-    validate = function(show, ctx, path)
-      if show.interval < 1000 then
-        ctx:fail(path .. ".interval", "interval must be at least 1s")
-      end
-    end,
-  },
-  {
-    field = "panel",
-    validate = function(panel, ctx, prefix)
-      local db = panel.database
-      if panel.show.refresh_hidden and require("dbdash.db").driver(db.type).produce then
-        ctx:fail(
-          prefix .. "show.refresh_hidden",
-          "refresh_hidden does not apply to %s:// (push sources keep receiving while hidden)",
-          db.type
-        )
-      end
-    end,
-  },
-  {
-    field = "dashboard",
-    validate = function(cfg, ctx)
-      if cfg.refresh_all and cfg.refresh_all < 1000 then
-        ctx:fail("interval", "interval must be at least 1s")
-      end
-    end,
-  },
-}
-
 return M

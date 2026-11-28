@@ -196,7 +196,8 @@ end
 
 ---Known names of a kind: "renderer" (of any chart type), "canvas", "ticks", "palette",
 ---"frame".
-local function known(kind)
+---@return string[]
+function M.known(kind)
   if kind == "renderer" then
     local out = {}
     for t in pairs(M.types()) do
@@ -206,39 +207,5 @@ local function known(kind)
   end
   return M.names(kind .. "/")
 end
-
--- The rules of a config's charts and style sheets (config/validators.lua): the chart type
--- is known; implementations named in renderer, canvas and palette exist.
-M.validators = {
-  {
-    field = "show",
-    validate = function(show, ctx, path)
-      if not M.type(show.type) then
-        ctx:fail(path .. ".type", "unknown chart type '%s'", show.type)
-      end
-    end,
-  },
-  {
-    field = "style",
-    validate = function(rules, ctx, path)
-      for _, rule in ipairs(rules or {}) do
-        for _, kind in ipairs({ "renderer", "canvas", "palette" }) do
-          local name = rule.decls[kind]
-          if type(name) == "string" and not vim.tbl_contains(known(kind), name) then
-            local names = known(kind)
-            table.sort(names)
-            ctx:fail(
-              ("%s.%s.%s"):format(path, rule.key, kind),
-              "unknown %s '%s' (known: %s)",
-              kind,
-              name,
-              table.concat(vim.fn.uniq(names) --[[@as string[] ]], ", ")
-            )
-          end
-        end
-      end
-    end,
-  },
-}
 
 return M

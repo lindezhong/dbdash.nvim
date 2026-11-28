@@ -132,7 +132,7 @@ T["config: password_cmd is validated, unset ${ENV} reported with its line"] = fu
   )
   local _, err = require("dbdash.config").load(f)
   assert(err)
-  eq(err.message:find(":2:%d+: environment variable DBDASH_T_UNSET is not set") ~= nil, true)
+  eq(err.message:find(":2:%d+: %[db%] environment variable DBDASH_T_UNSET is not set") ~= nil, true)
   vim.fn.writefile(
     { "database:", "  url: postgres://u@h/db", "  password_cmd: 3", "query: { sql: x }" },
     f

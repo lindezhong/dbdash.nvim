@@ -11,6 +11,18 @@ local map = require("dbdash.util.map")
 
 local M = {}
 
+---@class dbdash.ArgSpec
+---@field name string
+---@field type "string"|"number"|"int"|"boolean"|"list"|"map"
+---@field default any
+---@field required boolean
+---@field show boolean
+---@field description string?
+---@field choices any[]?
+---@field key string? the key of its value: the name, or <panel id>.<name>
+---@field panel integer? the panel of a local argument
+---@field panel_id string?
+
 ---Raise an args error (it never returns; `x or fail(...)` keeps x's type).
 ---@return any
 local function fail(msg, ...)
@@ -393,32 +405,44 @@ end
 ---The types of arguments.
 M.TYPES = { string = true, number = true, int = true, boolean = true, list = true, map = true }
 
--- The rules of a config's arguments (config/validators.lua): names are identifiers, types
--- known, a list has each name once.
-M.validators = {
-  {
-    field = "arg",
-    validate = function(spec, ctx, path)
-      if not spec.name:match("^[%a_][%w_]*$") then
-        ctx:fail(path .. ".name", "argument name '%s' must be an identifier", spec.name)
-      end
-      if not M.TYPES[spec.type] then
-        ctx:fail(path .. ".type", "unknown argument type '%s'", spec.type)
-      end
-    end,
-  },
-  {
-    field = "args",
-    validate = function(list, ctx, path)
-      local seen = {}
-      for i, spec in ipairs(list) do
-        if seen[spec.name] then
-          ctx:fail(("%s[%d].name"):format(path, i), "duplicate argument '%s'", spec.name)
+---Names of the arguments that template or Lua `text` reads: args.name, args["name"] and
+---args['name']. `all` when it uses args as a whole (args.items(), `in args`, args passed on,
+---args[expr]) so any argument may matter.
+---@return table<string, boolean> names, boolean all
+function M.arg_refs(text)
+  local names, all = {}, false
+  local init = 1
+  while true do
+    local s, e = text:find("%f[%w_]args%f[^%w_]", init)
+    if not s then
+      break
+    end
+    init = e + 1
+    local before = text:sub(1, s - 1)
+    local after = text:sub(e + 1)
+    if not before:match("[%.:]%s*$") then -- not x.args
+      local name = after:match("^%s*%.%s*([%a_][%w_]*)")
+      local key = after:match("^%s*%[%s*'([%a_][%w_]*)'%s*%]")
+        or after:match('^%s*%[%s*"([%a_][%w_]*)"%s*%]')
+      if name then
+        if after:match("^%s*%.%s*[%a_][%w_]*%s*%(") then -- args.items(), args.keys()
+          all = true
+        else
+          names[name] = true
         end
-        seen[spec.name] = true
+      elseif key then
+        names[key] = true
+      elseif
+        after:match("^%s*%[")
+        or after:match("^%s*[,)]")
+        or before:match("[(,]%s*$")
+        or before:match("%f[%w_]in%s+$")
+      then
+        all = true
       end
-    end,
-  },
-}
+    end
+  end
+  return names, all
+end
 
 return M
