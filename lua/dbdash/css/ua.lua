@@ -59,9 +59,9 @@ local M = {
   -- the sidebar
   ["sidebar-dir"] = { color = "DbDashSidebarDir" },
   -- a config file's mark (content) and its color: what its dashboard fetches
-  ["sidebar-item.fetching"] = { color = "DbDashSidebarFetching", content = "●" },
+  ["sidebar-item.active"] = { color = "DbDashSidebarActive", content = "●" },
   ["sidebar-item.partly"] = { color = "DbDashSidebarPartly", content = "◐" },
-  ["sidebar-item.paused"] = { color = "DbDashSidebarPaused", content = "○" },
+  ["sidebar-item.idle"] = { color = "DbDashSidebarIdle", content = "○" },
   ["sidebar-item.stopped"] = { color = "DbDashSidebarStopped", content = "◌" },
   ["sidebar-item.cursor"] = { color = "DbDashSidebarCursor" },
 }

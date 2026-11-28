@@ -53,9 +53,9 @@ M.BASE = {
   DbDashSidebarCursorLine = {},
   DbDashSidebarCursor = { underline = true, cterm = { underline = true } },
   -- the marks: every panel fetches, some do, none does (paused), not running
-  DbDashSidebarFetching = { link = "DiagnosticOk" },
+  DbDashSidebarActive = { link = "DiagnosticOk" },
   DbDashSidebarPartly = { link = "DiagnosticWarn" },
-  DbDashSidebarPaused = { link = "DiagnosticInfo" },
+  DbDashSidebarIdle = { link = "DiagnosticInfo" },
   DbDashSidebarStopped = { link = "Comment" },
   -- Series colors, taken from common syntax groups so they follow the colorscheme.
   DbDashSeries1 = { link = "Function" },

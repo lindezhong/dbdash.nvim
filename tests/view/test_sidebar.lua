@@ -126,13 +126,13 @@ T["highlights: directories with their arrow; the marks and their legend on two l
   dbdash.setup({ sidebar = { dir = dir .. "/sub" } })
   local _, marks, buf = render()
   eq(vim.api.nvim_buf_get_lines(buf, 3, 5, false), {
-    "● Fetching        ◐ Partly fetching",
-    "○ Paused          ◌ Not running",
+    "● Active          ◐ Partly active",
+    "○ Idle            ◌ Not running",
   })
   eq(marks, {
-    { "DbDashSidebarFetching", "●" }, -- legend
+    { "DbDashSidebarActive", "●" }, -- legend
     { "DbDashSidebarPartly", "◐" },
-    { "DbDashSidebarPaused", "○" },
+    { "DbDashSidebarIdle", "○" },
     { "DbDashSidebarStopped", "◌" },
     { "DbDashSidebarStopped", "◌" }, -- e.yaml
     { "DbDashSidebarDir", "▸ deeper/" },
@@ -140,18 +140,18 @@ T["highlights: directories with their arrow; the marks and their legend on two l
   local links = {}
   for _, g in ipairs({
     "DbDashSidebarDir",
-    "DbDashSidebarFetching",
+    "DbDashSidebarActive",
     "DbDashSidebarPartly",
-    "DbDashSidebarPaused",
+    "DbDashSidebarIdle",
     "DbDashSidebarStopped",
   }) do
     links[g] = vim.api.nvim_get_hl(0, { name = g }).link
   end
   eq(links, {
     DbDashSidebarDir = "Directory",
-    DbDashSidebarFetching = "DiagnosticOk",
+    DbDashSidebarActive = "DiagnosticOk",
     DbDashSidebarPartly = "DiagnosticWarn",
-    DbDashSidebarPaused = "DiagnosticInfo",
+    DbDashSidebarIdle = "DiagnosticInfo",
     DbDashSidebarStopped = "Comment",
   })
 end
@@ -162,7 +162,7 @@ T["the marks and their colors come from the style sheet (sidebar-item content, c
     style = { ["sidebar-item.stopped"] = { content = "·", color = "Error" } },
   })
   local lines, marks, buf = render()
-  eq(vim.api.nvim_buf_get_lines(buf, 4, 5, false)[1], "○ Paused          · Not running")
+  eq(vim.api.nvim_buf_get_lines(buf, 4, 5, false)[1], "○ Idle            · Not running")
   eq(lines[1], "· e.yaml")
   -- the legend's mark and e.yaml's: the user's mark, in the user's color (not the default)
   eq({ marks[4][2], marks[5][2] }, { "·", "·" })

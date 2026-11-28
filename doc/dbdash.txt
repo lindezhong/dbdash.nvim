@@ -219,9 +219,11 @@ database:
     Open the sidebar: the *.yaml / *.yml files of the current directory and
     its subdirectories as a tree (see `sidebar` in |dbdash-setup| for the
     directory, globs and width). A file's mark says what its dashboard
-    fetches, the panels' state (|dbdash-pause|): `●` every panel, `◐` some
-    (hidden, with panels that go on: `show.refresh_hidden`, a source that
-    sends data), `○` none (running but paused), `◌` not running. The legend
+    fetches, the panels' state (|dbdash-pause|): `●` active (every panel
+    fetches), `◐` partly active (some do: it is hidden and some panels go
+    on, `show.refresh_hidden` or a source that sends data; or some sources
+    ended), `○` idle (running, none fetches: hidden, or every source ended),
+    `◌` not running. The legend
     is at the top, on two lines. The marks and their colors are a style
     sheet's (`sidebar-item`, |dbdash-css-elements|). Directories show `▸`
     (collapsed) or `▾` (expanded) and stay expanded when the sidebar is
@@ -861,12 +863,12 @@ Elements                                                 *dbdash-css-elements*
                      line-number: the lines' numbers
   note, warning      notes ("… 3 more rows") and warnings
 
-The sidebar is a document of its own: sidebar-dir, sidebar-item (.fetching,
-.partly, .paused, .stopped, .cursor). A file's mark is the `content` of its
+The sidebar is a document of its own: sidebar-dir, sidebar-item (.active,
+.partly, .idle, .stopped, .cursor). A file's mark is the `content` of its
 sidebar-item class, its color the `color`, as with any element: >lua
   require("dbdash").setup({ style = {
     ["sidebar-item.stopped"] = { content = "·" },
-    ["sidebar-item.fetching"] = { content = "▶", color = "DiagnosticOk" },
+    ["sidebar-item.active"] = { content = "▶", color = "DiagnosticOk" },
   } })
 <
 
@@ -2255,9 +2257,9 @@ All groups link to standard groups by default:
   (DiagnosticError)                 stat value and its change
 
 Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
-`Directory`), the marks `DbDashSidebarFetching` (● every panel fetches,
+`Directory`), the marks `DbDashSidebarActive` (● every panel fetches,
 links to `DiagnosticOk`), `DbDashSidebarPartly` (◐ some do, links to
-`DiagnosticWarn`), `DbDashSidebarPaused` (○ none does, links to
+`DiagnosticWarn`), `DbDashSidebarIdle` (○ running, none does, links to
 `DiagnosticInfo`), `DbDashSidebarStopped` (◌ not running, links to
 `Comment`). With
 `sidebar.cursorline = "name"` the sidebar window's cursor line uses

@@ -229,8 +229,8 @@ T["sidebar lists configs and starts/stops them"] = function()
     "DbDash Sidebar",
     "Directory: " .. child.lua_get("vim.fn.fnamemodify(vim.fn.getcwd(), ':~')"),
     "",
-    "● Fetching        ◐ Partly fetching",
-    "○ Paused          ◌ Not running",
+    "● Active          ◐ Partly active",
+    "○ Idle            ◌ Not running",
     "",
     "◌ board.yaml",
     "◌ broken.yaml",
@@ -345,7 +345,7 @@ T["sidebar cursorline = name: underline after the marker, marker keeps its color
   child.cmd("7")
   eq(lines()[7], "● board.yaml")
   eq(cursor_mark(), { 7, "board.yaml", "DbDashSidebarCursor" }) -- not the ●
-  eq(marker(7), "DbDashSidebarFetching")
+  eq(marker(7), "DbDashSidebarActive")
   child.cmd("8")
   eq(cursor_mark(), { 8, "broken.yaml", "DbDashSidebarCursor" })
   child.cmd("9") -- a directory: arrow and name share a color, the whole entry is underlined

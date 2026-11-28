@@ -100,9 +100,9 @@ end
 -- mark is the `content` of its sidebar-item class, its color the `color` (css/ua.lua; a
 -- user sheet changes either: :help dbdash-css).
 local MARKS = {
-  { "fetching", "Fetching" }, -- every panel fetches
-  { "partly", "Partly fetching" }, -- some do
-  { "paused", "Paused" }, -- running, none fetches (hidden)
+  { "active", "Active" }, -- every panel fetches
+  { "partly", "Partly active" }, -- some do
+  { "idle", "Idle" }, -- running, none fetches (hidden, or its sources ended)
   { "stopped", "Not running" },
 }
 
@@ -113,7 +113,7 @@ local function class_of(path)
   if not (d and d.state.running) then
     return "stopped"
   end
-  return ({ all = "fetching", some = "partly" })[d.state.fetching] or "paused"
+  return ({ all = "active", some = "partly" })[d.state.fetching] or "idle"
 end
 
 local sidebar_doc
@@ -132,7 +132,7 @@ end
 function M.render(buf)
   require("dbdash.css.hl").setup()
   local root = M.dir()
-  -- marks and colors from the sidebar's own document (css: sidebar-item.fetching { content,
+  -- marks and colors from the sidebar's own document (css: sidebar-item.active { content,
   -- color }, sidebar-dir, ...)
   local css = M.css()
   local function item(state)
@@ -203,7 +203,7 @@ local CURSOR_NS = vim.api.nvim_create_namespace("dbdash_sidebar_cursor")
 M.CURSOR_NS = CURSOR_NS
 
 ---With sidebar.cursorline = "name": mark the cursor line's name with DbDashSidebarCursor
----(an underline by default), leaving out the running/paused/idle marker so it keeps its
+---(an underline by default), leaving out the mark so it keeps its
 ---own color; the window's CursorLine is then DbDashSidebarCursorLine (empty by default).
 function M.update_cursor(buf)
   vim.api.nvim_buf_clear_namespace(buf, CURSOR_NS, 0, -1)
