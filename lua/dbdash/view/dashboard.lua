@@ -4,9 +4,9 @@
 -- model is its document asking for a frame (Document.on_update); of the dashboards' events
 -- the view follows dashboard:stopped (it closes the buffer).
 local buffer = require("dbdash.view.buffer")
+local W = require("dbdash.util.width")
 local events = require("dbdash.dashboard.events")
-local child = require("dbdash.dom.node").child
-require("dbdash.view.notifier") -- it tells what the dashboards report
+local notifier = require("dbdash.view.notifier") -- it tells what the dashboards report
 
 local M = {}
 
@@ -49,9 +49,9 @@ end
 ---(layout/view.lua), paint it (paint/) and composite the layers into lines (compositor/).
 ---@return string[] lines the header's
 ---@return table[] hl
----@return dbdash.render.Output|dbdash.compositor.Frame body
+---@return dbdash.compositor.Frame body
 ---@return integer offset the header's rows
----@return table[]? regions the panels' (multi-panel)
+---@return table[] regions the panels' (by panel index)
 function M.render_view(d, width, height)
   d.doc.updating = true -- parts created while laying out need no frame of their own
   -- style phase: restyle from the dirty root before layout reads computed styles and
@@ -61,22 +61,35 @@ function M.render_view(d, width, height)
   local list = require("dbdash.paint").view(tree)
   local lines, hl = vim.deepcopy(list.header.lines), vim.deepcopy(list.header.hl)
   local offset = #lines
-  local body ---@type dbdash.render.Output|dbdash.compositor.Frame
-  local regions
-  local single = list.body
-  if single then
-    body = single
-  else
-    local cells, outs = {}, {}
-    for i, l in ipairs(list.layers) do
-      cells[i] = { x = l.x, width = l.width, y = l.y, height = l.height }
-      outs[i] = l.out
-    end
-    body = require("dbdash.compositor").compose(cells, outs)
-    regions = {}
-    for i, r in ipairs(body.regions) do
-      regions[i] = { row_s = r.row_s + offset, row_e = r.row_e + offset, x = r.x, width = r.width }
-    end
+  local cells, outs = {}, {}
+  for i, l in ipairs(list.layers) do
+    cells[i] = { x = l.x, width = l.width, y = l.y, height = l.height }
+    outs[i] = l.out
+  end
+  local body = require("dbdash.compositor").compose(cells, outs)
+  local regions = {}
+  for i, r in ipairs(body.regions) do
+    regions[i] = { row_s = r.row_s + offset, row_e = r.row_e + offset, x = r.x, width = r.width }
+  end
+  -- where the statuses go (update_status): the header's line, each panel's title line
+  local head = list.header.lines[1]
+  d.header_slot = head
+    and {
+      row = 0,
+      start = 0,
+      from = W.width((head:gsub("%s+$", ""))) + (head:match("%S") and 1 or 0),
+      to = width,
+    }
+  d.status_slots = {}
+  for i, l in ipairs(list.layers) do
+    local sl = l.out.status_slot
+    d.status_slots[i] = sl
+      and {
+        row = l.y + sl.row + offset,
+        start = l.x + sl.start,
+        from = l.x + sl.from,
+        to = l.x + sl.to,
+      }
   end
   -- hit-test regions in buffer rows (events/)
   d.hits = {}
@@ -149,68 +162,62 @@ function M.redraw(d)
   M.update_status(d)
 end
 
----The status line (extmarks) from the document's data (dashboard/commit.lua): countdowns,
----running ("…"), a push source's state, a single chart's error.
+---A status `text` placed in `slot` (buffer row, window columns: `start` of the line,
+---free cells `from` up to `to`) by setup countdown_position: "right_align" at the end of
+---the free cells, "eol" at their start, "overlay" at the line's start. In the free cells
+---it is cut with "…" when it does not fit, and left out without room: the title is
+---content, the status gives way.
+---@return dbdash.view.buffer.StatusMark?
+local function place(slot, text, hl)
+  if not (slot and text and text ~= "") then
+    return nil
+  end
+  local position = opts().countdown_position
+  if position == "overlay" then
+    local room = slot.to - slot.start
+    return { row = slot.row, col = slot.start, text = W.truncate(text, room, "…"), hl = hl }
+  end
+  local room = slot.to - slot.from
+  if W.width(text) > room then
+    if room < 2 then
+      return nil
+    end
+    text = W.truncate(text, room, "…")
+  end
+  local col = position == "eol" and slot.from or slot.to - W.width(text)
+  return { row = slot.row, col = col, text = text, hl = hl }
+end
+
+---The status line (extmarks) from the document's data (dashboard/commit.lua): the
+---top-level countdown on the header line, each panel's status on its title line (its
+---source's state, its countdown; "…" while it queries).
 function M.update_status(d)
   d.doc.data_changed = false
-  local header
+  local hl = scope(d.header_node):hl("countdown")
+  local marks = {}
   local hdata = d.header_node.data or {}
   local shown, format = require("dbdash.css").countdown(d.header_node)
   if shown and hdata.next_at then
-    header = M.countdown_text(format, remaining(hdata.next_at), hdata.refreshing)
+    local text = M.countdown_text(format, remaining(hdata.next_at), hdata.refreshing)
+    marks[#marks + 1] = place(d.header_slot, text, hl)
   end
-  ---The status of panel element `node`: its countdown, after its source's state.
-  local function panel_status(node, countdown_shown, fmt)
-    local data = node.data or {}
-    local text = countdown_shown and M.countdown_text(fmt, remaining(data.next_at), data.running)
+  for i, p in ipairs(d.panels) do
+    local data = p.node.data or {}
+    local p_shown, p_format = require("dbdash.css").countdown(p.node)
+    local text = (p_shown or data.running)
+        and M.countdown_text(p_format, remaining(data.next_at), data.running)
       or nil
     if data.state then
-      text = data.state .. (text and data.state ~= "ended" and ("  " .. text) or "")
+      text = data.state .. (text and p_shown and data.state ~= "ended" and ("  " .. text) or "")
     end
-    return text, data
+    marks[#marks + 1] = place(d.status_slots and d.status_slots[i], text, hl)
   end
-  if not d.cfg.grid then
-    local node = d.panels[1].node
-    local p_shown, p_format = require("dbdash.css").countdown(node)
-    local countdown = panel_status(node, p_shown, p_format)
-    buffer.set_status(d.buf, {
-      header = header,
-      countdown = countdown,
-      row = d.header_rows or 0,
-      error = child(node, "error").text,
-      position = opts().countdown_position,
-      countdown_hl = scope(d.header_node):hl("countdown"),
-      error_hl = scope(node):hl("error"),
-    })
-    return
-  end
-  local marks = {}
-  for i, p in ipairs(d.panels) do
-    local r = d.regions and d.regions[i]
-    local p_shown, p_format = require("dbdash.css").countdown(p.node)
-    local text, data = panel_status(p.node, true, p_format)
-    if r and (p_shown or data.running or data.state) then
-      if data.state and not p_shown then
-        text = data.state
-      end
-      marks[#marks + 1] =
-        { row = r.row_s, col = r.x + r.width - vim.fn.strdisplaywidth(text or ""), text = text }
-    end
-  end
-  buffer.set_status(
-    d.buf,
-    { header = header, panels = marks, countdown_hl = scope(d.header_node):hl("countdown") }
-  )
+  buffer.set_status(d.buf, marks)
 end
 
----Panel whose region contains buffer line `lnum` (1-based) and display column `dcol`
----(0-based); the only panel when single. Panels side by side share lines, so the column
----decides between them.
+---The panel at buffer line `lnum` (1-based) and display column `dcol` (0-based): the node
+---there (hit test, events/), then its panel.
 function M.panel_at(d, lnum, dcol)
-  if not d.cfg.grid then
-    return d.panels[1]
-  end
-  -- hit test: the node at the position, then its panel (events/)
   local dom_events = require("dbdash.events")
   return dom_events.panel_of(d, dom_events.hit_test(d, lnum, dcol))
 end
@@ -343,20 +350,16 @@ function M.start(path, o)
     if answer == "allow" then
       M.start(path, o)
     elseif answer == "deny" then
-      vim.notify(
-        ("dbdash: %s denied; it will not run (:DbDashTrust allow %s to allow it)"):format(
-          name,
-          name
-        ),
-        vim.log.levels.WARN
+      notifier.warn(
+        ("%s denied; it will not run (:DbDashTrust allow %s to allow it)"):format(name, name)
       )
     else
-      vim.notify(("dbdash: %s not started (not trusted yet)"):format(name), vim.log.levels.INFO)
+      notifier.info(("%s not started (not trusted yet)"):format(name))
     end
   end)
   if not cfg then
     if type(state) == "string" then
-      vim.notify("dbdash: " .. state, level or vim.log.levels.WARN)
+      notifier.notify(state, level or vim.log.levels.WARN)
     elseif state then
       events:emit("dashboard:error", path, state)
     end

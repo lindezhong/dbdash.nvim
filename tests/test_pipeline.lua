@@ -73,6 +73,8 @@ T["a new result of one panel lays out that panel only"] = function()
   local p = d.panels[2]
   local before = counters(d)
   p.rs = require("dbdash.db.resultset").new({ { name = "m", type = "integer" } }, { { 3 } })
+  p.committed = false -- (a new period: the result is committed at once)
+  p:emit("panel:result", p.rs, {}) -- as the panel's consumer tells it
   require("dbdash.view.dashboard").redraw(d)
   local dd = delta(before, counters(d))
   -- panel b: measured twice (min / max-content) and laid out once; panel a: reused

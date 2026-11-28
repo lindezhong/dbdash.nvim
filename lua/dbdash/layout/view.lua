@@ -1,10 +1,10 @@
 -- Layout of a dashboard view (Servo's layout: box tree -> fragment tree), from the
 -- dashboard's document and computed styles:
---   view     the header block, then the panels: one block (a one-chart dashboard) or the
---            grid formatting context (layout/grid.lua)
+--   view     the header block, then the panels in the grid formatting context
+--            (layout/grid.lua; a dashboard of one panel is a grid of one)
 --   panel    a block box (padding, border: paint/box.lua settings) stacking its rows:
---            the title line (inline: title, ⓘ, error), the subtitle, the argument line,
---            and the chart
+--            the title line (inline: title, ⓘ; the status goes on it), the error (whole,
+--            wrapped), the subtitle, the argument line, and the chart
 --   chart    a replaced element: laid out at the size it gets; its raster comes from the
 --            chart code (layout/replaced.lua)
 -- The result is a tree of fragments; painting them is paint/init.lua's job.
@@ -31,6 +31,8 @@ local M = {}
 ---@field border_title table? the title drawn in the top border
 ---@field caption_bottom boolean?
 ---@field after dbdash.layout.FragmentRow? a row after the chart (caption-side: bottom)
+---@field title_line { used: integer }? the panel has a title line; `used` cells of it show
+---  the title and ⓘ (the rest is for its status)
 ---@field painted dbdash.render.Output? its display list item (paint/)
 
 local function child(node, tag)
@@ -103,30 +105,49 @@ function M.args_line(p, width)
   return { lines = { line }, hl = hl }
 end
 
----The title line of a panel: the title aligned in the room ⓘ leaves, ⓘ, then the error
----when at least 6 cells are left (an inline formatting context whose first item shrinks).
+---The title line of a panel: the title aligned in the room ⓘ leaves, then ⓘ. Empty when
+---the panel has neither (its status, view/dashboard.lua, may still go on the line).
 ---@return string line, table[] spans
 local function title_line(p, st, iw)
-  local title_node, icon_node, err_node =
-    child(p.node, "panel-title"), child(p.node, "description-icon"), child(p.node, "error")
+  local title_node, icon_node = child(p.node, "panel-title"), child(p.node, "description-icon")
   local name, icon = text(title_node) or "", text(icon_node)
   local room = math.max(iw - (icon and (W.width(icon) + 1) or 0), 1)
   local head, s0, e0 = box.title_line(name, room, st.title_align or "left", st.ellipsis)
   local spans = { { s0, e0, st.title_group } }
   if icon then
-    head = head .. " " .. icon
+    head = (name ~= "" and head .. " " or "") .. icon
     spans[#spans + 1] = { #head - #icon, #head, css.hl_of(icon_node) }
   end
-  local err = text(err_node)
-  if err then
-    local free = iw - W.width(head) - 3
-    if free > 5 then
-      local e = W.truncate(err:gsub("\n", " "), free)
-      spans[#spans + 1] = { #head + 2, #head + 2 + #("✗ " .. e), css.hl_of(err_node) }
-      head = head .. "  ✗ " .. e
+  return head, spans
+end
+
+---Has the panel a title line: a title or ⓘ, or a status to show on it (a source that sends
+---data has a state; a countdown its style shows). Known without its current status, so
+---a status that changes does not lay the panel out again.
+local function has_title_line(p, head)
+  return vim.trim(head) ~= "" or p.sends == true or (require("dbdash.css").countdown(p.node))
+end
+
+---The error of a panel, whole: "✗ " and its lines wrapped to `width`.
+---@return dbdash.render.Output?
+local function error_rows(p, width)
+  local node = child(p.node, "error")
+  local err = text(node)
+  if not err then
+    return nil
+  end
+  local group = css.hl_of(node)
+  local out = { lines = {}, hl = {} }
+  for i, line in ipairs(vim.split(err, "\n", { plain = true })) do
+    local prefix = i == 1 and "✗ " or "  "
+    for _, piece in ipairs(W.wrap(line, math.max(width - 2, 1), "word")) do
+      local l = prefix .. piece
+      out.lines[#out.lines + 1] = l
+      out.hl[#out.hl + 1] = { row = #out.lines - 1, col_s = 0, col_e = #l, group = group }
+      prefix = "  "
     end
   end
-  return head, spans
+  return out
 end
 
 local layout_panel
@@ -198,9 +219,15 @@ layout_panel = function(p, width, height, fill, exact)
     box = st,
     rows = {},
   }
-  local header = { lines = { head }, hl = {} }
-  for _, sp in ipairs(spans) do
-    header.hl[#header.hl + 1] = { row = 0, col_s = sp[1], col_e = sp[2], group = sp[3] }
+  local header = { lines = {}, hl = {} }
+  if has_title_line(p, head) then
+    -- the status (view/dashboard.lua) goes on this line after what it shows
+    frag.title_line = { used = W.width((head:gsub("%s+$", ""))) }
+    header.title_line = true -- (paint/: where the line is)
+    header.lines[1] = head
+    for _, sp in ipairs(spans) do
+      header.hl[#header.hl + 1] = { row = 0, col_s = sp[1], col_e = sp[2], group = sp[3] }
+    end
   end
   if st.border then
     -- fieldset style: ╭─ Title ⓘ ──╮
@@ -214,18 +241,29 @@ layout_panel = function(p, width, height, fill, exact)
   local sub_node = child(p.node, "subtitle")
   if sub_node.text and header then
     local sl, ss, se = box.title_line(sub_node.text, iw, st.title_align or "left", st.ellipsis)
-    header.lines[2] = sl
-    header.hl[#header.hl + 1] = { row = 1, col_s = ss, col_e = se, group = css.hl_of(sub_node) }
+    local row = #header.lines
+    header.lines[row + 1] = sl
+    header.hl[#header.hl + 1] = { row = row, col_s = ss, col_e = se, group = css.hl_of(sub_node) }
+  end
+  if header and #header.lines == 0 then
+    header = nil
   end
   show.subtitle = nil
+  local errors = error_rows(p, iw)
   local args_line = M.args_line(p, iw)
-  local bh = ih - (header and #header.lines or 0) - (args_line and 1 or 0)
+  local bh = ih
+    - (header and #header.lines or 0)
+    - (errors and #errors.lines or 0)
+    - (args_line and 1 or 0)
   local body = replaced.raster(p, show, iw, bh, fill)
   body = box.position(body, st, iw, exact and bh or nil)
   -- the title under the chart
   frag.caption_bottom = scope:get("panel-title")["caption-side"] == "bottom"
   if header and not frag.caption_bottom then
     frag.rows[#frag.rows + 1] = { node = p.node, out = header }
+  end
+  if errors then
+    frag.rows[#frag.rows + 1] = { node = child(p.node, "error"), out = errors }
   end
   if args_line then
     frag.rows[#frag.rows + 1] = { node = child(p.node, "args"), out = args_line }
@@ -234,34 +272,6 @@ layout_panel = function(p, width, height, fill, exact)
   if header and frag.caption_bottom then
     frag.after = { node = p.node, out = header }
   end
-  return frag
-end
-
----The chart of a one-chart dashboard in its box; the title stays the chart's own unless
----the border carries it.
----@return dbdash.layout.Fragment
-local layout_single
-
-function M.single(p, width, height)
-  return cached(p, "single", width, height, false, false, function()
-    return layout_single(p, width, height)
-  end)
-end
-
-layout_single = function(p, width, height)
-  local show = p:show_config()
-  local st = box.settings(css.scope(p.node))
-  local iw, ih = box.inner(st, width, height)
-  local frag = { node = p.node, x = 0, y = 0, width = width, box = st, rows = {} }
-  if st.border and show.title ~= nil and show.title ~= vim.NIL then
-    frag.border_title = { text = show.title, spans = { { 0, #show.title, st.title_group } } }
-    show = vim.deepcopy(show)
-    show.title = nil
-  end
-  local body = replaced.raster(p, show, iw, ih)
-  local exact = st.align ~= "start" or st.border ~= nil or st.background ~= nil
-  frag.chart = { node = p.chart_node, out = box.position(body, st, iw, exact and ih or nil) }
-  frag.height = exact and height or nil
   return frag
 end
 
@@ -275,7 +285,7 @@ function M.measure(p, width)
   local key = vim.json.encode({
     width,
     show,
-    p.error and true or false,
+    child(p.node, "error").text or false,
     p.node and p.node.layout_version or 0,
   })
   local m = p.measured
@@ -354,21 +364,13 @@ end
 
 ---@class dbdash.layout.View
 ---@field header dbdash.render.Output
----@field single dbdash.layout.Fragment?
----@field args dbdash.render.Output?
----@field grid { fragments: dbdash.layout.Fragment[] }?
+---@field grid { fragments: dbdash.layout.Fragment[], error: string? }
 
 ---Lay out the whole view at `width` x `height`.
 ---@return dbdash.layout.View
 function M.reflow(d, width, height)
   local header = M.header(d)
   local avail = height - #header.lines
-  if not d.cfg.grid then
-    local p = d.panels[1]
-    local args_line = M.args_line(p, width)
-    local h = avail - (args_line and 2 or 0)
-    return { header = header, args = args_line, single = M.single(p, width, h) }
-  end
   return { header = header, grid = M.grid(d, width, avail) }
 end
 

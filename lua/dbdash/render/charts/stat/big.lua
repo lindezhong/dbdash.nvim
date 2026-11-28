@@ -180,11 +180,6 @@ local function one(rs, show, ctx, history, i)
       o.hl[#o.hl + 1] = { row = #o.lines - 1, col_s = sp[1], col_e = sp[2], group = sp[3] }
     end
   end
-  local title = show.title ~= vim.NIL and show.title or ""
-  if title ~= "" then
-    title = W.truncate(title, ctx.width)
-    out:add(title, { { 0, #title, ctx.css:hl("title") } })
-  end
   local v, err = C.value(rs, show)
   if err then
     out:add(err, { { 0, #err, ctx.css:hl("warning") } })

@@ -1,5 +1,3 @@
-│Active users
-  ^ 0-12 DbDashTitle
 │▄█  █▀█ █ █ ▀▀█
   ^ 0-35 DbDashStatValue
 │ █  █ █ ▀▀█   █

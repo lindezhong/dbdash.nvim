@@ -139,7 +139,6 @@ end
 M.mark_group = mark_group
 
 ---@class dbdash.render.charts.bars.HorizontalOpts
----@field title string?
 ---@field xlabel string?
 ---@field ylabel string?
 ---@field show_values boolean
@@ -313,7 +312,6 @@ function M.horizontal(ctx, bars, o)
     end
   end
   local spec = {
-    title = o.title,
     xlabel = o.xlabel,
     ylabel = o.ylabel,
     ylabels = labels,
@@ -428,7 +426,6 @@ function M.vertical(ctx, bars, o)
   local minv, maxv, all = value_range(bars, stacked, o.axes)
   local lo, hi = C.limits(ctx, minv, maxv, o.axes and o.axes.ymin or 0, o.axes and o.axes.ymax)
   local spec = {
-    title = o.title,
     xlabel = o.xlabel,
     ylabel = o.ylabel,
     height = ctx.plot_height,

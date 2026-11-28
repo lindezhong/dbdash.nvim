@@ -111,7 +111,7 @@ T["defaults apply where a config or URL sets nothing"] = function()
     "show: { type: table }",
   }, f)
   local cfg = assert(require("dbdash.config").load(f))
-  eq({ cfg.show.interval, cfg.query.max_rows }, { 120000, 5 })
+  eq({ cfg.panels[1].show.interval, cfg.panels[1].query.max_rows }, { 120000, 5 })
   local u = require("dbdash.db.url").parse("postgres://h/db")
   eq({ u.timeout, u.connect_timeout }, { 7000, 3000 })
   u = require("dbdash.db.url").parse("postgres://h/db?timeout=1s")

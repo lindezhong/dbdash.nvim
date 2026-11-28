@@ -162,7 +162,6 @@ function M.render(rs, show, ctx)
     lw = legend_width(legend)
   end
   local cols, rows, beside = size(ctx, legend, lw, pos, half)
-  local title = P.title(show, math.min(beside and (cols + 3 + lw) or math.max(cols, lw), ctx.width))
   local canvas = ctx.canvas(cols, rows, { 0, 1 }, { 0, 1 })
   fill(canvas, items, sum, donut, half)
   local body, body_hl = canvas:render()
@@ -176,9 +175,6 @@ function M.render(rs, show, ctx)
   end
   if donut >= 0.5 and not half then
     body_hl = total_in_hole(ctx, show, sum, body, body_hl, rows, donut)
-  end
-  if title then
-    out:add(title.text, title.spans)
   end
   with_legend(out, body, body_hl, legend, rows, beside)
   return { lines = out.lines, hl = out.hl }

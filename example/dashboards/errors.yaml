@@ -2,7 +2,8 @@
 #
 # Errors (:help dbdash-errors), on purpose:
 # - A database whose query fails three times in every six refreshes (meta.refresh_count).
-#   The last good result stays on screen with the error above it. Failures in a row back
+#   The last good result stays on screen; the error is a line of its own under the
+#   panel's title, in full (wrapped in a narrow window, never cut). Failures in a row back
 #   off: the second waits 2 intervals, the third 4 (setup errors.backoff caps it); the
 #   status says "retrying" and :DbDashStatus shows the count and the next try. The first
 #   success goes back to the interval.
@@ -15,8 +16,8 @@
 title: "Errors"
 description: |
   A query that fails now and then, backing off, and a source that sends a bad item now and
-  then. The last good result stays on screen with the error above it. See
-  `:help dbdash-errors`.
+  then. The last good result stays on screen, the error in full under the panel's title.
+  See `:help dbdash-errors`.
 
 style:
   dashboard: { grid-template-columns: 2 }

@@ -16,7 +16,6 @@ local M = {
   ["warning"] = { color = "DbDashWarn" },
   ["note"] = { color = "DbDashMuted" },
   -- charts
-  ["title"] = { color = "DbDashTitle" },
   ["subtitle"] = { color = "DbDashMuted" },
   ["plot"] = { ["border-color"] = "DbDashBorder", border = "single" },
   ["axis"] = { color = "DbDashAxis" },

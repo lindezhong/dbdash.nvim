@@ -7,6 +7,7 @@
 #   (strings quoted and escaped, lists as (a, b), none as NULL); | safe opts out.
 # - Imported macros see args and meta: h.labelled('team') uses args.label and meta.
 
+title: "Template macros"
 description: |
   Macros in a file of their own (`macros/sql_helpers.sql`), imported into the query, and
   `query.autoescape`. See `:help dbdash-template-imports`.

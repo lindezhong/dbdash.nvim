@@ -77,7 +77,6 @@ function M.render(rs, show, ctx)
     legend[i] = { label = d.label, group = d.group, symbol = "─" }
   end
   local spec = {
-    title = nn(show.title),
     xlabel = axes.xlabel,
     ylabel = axes.ylabel,
     legend = legend,

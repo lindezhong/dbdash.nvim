@@ -62,10 +62,11 @@ configs (|dbdash-examples|). Every field has a tag:
   $id: "dbdash.schema.yaml"
   title: dbdash.nvim dashboard
   description: >-
-    One dashboard: either a single chart (database / query / show) or several
-    panels (panels). Top-level bare fields (interval, args, style) are
-    dashboard-wide; the top-level database, query and show are the panels'
-    defaults (without panels: the only panel). All appearance is in style
+    One dashboard: a grid of panels (panels), or one panel written at the top
+    level (database / query / show), drawn the same way. Top-level bare
+    fields (interval, args, style) are dashboard-wide; the top-level
+    database, query and show are the panels' defaults (without panels: the
+    only panel). All appearance is in style
     sheets (style, panels[].style). See :help dbdash-config.
   type: object
   if: { required: [panels] }
@@ -822,7 +823,12 @@ configs (|dbdash-examples|). Every field has a tag:
           default: table
 <
                                               *dbdash-schema-show.title* >yaml
-        title: { type: string }
+        title:
+          type: string
+          description: >-
+            The panel's title, on its title line with its ⓘ and its status.
+            Without one: "Panel N" when the dashboard has several panels,
+            no title when it has one.
 <
                                            *dbdash-schema-show.subtitle* >yaml
         subtitle:
@@ -835,8 +841,8 @@ configs (|dbdash-examples|). Every field has a tag:
           description: >-
             This chart's description: a template (args, meta, as its query
             sees them; it cannot assign arguments) whose result is Markdown,
-            shown by K / :DbDashDescribe; ⓘ after the panel's title (in a
-            one-chart dashboard: in the header) says there is one. With
+            shown by K / :DbDashDescribe; ⓘ after the panel's title says there
+            is one. With
             panels, it belongs in each panel.
 <
                                            *dbdash-schema-show.interval* >yaml

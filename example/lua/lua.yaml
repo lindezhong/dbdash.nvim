@@ -9,6 +9,7 @@
 # values are inserted as written. Reading them from `args` inside Lua needs no quoting.
 # Try: :DbDashStart lua.yaml days=30 wave=false
 
+title: "Lua source"
 description: |
   A `lua://` source: Lua code returns the rows; it sees the arguments, the template and
   the `dbdash.*` helpers. Runs Lua, so it asks for trust first. See `:help dbdash-lua`.

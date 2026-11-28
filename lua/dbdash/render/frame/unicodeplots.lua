@@ -1,7 +1,6 @@
--- Plot frame (after UnicodePlots): title, y-axis labels, bordered plot area,
--- x-axis labels, axis titles and legend.
+-- Plot frame (after UnicodePlots): y-axis labels, bordered plot area, x-axis labels,
+-- axis titles and legend (the chart's title is its panel's).
 --
---          Title
 --   y title
 --   150 ┌──────────┐ ■ visits
 --       │⠀⠀⡠⠊⠉⠢⡀⠀⠀│ ■ signups
@@ -14,7 +13,6 @@ local borders = require("dbdash.render.borders")
 local M = { name = "unicodeplots" }
 
 ---@class dbdash.render.FrameSpec
----@field title string?
 ---@field xlabel string? x-axis title
 ---@field ylabel string? y-axis title
 ---@field ylabels string[]? every y tick label (to size the left margin)
@@ -86,7 +84,6 @@ function M.plot_size(ctx, spec)
   local left = margin(spec) + (margin(spec) > 0 and 1 or 0)
   local cols = ctx.width - left - border - legend_width(spec)
   local extra = border
-    + (spec.title and spec.title ~= "" and 1 or 0)
     + (spec.ylabel and 1 or 0)
     + (spec.x_axis ~= false and 1 or 0)
     + (spec.xlabel and 1 or 0)
@@ -231,9 +228,6 @@ function M.render(ctx, spec, body)
     lines = {},
     hl = {},
   }
-  if spec.title and spec.title ~= "" then
-    centered(f, spec.title, ctx.css:hl("title"))
-  end
   if spec.ylabel then
     local t = W.truncate(spec.ylabel, ctx.width)
     add(f, t, { { 0, #t, ctx.css:hl("axis-title") } })

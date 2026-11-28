@@ -23,7 +23,7 @@ T["one line per row; cells joined by spaces; strings as they are"] = function()
     { "a\nb", 2.5, false },
     { vim.NIL, vim.NIL, vim.NIL },
   })
-  eq(lines(r, { title = "Log" }), { "Log", "  start   1 true", "a", "b 2.5 false", "  " })
+  eq(lines(r, { title = "Log" }), { "  start   1 true", "a", "b 2.5 false", "  " })
 end
 
 T["column_list, separator, cell.null content; tabs and CR"] = function()

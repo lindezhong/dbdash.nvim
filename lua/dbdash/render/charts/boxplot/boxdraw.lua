@@ -159,7 +159,6 @@ function M.render(rs, show, ctx)
   end
   local rows = #order * 4 - (show_values and 0 or 1)
   local spec = {
-    title = nn(show.title),
     xlabel = axes.xlabel or axes.ylabel,
     ylabels = order,
     height = rows,

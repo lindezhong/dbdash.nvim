@@ -109,6 +109,32 @@ function M.position(body, s, width, height)
   return shift(body, dx, dy)
 end
 
+---The top border line: ╭─ Title ───╮ (the legend of a fieldset, aligned by title_align)
+---or a plain one. Returns the line, its spans and the display column after the title.
+---@return string line, table[] spans, integer? title_end
+local function top_border(s, width, title)
+  local b, g = s.border, s.border_group
+  local t = title and title.text or ""
+  if not (title and t ~= "") then
+    local line = b.tl .. string.rep(b.h, width - 2) .. b.tr
+    return line, { { 0, #line, g } }, nil
+  end
+  local room = width - 4
+  local tt = W.truncate(t, math.max(room - 2, 1), s.ellipsis)
+  local fill = room - W.width(tt) - 2
+  local lead = s.title_align == "center" and math.floor(fill / 2)
+    or (s.title_align == "right" and fill or 0)
+  local pre = b.tl .. b.h .. string.rep(b.h, lead) .. " "
+  local line = pre .. tt .. " " .. string.rep(b.h, fill - lead) .. b.h .. b.tr
+  local spans = { { 0, #pre, g }, { #pre + #tt, #line, g } }
+  for _, sp in ipairs(title.spans) do
+    if sp[1] < #tt then
+      spans[#spans + 1] = { #pre + sp[1], #pre + math.min(sp[2], #tt), sp[3] }
+    end
+  end
+  return line, spans, W.width(pre .. tt)
+end
+
 ---Wrap `content` (already `inner` sized) in padding and border; `title` goes into the top
 ---border when there is one. The result is `width` cells wide (lines padded when there is a
 ---background or a border) and carries `bg` for the layout.
@@ -150,28 +176,11 @@ function M.wrap(content, s, width, height, title)
     end
   end
   local g = s.border_group
+  local title_end -- display column after the border's title (the status goes after it)
   if b then
-    local t = title and title.text or ""
-    if title and t ~= "" then
-      -- ╭─ Title ───╮ (the legend of a fieldset), aligned by title_align
-      local room = width - 4
-      local tt = W.truncate(t, math.max(room - 2, 1), s.ellipsis)
-      local fill = room - W.width(tt) - 2
-      local lead = s.title_align == "center" and math.floor(fill / 2)
-        or (s.title_align == "right" and fill or 0)
-      local pre = b.tl .. b.h .. string.rep(b.h, lead) .. " "
-      local line = pre .. tt .. " " .. string.rep(b.h, fill - lead) .. b.h .. b.tr
-      local spans = { { 0, #pre, g }, { #pre + #tt, #line, g } }
-      for _, sp in ipairs(title.spans) do
-        if sp[1] < #tt then
-          spans[#spans + 1] = { #pre + sp[1], #pre + math.min(sp[2], #tt), sp[3] }
-        end
-      end
-      add(line, spans)
-    else
-      local line = b.tl .. string.rep(b.h, width - 2) .. b.tr
-      add(line, { { 0, #line, g } })
-    end
+    local line, spans
+    line, spans, title_end = top_border(s, width, title)
+    add(line, spans)
   end
   local lpad, rpad_w = string.rep(" ", left), right
   for k = 1, math.min(#rows, inner_h) do
@@ -208,7 +217,13 @@ function M.wrap(content, s, width, height, title)
       )
     end
   end
-  return { lines = lines, hl = hl, bg = s.background, full = s.background ~= nil or b ~= nil }
+  return {
+    lines = lines,
+    hl = hl,
+    bg = s.background,
+    full = s.background ~= nil or b ~= nil,
+    title_end = title_end,
+  }
 end
 
 return M

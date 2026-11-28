@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Panel titles and their status (:help dbdash-panels). Every dashboard is drawn the same
+# way, one panel or many: each panel has a title line with its title, its ⓘ (a
+# show.description) and its status (a source's state, its countdown):
+# - show.title titles the panel; without one a panel is "Panel N" when the dashboard has
+#   several panels (the second and third here), and has no title when it has one (a
+#   config without panels:, as most files of example/charts/ that set no show.title).
+# - Where the status goes on the title line is setup countdown_position:
+#     "right_align"  at the right of the panel (the default)
+#     "eol"          after the title and ⓘ
+#     "overlay"      over the start of the line
+#   Try: :lua require("dbdash").setup({ countdown_position = "eol" }), then
+#   :DbDashStart! titles.yaml. In a narrow window the status gives way to the title and
+#   ⓘ: it is cut with "…", or left out when there is no room (make the window narrow to
+#   see it).
+# - An error is a line of its own under the title, in full (dashboards/errors.yaml).
+
+title: "Titles and status"
+description: |
+  Panel titles: `show.title`, or "Panel N" when several panels have none. Each panel's
+  status (its countdown here) goes on its title line, where setup `countdown_position`
+  says. See `:help dbdash-panels`.
+
+database:
+  url: "sqlite:///:memory:"
+
+style:
+  dashboard: { grid-template-columns: 3 }
+  countdown: { display: block, content: "next in {time}s" }
+
+panels:
+  - query:
+      sql: "SELECT strftime('%H:%M:%S', 'now', 'localtime') AS now"
+    show:
+      type: table
+      title: "A panel with a long title"
+      description: "Its title line: the title, ⓘ, then its countdown."
+      interval: 10s
+  - query:
+      sql: "SELECT abs(random() % 100) AS value"
+    show:
+      type: table
+      description: "No `show.title`: the second of three panels is \"Panel 2\"."
+      interval: 15s
+  - query:
+      sql: "SELECT abs(random() % 1000) AS value"
+    show:
+      type: table
+      description: "No `show.title` either: \"Panel 3\"."
+      interval: 20s

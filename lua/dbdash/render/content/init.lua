@@ -162,6 +162,9 @@ function M.build(chart, rs, show)
   local built = chart.content
   if built and built.rs == rs and built.key == key and built.type == show.type then
     M.stats.skipped = M.stats.skipped + 1
+    if built.error then
+      error(built.error, 0)
+    end
     return built.root
   end
   if built and built.type ~= show.type then
@@ -169,9 +172,26 @@ function M.build(chart, rs, show)
     chart:set_children({})
     chart.css_parts, chart.content_items, chart.content_sigs = {}, nil, nil
   end
-  local root = require(mod).build(chart, rs, show)
-  chart.content = { rs = rs, key = key, type = show.type, root = root }
+  local ok, root = pcall(require(mod).build, chart, rs, show)
+  -- a result the content cannot use (a missing column) is kept: the renderer reports it
+  chart.content = { rs = rs, key = key, type = show.type, root = ok and root or nil }
+  if not ok then
+    chart.content.error = root
+    error(root, 0)
+  end
   return root
+end
+
+---The content's root element as built (commit in a dashboard, render.render for a chart
+---of its own): renderers read it, they do not build it.
+---@param chart dbdash.dom.Node
+---@return dbdash.dom.Node?
+function M.root(chart)
+  local built = chart.content
+  if built and built.error then
+    error(built.error, 0) -- the data could not be shown: render.render reports it
+  end
+  return built and built.root
 end
 
 return M

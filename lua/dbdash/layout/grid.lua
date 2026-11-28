@@ -711,9 +711,6 @@ M.validators = {
   {
     field = "dashboard",
     validate = function(cfg, ctx)
-      if not cfg.grid then
-        return
-      end
       local doc = ctx:document(cfg)
       local style = require("dbdash.css.style")
       local items = {}
@@ -723,8 +720,9 @@ M.validators = {
       local _, err = M.from_styles(style.get(doc.doc.root), items)
       if err then
         -- the declaration at fault: <sheet>.<selector>.<property>, else the sheet
-        local sheet = err.index and ("panels[%d].style"):format(err.index) or "style"
-        local rules = (err.index and cfg.panels[err.index].style_rules or cfg.style_rules) or {}
+        local own = err.index and cfg.panels[err.index].style_rules
+        local sheet = own and ("panels[%d].style"):format(err.index) or "style"
+        local rules = own or cfg.style_rules or {}
         local where = sheet
         for _, r in ipairs(rules) do
           if r.decls[err.field] ~= nil then

@@ -10,8 +10,6 @@ local W = require("dbdash.util.width")
 
 local M = { name = "plain" }
 
-local nn = require("dbdash.util.null").nn
-
 ---Expand tabs to 8-column stops (by display width).
 local function expand_tabs(line)
   if not line:find("\t", 1, true) then
@@ -31,26 +29,22 @@ local function expand_tabs(line)
   return table.concat(out)
 end
 
----@param rs dbdash.db.ResultSet
----@param show table
+---@param _rs dbdash.db.ResultSet
+---@param _show table
 ---@param ctx dbdash.render.Ctx
 ---@return dbdash.render.Output
-function M.render(rs, show, ctx)
+function M.render(_rs, _show, ctx)
   local css = ctx.css
   local style = require("dbdash.css.style")
   local hl = require("dbdash.css.hl")
   -- the lines' DOM (render/content/text.lua), one line element per row
-  local root = require("dbdash.render.content").build(css.node, rs, show)
-  ---@cast root -nil (a text chart's content has a root)
+  local root = require("dbdash.render.content").root(css.node)
+  if not root then
+    return { lines = {}, hl = {} } -- nothing built (no result yet)
+  end
   local line_nodes = require("dbdash.render.content").list(root, "line")
   local null_text = css:get("cell", { classes = { "null" } }).content or ""
   local lines, hls = {}, {}
-  local title = nn(show.title)
-  if title and title ~= "" then
-    local t = W.truncate(title, ctx.width)
-    lines[1] = t
-    hls[1] = { row = 0, col_s = 0, col_e = #t, group = css:hl("title") }
-  end
   if root.data.total == 0 then
     lines[#lines + 1] = "(no rows)"
     hls[#hls + 1] =

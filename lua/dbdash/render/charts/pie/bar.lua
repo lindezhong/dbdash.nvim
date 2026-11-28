@@ -44,10 +44,6 @@ function M.render(rs, show, ctx)
     end
   end
   local width = math.max(10, ctx.width - 2)
-  local title = P.title(show, width)
-  if title then
-    add(" " .. title.text, title.spans, 1)
-  end
   if #items == 0 then
     add("(no positive values to plot)", { { 0, 28, ctx.css:hl("note") } })
     return { lines = lines, hl = hl }

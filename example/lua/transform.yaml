@@ -5,6 +5,7 @@
 # and args, and returns rows like a lua:// query. Here: amounts in cents become dollars,
 # with a running total. dbdash asks whether you trust this file first (:help dbdash-lua).
 
+title: "query.transform"
 description: |
   `query.transform`: Lua that reshapes any database's result before it is shown. Runs
   Lua, so it asks for trust first. See `:help dbdash-transform`.

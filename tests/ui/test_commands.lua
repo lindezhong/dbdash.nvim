@@ -63,7 +63,8 @@ end
 local function wait_loaded()
   child.lua([[_G.wait_for(function()
     local l = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-    return #l > 1 and table.concat(l, "\n"):find("Test board") ~= nil
+    -- the title shows before the result: wait for its table's rows
+    return table.concat(l, "\n"):find("│ %d") ~= nil
   end)]])
 end
 
@@ -122,7 +123,7 @@ T["start shows a dashboard buffer"] = function()
     { child.lua_get("vim.bo.filetype"), child.lua_get("#require('dbdash.dashboard').list()") },
     { "dbdash", 1 }
   )
-  eq(lines()[1], "n=1  label=hello  ids=1,2")
+  eq(lines()[2], "n=1  label=hello  ids=1,2")
   eq(find_line("│%s+1 │ hello │ %(1, 2%)") ~= nil, true)
   for _, k in ipairs({ "a", "A", "r", "R", "s" }) do
     eq(child.lua_get("vim.fn.maparg(..., 'n', false, true).buffer", { k }), 1)
@@ -143,7 +144,7 @@ T["starting a running config switches to it; args on the command line apply"] = 
   child.cmd("enew")
   child.cmd("DbDashStart board.yaml")
   eq(child.lua_get("vim.api.nvim_get_current_buf()"), buf)
-  eq(lines()[1], "n=5  label=hello  ids=7,8")
+  eq(lines()[2], "n=5  label=hello  ids=7,8")
 end
 
 T["variables: update, reset, show"] = function()
@@ -160,7 +161,7 @@ T["variables: update, reset, show"] = function()
   child.lua(
     [[_G.wait_for(function() return vim.api.nvim_buf_get_lines(0, 0, 1, false)[1]:find("label=hello") end)]]
   )
-  eq(lines()[1], "n=1  label=hello  ids=1,2")
+  eq(lines()[2], "n=1  label=hello  ids=1,2")
   child.type_keys("A")
   eq(child.lua_get("vim.api.nvim_win_get_config(0).relative"), "editor")
   eq(lines()[1]:match("^n = 1"), "n = 1")
@@ -200,14 +201,11 @@ T["errors are reported with their phase and shown above the content"] = function
   local n = child.lua_get("_G.notes[1]")
   eq(n.level, vim.log.levels.ERROR)
   eq(n.msg:find("sqlite query error") ~= nil, true)
-  -- the status line follows with the next frame
-  child.lua(
-    [[_G.wait_for(function() return #vim.api.nvim_buf_get_extmarks(0, require("dbdash.view.buffer").ns_status, 0, -1, {}) > 0 end)]]
-  )
-  local vl = child.lua_get(
-    [[vim.api.nvim_buf_get_extmarks(0, require("dbdash.view.buffer").ns_status, 0, -1, { details = true })[1][4].virt_lines[1][1][1] ]]
-  )
-  eq(vl:find("^✗ sqlite query error") ~= nil, true)
+  child.lua([[_G.wait_for(function()
+    return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n"):find("✗") ~= nil
+  end)]])
+  -- its own line under the panel's title, in full
+  eq(find_line("^✗ sqlite query error") ~= nil, true)
   child.cmd("DbDashStart missing.yaml")
   eq(child.lua_get("_G.notes[#_G.notes].msg"):find("config file not found") ~= nil, true)
   child.cmd("DbDashStart board.yaml nope=1")
@@ -243,7 +241,7 @@ T["sidebar lists configs and starts/stops them"] = function()
     { "dbdash-sidebar", 30, true, false }
   )
   child.type_keys("r")
-  eq(child.lua_get("_G.notes[#_G.notes].msg"), "DbDash not running for this config")
+  eq(child.lua_get("_G.notes[#_G.notes].msg"), "dbdash: not running for this config")
   child.type_keys("<CR>")
   wait_loaded()
   eq(child.lua_get("vim.bo.filetype"), "dbdash")
@@ -483,7 +481,7 @@ T["sessions restore running dashboards"] = function()
   wait_loaded()
   eq(child.lua_get("vim.bo.filetype"), "dbdash")
   -- arguments are session-only: defaults after restore
-  eq(lines()[1], "n=1  label=hello  ids=1,2")
+  eq(lines()[2], "n=1  label=hello  ids=1,2")
 end
 
 T["sessions without 'blank' in sessionoptions keep dashboard windows"] = function()
@@ -531,7 +529,7 @@ T["mksession(file) and load_session(file) keep changed arguments"] = function()
   child.lua(
     [[_G.wait_for(function() return vim.api.nvim_buf_get_lines(0, 0, 1, false)[1] == "n=9  label=hello  ids=3,4" end)]]
   )
-  eq(lines()[1], "n=9  label=hello  ids=3,4")
+  eq(lines()[2], "n=9  label=hello  ids=3,4")
   -- load before the dashboard runs (as when a session is sourced): applied when it
   -- starts; unknown arguments and invalid values are skipped
   child.cmd("DbDashStop")
@@ -544,7 +542,7 @@ T["mksession(file) and load_session(file) keep changed arguments"] = function()
   child.lua("require('dbdash').load_session(...)", { file })
   child.cmd("DbDashStart board.yaml")
   wait_loaded()
-  eq(lines()[1], "n=1  label=hello  ids=5")
+  eq(lines()[2], "n=1  label=hello  ids=5")
   -- missing file: nothing to do; broken file: an error, not an exception
   eq(child.lua_get("{ require('dbdash').load_session(...) }", { dir .. "/none" }), { true })
   vim.fn.writefile({ "{" }, file)
@@ -664,7 +662,6 @@ end
 
 T["grid: show SQL and status follow each panel's database"] = function()
   start_grid()
-  local d = "require('dbdash.dashboard').list()[1]"
   -- The query popup's filetype follows the panel picked (from another buffer: a picker).
   child.cmd("enew")
   child.lua("vim.ui.select = function(items, _, cb) cb(items[2]) end")
@@ -678,7 +675,6 @@ T["grid: show SQL and status follow each panel's database"] = function()
   child.cmd("DbDashStatus")
   local text = table.concat(lines(), "\n")
   eq(text:find("Database:  sqlite") ~= nil and text:find("Database:  lua") ~= nil, true)
-  eq(child.lua_get(d .. ".cfg.grid"), true)
 end
 
 T["the global interval and a panel's own both refresh, without double queries"] = function()
@@ -1054,12 +1050,8 @@ T["errors.notify always / never; backoff = 1 keeps the interval"] = function()
     [[_G.wait_for(function() return (require("dbdash.dashboard").list()[1].panels[1].failures or 0) >= 2 end)]]
   )
   eq(child.lua_get("#_G.notes"), 0)
-  -- still shown in the dashboard (a virtual line above the first line)
-  local marks = child.lua_get(
-    [[vim.tbl_map(function(m) return m[4].virt_lines and m[4].virt_lines[1][1][1] or "" end,
-    vim.api.nvim_buf_get_extmarks(0, require("dbdash.view.buffer").ns_status, 0, -1, { details = true }))]]
-  )
-  eq(table.concat(marks, "\n"):find("✗ ", 1, true) ~= nil, true)
+  -- still shown in the dashboard (its own line under the panel's title)
+  eq(find_line("^✗ ") ~= nil, true)
 end
 
 T["backoff with panels: the global interval skips a panel that is backing off"] = function()
@@ -1270,7 +1262,7 @@ T["multi-panel: grid, per-panel errors and countdowns"] = function()
   start_multi()
   local first = lines()[1]
   eq(first:match("^Fast") ~= nil and first:find("Slow") ~= nil, true) -- side by side
-  eq(find_line("^Broken  ✗ .*sqlite query error") ~= nil, true)
+  eq(find_line("^Broken") ~= nil and find_line("^✗ .*sqlite query error") ~= nil, true)
   eq(find_line("alpha") ~= nil and find_line("beta") ~= nil, true)
   local regions = child.lua_get("vim.b.dbdash_regions")
   eq(#regions, 3)

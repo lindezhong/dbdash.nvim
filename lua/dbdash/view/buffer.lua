@@ -174,77 +174,28 @@ function M.forget(buf)
   shown[buf] = nil
 end
 
----@class dbdash.view.buffer.Status
----@field header string?
----@field countdown string?
----@field row integer?
----@field error string?
----@field position string?
----@field panels { row: integer, col: integer, text: string }[]?
----@field countdown_hl string?
----@field error_hl string?
+---@class dbdash.view.buffer.StatusMark
+---@field row integer 0-based buffer line
+---@field col integer window column
+---@field text string
+---@field hl string highlight group
 
----Countdown and error display.
----`header`: the global countdown, right-aligned on the first line (the header).
----Single panel: `countdown` on line `row` (the first after the header) and `error` as
----virtual lines above it.
----Multiple panels: `panels` lists { row, col, text } marks at fixed window columns.
+---The status (countdowns, states): marks drawn over the given window columns of their lines.
 ---@param buf integer
----@param status dbdash.view.buffer.Status
-function M.set_status(buf, status)
+---@param marks dbdash.view.buffer.StatusMark[]
+function M.set_status(buf, marks)
   if not vim.api.nvim_buf_is_valid(buf) then
     return
   end
   vim.api.nvim_buf_clear_namespace(buf, M.ns_status, 0, -1)
-  -- colors come from the computed styles of `countdown` and `error` (css)
-  local cd_hl, err_hl = status.countdown_hl or "DbDashCountdown", status.error_hl or "DbDashError"
-  if status.header then
-    vim.api.nvim_buf_set_extmark(buf, M.ns_status, 0, 0, {
-      virt_text = { { status.header, cd_hl } },
-      virt_text_pos = "right_align",
-      priority = 200,
-    })
-  end
-  if status.panels then
-    local last = vim.api.nvim_buf_line_count(buf) - 1
-    for _, m in ipairs(status.panels) do
-      if m.row <= last then
-        vim.api.nvim_buf_set_extmark(buf, M.ns_status, m.row, 0, {
-          virt_text = { { m.text, cd_hl } },
-          virt_text_win_col = math.max(0, m.col),
-          priority = 200,
-        })
-      end
-    end
-    return
-  end
-  local row = math.min(status.row or 0, vim.api.nvim_buf_line_count(buf) - 1)
-  if status.countdown then
-    vim.api.nvim_buf_set_extmark(buf, M.ns_status, row, 0, {
-      virt_text = { { status.countdown, cd_hl } },
-      virt_text_pos = status.position or "right_align",
-      priority = 200,
-    })
-  end
-  if status.error then
-    local vl = {}
-    for line in (status.error .. "\n"):gmatch("([^\n]*)\n") do
-      vl[#vl + 1] = { { (#vl == 0 and "✗ " or "  ") .. line, err_hl } }
-    end
-    vim.api.nvim_buf_set_extmark(buf, M.ns_status, row, 0, {
-      virt_lines = vl,
-      virt_lines_above = true,
-      priority = 200,
-    })
-    -- Lines above the first buffer line are only visible with topfill.
-    for _, win in ipairs(row == 0 and vim.fn.win_findbuf(buf) or {}) do
-      vim.api.nvim_win_call(win, function()
-        local view = vim.fn.winsaveview()
-        if view.topline == 1 then
-          view.topfill = #vl
-          vim.fn.winrestview(view)
-        end
-      end)
+  local last = vim.api.nvim_buf_line_count(buf) - 1
+  for _, m in ipairs(marks) do
+    if m.row <= last then
+      vim.api.nvim_buf_set_extmark(buf, M.ns_status, m.row, 0, {
+        virt_text = { { m.text, m.hl } },
+        virt_text_win_col = math.max(0, m.col),
+        priority = 200,
+      })
     end
   end
 end

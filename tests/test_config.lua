@@ -40,14 +40,14 @@ end
 T["minimal config gets defaults"] = function()
   local cfg = assert(load(MINIMAL))
   eq(cfg.database.type, "sqlite")
-  eq(cfg.query.sql, "SELECT 1\n")
-  eq(cfg.query.sql_line, 5)
-  eq(cfg.query.max_rows, 10000)
-  eq(cfg.query.autoescape, false)
-  eq(cfg.show.args_show, false)
-  eq(cfg.query.args, {})
-  eq(cfg.show.type, "table")
-  eq(cfg.show.interval, 30000)
+  eq(cfg.panels[1].query.sql, "SELECT 1\n")
+  eq(cfg.panels[1].query.sql_line, 5)
+  eq(cfg.panels[1].query.max_rows, 10000)
+  eq(cfg.panels[1].query.autoescape, false)
+  eq(cfg.panels[1].show.args_show, false)
+  eq(cfg.panels[1].query.args, {})
+  eq(cfg.panels[1].show.type, "table")
+  eq(cfg.panels[1].show.interval, 30000)
   eq(cfg.style_rules, nil)
 end
 
@@ -61,7 +61,7 @@ T["args are normalized"] = function()
       choices: [18, 30]
     - name: label
 ]]))
-  eq(cfg.query.args[1], {
+  eq(cfg.panels[1].query.args[1], {
     key = "min_age", -- a local argument of panel 1; its name is unique
     panel = 1,
     panel_id = "1",
@@ -72,8 +72,8 @@ T["args are normalized"] = function()
     show = true,
     choices = { 18, 30 },
   })
-  eq(cfg.query.args[2].type, "string")
-  eq(cfg.query.args[2].default, nil)
+  eq(cfg.panels[1].query.args[2].type, "string")
+  eq(cfg.panels[1].query.args[2].default, nil)
 end
 
 T["key: in args is rejected with a hint"] = function()
@@ -106,12 +106,12 @@ end
 
 T["the top-level interval is the panel's interval without its own"] = function()
   local cfg = assert(load(MINIMAL .. "interval: 2m\n"))
-  eq(cfg.show.interval, 120000)
+  eq(cfg.panels[1].show.interval, 120000)
 end
 
 T["single-chart configs become one panel"] = function()
   local cfg = assert(load(MINIMAL .. "args:\n  - name: top\n"))
-  eq({ cfg.grid, #cfg.panels, cfg.panels[1].query == cfg.query }, { false, 1, true })
+  eq(#cfg.panels, 1)
   eq(
     vim.tbl_map(function(a)
       return a.key
@@ -150,7 +150,7 @@ panels:
 
 T["multi-panel configs"] = function()
   local cfg = assert(load(MULTI))
-  eq({ cfg.grid, #cfg.panels, #cfg.style_rules, cfg.refresh_all }, { true, 2, 1, 300000 })
+  eq({ #cfg.panels, #cfg.style_rules, cfg.refresh_all }, { 2, 1, 300000 })
   -- Shared arguments, then each panel's local ones (keyed <panel id>.<name>).
   eq(
     vim.tbl_map(function(a)

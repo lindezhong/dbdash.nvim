@@ -32,11 +32,9 @@ function M.dashboard(d)
   return doc
 end
 
----The header shows ⓘ for the dashboard's description, and in a one-chart dashboard for the
----chart's too (the chart has no title line of its own).
+---The header shows ⓘ for the dashboard's description (a panel's is on its own title line).
 function M.header_icon(d)
-  local cfg = d.cfg
-  return cfg.description ~= nil or (not cfg.grid and d.panels[1].cfg.show.description ~= nil)
+  return d.cfg.description ~= nil
 end
 
 ---The document of a config without running it (config checks, tests, tools): a stand-in

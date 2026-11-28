@@ -8,6 +8,10 @@ local options = require("dbdash.options")
 require("dbdash.trust").viewer = function(...)
   return require("dbdash.view.trust").view(...)
 end
+-- A failing event listener is told by the notifier, as every message is.
+require("dbdash.util.emitter").on_error = function(msg)
+  require("dbdash.view.notifier").error(msg)
+end
 
 -- The dashboard keys' actions are commands (the controller).
 require("dbdash.dashboard.events"):on("action", function(...)
@@ -71,7 +75,7 @@ end
 function M.setup(opts)
   local errors = options.set(opts)
   if #errors > 0 then
-    vim.notify("dbdash setup: " .. table.concat(errors, "\n"), vim.log.levels.ERROR)
+    require("dbdash.view.notifier").error("setup: " .. table.concat(errors, "\n"))
   end
   M.del_mappings()
   M.set_mappings()

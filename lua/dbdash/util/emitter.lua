@@ -2,6 +2,18 @@
 -- the order they were added, on the caller's stack (the main loop for dashboards).
 local M = {}
 
+---Where a failing listener is reported (init.lua sets the notifier: util/ knows no view);
+---before that, vim.notify.
+---@type fun(msg: string)?
+M.on_error = nil
+
+local function report(msg)
+  if M.on_error then
+    return M.on_error(msg)
+  end
+  vim.notify("dbdash: " .. msg, vim.log.levels.ERROR)
+end
+
 ---@class dbdash.Emitter
 ---@field listeners table<string, function[]>
 local Emitter = {}
@@ -41,10 +53,7 @@ function Emitter:emit(type, ...)
   for _, fn in ipairs(vim.list_slice(self.listeners[type] or {})) do
     local ok, err = pcall(fn, ...)
     if not ok then
-      vim.notify(
-        ("dbdash: %s listener failed: %s"):format(type, tostring(err)),
-        vim.log.levels.ERROR
-      )
+      report(("%s listener failed: %s"):format(type, tostring(err)))
     end
   end
 end

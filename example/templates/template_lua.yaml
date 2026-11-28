@@ -11,6 +11,7 @@
 # The config and modules/helpers.lua are trusted together, once (:help dbdash-lua).
 # Try: :DbDashStart template_lua.yaml days=14
 
+title: "Lua in templates"
 description: |
   Lua in templates: {% raw %}`{% lua %}`{% endraw %} blocks and imported `.lua` modules in `query.sql` and
   `query.transform`. Runs Lua, so it asks for trust first. See

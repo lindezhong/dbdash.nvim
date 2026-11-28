@@ -380,9 +380,10 @@ T["xy: stepped lines, NULL gaps, percent stacking"] = function()
   eq(text:find("100 │", 1, true) ~= nil, true)
 end
 
-T["xy: subtitle under the title"] = function()
-  local out = xy({ { 1, 1 }, { 2, 2 } }, { type = "line", title = "T", subtitle = "sub" })
-  eq({ vim.trim(out.lines[1]), vim.trim(out.lines[2]) }, { "T", "sub" })
+T["xy: no title or subtitle (they are the panel's)"] = function()
+  local out = xy({ { 1, 1 }, { 2, 2 } }, { type = "line", title = "Title", subtitle = "Sub" })
+  local text = table.concat(out.lines, "\n")
+  eq({ text:find("Title", 1, true), text:find("Sub", 1, true) }, { nil, nil })
 end
 
 -- bar and histogram options -------------------------------------------------------------

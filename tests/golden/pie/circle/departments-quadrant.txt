@@ -1,5 +1,3 @@
-│                  Headcount share
-  ^ 18-33 DbDashTitle
 │   ▄▟██▙▄   
   ^ 3-12 DbDashSeries4
   ^ 12-21 DbDashSeries1

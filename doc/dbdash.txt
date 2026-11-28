@@ -37,7 +37,11 @@ defaults: >lua
   require("dbdash").setup({
     mappings = true,       -- global keys, see below
     countdown_interval = 10000,          -- ms between countdown updates
-    countdown_position = "right_align",  -- "eol", "overlay"
+    countdown_position = "right_align",  -- where a panel's status goes on
+                           -- its title line: "right_align" (at its right),
+                           -- "eol" (after the title and ⓘ), "overlay" (over
+                           -- the line's start); the first two give way to
+                           -- the title (cut with "…", or left out)
     style = {},            -- your style sheet for every dashboard:
                            -- selector -> properties, |dbdash-css|
     ticks = "nice",        -- axis ticks: "nice" or "linear"
@@ -143,7 +147,7 @@ a SQL syntax error, or the result is not rows, |dbdash-result|), transform
 too, |dbdash-cancel|) or decode. Then:
 
 - the last good result stays on screen, with the error as a red `✗` line
-  above it (with panels: in the panel's header);
+  of its own under the panel's title, in full (wrapped, never cut);
 - `errors.notify = "once"` notifies when an error first appears or changes,
   "always" on every failure, "never" not at all (it still shows in the
   dashboard and in |:DbDashStatus|);
@@ -259,8 +263,8 @@ and still notify thresholds and errors.
 :DbDashDescribe                                              *:DbDashDescribe*
     Show a description (|dbdash-description|) in a floating window, as
     Markdown: the dashboard's with the cursor on the header line, the
-    panel's with the cursor on a panel, both in a one-chart dashboard;
-    elsewhere pick one. "q"/<Esc> close, "y" yank. `K` in a dashboard.
+    panel's with the cursor on a panel; elsewhere pick one. "q"/<Esc>
+    close, "y" yank. `K` in a dashboard.
 
 :DbDashExport[!] [{format}] [{file}]                          *:DbDashExport*
     Export the result of the current dashboard (with panels: the one under the
@@ -486,14 +490,14 @@ rendered when shown, and their result is Markdown: >yaml
     | orders replica | 5 min |
 <
 They are not drawn in the dashboard: `ⓘ` after a title says there is one
-(the header's for the dashboard's; a panel's own title for a panel's; in a
-one-chart dashboard the header's for either; the icon is the `content` of
-`description-icon`), and `K` (|:DbDashDescribe|) shows it in a float with
-Markdown highlighting (treesitter; the Vim syntax when Neovim has no
-markdown parser), concealed markup and wrapped lines. A chart's description
-sees what its query sees: `args` with its own arguments and `meta` with its
-panel and database. The dashboard's sees the shared arguments and `meta`
-without the panel fields (`db_*` of the top-level database). Imports and Lua
+(the header's for the dashboard's, a panel's title line for the panel's;
+the icon is the `content` of `description-icon`), and `K`
+(|:DbDashDescribe|) shows it in a float with Markdown highlighting
+(treesitter; the Vim syntax when Neovim has no markdown parser), concealed
+markup and wrapped lines. A chart's description sees what its query sees:
+`args` with its own arguments and `meta` with its panel and database. The
+dashboard's sees the shared arguments and `meta` without the panel fields
+(`db_*` of the top-level database). Imports and Lua
 work as in queries, and Lua in a description asks for trust like any other
 (|dbdash-lua|), but a description cannot assign arguments
 (|dbdash-assign-args|): showing it changes nothing. The SQL filters quote for
@@ -556,8 +560,12 @@ One config can hold several charts in a grid: >yaml
       show: { type: table, title: Latest }
 <
 Panels flow left to right and wrap; `panel { grid-column: "span 2" }`
-widens a panel over several columns, and a single panel under `panels` is a
-grid too (|dbdash-layout| for sizes, rows, areas and placement). `id` names
+widens a panel over several columns (|dbdash-layout| for sizes, rows, areas
+and placement). A config without `panels` is a dashboard of one panel, drawn
+the same way. Each panel's title line shows `show.title` (without one:
+"Panel N" when the dashboard has several panels, nothing when it has one),
+its `ⓘ` and its status (a source's state, its countdown; setup
+`countdown_position`); an error is a line of its own under it. `id` names
 a panel for its arguments (|dbdash-arguments|) and for style sheets
 (`#orders`). In the dashboard, `s` and |:DbDashStyle| act on the panel under
 the cursor (or ask which one); `r` refreshes all panels.
@@ -805,12 +813,11 @@ Elements                                                 *dbdash-css-elements*
     header           the header line: header-title, description-icon,
                      countdown
     panel            a grid item; classes: its chart type; id: its `id`
-      panel-title    the title line of a panel in a grid; subtitle
+      panel-title    the panel's title line (|dbdash-panels|); subtitle
       description-icon, error, countdown
       args           the argument line: arg-name (.local for a panel's
                      own), arg-value
       chart          the chart; classes and [type]: its type
-        title, subtitle   the chart's title (one-chart dashboards)
         plot         the plot area (border, height, min-height)
         axis, axis-title, label, grid (.x, .y), rule, note
         legend       > legend-item[name] (> label, value, percent: pie)
@@ -1522,8 +1529,8 @@ all numbers, strings otherwise. Escape `,` and `:` with a backslash, or quote
 the item: `names='Smith, J',"a:b"`. On the command line, write a space in a
 value as `\ `: `title=two\ words`.
 
-`show.args_show: true` shows argument values above the chart (in a grid,
-under the panel's title): the arguments its query reads (`query.sql`,
+`show.args_show: true` shows argument values above the chart, under the
+panel's title: the arguments its query reads (`query.sql`,
 `query.transform` and what they import, found by name; all of them when the
 code uses `args` as a whole) and its own `query.args`, except those with
 `show: false`. A list of names shows those instead: `args_show: [region]`.

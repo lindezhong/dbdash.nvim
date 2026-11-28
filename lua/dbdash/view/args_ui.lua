@@ -11,9 +11,7 @@ local function prompt_for(spec)
   return p .. ": "
 end
 
-local function notify(msg)
-  vim.notify("dbdash: " .. msg, vim.log.levels.ERROR)
-end
+local notify = require("dbdash.view.notifier").error
 
 ---Ask for one value. `cb(value)` gets the parsed value, or nil when cancelled.
 ---@param spec dbdash.ArgSpec

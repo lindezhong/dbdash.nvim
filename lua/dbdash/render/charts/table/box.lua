@@ -317,17 +317,18 @@ local function columns(tnode, row_nodes, header_nodes)
 end
 
 ---@param rs dbdash.db.ResultSet
----@param show table
+---@param _show table
 ---@param ctx dbdash.render.Ctx
 ---@return dbdash.render.Output
-function M.render(rs, show, ctx)
+function M.render(rs, _show, ctx)
   local css = ctx.css
   local style = require("dbdash.css.style")
   local content = require("dbdash.render.content")
-  -- the table's DOM (render/content/table.lua): built from the result before styles, here
-  -- only brought up to date when rendering outside a dashboard
-  local tnode = content.build(css.node, rs, show)
-  ---@cast tnode -nil (a table's content has a root)
+  -- the table's DOM (render/content/table.lua), built from the result before styles
+  local tnode = content.root(css.node)
+  if not tnode then
+    return { lines = {}, hl = {} } -- nothing built (no result yet)
+  end
   local tbl = style.get(tnode)
   local row_nodes = content.list(tnode, "row")
   -- table-wide cell settings: the first cell's (a cell part when there are no rows)

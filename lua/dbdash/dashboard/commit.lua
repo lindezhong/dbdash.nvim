@@ -83,7 +83,7 @@ function M.panel(p)
     pcall(require("dbdash.render.content").build, p.chart_node, p.rs, show)
   end
   local title = child(p.node, "panel-title")
-  title:set_text(style.get(title).display == "none" and "" or p:title())
+  title:set_text(style.get(title).display ~= "none" and p:shown_title() or nil)
   icon(p.node, p.cfg.show.description ~= nil)
   local sub = show.subtitle
   child(p.node, "subtitle"):set_text(sub ~= nil and sub ~= vim.NIL and sub or nil)

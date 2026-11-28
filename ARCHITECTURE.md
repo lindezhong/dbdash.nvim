@@ -45,7 +45,8 @@ Rules that keep it so:
   `d.events`, and `dashboard/events.lua` for all of them) and through its document (a
   change asks its view for a frame).
 - Hooks the entry module wires for lower layers: the trust prompt's View float
-  (`trust.viewer`) and the dashboard keys' actions (the `action` event → `commands`).
+  (`trust.viewer`), the report of a failing event listener (`util/emitter.on_error` →
+  `view/notifier`) and the dashboard keys' actions (the `action` event → `commands`).
 - `plugin/dbdash.lua` forwards Neovim's events to the view: reading a dbdash:// buffer
   (`on_read`), visibility (`update_visibility`), closed windows, resizes and exiting
   (`on_exit`); a new colorscheme only makes the highlight groups again (`css/hl.lua`).
@@ -81,6 +82,9 @@ Rules that keep it so:
       │   event `dashboard:started`; Dashboard:start: commit, the clock, every source
       └ attach: the buffer, Document.on_update → a frame, the key actions, countdowns
 ```
+
+A config without `panels:` is a dashboard of one panel: once loaded, a config is always
+its list of panels (`cfg.panels`), and nothing after loading asks how it was written.
 
 Only what depends on templates is checked when it runs: the rendered curl command,
 OpenAPI document or SQL.
@@ -163,6 +167,11 @@ on_result → Panel:on_result: queued (setup push.max_queue, unlimited by defaul
               (thresholds.lua: `panel:threshold`), commit (commit.lua)
 ```
 
+A panel's templates (query.sql, query.transform, an item's transform, show.description)
+are rendered by its run (`Run:render`), the one place their options are made (the
+arguments, `meta`, the Lua globals, set_arg); the dashboard's description by
+`Run.dashboard_opts` (the shared arguments, the dashboard's `meta`).
+
 `dbdash.run(args)` in Lua code runs the panel's pipeline again with other arguments: a
 query panel queries once, a push panel takes the current item again; nothing is settled.
 
@@ -181,26 +190,52 @@ Lua guard) are tables of their own and never reach the user as such.
 
 ## Drawing
 
-The model commits (`dashboard/commit.lua`): it writes what is shown into the document
-(built by `dashboard/document.lua`): titles, errors, argument lines, each chart's content
-through `render/content`, and the status as element data (`Node:set_data`: running, a
-source's state, the next tick). A panel's results are committed at most once per period:
-the first of a period at once (a database's query of the tick), later ones at the next
-`panel:tick`; a tick with nothing pending writes nothing. Only changes mark nodes dirty; a
-document that gets something to update asks its view for a frame (`Document.on_update`).
+The model commits (`dashboard/commit.lua`), the one writer of what is shown: it writes it
+into the document (built by `dashboard/document.lua`): each panel's title (`show.title`;
+without one, "Panel N" when the dashboard has more than one panel, none when it has
+one), errors, argument lines, each chart's content (built here only, through
+`render/content`; renderers read it with `content.root`), and the status as element data
+(`Node:set_data`: running, a source's state, the next tick). A panel's results are
+committed at most once per period: the first of a period at once (a database's query of
+the tick), later ones at the next `panel:tick`; a tick with nothing pending writes
+nothing. Only changes mark nodes dirty; a document that gets something to update asks
+its view for a frame (`Document.on_update`).
+
+Every dashboard is drawn the same way: a header (the dashboard's title and ⓘ) and a grid
+of panels, one panel being a grid of one. A panel's box holds, in order:
+
+```
+title line   title · ⓘ · its status slot     (when any of them can show; on a border:
+                                             the top line)
+error line   ✗ the error, wrapped, never cut
+subtitle · argument line · the chart          (render.render draws the chart only)
+```
 
 ```
 view/dashboard.request_render  one frame for every request within 20 ms; none while hidden
   only element data changed: the status line, nothing else
   frame: css/style.restyle          cascade, styles shared by key, dirty subtrees only
-         layout/view.reflow         grid tracks, panel sizes, a layout cache
+         layout/view.reflow         the header and the grid: tracks, panel sizes, a
+                                    layout cache
            layout/replaced.raster   a chart is a replaced element: render.render draws it
-         paint.view                 a display list (paint/box: borders and padding)
+         paint.view                 layers (paint/box: borders, padding) and each
+                                    panel's status slot
          compositor.compose         layers into lines
          view/buffer.draw           changed lines and extmarks
-         update_status              the status line from the document's data: countdowns,
-                                    running / listening / ended, a single chart's error
+         update_status              one mark per panel on its title line (and the
+                                    header's countdown), placed by countdown_position:
+                                    right_align / eol in the free cells after the title
+                                    and ⓘ (cut with "…", left out without room),
+                                    overlay at the line's start
 ```
+
+## User messages
+
+Everything the plugin tells the user goes through `view/notifier` (`error`, `warn`,
+`info`; "dbdash: " before each): command errors, setup errors, trust results, exports,
+dashboard errors by `errors.notify`, thresholds that notify, failing event listeners
+(through `util/emitter.on_error`). What a command prints as its output (`:DbDashList`) is
+echoed.
 
 ## Events
 
@@ -248,7 +283,8 @@ The view listens to no data event: what it shows comes from the document.
 | `dbdash.db.Driver`, `Connection`, `StreamCtx` | `db/types.lua` (base: `db/driver.lua`) | `db/drivers/*` |
 | a config part's rules (`M.validators`) | `config/types.lua` (listed in `config/validators.lua`) | `css`, `args`, `db`, `render/registry`, `render/thresholds`, `layout/grid`, `dashboard/timer` |
 | chart renderers, canvases, ticks, palettes, frames | `render/types.lua` (checked by `render/registry.lua`) | `render/charts/*`, `render/{canvas,ticks,palette,frame}/*` |
-| `dbdash.render.Output` (lines and highlights) | `render/types.lua` | every renderer |
+| `dbdash.render.Output` (lines and highlights): the chart only, never its title | `render/types.lua` | every renderer |
+| a chart's content (DOM) | `render/content` (`build` by commit, `root` for renderers) | `render/content/*`; read by table and text renderers |
 | `dbdash.Error` | `util/error.lua` | every error shown to the user |
 | a run of `db.run` (`dbdash.db.RunHandle`) | `db/init.lua` | used by `dashboard/panel.lua` |
 

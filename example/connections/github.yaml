@@ -9,6 +9,7 @@
 # (:help dbdash-http, :help dbdash-transform).
 # Try: :DbDashStart http.yaml repo=folke/lazy.nvim
 
+title: "GitHub API over HTTP"
 description: |
   An HTTPS API as a data source: a GET of the GitHub releases of a repository, the JSON
   list of objects shown as rows. Needs network. See `:help dbdash-http`.

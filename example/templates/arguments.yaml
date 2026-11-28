@@ -8,6 +8,7 @@
 #   :DbDashStart! template_example.yaml        (asks for every argument)
 # and changed in the dashboard with a (modify), A (show), R (reset).
 
+title: "Arguments"
 description: |
   Arguments: typed, with defaults, choices and prompts, used in the query and shown
   above the chart. See `:help dbdash-arguments`.

@@ -1,5 +1,3 @@
-│                           Departments
-  ^ 27-38 DbDashTitle
 │┏━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━┓
   ^ 0-198 DbDashBorder
 │┃ id ┃ department             ┃ headcount ┃     budget ┃ manager ┃

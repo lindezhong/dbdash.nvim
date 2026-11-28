@@ -11,6 +11,7 @@
 #
 # Each refresh logs a row, so the chart grows over time.
 
+title: "SQLite file"
 description: |
   A SQLite file next to the config (`sqlite://.dbdash-example.db`): created on the first
   run, a row added every refresh. See `:help dbdash-databases`.

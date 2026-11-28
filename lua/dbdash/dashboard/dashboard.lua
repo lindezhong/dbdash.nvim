@@ -25,7 +25,9 @@ local M = {}
 ---The view's (view/dashboard.lua):
 ---@field buf integer
 ---@field ctimer uv.uv_timer_t? countdown display timer
----@field regions table[]? buffer regions of the panels (multi-panel)
+---@field regions table[]? buffer regions of the panels
+---@field header_slot table? where the top-level countdown goes (view/dashboard.update_status)
+---@field status_slots table[]? where each panel's status goes
 ---@field hits table[]? hit-test regions (events/)
 ---@field header_rows integer?
 ---@field last_size integer[]?
@@ -228,33 +230,14 @@ end
 ---The dashboard's description rendered with the shared arguments and the metadata
 ---outside any panel (db_* of the top-level database).
 function Dashboard:describe_async(cb)
-  local cfg = self.cfg
   local Run = require("dbdash.dashboard.run")
   Run.describe_async(function()
-    local values = args.resolve(cfg.shared_args, self.state)
-    local seen = vim.deepcopy(values)
-    local function refuse()
-      error("arguments cannot be assigned in a description", 0)
-    end
-    local dialect = cfg.database
-      and require("dbdash.template.dialect").get(
-        require("dbdash.db").driver(cfg.database.type).dialect
-      )
-    return Run.render_text(self, cfg.description, cfg.description_line, {
-      dialect = dialect or nil,
-      specs = cfg.shared_args,
-      values = values,
-      meta = require("dbdash.metadata").dashboard_values(self),
-      lua = {
-        -- showing a description does not change arguments
-        after = function()
-          if not vim.deep_equal(values, seen) then
-            refuse()
-          end
-        end,
-      },
-      set_arg = refuse,
-    })
+    return Run.render_text(
+      self,
+      self.cfg.description,
+      self.cfg.description_line,
+      Run.dashboard_opts(self)
+    )
   end, cb)
 end
 

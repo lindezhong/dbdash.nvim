@@ -4,9 +4,8 @@ local sched = require("dbdash.dashboard")
 
 local M = {}
 
-local function err(msg)
-  vim.notify("dbdash: " .. msg, vim.log.levels.ERROR)
-end
+local notifier = require("dbdash.view.notifier")
+local err = notifier.error
 
 ---The dashboard for the current buffer; with exactly one running, that one.
 ---@return dbdash.Dashboard?
@@ -69,8 +68,8 @@ function M.trust(fargs)
   local trust = require("dbdash.trust")
   local files = trust.collect(path, cfg)
   trust.record(path, action, files)
-  vim.notify(
-    ("dbdash: %s %s"):format(
+  notifier.info(
+    ("%s %s"):format(
       vim.fn.fnamemodify(path, ":~:."),
       ({ allow = "trusted", deny = "denied", remove = "will be asked about again" })[action]
     )
@@ -157,14 +156,12 @@ function M.status()
   end
   for _, p in ipairs(d.panels) do
     lines[#lines + 1] = ""
-    if d.cfg.grid then
-      lines[#lines + 1] = ("Panel %d: %s"):format(p.index, p:title())
-    end
+    lines[#lines + 1] = ("Panel %d: %s"):format(p.index, p:title())
     lines[#lines + 1] = "Database:  "
       .. p.cfg.database.type
       .. "  "
       .. url.redact(p.cfg.database.url)
-    if p.push then
+    if p.sends then
       local st = p.stream or { received = 0, processed = 0, dropped = 0, queue = {} }
       lines[#lines + 1] = ("Interval:  drawn every %ds, next in %ds"):format(
         p.cfg.show.interval / 1000,
@@ -362,11 +359,11 @@ function M.export(fargs, bang, reg)
         end
         f:write(out)
         f:close()
-        vim.notify(("dbdash: exported %s to %s"):format(what, vim.fn.fnamemodify(file, ":~:.")))
+        notifier.info(("exported %s to %s"):format(what, vim.fn.fnamemodify(file, ":~:.")))
       else
         reg = (reg and reg ~= "") and reg or '"'
         vim.fn.setreg(reg, out, "l")
-        vim.notify(("dbdash: exported %s to register %s"):format(what, reg))
+        notifier.info(("exported %s to register %s"):format(what, reg))
       end
     end)
   end
@@ -405,7 +402,7 @@ function M.show_sql()
         vim.list_extend(lines, vim.split(code, "\n", { plain = true }))
       end
       require("dbdash.view.popup").open(lines, {
-        title = d.cfg.grid and ("DbDash query: " .. p:title()) or "DbDash query",
+        title = "DbDash query: " .. p:title(),
         filetype = ({ mongodb = "json", http = "json", lua = "lua" })[p.cfg.database.type] or "sql",
       })
     end
@@ -432,7 +429,7 @@ function M.describe()
   local cfg = d.cfg
   local function show(parts)
     if #parts == 0 then
-      return vim.notify("dbdash: no description", vim.log.levels.WARN)
+      return notifier.warn("no description")
     end
     local texts, i = {}, 0
     local function next_part()
@@ -477,11 +474,6 @@ function M.describe()
           end,
         }
       or nil
-  end
-  if not cfg.grid then
-    return show(vim.tbl_filter(function(x)
-      return x ~= nil
-    end, { dashboard_part(), panel_part(d.panels[1]) }))
   end
   if vim.api.nvim_get_current_buf() == d.buf then
     local cur = vim.api.nvim_win_get_cursor(0)

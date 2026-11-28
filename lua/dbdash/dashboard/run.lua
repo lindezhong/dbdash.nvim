@@ -43,24 +43,37 @@ M.Run = Run
 ---template or database error.
 ---@return string sql, string? transform_code
 function Run:render_templates()
-  local q = self.panel.cfg.query
-  local o = self:template_opts()
-  local sql = M.render_text(
-    self.panel.d,
-    q.sql,
-    q.sql_line,
-    vim.tbl_extend("force", o, { autoescape = q.autoescape })
-  )
-  local code = q.transform and M.render_text(self.panel.d, q.transform, q.transform_line, o) or nil
-  return sql, code
+  return self:render_sql(), self:render_transform()
 end
 
----The options of M.render_text for the run's templates (and its `meta`, set on it).
+---query.sql rendered for the run (autoescaped as query.autoescape says).
+---@param cancel dbdash.db.CancelToken? the token that stops it (default: the life's)
+function Run:render_sql(cancel)
+  local q = self.panel.cfg.query
+  return self:render(q.sql, q.sql_line, { autoescape = q.autoescape, cancel = cancel })
+end
+
+---query.transform rendered for the run (Lua code: never autoescaped), or nil without one.
+function Run:render_transform()
+  local q = self.panel.cfg.query
+  return q.transform and self:render(q.transform, q.transform_line) or nil
+end
+
+---Render a template of the panel (its query, its transform, its description) for the run:
+---the one place a panel's template options are made (Run:template_opts).
+---@param extra table? options over them (autoescape, cancel)
+function Run:render(text, line, extra)
+  local o = self:template_opts()
+  return M.render_text(self.panel.d, text, line, extra and vim.tbl_extend("force", o, extra) or o)
+end
+
+---The options of M.render_text for the run's templates (and its `meta`, set on it; a
+---refresh's is the panel's meta too).
 function Run:template_opts()
   local p = self.panel
   local q = p.cfg.query
   self.meta = require("dbdash.metadata").values(p, self) -- `meta` of templates and Lua
-  if self.depth == 0 then
+  if self.depth == 0 and not self.read_only then
     p.meta = self.meta
   end
   return {
@@ -268,6 +281,31 @@ end
 ---@field on_allow fun()?
 ---@field run dbdash.Run? the run whose `args` mapping this is
 ---@field set_arg fun(name: string, v: any)? {% set args.x = v %}
+
+---The options of M.render_text for a template of dashboard `d` outside any panel (its
+---description): the shared arguments, the dashboard's metadata; it changes no argument.
+function M.dashboard_opts(d)
+  local cfg = d.cfg
+  local values = args.resolve(cfg.shared_args, d.state)
+  local seen = vim.deepcopy(values)
+  local function refuse()
+    error("arguments cannot be assigned in a description", 0)
+  end
+  return {
+    dialect = cfg.database and dialect.get(db.driver(cfg.database.type).dialect) or nil,
+    specs = cfg.shared_args,
+    values = values,
+    meta = require("dbdash.metadata").dashboard_values(d),
+    lua = {
+      after = function()
+        if not vim.deep_equal(values, seen) then
+          refuse()
+        end
+      end,
+    },
+    set_arg = refuse,
+  }
+end
 
 ---Render template `text` (at `line` of the config) of dashboard `d`. Templates see exactly
 ---two names: args.<name> (o.specs with o.values) and meta.<name> (o.meta); imported

@@ -1,5 +1,3 @@
-│                             Hourly visits
-  ^ 29-42 DbDashTitle
 │    ┌────────────────────────────────────────────────────────┐
   ^ 4-178 DbDashBorder
 │150 │                                   ***                  │ ■ visits
@@ -17,72 +15,80 @@
   ^ 63-66 DbDashBorder
   ^ 67-70 DbDashSeries2
   ^ 70-78 DbDashLegend
-│    │                      ** ***   **      **               │
+│    │                      ** **    **      **               │
   ^ 4-7 DbDashBorder
   ^ 29-31 DbDashSeries1
-  ^ 32-35 DbDashSeries1
+  ^ 32-34 DbDashSeries1
   ^ 38-40 DbDashSeries1
   ^ 46-48 DbDashSeries1
   ^ 63-66 DbDashBorder
-│    │                     **     ***          *              │
+│    │                      *    ****          *              │
   ^ 4-7 DbDashBorder
-  ^ 28-30 DbDashSeries1
-  ^ 35-38 DbDashSeries1
+  ^ 29-30 DbDashSeries1
+  ^ 34-38 DbDashSeries1
   ^ 48-49 DbDashSeries1
   ^ 63-66 DbDashBorder
-│100 │                    *                     *             │
+│    │                    **       *           **             │
+  ^ 4-7 DbDashBorder
+  ^ 27-29 DbDashSeries1
+  ^ 36-37 DbDashSeries1
+  ^ 48-50 DbDashSeries1
+  ^ 63-66 DbDashBorder
+│100 │                    *                      *            │
   ^ 0-3 DbDashAxis
   ^ 4-7 DbDashBorder
   ^ 27-28 DbDashSeries1
-  ^ 49-50 DbDashSeries1
+  ^ 50-51 DbDashSeries1
   ^ 63-66 DbDashBorder
-│    │                    *                      **           │
-  ^ 4-7 DbDashBorder
-  ^ 27-28 DbDashSeries1
-  ^ 50-52 DbDashSeries1
-  ^ 63-66 DbDashBorder
-│    │                   *                         **         │
+│    │                   *                        **          │
   ^ 4-7 DbDashBorder
   ^ 26-27 DbDashSeries1
-  ^ 52-54 DbDashSeries1
+  ^ 51-53 DbDashSeries1
   ^ 63-66 DbDashBorder
-│    │                   *                           **       │
+│    │                   *                         ***        │
   ^ 4-7 DbDashBorder
   ^ 26-27 DbDashSeries1
-  ^ 54-56 DbDashSeries1
+  ^ 52-55 DbDashSeries1
   ^ 63-66 DbDashBorder
-│    │                  *                              *      │
+│    │                  *                             **      │
   ^ 4-7 DbDashBorder
   ^ 25-26 DbDashSeries1
-  ^ 56-57 DbDashSeries1
+  ^ 55-57 DbDashSeries1
   ^ 63-66 DbDashBorder
-│ 50 │                 *               ******           **    │
+│ 50 │                 **                              **     │
   ^ 1-3 DbDashAxis
   ^ 4-7 DbDashBorder
-  ^ 24-25 DbDashSeries1
-  ^ 40-46 DbDashSeries2
-  ^ 57-59 DbDashSeries1
+  ^ 24-26 DbDashSeries1
+  ^ 56-58 DbDashSeries1
   ^ 63-66 DbDashBorder
-│    │                **   *************     ****         **  │
+│    │                 *     ****     *********          **   │
   ^ 4-7 DbDashBorder
-  ^ 23-25 DbDashSeries1
-  ^ 28-41 DbDashSeries2
-  ^ 46-50 DbDashSeries2
-  ^ 59-61 DbDashSeries1
+  ^ 24-25 DbDashSeries1
+  ^ 30-34 DbDashSeries2
+  ^ 39-48 DbDashSeries2
+  ^ 58-60 DbDashSeries1
   ^ 63-66 DbDashBorder
-│    │               *  ***                      *******    **│
+│    │                *   ***    *****         ***         *  │
+  ^ 4-7 DbDashBorder
+  ^ 23-24 DbDashSeries1
+  ^ 27-30 DbDashSeries2
+  ^ 34-39 DbDashSeries2
+  ^ 48-51 DbDashSeries2
+  ^ 60-61 DbDashSeries1
+  ^ 63-66 DbDashBorder
+│    │               *  **                        ******    **│
   ^ 4-7 DbDashBorder
   ^ 22-23 DbDashSeries1
-  ^ 25-28 DbDashSeries2
-  ^ 50-57 DbDashSeries2
+  ^ 25-27 DbDashSeries2
+  ^ 51-57 DbDashSeries2
   ^ 61-63 DbDashSeries1
   ^ 63-66 DbDashBorder
-│    │*****        ******                              *******│
+│    │*****        *****                                ******│
   ^ 4-7 DbDashBorder
   ^ 7-12 DbDashSeries1
   ^ 20-22 DbDashSeries1
-  ^ 22-26 DbDashSeries2
-  ^ 56-63 DbDashSeries2
+  ^ 22-25 DbDashSeries2
+  ^ 57-63 DbDashSeries2
   ^ 63-66 DbDashBorder
 │  0 │***************                                         │
   ^ 2-3 DbDashAxis

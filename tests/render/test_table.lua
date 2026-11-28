@@ -212,7 +212,7 @@ T["CSS: border styles, padding, align, vertical-align, stripes, text-overflow"] 
   eq(bg[1].row, 4)
 end
 
-T["DataTables-like: sort, rows shown, column format and color, row thresholds, caption"] = function()
+T["DataTables-like: sort, rows shown, column format and color, row thresholds"] = function()
   local rs = resultset.new(
     { { name = "k", type = "string" }, { name = "n", type = "number" } },
     { { "a", 1234.5 }, { "b", vim.NIL }, { "c", 99 } }
@@ -242,8 +242,6 @@ T["DataTables-like: sort, rows shown, column format and color, row thresholds, c
     return h.row == 3 and h.group == "DiagnosticError"
   end, o.hl)
   eq(#red, 2) -- both cells of the row with 1234.5
-  o = out(rs, { title = "T" }, nil, { title = { ["caption-side"] = "bottom" } })
-  eq(vim.trim(o.lines[#o.lines]), "T")
 end
 
 return T

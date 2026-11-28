@@ -91,15 +91,4 @@ function M.legend(items, sum, show, max_label, ctx)
   return out
 end
 
----Centered title line, or nil.
-function M.title(show, width)
-  local title = nn(show.title)
-  if not title or title == "" then
-    return nil
-  end
-  local t = W.truncate(title, width)
-  local pad = math.max(0, math.floor((width - W.width(t)) / 2))
-  return { text = string.rep(" ", pad) .. t, spans = { { pad, pad + #t, "DbDashTitle" } } }
-end
-
 return M

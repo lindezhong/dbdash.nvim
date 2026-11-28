@@ -127,7 +127,7 @@ T["K on the header shows the dashboard's, on a panel the panel's, rendered as Ma
   eq(notes, { "dbdash: no description" })
 end
 
-T["one chart: both descriptions in one float; the keys come from setup()"] = function()
+T["one chart: the header shows the board's description, the panel its own; keys from setup()"] = function()
   require("dbdash").setup({ lua = { confirm = false }, dashboard = { keys = { describe = "gK" } } })
   local d = run(
     "one",
@@ -142,8 +142,10 @@ show: { title: Chart, description: "About **{{ meta.panel_title }}**." }
   eq(vim.api.nvim_buf_get_lines(d.buf, 0, 1, false)[1], "Board ⓘ")
   eq(vim.fn.maparg("gK", "n", false, true).buffer, 1)
   eq(vim.fn.maparg("K", "n", false, true).buffer, nil)
-  local lines = describe(d, 3)
-  eq(lines, { "## Board", "", "About the board.", "", "## Chart", "", "About **Chart**." })
+  eq(describe(d, 1), { "About the board." })
+  vim.cmd("close")
+  eq(vim.api.nvim_buf_get_lines(d.buf, 2, 3, false)[1]:match("^%s*(.-)%s*$"), "Chart ⓘ")
+  eq(describe(d, 3), { "About **Chart**." })
 end
 
 T["descriptions: imports, errors with their line, trust for Lua"] = function()
@@ -158,7 +160,7 @@ description: |
 query: { sql: SELECT 1 AS x }
 ]]
   )
-  eq(describe(d, 3), { "Owned by team data." })
+  eq(describe(d, 1), { "Owned by team data." })
   vim.cmd("close")
   local bad = run(
     "bad",

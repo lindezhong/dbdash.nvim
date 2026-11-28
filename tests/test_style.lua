@@ -61,4 +61,22 @@ T["no function is 100 lines or longer"] = function()
   eq(long, {})
 end
 
+T["messages go through view/notifier (the one vim.notify)"] = function()
+  local allowed = {
+    ["lua/dbdash/view/notifier.lua"] = true,
+    ["lua/dbdash/util/emitter.lua"] = true, -- its fallback before init.lua sets the notifier
+  }
+  local bad = {}
+  for _, path in ipairs(modules()) do
+    if not allowed[path] then
+      for i, l in ipairs(read(path)) do
+        if l:find("vim.notify(", 1, true) and not l:match("^%s*%-%-") then
+          bad[#bad + 1] = path .. ":" .. i
+        end
+      end
+    end
+  end
+  eq(bad, {})
+end
+
 return T

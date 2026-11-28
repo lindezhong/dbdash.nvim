@@ -54,43 +54,6 @@ function M.ctx(opts)
   }
 end
 
-local nn = require("dbdash.util.null").nn
-
--- Where a title sits when its text-align is "start".
-local LEFT_TITLES = { stat = true, text = true }
-
----Put the title line (and the subtitle under it) above a chart, aligned over the chart's
----width; caption-side: bottom puts them under it. Styles: the title and subtitle parts.
-function M.with_title(out, title, subtitle, width, chart_type, css)
-  local w = 0
-  for _, l in ipairs(out.lines) do
-    w = math.max(w, W.width(l))
-  end
-  w = math.min(math.max(w, 1), width)
-  local output = require("dbdash.render.output")
-  local tc = css:get("title")
-  local function line_of(text, part)
-    local c = css:get(part)
-    local align = c["text-align"] ~= "start" and c["text-align"]
-      or (LEFT_TITLES[chart_type] and "left" or "center")
-    local line, s, e = output.title_line(text, w, align, require("dbdash.css").ellipsis(c))
-    return {
-      lines = { (line:gsub("%s+$", "")) },
-      hl = { { row = 0, col_s = s, col_e = e, group = css:hl(part) } },
-    }
-  end
-  local parts = { line_of(title, "title") }
-  if subtitle and css:get("subtitle").display ~= "none" then
-    parts[#parts + 1] = line_of(subtitle, "subtitle")
-  end
-  local stack = output.stack
-  if tc["caption-side"] == "bottom" then
-    return stack(vim.list_extend({ out }, parts))
-  end
-  parts[#parts + 1] = out
-  return stack(parts)
-end
-
 local function message(text, group)
   return { lines = { text }, hl = { { row = 0, col_s = 0, col_e = #text, group = group } } }
 end
@@ -141,28 +104,8 @@ function M.render(rs, show, opts)
     if not opts.node then
       pcall(require("dbdash.render.content").build, css.node, rs, show)
     end
-    -- The title is drawn here for every chart type; the chart gets the rest of the height.
-    local title = nn(show.title)
-    if css:get("title").display == "none" then
-      title = nil
-    end
-    local inner = show
-    if nn(show.title) ~= nil or nn(show.subtitle) ~= nil then
-      inner = {}
-      for k, v in pairs(show) do
-        inner[k] = v
-      end
-      inner.title, inner.subtitle = vim.NIL, vim.NIL
-      setmetatable(inner, getmetatable(show))
-    end
-    local subtitle = nn(show.subtitle)
-    if title and title ~= "" then
-      ctx.height = math.max(ctx.height - (subtitle and 2 or 1), 5)
-    end
-    local out = style.render(rs, inner, ctx)
-    if title and title ~= "" then
-      out = M.with_title(out, title, subtitle, ctx.width, show.type, css)
-    end
+    -- the chart only: its title is its panel's (layout/view.lua)
+    local out = style.render(rs, show, ctx)
     return out
   end)
   if ok then

@@ -32,8 +32,8 @@ local M = {}
 ---@field d dbdash.Dashboard
 ---@field index integer
 ---@field cfg dbdash.PanelConfig
----@field push boolean? a push source (shown so)
----@field sends boolean? its source sends data (a driver with produce)
+---@field sends boolean its source sends data (a driver with produce); a database is queried
+---  on every tick
 ---@field node dbdash.dom.Node the panel's element
 ---@field chart_node dbdash.dom.Node its chart element
 ---@field running boolean a query of a tick runs
@@ -93,7 +93,8 @@ function M.new(d, index, cfg)
     index = index,
     cfg = cfg,
     running = false,
-    push = db.driver(cfg.database.type).produce ~= nil or nil, -- a push source (shown so)
+    -- its source sends data (a driver with produce): it runs its query once, until it ends
+    sends = db.driver(cfg.database.type).produce ~= nil,
     next_at = now(),
     history = {},
     style = {},
@@ -130,6 +131,17 @@ function Panel:title()
     return t
   end
   return ("Panel %d"):format(self.index)
+end
+
+---The title shown on the panel's title line: show.title, else "Panel N" among several
+---panels; nil for the only panel without a title (nothing to tell it apart from).
+---@return string?
+function Panel:shown_title()
+  local t = self.cfg.show.title
+  if t and t ~= "" then
+    return t
+  end
+  return #self.d.panels > 1 and self:title() or nil
 end
 
 ---The effective show config (config file + :DbDashStyle overrides).
@@ -265,10 +277,6 @@ end
 function Panel:start()
   self:stop_run("restarted")
   local gen = self.gen
-  local driver = db.driver(self.cfg.database.type)
-  -- A source that sends data runs its query (rendered once) until it ends; a database is
-  -- queried on every tick of the panel.
-  self.sends = driver.produce ~= nil
   local feed = {
     queue = {},
     received = 0,
@@ -298,15 +306,7 @@ function Panel:start()
     query = function()
       -- rendered once per start (the arguments and meta of that moment)
       local run = self:new_run(nil, nil, "render")
-      local to = run:template_opts()
-      to.cancel = feed.token
-      local q = self.cfg.query
-      feed.sql = Run.render_text(
-        self.d,
-        q.sql,
-        q.sql_line,
-        vim.tbl_extend("force", to, { autoescape = q.autoescape })
-      )
+      feed.sql = run:render_sql(feed.token)
       o.args, o.meta, o.lua = run.args, run.meta, run.lua
       if feed.state == "starting" then
         feed.state = "running"
@@ -453,12 +453,11 @@ function Panel:apply_transform(run, value)
   local started = vim.uv.hrtime()
   local rs = value
   if run.item then
-    local o = run:template_opts()
     run.record.sql = self.feed and self.feed.sql
     -- the item as it came (rows made from it keep it as .item)
     local raw = type(value) == "table" and value.item
     run.record.query = raw ~= nil and raw or value
-    run.code = q.transform and Run.render_text(self.d, q.transform, q.transform_line, o) or nil
+    run.code = run:render_transform()
     if run.code then
       rs = lua_result.raw(value, run.item.vars)
     end
@@ -587,7 +586,7 @@ end
 ---What a push panel is doing, for its header: "running", "listening 127.0.0.1:8765",
 ---"ended", "failed" (nil for other panels).
 function Panel:push_state()
-  if not self.push then
+  if not self.sends then
     return nil
   end
   local st = self.feed
@@ -602,17 +601,7 @@ function Panel:describe_async(cb)
   Run.describe_async(function()
     local run = self:new_run(nil, nil, "render")
     run.read_only = true -- showing a description does not change arguments
-    return Run.render_text(self.d, show.description, show.description_line, {
-      dialect = require("dbdash.template.dialect").get(db.driver(self.cfg.database.type).dialect),
-      specs = self.cfg.visible_args,
-      values = run.args,
-      meta = require("dbdash.metadata").values(self, run),
-      lua = run.lua,
-      set_arg = function(name, v)
-        run:set_arg(name, v)
-      end,
-      timeout = self.cfg.query.timeout,
-    })
+    return run:render(show.description, show.description_line)
   end, cb)
 end
 

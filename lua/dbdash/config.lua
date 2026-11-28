@@ -50,17 +50,12 @@ local DEFAULTS = setmetatable({}, {
 ---@field path string absolute path of the YAML file
 ---@field dir string directory containing the file
 ---@field database dbdash.ConfigDatabase? top-level database: the default of every panel
----@field panels dbdash.PanelConfig[]
----@field query dbdash.ConfigQuery
----@field show table show section, with interval (ms), title, show_countdown, countdown_format
+---@field panels dbdash.PanelConfig[] the panels (one when the config has no `panels:`)
 ---@field positions table<string, {line: integer, col: integer}>
----@field grid boolean `panels:` (a grid, even of one panel)
 ---@field refresh_all integer? ms: the top-level interval, a refresh of every panel
 ---@field title string? the dashboard's title (top-level `title`)
 ---@field description string? the dashboard's description (a template, shown as Markdown)
 ---@field description_line integer
----@field show_countdown boolean countdown to the next refresh_all in the header
----@field countdown_format string
 ---@field shared_args dbdash.ArgSpec[] top-level args
 ---@field args dbdash.ArgSpec[] shared and local arguments, each with its `key`
 ---@field style_rules dbdash.css.Rule[]? the dashboard's style sheet
@@ -74,6 +69,7 @@ M.parse_duration = require("dbdash.util.duration").parse
 ---@class dbdash.config.Ctx
 ---@field file string
 ---@field pos table<string, { line: integer, col: integer }>
+---@field listed boolean? the config lists its panels (`panels:`): where its fields are
 local Ctx = {}
 Ctx.__index = Ctx
 
@@ -461,9 +457,9 @@ function Ctx:check_defaults(top_query, top_show)
 end
 
 ---Panel i's id (`id:`, else its index), unique.
-function Ctx:panel_id(cfg, raw, i, prefix, ids)
+function Ctx:panel_id(raw, i, prefix, ids)
   local id = tostring(i)
-  if cfg.grid and nn(raw.id) ~= nil then
+  if self.listed and nn(raw.id) ~= nil then
     id = self:expect(prefix .. "id", raw.id, "string")
     if not id:match("^[%a_][%w_]*$") then
       self:fail(prefix .. "id", "panel id '%s' must be an identifier", id)
@@ -480,8 +476,8 @@ end
 function Ctx:panels(cfg, panels_raw, top_query, top_show, top_interval)
   local ids = {}
   for i, raw in ipairs(panels_raw) do
-    local prefix = cfg.grid and ("panels[%d]."):format(i) or ""
-    if cfg.grid then
+    local prefix = self.listed and ("panels[%d]."):format(i) or ""
+    if self.listed then
       self:expect(("panels[%d]"):format(i), raw, "map")
       -- Inherited fields report the line of the top-level default.
       for path, p in pairs(self.pos) do
@@ -492,13 +488,13 @@ function Ctx:panels(cfg, panels_raw, top_query, top_show, top_interval)
         end
       end
     end
-    local id = self:panel_id(cfg, raw, i, prefix, ids)
+    local id = self:panel_id(raw, i, prefix, ids)
     local panel = self:panel({
       database = nn(raw.database),
       query = merge(top_query, nn(raw.query)),
       show = merge(top_show, nn(raw.show)),
     }, prefix, cfg, i, id, top_interval)
-    panel.style_rules = cfg.grid and self:style(raw.style, prefix .. "style") or nil
+    panel.style_rules = self.listed and self:style(raw.style, prefix .. "style") or nil
     cfg.panels[i] = panel
   end
 end
@@ -537,14 +533,13 @@ function Ctx:dashboard_fields(cfg, data)
   cfg.style_rules = self:style(data.style, "style")
 end
 
----One-chart configs (database/query/show at the top level) and multi-panel configs
----(`panels:`) are one model. Top-level bare fields are dashboard-wide: `interval` (a refresh
----of every panel, cfg.refresh_all), `args` (shared arguments), `layout`. The top-level
----`database`, `query` and `show` sections are the panels' defaults: without `panels:` they
----are the only panel; with `panels:` each panel is merged over them (the database is
----replaced as a whole) and fields describing one chart may not be top-level. Every panel
----is then validated the same way (Ctx:panel). `cfg.database`, `cfg.query` and `cfg.show`
----are the single panel's in one-chart configs.
+---A dashboard is a list of panels (cfg.panels); a config without `panels:` writes its
+---only panel at the top level. Top-level bare fields are dashboard-wide: `interval` (a
+---refresh of every panel, cfg.refresh_all), `args` (shared arguments), `style`. The
+---top-level `database`, `query` and `show` sections are the panels' defaults: without
+---`panels:` they are the only panel; with `panels:` each panel is merged over them (the
+---database is replaced as a whole) and fields describing one chart may not be top-level.
+---Every panel is then validated the same way (Ctx:panel).
 ---@param data any
 ---@param file string used in error messages
 ---@param positions table<string, {line: integer, col: integer}>?
@@ -559,11 +554,13 @@ function M.validate(data, file, positions)
   end
   local cfg = { path = file, dir = vim.fs.dirname(file), positions = ctx.pos, panels = {} }
   ctx:dashboard_fields(cfg, data)
+  -- `panels:` lists the panels; without it the top level is the only panel (the same
+  -- dashboard, written shorter): only where things are written differs (ctx.listed)
   local panels_raw = nn(data.panels)
-  cfg.grid = panels_raw ~= nil
+  ctx.listed = panels_raw ~= nil
   local top_query = ctx:expect("query", data.query, "map", true)
   local top_show = ctx:expect("show", data.show, "map", true)
-  if cfg.grid then
+  if ctx.listed then
     ctx:expect("panels", panels_raw, "list")
     if #panels_raw == 0 then
       ctx:fail("panels", "panels must not be empty")
@@ -581,10 +578,6 @@ function M.validate(data, file, positions)
   end
   ctx:panels(cfg, panels_raw, top_query, top_show, nn(data.interval))
   argument_keys(cfg)
-  if not cfg.grid then
-    local p = cfg.panels[1]
-    cfg.query, cfg.show = p.query, p.show
-  end
   return ctx:validate("dashboard", cfg, "")
 end
 
@@ -608,7 +601,8 @@ function Ctx:panel(raw, prefix, cfg, index, id, top_interval)
   if not db then
     self:fail(
       prefix .. "database",
-      cfg.grid and "missing required field '%sdatabase' (set it in the panel or at the top level)"
+      self.listed
+          and "missing required field '%sdatabase' (set it in the panel or at the top level)"
         or "missing required field '%sdatabase'",
       prefix
     )

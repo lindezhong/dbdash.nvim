@@ -23,8 +23,10 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
   top-level `database`, `query` and `show` are defaults every panel can override.
   Dashboards that are not on screen pause and catch up when shown again (or keep
   refreshing with `show.refresh_hidden`); closing a dashboard's last window stops it.
-- **Title and descriptions**: a header with the dashboard's title and a countdown;
-  descriptions of the dashboard and each chart are templates shown as Markdown (`K`).
+- **Title and descriptions**: a header with the dashboard's title and a countdown; each
+  panel's title line with its status (a source's state, its countdown) and its error in
+  full on a line of its own; descriptions of the dashboard and each chart are templates
+  shown as Markdown (`K`).
 - **Lua**: a `lua://` source whose query is Lua code, and `query.transform` to reshape any
   result with Lua before it is checked as rows (trusted configs only, as with `exrc`);
   a `store` table kept per panel, run records with the previous results (`meta.prev_ok`),
@@ -163,8 +165,9 @@ require("dbdash").load_session(session_file .. ".dbdash") -- after sourcing the 
 
 ## Configuration
 
-A config file describes one dashboard: `database`, `query` and `show`, or `panels` for
-several charts, and a `style` sheet for how it looks. Top-level bare fields are
+A config file describes one dashboard: `panels` for several charts, or `database`,
+`query` and `show` for one (a dashboard of one panel, drawn the same way), and a `style`
+sheet for how it looks. Top-level bare fields are
 dashboard-wide: `interval` (a refresh of every panel), `args` (shared arguments), `style`,
 the header's `title` and `description`. The top-level `database`, `query` and `show` are
 defaults each panel can override (a panel's own `database`, `show.interval`, ...); fields
@@ -215,7 +218,7 @@ Examples are in [`example/`](example), one directory per topic (`:help dbdash-ex
 | Directory | Shows |
 | --- | --- |
 | [`charts/`](example/charts) | style sheets: selectors, the cascade and the common properties ([`css.yaml`](example/charts/css.yaml)); one file per chart type with every renderer and option, one panel each ([`line.yaml`](example/charts/line.yaml), [`bar.yaml`](example/charts/bar.yaml), [`pie.yaml`](example/charts/pie.yaml), [`table.yaml`](example/charts/table.yaml), [`stat.yaml`](example/charts/stat.yaml), ...) |
-| [`dashboards/`](example/dashboards) | several panels in a grid ([`multi_panel.yaml`](example/dashboards/multi_panel.yaml): defaults, intervals, a database per panel, title, countdown, descriptions, argument lines); a grid laid out with CSS Grid properties ([`grid.yaml`](example/dashboards/grid.yaml): column and row tracks, areas, placement); a database next to a source that sends data, with the top-level interval ([`pull_push.yaml`](example/dashboards/pull_push.yaml)); errors and backing off ([`errors.yaml`](example/dashboards/errors.yaml)) |
+| [`dashboards/`](example/dashboards) | several panels in a grid ([`multi_panel.yaml`](example/dashboards/multi_panel.yaml): defaults, intervals, a database per panel, title, countdown, descriptions, argument lines); a grid laid out with CSS Grid properties ([`grid.yaml`](example/dashboards/grid.yaml): column and row tracks, areas, placement); a database next to a source that sends data, with the top-level interval ([`pull_push.yaml`](example/dashboards/pull_push.yaml)); errors and backing off ([`errors.yaml`](example/dashboards/errors.yaml)); panel titles ("Panel N" without one) and where each panel's status goes ([`titles.yaml`](example/dashboards/titles.yaml)) |
 | [`templates/`](example/templates) | arguments ([`arguments.yaml`](example/templates/arguments.yaml)); every statement ([`statements.yaml`](example/templates/statements.yaml)), filter ([`filters.yaml`](example/templates/filters.yaml)), test, function and expression ([`tests_functions.yaml`](example/templates/tests_functions.yaml)) and method ([`methods.yaml`](example/templates/methods.yaml)); SQL filters and autoescape ([`sql.yaml`](example/templates/sql.yaml)); macros ([`macros.yaml`](example/templates/macros.yaml)); extends / include / import ([`inheritance.yaml`](example/templates/inheritance.yaml)); Lua in templates ([`template_lua.yaml`](example/templates/template_lua.yaml)); every `meta` field ([`meta.yaml`](example/templates/meta.yaml)) |
 | [`lua/`](example/lua) | a `lua://` source ([`lua.yaml`](example/lua/lua.yaml)), `query.transform` ([`transform.yaml`](example/lua/transform.yaml)), panel state, callbacks and run records ([`callback.yaml`](example/lua/callback.yaml)) |
 | [`push/`](example/push) | push sources: [`luastream.yaml`](example/push/luastream.yaml) (with `dbdash.run()` on an item), [`exec.yaml`](example/push/exec.yaml), [`webhook.yaml`](example/push/webhook.yaml) (OpenAPI: a GET without a token, a POST with one) |

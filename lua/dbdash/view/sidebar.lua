@@ -291,7 +291,7 @@ local function on_refresh(buf)
   end
   local d = require("dbdash.dashboard").get(path)
   if not d then
-    vim.notify("DbDash not running for this config", vim.log.levels.WARN)
+    require("dbdash.view.notifier").warn("not running for this config")
     return
   end
   d:restart()

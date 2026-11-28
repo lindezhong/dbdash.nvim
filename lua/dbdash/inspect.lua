@@ -126,7 +126,7 @@ function M.open(d, tag)
   local dcol = vim.fn.strdisplaywidth(line:sub(1, cursor[2]))
   local node = events.hit_test(d, cursor[1], dcol)
   if not node then
-    return vim.notify("dbdash: nothing to inspect", vim.log.levels.WARN)
+    return require("dbdash.view.notifier").warn("nothing to inspect")
   end
   local box_node, others = node, nil
   if tag then
@@ -142,7 +142,7 @@ function M.open(d, tag)
       end
     end
     if not found then
-      return vim.notify(("dbdash: no %s in %s"):format(tag, node:describe()), vim.log.levels.WARN)
+      return require("dbdash.view.notifier").warn(("no %s in %s"):format(tag, node:describe()))
     end
     -- several of that name (rows, bars, legend items): say so, the first is shown
     local count = 0

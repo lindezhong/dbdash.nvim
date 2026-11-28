@@ -65,36 +65,26 @@ T["position: justify-self and align-self"] = function()
   eq(box.position(content("ab"), s, 10).lines, { "        ab" })
 end
 
-T["part rules recolor values and labels; title text-align and display"] = function()
+T["part rules recolor values; a chart draws no title (its panel's)"] = function()
   local rs = resultset.new(
     { { name = "k", type = "string" }, { name = "v", type = "integer" } },
     { { "a", 1 }, { "b", 2 } }
   )
   local out = render.render(rs, {
     type = "bar",
-    title = "T",
+    title = "Title",
     x_column = "k",
     y_column = "v",
   }, {
     width = 40,
-    style = {
-      value = { color = "Special" },
-      label = { color = "Comment" },
-      title = { ["text-align"] = "left", color = "Error" },
-    },
+    style = { value = { color = "Special" } },
   })
   local groups = {}
   for _, h in ipairs(out.hl) do
     groups[h.group] = true
   end
-  eq({ groups.Special, groups.DbDashNumber, groups.Error }, { true, nil, true })
-  eq(out.lines[1], "T")
-  out = render.render(
-    rs,
-    { type = "bar", title = "T", x_column = "k", y_column = "v" },
-    { width = 40, style = { title = { display = "none" } } }
-  )
-  eq(out.lines[1]:find("T", 1, true), nil)
+  eq({ groups.Special, groups.DbDashNumber }, { true, nil })
+  eq(table.concat(out.lines, "\n"):find("Title", 1, true), nil)
 end
 
 T["plot border styles and hidden axes"] = function()

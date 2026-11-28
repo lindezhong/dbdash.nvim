@@ -64,6 +64,8 @@
 ---@field hits { row_s: integer, row_e: integer, x: integer?, width: integer?, node: table }[]?
 ---  where elements inside are (hit testing)
 ---@field full boolean? keeps its full width (a background or border)
+---@field title_end integer? a box's border: the display column after its title (paint/box)
+---@field status_slot dbdash.paint.StatusSlot? a painted panel: where its status goes
 
 local M = {}
 
