@@ -230,10 +230,10 @@ T["sidebar lists configs and starts/stops them"] = function()
     "Directory: " .. child.lua_get("vim.fn.fnamemodify(vim.fn.getcwd(), ':~')"),
     "",
     "● Fetching        ◐ Partly fetching",
-    "○ Paused          ⊘ Not running",
+    "○ Paused          ◌ Not running",
     "",
-    "⊘ board.yaml",
-    "⊘ broken.yaml",
+    "◌ board.yaml",
+    "◌ broken.yaml",
   })
   eq(
     child.lua_get(
@@ -250,7 +250,7 @@ T["sidebar lists configs and starts/stops them"] = function()
   child.cmd("wincmd h")
   eq(lines()[7], "● board.yaml")
   child.type_keys("t")
-  eq(lines()[7], "⊘ board.yaml")
+  eq(lines()[7], "◌ board.yaml")
   eq(child.lua_get("#vim.tbl_keys(require('dbdash.dashboard').dashboards)"), 0)
   child.cmd("DbDash") -- already open: jump to it
   eq(child.lua_get("#vim.api.nvim_tabpage_list_wins(0)"), 2)
@@ -271,7 +271,7 @@ T["sidebar directories expand, collapse and open nested dashboards"] = function(
   )
   child.api.nvim_win_set_cursor(0, { 10, 0 })
   child.type_keys("<CR>")
-  eq(lines()[11], "    ⊘ nested.yaml")
+  eq(lines()[11], "    ◌ nested.yaml")
   child.type_keys("t") -- stop/refresh do nothing on directories
   eq(child.lua_get("#require('dbdash.dashboard').list()"), 0)
   child.api.nvim_win_set_cursor(0, { 11, 0 })
@@ -780,14 +780,14 @@ T["closing the last window of a dashboard stops it; hiding it pauses it"] = func
   child.cmd("q")
   settle(100)
   eq({ running(), paused() }, { 1, false })
-  -- closing its last window (:q) stops it like :DbDashStop (⊘), the buffer is gone
+  -- closing its last window (:q) stops it like :DbDashStop (◌), the buffer is gone
   child.cmd("q")
   settle(100)
   eq({
     running(),
     sidebar_mark("board.yaml"),
     child.lua_get(("vim.api.nvim_buf_is_valid(%d)"):format(buf)),
-  }, { 0, "⊘", false })
+  }, { 0, "◌", false })
 end
 
 T["a dashboard only in another tab pauses; closing that tab stops it"] = function()

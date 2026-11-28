@@ -14,7 +14,7 @@
 # - closing the dashboard's last window stops it.
 # setup({ dashboard = { pause_hidden = false } }) keeps every hidden dashboard refreshing.
 # The sidebar (:DbDash) shows what a dashboard fetches: this one is ● while shown, ◐ while
-# hidden (one of its two panels goes on), ⊘ once stopped.
+# hidden (one of its two panels goes on), ◌ once stopped.
 # Try: :DbDashStart hidden.yaml, :enew for a while, then :b# - "Keeps refreshing" has
 # counted on, "Pauses" picks up where it was.
 

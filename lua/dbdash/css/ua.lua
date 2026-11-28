@@ -58,10 +58,11 @@ local M = {
   ["chart.stat value.danger"] = { color = "DiagnosticError" },
   -- the sidebar
   ["sidebar-dir"] = { color = "DbDashSidebarDir" },
-  ["sidebar-item.fetching"] = { color = "DbDashSidebarFetching" },
-  ["sidebar-item.partly"] = { color = "DbDashSidebarPartly" },
-  ["sidebar-item.paused"] = { color = "DbDashSidebarPaused" },
-  ["sidebar-item.stopped"] = { color = "DbDashSidebarStopped" },
+  -- a config file's mark (content) and its color: what its dashboard fetches
+  ["sidebar-item.fetching"] = { color = "DbDashSidebarFetching", content = "●" },
+  ["sidebar-item.partly"] = { color = "DbDashSidebarPartly", content = "◐" },
+  ["sidebar-item.paused"] = { color = "DbDashSidebarPaused", content = "○" },
+  ["sidebar-item.stopped"] = { color = "DbDashSidebarStopped", content = "◌" },
   ["sidebar-item.cursor"] = { color = "DbDashSidebarCursor" },
 }
 

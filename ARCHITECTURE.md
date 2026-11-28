@@ -185,7 +185,7 @@ the panel: its one writer
                                                 └─ the dashboard  sums its panels
 the dashboard: the sum
   Dashboard.state ─ dashboard:state(d, state, changed) ─┬─ sidebar   ● all fetching, ◐ some,
-    (dashboard/events.lua)                              │            ○ none; ⊘ not running
+    (dashboard/events.lua)                              │            ○ none; ◌ not running
                                                         ├─ :DbDashStatus  d.state, each panel's
                                                         └─ :DbDashList    d.state
 ```

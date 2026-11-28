@@ -88,29 +88,29 @@ T["tree: files first, then directories; expanded ones show their content indente
   dbdash.setup({ sidebar = { dir = dir } })
   eq(
     (render()),
-    { "⊘ a.yaml", "⊘ b.yml", "⊘ d.dash.yaml", "▸ empty/", "▸ node_modules/", "▸ sub/" }
+    { "◌ a.yaml", "◌ b.yml", "◌ d.dash.yaml", "▸ empty/", "▸ node_modules/", "▸ sub/" }
   )
   sidebar.toggle(dir, dir .. "/sub")
   sidebar.toggle(dir, dir .. "/sub/deeper")
   sidebar.toggle(dir, dir .. "/empty")
   local lines, _, buf = render()
   eq(lines, {
-    "⊘ a.yaml",
-    "⊘ b.yml",
-    "⊘ d.dash.yaml",
+    "◌ a.yaml",
+    "◌ b.yml",
+    "◌ d.dash.yaml",
     "▾ empty/",
     "▸ node_modules/",
     "▾ sub/",
-    "  ⊘ e.yaml",
+    "  ◌ e.yaml",
     "  ▾ deeper/",
-    "    ⊘ f.yaml",
+    "    ◌ f.yaml",
   })
   -- line -> node mapping
   local nodes = vim.b[buf].dbdash_sidebar_nodes
-  -- name_col: where the name starts (after the indent and the ●/◐/○/⊘ mark)
+  -- name_col: where the name starts (after the indent and the ●/◐/○/◌ mark)
   eq(
     nodes[tostring(sidebar.HEADER_LINES + 7)],
-    { path = dir .. "/sub/e.yaml", name_col = 2 + #"⊘" + 1 }
+    { path = dir .. "/sub/e.yaml", name_col = 2 + #"◌" + 1 }
   )
   eq(
     nodes[tostring(sidebar.HEADER_LINES + 8)],
@@ -119,7 +119,7 @@ T["tree: files first, then directories; expanded ones show their content indente
   sidebar.toggle(dir, dir .. "/sub") -- collapse: its children are hidden, state kept
   eq(#render(), 6)
   sidebar.toggle(dir, dir .. "/sub")
-  eq((render())[9], "    ⊘ f.yaml")
+  eq((render())[9], "    ◌ f.yaml")
 end
 
 T["highlights: directories with their arrow; the marks and their legend on two lines"] = function()
@@ -127,14 +127,14 @@ T["highlights: directories with their arrow; the marks and their legend on two l
   local _, marks, buf = render()
   eq(vim.api.nvim_buf_get_lines(buf, 3, 5, false), {
     "● Fetching        ◐ Partly fetching",
-    "○ Paused          ⊘ Not running",
+    "○ Paused          ◌ Not running",
   })
   eq(marks, {
     { "DbDashSidebarFetching", "●" }, -- legend
     { "DbDashSidebarPartly", "◐" },
     { "DbDashSidebarPaused", "○" },
-    { "DbDashSidebarStopped", "⊘" },
-    { "DbDashSidebarStopped", "⊘" }, -- e.yaml
+    { "DbDashSidebarStopped", "◌" },
+    { "DbDashSidebarStopped", "◌" }, -- e.yaml
     { "DbDashSidebarDir", "▸ deeper/" },
   })
   local links = {}
@@ -154,6 +154,19 @@ T["highlights: directories with their arrow; the marks and their legend on two l
     DbDashSidebarPaused = "DiagnosticInfo",
     DbDashSidebarStopped = "Comment",
   })
+end
+
+T["the marks and their colors come from the style sheet (sidebar-item content, color)"] = function()
+  dbdash.setup({
+    sidebar = { dir = dir .. "/sub" },
+    style = { ["sidebar-item.stopped"] = { content = "·", color = "Error" } },
+  })
+  local lines, marks, buf = render()
+  eq(vim.api.nvim_buf_get_lines(buf, 4, 5, false)[1], "○ Paused          · Not running")
+  eq(lines[1], "· e.yaml")
+  -- the legend's mark and e.yaml's: the user's mark, in the user's color (not the default)
+  eq({ marks[4][2], marks[5][2] }, { "·", "·" })
+  eq(marks[4][1] ~= "DbDashSidebarStopped" and marks[4][1] == marks[5][1], true)
 end
 
 T["an empty directory says so"] = function()

@@ -221,12 +221,13 @@ database:
     directory, globs and width). A file's mark says what its dashboard
     fetches, the panels' state (|dbdash-pause|): `●` every panel, `◐` some
     (hidden, with panels that go on: `show.refresh_hidden`, a source that
-    sends data), `○` none (running but paused), `⊘` not running. The legend
-    is at the top, on two lines. Directories show `▸` (collapsed) or `▾`
-    (expanded) and stay expanded when the sidebar is reopened. Hidden
-    directories and names matching `sidebar.exclude` (by default
-    `*.schema.yaml`) are not listed; without
-    config files the list says so. The cursor line is your usual
+    sends data), `○` none (running but paused), `◌` not running. The legend
+    is at the top, on two lines. The marks and their colors are a style
+    sheet's (`sidebar-item`, |dbdash-css-elements|). Directories show `▸`
+    (collapsed) or `▾` (expanded) and stay expanded when the sidebar is
+    reopened. Hidden directories and names matching `sidebar.exclude` (by
+    default `*.schema.yaml`) are not listed; without config files the list
+    says so. The cursor line is your usual
     'cursorline'; `sidebar.cursorline = "name"` marks only the name (when an
     underlined CursorLine would turn partly green under ●), false hides it.
 
@@ -861,7 +862,13 @@ Elements                                                 *dbdash-css-elements*
   note, warning      notes ("… 3 more rows") and warnings
 
 The sidebar is a document of its own: sidebar-dir, sidebar-item (.fetching,
-.partly, .paused, .stopped, .cursor).
+.partly, .paused, .stopped, .cursor). A file's mark is the `content` of its
+sidebar-item class, its color the `color`, as with any element: >lua
+  require("dbdash").setup({ style = {
+    ["sidebar-item.stopped"] = { content = "·" },
+    ["sidebar-item.fetching"] = { content = "▶", color = "DiagnosticOk" },
+  } })
+<
 
 Properties                                             *dbdash-css-properties*
 
@@ -2251,12 +2258,12 @@ Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
 `Directory`), the marks `DbDashSidebarFetching` (● every panel fetches,
 links to `DiagnosticOk`), `DbDashSidebarPartly` (◐ some do, links to
 `DiagnosticWarn`), `DbDashSidebarPaused` (○ none does, links to
-`DiagnosticInfo`), `DbDashSidebarStopped` (⊘ not running, links to
+`DiagnosticInfo`), `DbDashSidebarStopped` (◌ not running, links to
 `Comment`). With
 `sidebar.cursorline = "name"` the sidebar window's cursor line uses
 `DbDashSidebarCursorLine` (empty) instead of `CursorLine`, and
 `DbDashSidebarCursor` (underline) marks the name on the cursor line without
-the ●/◐/○/⊘ mark: a terminal draws an underline in the text color, so with an
+the ●/◐/○/◌ mark: a terminal draws an underline in the text color, so with an
 underlined CursorLine the green ● leaves a green piece in the line.
 
 `DbDashTrustFile` (links to `Title`) is the separator line before each

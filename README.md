@@ -117,8 +117,9 @@ Then `:DbDashStart signups.yaml hours=48`, or `:DbDash` for a sidebar listing th
 of the current directory as a tree: `<CR>` on a directory expands it, on a file starts its
 dashboard. A file's mark says what its dashboard fetches (fetching is the work): `●` every
 panel, `◐` some (it is not on screen, and only some panels go on: `show.refresh_hidden`, a
-source that sends data), `○` none (running, paused while not on screen), `⊘` not running
-(closing a dashboard's last window stops it).
+source that sends data), `○` none (running, paused while not on screen), `◌` not running
+(closing a dashboard's last window stops it). The marks and their colors are set in a style
+sheet, like everything shown (`sidebar-item.stopped { content: "·" }`).
 
 To try it without a database server, open a file in [`example/`](example): most use an
 in-memory SQLite database (`connections/github.yaml` and `dashboards/multi_panel.yaml` also

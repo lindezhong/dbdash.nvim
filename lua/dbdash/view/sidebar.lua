@@ -96,43 +96,24 @@ function M.toggle(root, dir)
   expanded[root][dir] = not expanded[root][dir] or nil
 end
 
--- The marks of a config: what its dashboard fetches (Dashboard.state), or not running.
+-- The marks of a config: what its dashboard fetches (Dashboard.state), or not running. A
+-- mark is the `content` of its sidebar-item class, its color the `color` (css/ua.lua; a
+-- user sheet changes either: :help dbdash-css).
 local MARKS = {
-  { "●", "fetching", "Fetching" }, -- every panel fetches
-  { "◐", "partly", "Partly fetching" }, -- some do
-  { "○", "paused", "Paused" }, -- running, none fetches (hidden)
-  { "⊘", "stopped", "Not running" },
+  { "fetching", "Fetching" }, -- every panel fetches
+  { "partly", "Partly fetching" }, -- some do
+  { "paused", "Paused" }, -- running, none fetches (hidden)
+  { "stopped", "Not running" },
 }
 
-local function legend(a, b)
-  local left = MARKS[a][1] .. " " .. MARKS[a][3]
-  return left
-    .. string.rep(" ", 18 - vim.fn.strdisplaywidth(left))
-    .. MARKS[b][1]
-    .. " "
-    .. MARKS[b][3]
-end
-
-M.HEADER = {
-  "DbDash Sidebar",
-  "", -- Directory: ...
-  "",
-  legend(1, 2),
-  legend(3, 4),
-  "",
-}
-
----The mark of a config file: its dashboard's state, or not running.
----@return string mark, string class
-local function mark_of(path)
+---The class of a config file's mark: its dashboard's state, or not running.
+---@return string
+local function class_of(path)
   local d = require("dbdash.dashboard").get(path)
-  local m = MARKS[4]
-  if d and d.state.running then
-    m = d.state.fetching == "all" and MARKS[1]
-      or (d.state.fetching == "some" and MARKS[2])
-      or MARKS[3]
+  if not (d and d.state.running) then
+    return "stopped"
   end
-  return m[1], m[2]
+  return ({ all = "fetching", some = "partly" })[d.state.fetching] or "paused"
 end
 
 local sidebar_doc
@@ -151,19 +132,29 @@ end
 function M.render(buf)
   require("dbdash.css.hl").setup()
   local root = M.dir()
-  local lines = vim.deepcopy(M.HEADER)
-  lines[2] = "Directory: " .. vim.fn.fnamemodify(root, ":~")
-  -- colors from the sidebar's own document (css: sidebar-item.fetching, sidebar-dir, ...)
+  -- marks and colors from the sidebar's own document (css: sidebar-item.fetching { content,
+  -- color }, sidebar-dir, ...)
   local css = M.css()
   local function item(state)
     return css:hl("sidebar-item", { classes = { state } })
   end
-  local hl = {}
-  for i, m in ipairs(MARKS) do -- the legend's marks, two to a line
-    local row = 3 + math.floor((i - 1) / 2)
-    local col = lines[row + 1]:find(m[1], 1, true) - 1
-    hl[#hl + 1] = { row = row, col_s = col, col_e = col + #m[1], group = item(m[2]) }
+  local function mark(state)
+    return css:get("sidebar-item", { classes = { state } }).content or ""
   end
+  local lines = { "DbDash Sidebar", "Directory: " .. vim.fn.fnamemodify(root, ":~"), "" }
+  local hl = {}
+  for i = 1, #MARKS, 2 do -- the legend: the marks two to a line
+    local row, text = #lines, ""
+    for k = i, i + 1 do
+      local m = mark(MARKS[k][1])
+      local pre = k == i and "" or string.rep(" ", 18 - vim.fn.strdisplaywidth(text))
+      local col = #text + #pre
+      text = text .. pre .. m .. " " .. MARKS[k][2]
+      hl[#hl + 1] = { row = row, col_s = col, col_e = col + #m, group = item(MARKS[k][1]) }
+    end
+    lines[#lines + 1] = text
+  end
+  lines[#lines + 1] = ""
   local nodes = {}
 
   local function walk(dir, depth)
@@ -171,11 +162,11 @@ function M.render(buf)
     local indent = string.rep("  ", depth)
     for _, f in ipairs(e.files) do
       local path = vim.fs.joinpath(dir, f)
-      local mark, class = mark_of(path)
-      local group = item(class)
-      lines[#lines + 1] = indent .. mark .. " " .. f
-      hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #indent + #mark, group = group }
-      nodes[tostring(#lines)] = { path = path, name_col = #indent + #mark + 1 }
+      local class = class_of(path)
+      local sym, group = mark(class), item(class)
+      lines[#lines + 1] = indent .. sym .. " " .. f
+      hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #indent + #sym, group = group }
+      nodes[tostring(#lines)] = { path = path, name_col = #indent + #sym + 1 }
     end
     for _, d in ipairs(e.dirs) do
       local path = vim.fs.joinpath(dir, d)
