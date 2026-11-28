@@ -890,6 +890,30 @@ T["pause_hidden = false keeps hidden dashboards refreshing"] = function()
   eq(runs() >= before + 1, true)
 end
 
+T["hidden by switching the window: only refresh_hidden panels go on (the example)"] = function()
+  vim.fn.writefile(
+    vim.fn.readfile(ROOT .. "/example/dashboards/hidden.yaml"),
+    dir .. "/hidden.yaml"
+  )
+  child.cmd("DbDashStart hidden.yaml")
+  child.lua([[_G.wait_for(function()
+    local d = require("dbdash.dashboard").list()[1]
+    return d and d.panels[1].rs and d.panels[2].rs
+  end)]])
+  local count = [[vim.tbl_map(function(p) return p.refresh_count or 0 end,
+    require("dbdash.dashboard").list()[1].panels)]]
+  child.cmd("enew")
+  settle(100)
+  eq(paused(), true)
+  local before = child.lua_get(count)
+  settle(4500) -- two intervals of 2s
+  local hidden = child.lua_get(count)
+  eq({ hidden[1] >= before[1] + 2, hidden[2] }, { true, before[2] })
+  child.cmd("buffer hidden.yaml")
+  settle(300)
+  eq({ paused(), child.lua_get(count)[2] }, { false, before[2] + 1 }) -- due: at once
+end
+
 T[":DbDashExport: register, named register, file, overwrite with !"] = function()
   child.cmd("DbDashStart board.yaml")
   wait_loaded()

@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=../dbdash.schema.yaml
+#
+# Dashboards off screen (:help dbdash-pause). When no window of the current tab page
+# shows a dashboard (another buffer in its window, another tab page), it pauses:
+# - its panels stop querying, except those with show.refresh_hidden: true, which keep
+#   their interval (an alert you want to hear about, a log you want complete);
+# - shown again, a panel whose tick came due while hidden queries at once, the others
+#   keep the time they had left;
+# - sources that send data (luastream://, exec://, webhook://) keep receiving anyway,
+#   so refresh_hidden does not apply to them;
+# - closing the dashboard's last window stops it.
+# setup({ dashboard = { pause_hidden = false } }) keeps every hidden dashboard refreshing.
+# Try: :DbDashStart hidden.yaml, :enew for a while, then :b# - "Keeps refreshing" has
+# counted on, "Pauses" picks up where it was.
+
+title: "Hidden dashboards"
+description: |
+  Two panels querying every 2 seconds. Hide the dashboard (`:enew`) for a while, then come
+  back (`:b#`): the panel with `show.refresh_hidden: true` went on, the other paused and
+  queries again at once. See `:help dbdash-pause`.
+
+database:
+  url: "sqlite:///:memory:"
+
+style:
+  dashboard: { grid-template-columns: 2 }
+  countdown: { display: block, content: "next in {time}s" }
+
+panels:
+  - query:
+      sql: |
+        SELECT {{ meta.refresh_count }} AS queries,
+               strftime('%H:%M:%S', 'now', 'localtime') AS last
+    show:
+      type: table
+      title: "Keeps refreshing"
+      description: "`show.refresh_hidden: true`: it queries while the dashboard is hidden."
+      interval: 2s
+      refresh_hidden: true
+  - query:
+      sql: |
+        SELECT {{ meta.refresh_count }} AS queries,
+               strftime('%H:%M:%S', 'now', 'localtime') AS last
+    show:
+      type: table
+      title: "Pauses"
+      description: "The default: no queries while the dashboard is hidden."
+      interval: 2s
