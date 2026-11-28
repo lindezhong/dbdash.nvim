@@ -471,9 +471,10 @@ as m:ss (h:mm:ss from an hour): >yaml
   style:
     header countdown: { display: block, content: "all in {clock}" }
 <
-The title also names the dashboard in threshold notifications (for a chart
-without `show.title`), the panel picker, |:DbDashStatus| and
-`meta.dashboard_title`.
+The title also names the dashboard in the panel picker, |:DbDashStatus| and
+`meta.dashboard_title`. Notifications (errors, thresholds) start with the
+config file and the panel's title, when it has one: "dbdash: board.yaml ›
+Orders: ...".
 
 Descriptions                                              *dbdash-description*
 

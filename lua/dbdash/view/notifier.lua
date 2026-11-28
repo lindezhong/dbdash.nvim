@@ -28,25 +28,29 @@ function M.info(msg)
   M.notify(msg, vim.log.levels.INFO)
 end
 
-local function on_error(_, err, o)
+---Where a message of a dashboard comes from: its config file (as on the command line)
+---and, when it has a title, the panel ("errors.yaml › Every fifth item is bad").
+---@param path string
+---@param p dbdash.Panel?
+function M.where(path, p)
+  local file = vim.fn.fnamemodify(path, ":~:.")
+  local title = p and p:shown_title()
+  return title and (file .. " › " .. title) or file
+end
+
+local function on_error(p, err, o)
   local mode = require("dbdash.options").current.errors.notify
   if o.always or mode == "always" or (mode == "once" and o.changed) then
-    M.error(err)
+    M.notify(M.where(p.d.path, p) .. ": " .. format_error(err), vim.log.levels.ERROR)
   end
 end
 
 local function on_threshold(p, cur)
-  local d = p.d
-  local t = p.cfg.show.title
-  local title = (t and t ~= "") and t
-    or d.cfg.title
-    or p:shown_title()
-    or vim.fn.fnamemodify(d.path, ":t")
   local what = cur.column and (cur.column .. " = ") or ""
   local value = require("dbdash.render.format").value_text(cur.value, nil, "NULL")
   M.warn(
     ("%s: %s%s %s %s"):format(
-      title,
+      M.where(p.d.path, p),
       what,
       value,
       cur.below and "≤" or "≥",
@@ -60,8 +64,12 @@ events:on("dashboard:started", function(d)
   d.events:on("panel:threshold", on_threshold)
 end)
 
-events:on("dashboard:error", function(_, err)
-  M.error(err)
+-- A config that could not start: its file, unless the error says where it is already.
+events:on("dashboard:error", function(path, err)
+  if type(err) == "table" and err.file then
+    return M.error(err)
+  end
+  M.notify(M.where(path) .. ": " .. format_error(err), vim.log.levels.ERROR)
 end)
 
 return M

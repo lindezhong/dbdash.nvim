@@ -104,7 +104,7 @@ properties:
     type: string
     description: >-
       The dashboard's title: on the header line above the charts, in
-      notifications and :DbDashStatus, and meta.dashboard_title.
+      :DbDashStatus and the panel picker, and meta.dashboard_title.
   description:
     type: string
     description: >-

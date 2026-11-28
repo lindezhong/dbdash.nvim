@@ -118,7 +118,7 @@ query: { sql: SELECT 1 AS x }
   eq(#marks(d, 0), 0)
 end
 
-T["threshold notifications use the dashboard title when the panel has none"] = function()
+T["threshold notifications name the config file (and the panel's title, when it has one)"] = function()
   local notes = {}
   local real = vim.notify
   ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
@@ -139,7 +139,7 @@ show:
   vim.notify = real
   local found = false
   for _, n in ipairs(notes) do
-    found = found or n:find("^dbdash: Board: ") ~= nil
+    found = found or n:find("^dbdash: [^\n]*thr%.yaml: 99 ≥ 50") ~= nil
   end
   eq(found, true)
 end

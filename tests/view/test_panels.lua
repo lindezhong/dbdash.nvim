@@ -242,4 +242,36 @@ T["every message goes through the notifier, with its prefix"] = function()
   end
 end
 
+T["a panel's error names its config file and its panel"] = function()
+  local notes = {}
+  local real = vim.notify
+  ---@diagnostic disable-next-line: duplicate-set-field (replaced for the test)
+  vim.notify = function(m)
+    notes[#notes + 1] = m
+  end
+  run(
+    "where",
+    [[
+database: { url: "sqlite:///:memory:" }
+panels:
+  - query: { sql: "SELECT 1 AS a" }
+    show: { type: table, title: Good, interval: 1h }
+  - query: { sql: "SELEC oops" }
+    show: { type: table, title: Bad, interval: 1h }
+]]
+  )
+  run(
+    "lone",
+    [[
+database: { url: "sqlite:///:memory:" }
+query: { sql: "SELEC oops" }
+show: { type: table, interval: 1h }
+]]
+  )
+  vim.notify = real
+  local text = table.concat(notes, "\n")
+  eq(text:find("where%.yaml › Bad: sqlite query error") ~= nil, true)
+  eq(text:find("lone%.yaml: sqlite query error") ~= nil, true) -- no title: the file only
+end
+
 return T

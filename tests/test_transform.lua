@@ -92,7 +92,8 @@ T["template in the transform; errors point at the YAML line"] = function()
   eq(#notes, 1)
   eq(notes[1].level, vim.log.levels.ERROR)
   eq(
-    notes[1].msg:find("^dbdash: transform error: .*bad%.yaml:6: attempt to index local 'x'") ~= nil,
+    -- the config file first: which dashboard it is
+    notes[1].msg:find("^dbdash: [^\n]*bad%.yaml: transform error: .*bad%.yaml:6: attempt") ~= nil,
     true
   )
 end
@@ -151,10 +152,11 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
   })
   eq(p.error.phase, "transform")
   eq(p.error.message, "the result is not rows (got string)")
-  eq(notes[#notes], {
-    msg = "dbdash: transform error: the result is not rows (got string)",
-    level = vim.log.levels.ERROR,
-  })
+  eq(notes[#notes].level, vim.log.levels.ERROR)
+  eq(
+    notes[#notes].msg:match("http_bad%.yaml: (.*)$"),
+    "transform error: the result is not rows (got string)"
+  )
   -- without a transform the response itself is checked, with a hint
   p = run("http_plain", { ("database: { url: %q }"):format(base), "query: { sql: curl }" })
   eq(p.error.phase, "query")
@@ -163,10 +165,11 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
       ~= nil,
     true
   )
-  eq(notes[#notes], {
-    msg = "dbdash: http query error: the result is an object (items), not rows; add query.transform to reshape it (:help dbdash-transform)",
-    level = vim.log.levels.ERROR,
-  })
+  eq(notes[#notes].level, vim.log.levels.ERROR)
+  eq(
+    notes[#notes].msg:match("http_plain%.yaml: (.*)$"),
+    "http query error: the result is an object (items), not rows; add query.transform to reshape it (:help dbdash-transform)"
+  )
   eq(#notes, 2) -- one per failing dashboard; the successful ones did not notify
 end
 
