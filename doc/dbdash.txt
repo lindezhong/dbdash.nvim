@@ -61,7 +61,8 @@ defaults: >lua
     dashboard = {
       open = "current",    -- where :DbDashStart shows a dashboard:
                            -- "current" | "vsplit" | "split" | "tab"
-      pause_hidden = true, -- no queries while not on screen, see below
+      pause_hidden = true, -- nothing for the screen while not on it:
+                           -- no queries, no drawing (|dbdash-pause|)
       keys = { modify = "a", show_args = "A", refresh = "r",
                reset = "R", show_sql = "s", export = "e",
                describe = "K" },
@@ -227,17 +228,25 @@ database:
 
                                                                 *dbdash-pause*
 A dashboard that no window of the current tab page shows (you switched the
-window to another buffer, or it is only in another tab page) pauses: no
-queries, no countdown. Closing its last window is not hiding it: that stops
-the dashboard like |:DbDashStop| (the sidebar shows `○`, not `◐`), except
-while Neovim exits or a session loads. A window that shows it counts even
-when the cursor is in another window. When it is shown again, it refreshes
-right away if its next refresh is due, and otherwise continues the
-countdown. Set
-`dashboard.pause_hidden = false` to keep hidden dashboards refreshing, or
-`show.refresh_hidden: true` for some panels: they keep refreshing on their
-interval (and with the top-level `interval`) while the dashboard is paused,
-and still notify thresholds and errors.
+window to another buffer, or it is only in another tab page) pauses: it
+spends nothing on what is shown. Its databases are not queried (neither on
+a panel's interval nor on the top-level `interval`, nor a retry), nothing
+is drawn and the countdowns stop. A source that sends data (|dbdash-push|)
+cannot be paused without losing data: its items are still received and
+processed (`query.transform`, `meta.prev`, thresholds and errors notify),
+only not shown. When the dashboard is shown again, a panel whose refresh
+came due queries right away, the others continue their countdown, and
+what a source sent while hidden is shown at once (its latest result).
+
+Closing its last window is not hiding it: that stops the dashboard like
+|:DbDashStop| (the sidebar shows `○`, not `◐`), except while Neovim exits
+or a session loads. A window that shows it counts even when the cursor is
+in another window. Set `dashboard.pause_hidden = false` to keep hidden
+dashboards refreshing, or `show.refresh_hidden: true` for some panels:
+they keep querying on their interval (and with the top-level `interval`)
+while the dashboard is paused, their results recorded and notified, but
+not drawn until the dashboard is shown again (its latest result then).
+Example: `example/dashboards/hidden.yaml`.
 
 :DbDashClose                                                    *:DbDashClose*
     Close the sidebar.

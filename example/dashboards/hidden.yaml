@@ -3,11 +3,14 @@
 # Dashboards off screen (:help dbdash-pause). When no window of the current tab page
 # shows a dashboard (another buffer in its window, another tab page), it pauses:
 # - its panels stop querying, except those with show.refresh_hidden: true, which keep
-#   their interval (an alert you want to hear about, a log you want complete);
+#   their interval (an alert you want to hear about, a log you want complete): their
+#   results are recorded and notify, but nothing is redrawn while hidden;
 # - shown again, a panel whose tick came due while hidden queries at once, the others
 #   keep the time they had left;
-# - sources that send data (luastream://, exec://, webhook://) keep receiving anyway,
-#   so refresh_hidden does not apply to them;
+# - nothing is drawn; sources that send data (luastream://, exec://, webhook://) cannot
+#   be paused without losing data: their items are still received and processed
+#   (transform, history, thresholds and errors notify) and the latest is shown at once
+#   when the dashboard is shown again (refresh_hidden does not apply to them);
 # - closing the dashboard's last window stops it.
 # setup({ dashboard = { pause_hidden = false } }) keeps every hidden dashboard refreshing.
 # Try: :DbDashStart hidden.yaml, :enew for a while, then :b# - "Keeps refreshing" has
@@ -34,7 +37,9 @@ panels:
     show:
       type: table
       title: "Keeps refreshing"
-      description: "`show.refresh_hidden: true`: it queries while the dashboard is hidden."
+      description: |
+        `show.refresh_hidden: true`: it queries while the dashboard is hidden (drawn when
+        it is shown again).
       interval: 2s
       refresh_hidden: true
   - query:

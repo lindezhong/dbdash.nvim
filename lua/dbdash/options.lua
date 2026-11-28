@@ -27,7 +27,8 @@ local db_defaults = require("dbdash.db.defaults") -- the built-in values
 
 ---@class dbdash.DashboardOptions
 ---@field open "current"|"vsplit"|"split"|"tab" where :DbDashStart shows a dashboard
----@field pause_hidden boolean stop refreshing while no window of the current tab shows it
+---@field pause_hidden boolean while no window of the current tab shows it: no queries, no
+---  drawing (sources that send data keep receiving; :help dbdash-pause)
 ---@field keys table<dbdash.Key, string|false>
 
 ---@class dbdash.PopupOptions

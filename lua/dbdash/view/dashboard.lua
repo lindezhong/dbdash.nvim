@@ -103,6 +103,7 @@ function M.render_view(d, width, height)
     }
   end
   d.doc.updating = false
+  d.doc:drawn()
   return lines, hl, body, offset, regions
 end
 
@@ -125,7 +126,7 @@ function M.request_render(d)
       d.render_skipped = true -- hidden: drawn when shown again (resume)
       return
     end
-    if d.doc:needs_update() then
+    if d.doc:needs_frame() then
       M.redraw(d)
     else
       M.update_status(d)
@@ -439,9 +440,10 @@ function M.update_visibility()
     if not pause_hidden or shown[d.buf] then
       if d.paused then
         d:resume()
-        -- shown again: the countdowns, and the frame that waited
+        -- shown again: the countdowns, and the frame that waited (what was committed as
+        -- it was shown: dashboard/commit.lua)
         start_countdowns(d)
-        if d.render_skipped then
+        if d.render_skipped or d.doc:needs_frame() then
           d.render_skipped = false
           M.request_render(d)
         end

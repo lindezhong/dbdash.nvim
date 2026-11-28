@@ -59,6 +59,27 @@ local function delta(a, b)
   }
 end
 
+T["a style query before the frame (a flush) does not lose the frame"] = function()
+  local d = start()
+  local p = d.panels[2]
+  p.rs = require("dbdash.db.resultset").new({ { name = "m", type = "integer" } }, { { 7 } })
+  p.committed = false
+  p:emit("panel:result", p.rs, {}) -- committed: the document asks for a frame
+  -- what the status line does: read computed styles, which restyles the document early
+  require("dbdash.css.style").get(p.node)
+  eq(d.doc:needs_update(), false)
+  eq(d.doc:needs_frame(), true)
+  eq(
+    vim.wait(1000, function()
+      return table
+        .concat(vim.api.nvim_buf_get_lines(d.buf, 0, -1, false), "\n")
+        :find("│ 7 │", 1, true) ~= nil
+    end, 10),
+    true
+  )
+  eq(d.doc:needs_frame(), false)
+end
+
 T["nothing changed: layout is reused and no row is written"] = function()
   local d = start()
   local before = counters(d)

@@ -144,7 +144,13 @@ dashboard:args    every count starts again (and every panel's run)
 
 `panel:tick` listeners: the panel (a database's loop waiting in `ctx.wait_tick` queries; a
 tick while the query runs is skipped, `panel:skipped`) and commit (a new period). A source
-that sends data never waits for ticks. User actions (`r`, changed arguments) restart the
+that sends data never waits for ticks.
+
+A hidden dashboard (setup `dashboard.pause_hidden`) spends nothing on what is shown: no
+tick, so a database is not queried (except `show.refresh_hidden` panels), nothing is
+committed and no frame is drawn. A source that sends data cannot be paused without losing
+data: its items are still received and processed (transform, history, thresholds and
+errors notify), and the latest is committed when the dashboard is shown again. User actions (`r`, changed arguments) restart the
 panel's run at once. Each run has a number (`Panel.gen`): ticks and results of an older
 run are dropped.
 
@@ -198,8 +204,11 @@ one), errors, argument lines, each chart's content (built here only, through
 (`Node:set_data`: running, a source's state, the next tick). A panel's results are
 committed at most once per period: the first of a period at once (a database's query of
 the tick), later ones at the next `panel:tick`; a tick with nothing pending writes
-nothing. Only changes mark nodes dirty; a document that gets something to update asks
-its view for a frame (`Document.on_update`).
+nothing; a hidden dashboard commits nothing, and what waited is committed when it is
+shown. Only changes mark nodes dirty; a document that gets something to update asks its
+view for a frame (`Document.on_update`). Whether a frame has something to draw is the
+document's version against the last frame's (`Document:needs_frame`): a style query
+(`css/style.get`, as getComputedStyle) may restyle early, the frame still draws.
 
 Every dashboard is drawn the same way: a header (the dashboard's title and ⓘ) and a grid
 of panels, one panel being a grid of one. A panel's box holds, in order:
@@ -274,7 +283,7 @@ The view listens to no data event: what it shows comes from the document.
 | JS variables | the model (history, prev, store, values) |
 | `requestAnimationFrame` writing the DOM | commit (at most once per panel period) |
 | update the rendering (only what is dirty) | the view's frame |
-| hidden tab: no rendering, slower timers | hidden dashboard: no frames, only refresh_hidden ticks |
+| hidden tab: no rendering, slower timers | hidden dashboard: no frames, no commits, only refresh_hidden ticks; push sources keep receiving |
 
 ## Interfaces
 

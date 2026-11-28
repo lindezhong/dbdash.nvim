@@ -10,8 +10,11 @@ local T = MiniTest.new_set({
     pre_case = function()
       dir = vim.fs.normalize(vim.fn.tempname())
       vim.fn.mkdir(dir, "p")
+      -- the dashboards here have no window: shown all the same (pausing: test_pause.lua)
+      require("dbdash").setup({ dashboard = { pause_hidden = false } })
     end,
     post_case = function()
+      require("dbdash").setup({})
       for _, d in ipairs(sched.list()) do
         sched.stop(d.path)
       end

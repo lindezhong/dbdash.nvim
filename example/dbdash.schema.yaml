@@ -714,9 +714,14 @@ definitions:
         type: boolean
         default: false
         description: >-
-          Keep refreshing this chart while the dashboard is not visible
-          (paused, see dashboard.pause_hidden in setup): thresholds and
-          errors still notify.
+          Keep querying this chart's database while the dashboard is not
+          visible (paused, see dashboard.pause_hidden in setup; :help
+          dbdash-pause): its results are recorded (history, meta.prev) and
+          thresholds and errors notify, but the dashboard is not redrawn
+          while hidden; the latest result is shown when it is visible
+          again. Not for sources that send data: they always keep
+          receiving and processing while hidden, and are not redrawn
+          either until the dashboard is visible again.
       args_show:
         description: >-
           Show argument values above this chart: true for the arguments its

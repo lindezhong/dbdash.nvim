@@ -21,8 +21,9 @@ are implemented in Lua; SQLite goes through LuaJIT FFI and the system `libsqlite
 - **Several panels** per dashboard in a grid, each with its own database (mix SQLite,
   PostgreSQL, an HTTP API, ...) and interval, plus an optional refresh of all of them; the
   top-level `database`, `query` and `show` are defaults every panel can override.
-  Dashboards that are not on screen pause and catch up when shown again (or keep
-  refreshing with `show.refresh_hidden`); closing a dashboard's last window stops it.
+  Dashboards that are not on screen pause: no queries, no drawing (sources that send data
+  keep receiving), and catch up when shown again (or keep querying with
+  `show.refresh_hidden`); closing a dashboard's last window stops it.
 - **Title and descriptions**: a header with the dashboard's title and a countdown; each
   panel's title line with its status (a source's state, its countdown) and its error in
   full on a line of its own; descriptions of the dashboard and each chart are templates

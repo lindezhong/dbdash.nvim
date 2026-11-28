@@ -4,9 +4,11 @@
 --
 -- A panel's results are committed at most once per period (its ticks): the first result
 -- of a period at once (a database's query of the tick), later ones at the next tick (a
--- source that sends data faster than its interval). Committing is idempotent: a tick with
--- nothing pending writes nothing new. The status (running, listening..., the next tick)
--- is element data (Node:set_data), written when it changes.
+-- source that sends data faster than its interval). A hidden dashboard (dashboard:hidden)
+-- commits nothing: its results wait, and are committed at once when it is shown again.
+-- Committing is idempotent: a tick with nothing pending writes nothing new. The status
+-- (running, listening..., the next tick) is element data (Node:set_data), written when it
+-- changes.
 local dom = require("dbdash.dom.node")
 local format_error = require("dbdash.util.error").format
 
@@ -104,7 +106,7 @@ end
 ---next tick. The chart is laid out again (its values may change with the same result).
 ---@param p dbdash.Panel
 function M.result(p)
-  if p.committed then
+  if p.committed or p.d.paused then
     p.pending = true
     return
   end
@@ -152,6 +154,15 @@ function M.attach(d)
   end)
   ev:on("dashboard:args", function()
     M.args(d)
+  end)
+  -- shown again: what came while hidden, at once (after the clock's ticks that came due)
+  ev:on("dashboard:shown", function()
+    for _, p in ipairs(d.panels) do
+      if p.pending then
+        p.committed = false
+        M.result(p)
+      end
+    end
   end)
 end
 

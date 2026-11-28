@@ -19,6 +19,7 @@ local M = {}
 ---@field updating boolean? a frame is updating it (changes then need no other frame)
 ---@field data_changed boolean? an element's data changed (Node:set_data) since the last frame
 ---@field restyled table? what the last restyle did (css/style.lua, for tests and :DbDashInspect)
+---@field drawn_version integer? the version the last frame showed (Document:drawn)
 local Document = {}
 Document.__index = Document
 
@@ -103,6 +104,18 @@ function Document:note_data()
   if idle then
     self:updated()
   end
+end
+
+---Does the next frame have to update the rendering (data changes aside)? Something changed
+---since the last frame: a style query (css/style.get) may have restyled it already, as
+---getComputedStyle flushes styles in a browser, but it is not drawn yet.
+function Document:needs_frame()
+  return self.version ~= self.drawn_version or self:needs_update()
+end
+
+---The view drew the document as it is now (the end of a frame).
+function Document:drawn()
+  self.drawn_version = self.version
 end
 
 ---Is there anything for the next update to do (data changes aside)?
