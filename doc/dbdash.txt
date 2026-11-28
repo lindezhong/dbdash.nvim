@@ -638,15 +638,23 @@ Tracks:
   max-content      rows: as tall as the panels with their full plot
                    (`plot { height }`, 15); tables, stat and text charts
                    have one height
-  "minmax(a, b)"   at least a, at most b (b may be fr)
+  "minmax(a, b)"   at least a, at most b (b may be fr); a number for a is
+                   that many lines, whatever the panels need
 
 Rows are sized like CSS: each row gets its panels' min-content, the lines of
 the window that are left grow the rows up to their limit (auto rows up to
 max-content, equally), and fr rows share what remains. Nothing is squeezed
 below its min-content: a grid taller than the window makes the buffer longer,
-and you scroll. A panel in a fixed or fr row fills its cell (its plot grows
-with the row, unless `plot { height }` is set). A panel over several rows
-that needs more than they give adds the difference to those rows.
+and you scroll. A row that gives its own size is the exception, as in CSS:
+a fixed row (`9`) and a `minmax` whose minimum is a number
+(`minmax(10, 1fr)`) do not grow for their panels. A panel that needs more
+than such a cell gives is cut at the bottom of the cell (as with
+`overflow: hidden`), its plot's bottom border and x axis too: give the row
+`min-content` as its minimum (`minmax(min-content, 1fr)`), or the chart a
+smaller `plot { min-height }`. A panel in a fixed or fr row fills its cell
+(its plot grows with the row, unless `plot { height }` is set). A panel over
+several rows that needs more than they give adds the difference to those
+rows.
 
 Placement follows CSS: panels with an area or a row and column go first,
 panels with only a row or a column go into the first free place there, and

@@ -8,7 +8,12 @@
 #   panel { grid-row, grid-column }       N, "span M" or "N / span M"
 # Panels without a place flow into the next free cells. Rows get at least their
 # panels' min-content (plot { min-height }), then share the window; a grid taller than
-# the window scrolls instead of squeezing the charts.
+# the window scrolls instead of squeezing the charts. Not a row that gives its own size
+# (as in CSS): a fixed row (9) and a minmax whose minimum is a number (the "wide" row,
+# minmax(10, 1fr)) stay that size. A panel taller than its cell is cut at the cell's
+# bottom (like overflow: hidden): in a short window the "wide" row gets its 10 lines
+# only, and its bar chart (a plot of at least 8 rows, plus its border and axis) loses
+# its plot's bottom border and x axis. minmax(min-content, 1fr) would give it room.
 
 title: "Grid layout"
 description: |
@@ -99,7 +104,10 @@ panels:
       description: |
         The third row is `minmax(10, 1fr)`: at least 10 lines, and whatever the window has
         left (CSS `fr`). A chart in a fixed or `fr` row fills its cell, so this one grows
-        with the window.
+        with the window. With nothing left (a short window) the row is 10 lines, less than
+        this chart needs: it is cut at the bottom (no bottom border, no x axis), as a
+        minimum given as a number does not grow for its panel (CSS). Use
+        `minmax(min-content, 1fr)` to keep it whole.
       x_column: day
       y_column: load
     style:
