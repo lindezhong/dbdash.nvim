@@ -8,6 +8,7 @@ local M = {}
 
 ---@class dbdash.dom.Node
 ---@field tag string element name ("#text" for text nodes)
+---@field result dbdash.db.ResultSet? a chart's result as committed (dashboard/commit.lua)
 ---@field id string?
 ---@field classes string[] in the order written
 ---@field attrs table<string, string>

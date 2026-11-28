@@ -5,7 +5,7 @@ local function opts()
   return require("dbdash.options").current.sidebar
 end
 
-local HEADER_LINES = 5
+local HEADER_LINES = 6
 local NAME = "dbdash-sidebar"
 
 local function sidebar_buf()
@@ -96,13 +96,44 @@ function M.toggle(root, dir)
   expanded[root][dir] = not expanded[root][dir] or nil
 end
 
+-- The marks of a config: what its dashboard fetches (Dashboard.state), or not running.
+local MARKS = {
+  { "●", "fetching", "Fetching" }, -- every panel fetches
+  { "◐", "partly", "Partly fetching" }, -- some do
+  { "○", "paused", "Paused" }, -- running, none fetches (hidden)
+  { "⊘", "stopped", "Not running" },
+}
+
+local function legend(a, b)
+  local left = MARKS[a][1] .. " " .. MARKS[a][3]
+  return left
+    .. string.rep(" ", 18 - vim.fn.strdisplaywidth(left))
+    .. MARKS[b][1]
+    .. " "
+    .. MARKS[b][3]
+end
+
 M.HEADER = {
   "DbDash Sidebar",
   "", -- Directory: ...
   "",
-  "● = Running  ◐ = Paused  ○ = Not running",
+  legend(1, 2),
+  legend(3, 4),
   "",
 }
+
+---The mark of a config file: its dashboard's state, or not running.
+---@return string mark, string class
+local function mark_of(path)
+  local d = require("dbdash.dashboard").get(path)
+  local m = MARKS[4]
+  if d and d.state.running then
+    m = d.state.fetching == "all" and MARKS[1]
+      or (d.state.fetching == "some" and MARKS[2])
+      or MARKS[3]
+  end
+  return m[1], m[2]
+end
 
 local sidebar_doc
 
@@ -119,25 +150,20 @@ end
 ---{ path, dir } nodes.
 function M.render(buf)
   require("dbdash.css.hl").setup()
-  local sched = require("dbdash.dashboard")
   local root = M.dir()
   local lines = vim.deepcopy(M.HEADER)
   lines[2] = "Directory: " .. vim.fn.fnamemodify(root, ":~")
-  -- colors from the sidebar's own document (css: sidebar-item.running, sidebar-dir, ...)
+  -- colors from the sidebar's own document (css: sidebar-item.fetching, sidebar-dir, ...)
   local css = M.css()
   local function item(state)
     return css:hl("sidebar-item", { classes = { state } })
   end
-  local hl = {
-    { row = 3, col_s = 0, col_e = #"●", group = item("running") },
-    { row = 3, col_s = #"● = Running  ", col_e = #"● = Running  ◐", group = item("paused") },
-    {
-      row = 3,
-      col_s = #"● = Running  ◐ = Paused  ",
-      col_e = #"● = Running  ◐ = Paused  ○",
-      group = item("idle"),
-    },
-  }
+  local hl = {}
+  for i, m in ipairs(MARKS) do -- the legend's marks, two to a line
+    local row = 3 + math.floor((i - 1) / 2)
+    local col = lines[row + 1]:find(m[1], 1, true) - 1
+    hl[#hl + 1] = { row = row, col_s = col, col_e = col + #m[1], group = item(m[2]) }
+  end
   local nodes = {}
 
   local function walk(dir, depth)
@@ -145,13 +171,8 @@ function M.render(buf)
     local indent = string.rep("  ", depth)
     for _, f in ipairs(e.files) do
       local path = vim.fs.joinpath(dir, f)
-      local d = sched.get(path)
-      local mark, group = "○", item("idle")
-      if d and d.paused then
-        mark, group = "◐", item("paused")
-      elseif d then
-        mark, group = "●", item("running")
-      end
+      local mark, class = mark_of(path)
+      local group = item(class)
       lines[#lines + 1] = indent .. mark .. " " .. f
       hl[#hl + 1] = { row = #lines - 1, col_s = #indent, col_e = #indent + #mark, group = group }
       nodes[tostring(#lines)] = { path = path, name_col = #indent + #mark + 1 }
@@ -401,16 +422,11 @@ end
 
 M.HEADER_LINES = HEADER_LINES
 
--- The list follows the dashboards: started, stopped, hidden, shown again.
-local events = require("dbdash.dashboard.events")
-local function refresh()
-  M.refresh()
-end
-events:on("dashboard:started", function(d)
-  d.events:on("dashboard:hidden", refresh)
-  d.events:on("dashboard:shown", refresh)
-  refresh()
+-- The marks follow the dashboards' states (dashboard:state: running, fetching).
+require("dbdash.dashboard.events"):on("dashboard:state", function(_, _, changed)
+  if changed.running or changed.fetching then
+    M.refresh()
+  end
 end)
-events:on("dashboard:stopped", refresh)
 
 return M

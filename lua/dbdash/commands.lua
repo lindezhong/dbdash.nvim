@@ -147,6 +147,7 @@ function M.status()
   vim.list_extend(lines, {
     "Config:    " .. short(d.path),
     "Status:    " .. d:status_word(),
+    "Fetching:  " .. d.state.fetching .. " of its panels",
   })
   if d.cfg.refresh_all then
     lines[#lines + 1] = ("Interval:  every panel refreshes every %ds, next in %ds"):format(
@@ -155,20 +156,25 @@ function M.status()
     )
   end
   for _, p in ipairs(d.panels) do
+    local ps = p.state
     lines[#lines + 1] = ""
-    lines[#lines + 1] = ("Panel %d: %s"):format(p.index, p:title())
+    lines[#lines + 1] = ("Panel %d: %s"):format(p.index, ps.title)
+    lines[#lines + 1] = ("State:     %s, %s"):format(
+      ps.fetching and "fetching" or "not fetching",
+      ps.drawing and "drawn" or "not drawn (hidden)"
+    )
     lines[#lines + 1] = "Database:  "
       .. p.cfg.database.type
       .. "  "
       .. url.redact(p.cfg.database.url)
     if p.sends then
-      local st = p.stream or { received = 0, processed = 0, dropped = 0, queue = {} }
+      local st = ps.stream or { received = 0, processed = 0, dropped = 0, queue = {} }
       lines[#lines + 1] = ("Interval:  drawn every %ds, next in %ds"):format(
         p.cfg.show.interval / 1000,
         p:remaining()
       )
       lines[#lines + 1] = ("Push:      %s; %d received, %d processed, %d queued, %d dropped"):format(
-        p:push_state(),
+        ps.source or "stopped",
         st.received,
         st.processed,
         #st.queue,
@@ -194,8 +200,8 @@ function M.status()
         p:remaining()
       )
     end
-    if p.error then
-      lines[#lines + 1] = "Error:     " .. sched.format_error(p.error):gsub("\n", " ")
+    if ps.error then
+      lines[#lines + 1] = "Error:     " .. sched.format_error(ps.error):gsub("\n", " ")
     end
     if p.retry_at then
       lines[#lines + 1] = ("Retrying:  failed %d times in a row, next try in %ds (interval x%d)"):format(
@@ -244,7 +250,7 @@ function M.show_variables()
   end
   local lines, hl = {}, {}
   for _, s in ipairs(specs) do
-    local v = args.value(s, d.state)
+    local v = args.value(s, d.arg_state)
     local key = s.key or s.name
     local line = ("%s = %s"):format(key, v == nil and "(unset)" or args.format_value(v))
     local css = require("dbdash.css").scope(d.doc and d.doc.root or nil)
@@ -282,13 +288,13 @@ function M.modify_variable()
   vim.ui.select(specs, {
     prompt = "Argument to modify",
     format_item = function(s)
-      return ("%s = %s"):format(s.key or s.name, args.format_value(args.value(s, d.state)))
+      return ("%s = %s"):format(s.key or s.name, args.format_value(args.value(s, d.arg_state)))
     end,
   }, function(spec)
     if not spec then
       return
     end
-    require("dbdash.view.args_ui").ask(spec, args.value(spec, d.state), function(v)
+    require("dbdash.view.args_ui").ask(spec, args.value(spec, d.arg_state), function(v)
       if v ~= nil and sched.get(d.path) == d then
         d:set_arg(spec.key or spec.name, v)
       end
@@ -340,13 +346,12 @@ function M.export(fargs, bang, reg)
       )
     end
     with_panel(d, function(p)
-      if not p.rs then
-        return err(
-          "nothing to export yet: " .. (p.error and sched.format_error(p.error) or "no result")
-        )
+      local rs, e = p.state.result, p.state.error
+      if not rs then
+        return err("nothing to export yet: " .. (e and sched.format_error(e) or "no result"))
       end
-      local out = export.format(p.rs, fmt)
-      local what = ("%d rows as %s"):format(p.rs.row_count, fmt)
+      local out = export.format(rs, fmt)
+      local what = ("%d rows as %s"):format(rs.row_count, fmt)
       local file = fargs[2]
       if file then
         file = vim.fn.fnamemodify(vim.fn.expand(file), ":p")

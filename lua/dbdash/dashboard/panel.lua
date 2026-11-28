@@ -1,10 +1,11 @@
--- A panel (ARCHITECTURE.md#results): a run of its source (db.run: a database queried on its
+-- A panel (ARCHITECTURE.md#state): a run of its source (db.run: a database queried on its
 -- ticks, or a source that sends data), the consumer that takes the results one at a time
--- through query.transform and the rows check, and what it tells (events on its dashboard).
+-- through query.transform and the rows check, and its state (Panel.state), of which it is
+-- the only writer. What it tells (events on its dashboard):
 --   panel:tick (the clock)       a waiting database query runs; one while it runs is skipped
---   panel:result / panel:error   a result settled (history, track, thresholds, commit listen)
+--   panel:state                  its state changed, sent whole with what changed (a result,
+--                                an error, querying, its source, fetching, drawing...)
 --   panel:skipped / cancelled    a tick while the query ran / a run cancelled (history)
---   panel:state                  what its status shows changed (commit, the sidebar)
 local async = require("dbdash.util.async")
 local db = require("dbdash.db")
 local errors = require("dbdash.util.error")
@@ -28,6 +29,23 @@ local M = {}
 ---@field end_error table?
 ---@field finished boolean?
 
+---@class dbdash.PanelState all there is to know about a panel (ARCHITECTURE.md#state)
+---@field path string the config file
+---@field id string the panel's `id`, else its index
+---@field index integer
+---@field title string as shown: show.title, else "Panel N"
+---@field fetching boolean it obtains data: a database is ticked (shown, or refresh_hidden), a
+---  source that sends data is alive
+---@field drawing boolean its results are committed and drawn (the dashboard is shown)
+---@field activity "idle"|"querying"|"retrying"
+---@field source string? what a source that sends data says ("listening ...", "ended")
+---@field next_at integer? loop time (ms) of its next tick
+---@field result dbdash.db.ResultSet? the current result
+---@field error table? the current error
+---@field run table? the record of the run that made the data (meta.prev)
+---@field prev table? the record before it
+---@field stream dbdash.Feed? a source that sends data: received, processed, dropped
+
 ---@class dbdash.Panel
 ---@field d dbdash.Dashboard
 ---@field index integer
@@ -36,6 +54,7 @@ local M = {}
 ---  on every tick
 ---@field node dbdash.dom.Node the panel's element
 ---@field chart_node dbdash.dom.Node its chart element
+---@field state dbdash.PanelState its state (Panel:set writes it; panel:state tells it)
 ---@field running boolean a query of a tick runs
 ---@field current dbdash.Run? the run of that query
 ---@field gen integer the run's number (results of an older run are dropped)
@@ -47,14 +66,12 @@ local M = {}
 ---@field committed boolean? a result was committed in this period (dashboard/commit.lua)
 ---@field pending boolean? a result waits for the next tick to be committed
 ---@field ended boolean? its source ended
----@field next_at integer? loop time (ms) of the next tick
+---@field next_at integer? loop time (ms) of the next tick (Panel:schedule)
 ---@field retry_at integer? backing off: the next query not before
 ---@field backoff_mult integer? the interval's multiple while backing off
 ---@field failures integer? failures in a row
----@field rs dbdash.db.ResultSet? last successful result
 ---@field sql string? last rendered query
 ---@field transform_code string? last rendered query.transform
----@field error table? last error (cleared on success)
 ---@field history dbdash.HistoryEntry[] (dashboard/history.lua)
 ---@field style table overrides from :DbDashStyle
 ---@field runtime_style table? :DbDashStyle rules of the panel
@@ -100,6 +117,16 @@ function M.new(d, index, cfg)
     style = {},
     store = {}, -- `store` of the panel's Lua code, for as long as the dashboard runs
   }, Panel)
+  p.state = {
+    path = d.path,
+    id = cfg.id,
+    index = index,
+    title = p:title(),
+    fetching = false,
+    drawing = not d.paused,
+    activity = "idle",
+    next_at = p.next_at,
+  }
   d.events:on("panel:tick", function(q)
     if q == p then
       p:on_tick()
@@ -108,12 +135,71 @@ function M.new(d, index, cfg)
   d.events:on("dashboard:args", function()
     p:restart()
   end)
+  -- hidden / shown: whether it fetches (a database) and draws
+  d.events:on("dashboard:hidden", function()
+    p:set(p:status())
+  end)
+  d.events:on("dashboard:shown", function()
+    p:set(p:status())
+  end)
   return p
 end
 
 ---Tell something on the dashboard's events (the panel first).
 function Panel:emit(event, ...)
   self.d.events:emit(event, self, ...)
+end
+
+-- The state ---------------------------------------------------------------------------
+
+local NONE = vim.NIL -- a field set to nothing (Panel:set)
+
+local function same(key, a, b)
+  if key == "error" then
+    return (a and format_error(a)) == (b and format_error(b))
+  end
+  return a == b
+end
+
+---Set fields of the panel's state (NONE: no value) and tell what changed, the state whole
+---(panel:state). Nothing changed: nothing is told.
+---@param fields table<string, any>
+function Panel:set(fields)
+  local st, changed = self.state, nil
+  for k, v in pairs(fields) do
+    if v == NONE then
+      v = nil
+    end
+    if not same(k, st[k], v) then
+      changed = changed or {}
+      changed[k] = true
+    end
+    st[k] = v
+  end
+  if changed then
+    self:emit("panel:state", st, changed)
+  end
+end
+
+---Whether it fetches and draws now: a database is ticked while the dashboard is shown
+---(or show.refresh_hidden), a source that sends data while it is alive (hiding cannot
+---pause it without losing data); results are drawn while the dashboard is shown.
+---@return table<string, any> fields: fetching, drawing (Panel:set takes more)
+function Panel:status()
+  local d, feed = self.d, self.feed
+  local alive = feed ~= nil and not feed.stopped and not feed.finished
+  local fetching = alive
+  if not self.sends then
+    fetching = alive and (not d.paused or self.cfg.show.refresh_hidden == true)
+  end
+  return { fetching = fetching, drawing = not d.paused }
+end
+
+---Its next tick at loop time `at` (the clock's deadline; the countdown).
+---@param at integer?
+function Panel:schedule(at)
+  self.next_at = at
+  self:set({ next_at = at or NONE })
 end
 
 ---Seconds until the panel's next refresh.
@@ -210,7 +296,7 @@ function Panel:prepare_run()
   self.current = run
   self.running = true
   self.refresh_count = (self.refresh_count or 0) + 1 -- meta.refresh_count
-  self:emit("panel:state")
+  self:set({ activity = "querying" })
   local sql, code = run:render_templates()
   run.record.sql, run.code = sql, code
   if run.depth == 0 then
@@ -243,7 +329,7 @@ end
 function Panel:back_off(not_before, failures)
   self.failures = failures
   local clock = self.d.clock
-  if not_before and (self.d.paused and not self.cfg.show.refresh_hidden) then
+  if not_before and not self.state.fetching then
     return -- hidden: no ticks to wait for
   end
   local was = self.retry_at ~= nil
@@ -251,14 +337,14 @@ function Panel:back_off(not_before, failures)
   self.retry_at = not_before
   self.backoff_mult = not_before and math.floor((not_before - now()) / interval + 0.5) or nil
   if not_before then
-    self.next_at = not_before
+    self:schedule(not_before)
   elseif was and clock then
     clock:reset(self)
   end
   if clock and (not_before or was) then
     clock:arm()
-    self:emit("panel:state")
   end
+  self:set({ activity = not_before and "retrying" or "idle" })
 end
 
 ---A tick (panel:tick from the clock): a source waiting for it queries now; one that is
@@ -290,7 +376,6 @@ function Panel:start()
   self.waits_ticks, self.start_tick, self.waiter = false, true, nil
   self.committed, self.pending = false, false -- a new period
   if self.sends then
-    self.error = nil
     self.ended = nil
   end
   local o = self:query_opts()
@@ -298,7 +383,7 @@ function Panel:start()
   o.on_status = function(text)
     if self.gen == gen then
       feed.state = text
-      self:emit("panel:state")
+      self:set({ source = text })
     end
   end
   local query
@@ -322,12 +407,18 @@ function Panel:start()
       return self:wait_tick(gen, not_before, failures)
     end
   end
+  -- its state first: it fetches (the source may query at once)
+  local fields = self:status()
+  fields.stream = feed
+  if self.sends then
+    fields.source, fields.error = feed.state, NONE
+  end
+  self:set(fields)
   feed.handle = db.run(self.cfg.database.url, query, o, function(err, v, vars, run)
     self:on_result(gen, err, v, vars, run)
   end, function(err)
     self:on_end(gen, err)
   end)
-  self:emit("panel:state")
 end
 
 ---Restart: the user asked (r, changed arguments). A query running is cancelled.
@@ -360,16 +451,18 @@ end
 function Panel:cancel(reason)
   self:stop_run(reason)
   local run = self.current
-  if not run then
-    return
+  if run then
+    self.current = nil
+    self.running = false
+    run.life.cancel:cancel(reason)
+    run:finish(errors.new({ phase = "cancelled", message = "query cancelled: " .. reason }))
+    self.prev, self.prev_runs = run.record, run.life.runs
+    self:emit("panel:cancelled", reason)
+    run.life.cancel:release()
   end
-  self.current = nil
-  self.running = false
-  run.life.cancel:cancel(reason)
-  run:finish(errors.new({ phase = "cancelled", message = "query cancelled: " .. reason }))
-  self.prev, self.prev_runs = run.record, run.life.runs
-  self:emit("panel:cancelled", reason)
-  run.life.cancel:release()
+  local fields = self:status()
+  fields.activity = "idle"
+  self:set(fields)
 end
 
 -- The consumer --------------------------------------------------------------------------
@@ -421,7 +514,7 @@ function Panel:consume(gen, feed)
   end, function(err)
     feed.busy = false
     if err then
-      self:emit("panel:error", errors.wrap(err), { always = true, internal = true })
+      self:set({ error = errors.wrap(err) }) -- the consumer itself failed
     end
     if self.gen == gen and feed.ended then
       self:finish_feed(feed)
@@ -512,13 +605,16 @@ function M.transform(code, rs, o)
   return lua_result.normalize(value, { max_rows = o.max_rows, phase = "transform" })
 end
 
----The end of one result: its record, then the result (panel:result) or the error
----(panel:error); the source is told how it went (a database backs off after failures).
+---The end of one result: its record, then the state: the result or the error, the run
+---and the one before (one panel:state); the source is told how it went (a database backs
+---off after failures).
 function Panel:settle(run, err, rs)
   local ticked = run.record.kind == "refresh"
+  local fields = {}
   if ticked and self.current == run then
     self.running = false
     self.current = nil
+    fields.activity = self.retry_at and "retrying" or "idle"
   end
   local feed = self.feed
   if feed then
@@ -528,22 +624,16 @@ function Panel:settle(run, err, rs)
   self.prev, self.prev_runs = run.record, run.life.runs
   run.life.cancel:release()
   if err then
-    local changed = not self.error or format_error(self.error) ~= format_error(err)
-    self.error = err
-    self:emit("panel:error", err, { changed = changed })
+    fields.error = err
   else
     self.prev_ok, self.prev_ok_runs = run.record, run.life.runs
-    self.rs = rs
-    self.error = nil
-    self:emit(
-      "panel:result",
-      rs,
-      { elapsed_ms = ticked and rs.elapsed_ms or run.record.elapsed_ms }
-    )
+    -- how long the data took: a query's own time, or the item's processing
+    run.record.data_ms = ticked and rs.elapsed_ms or run.record.elapsed_ms
+    fields.result, fields.error = rs, NONE
   end
-  if ticked then
-    self:emit("panel:state")
-  end
+  fields.prev = self.state.run or NONE
+  fields.run = run.record
+  self:set(fields)
   if feed and feed.handle and run.depth == 0 then
     feed.handle:report(err == nil) -- the source counts failures in a row
   end
@@ -576,21 +666,12 @@ function Panel:finish_feed(feed)
   self.ended = true
   self.running = false
   self.next_at = nil
+  local fields = self:status()
+  fields.source, fields.activity, fields.next_at = feed.state, "idle", NONE
   if feed.end_error then
-    self.error = feed.end_error
-    self:emit("panel:error", feed.end_error, { always = true })
+    fields.error = feed.end_error
   end
-  self:emit("panel:state")
-end
-
----What a push panel is doing, for its header: "running", "listening 127.0.0.1:8765",
----"ended", "failed" (nil for other panels).
-function Panel:push_state()
-  if not self.sends then
-    return nil
-  end
-  local st = self.feed
-  return st and st.state or "stopped"
+  self:set(fields)
 end
 
 -- Templates outside a run ---------------------------------------------------------------

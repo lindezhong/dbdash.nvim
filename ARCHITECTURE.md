@@ -8,14 +8,19 @@ changing the code. Diagrams name modules under `lua/dbdash/`.
 
 A dashboard is a YAML config. Loading it checks everything that can be known before
 running. Each panel then runs its data source; every result goes through the same
-consumer (`query.transform`, the rows check) into the dashboard's model, which writes what
-is shown into the dashboard's document (a DOM). A view draws that document the way a
-browser renders a page: style, layout, paint, composite, into a Neovim buffer.
+consumer (`query.transform`, the rows check) into the panel's state, which holds all
+there is to know about the panel (its status and its data) and is sent whole to whoever
+listens. The dashboard sums its panels' states. Commit writes what is shown into the
+dashboard's document (a DOM); a view draws that document the way a browser renders a
+page: style, layout, paint, composite, into a Neovim buffer.
 
 ```
 config file ─► config.load ─► dashboard (model) ─► db.run (producer) ─► results ─► consumer
                                    │  clock: panel:tick                                │
-                                   │ commit: the display state into the DOM ◄──────────┘
+                                   │  Panel.state ◄── the panel, its one writer ◄──────┘
+                                   │    panel:state ─► history, thresholds, notifier, commit
+                                   │  Dashboard.state: the sum of its panels' ─► sidebar
+                                   │  commit: the display state into the DOM
                                    ▼
 buffer ◄─ compositor ◄─ paint ◄─ layout ◄─ css ◄─ document (dirty) ◄─ frame (view)
 ```
@@ -124,6 +129,67 @@ result.
 `net/openapi` (`Api:handle`: the operation, its security and parameters, the body's
 items by media type, validation, the response).
 
+## State
+
+A panel's state (`Panel.state`) is all there is to know about the panel at this moment,
+in one table: who it is, what it is doing and its data. The panel is its only writer.
+Every change (a query starts or ends, a result, an error, the dashboard hidden or shown,
+its source's state) updates it and tells `panel:state(p, state, changed)` on `d.events`,
+`changed` naming the fields that changed. Listeners read the state they are given, never
+other fields of the panel.
+
+```
+Panel.state
+  identity  path      the config file
+            id        the panel's `id`, else "panel<N>"
+            index     its place in the panels
+            title     as shown: show.title, else "Panel N"
+  status    fetching  it obtains data: a database is ticked (the dashboard is shown, or
+                      show.refresh_hidden); a source that sends data is alive (starting,
+                      running, listening)
+            drawing   its results are committed and drawn: the dashboard is shown (always
+                      with setup dashboard.pause_hidden = false)
+            activity  "idle" | "querying" | "retrying"
+            source    what a source that sends data says ("listening 127.0.0.1:8765",
+                      "ended", "failed"); nil for a database
+            next_at   its next tick (the countdown)
+  data      result    the current result
+            error     the current error
+            prev      the result before it (meta.prev)
+            run       the record of the run that made the data
+            stream    a source that sends data: received, processed, dropped
+```
+
+A dashboard's state (`Dashboard.state`) sums its panels'; the dashboard is its only
+writer. It follows its panels' `panel:state` and, when what it sums changes, tells
+`dashboard:state(d, state, changed)` on `dashboard/events.lua`. A new result changes none
+of it: what follows dashboards (the sidebar) is not told about every result.
+
+```
+Dashboard.state
+  path      the config file
+  title     the dashboard's title
+  running   started (false: told once more when it stops)
+  visible   a window of the current tab page shows it
+  fetching  "all" | "some" | "none": its panels' state.fetching
+  panels    { [id] = Panel.state }
+```
+
+```
+the panel: its one writer
+  Panel.state ─ panel:state(p, state, changed) ─┬─ the clock      changed.fetching: ticks or not
+    (d.events)                                  ├─ history        changed.result / error
+                                                ├─ track, thresholds   changed.result
+                                                ├─ commit         into the document while drawing
+                                                ├─ view/notifier  changed.error (errors.notify)
+                                                └─ the dashboard  sums its panels
+the dashboard: the sum
+  Dashboard.state ─ dashboard:state(d, state, changed) ─┬─ sidebar   ● all fetching, ◐ some,
+    (dashboard/events.lua)                              │            ○ none; ⊘ not running
+                                                        ├─ :DbDashStatus  d.state, each panel's
+                                                        └─ :DbDashList    d.state
+```
+
 ## Scheduling
 
 `show.interval` is a panel's period: it shows new data at most once per period. One clock
@@ -137,8 +203,8 @@ wake: the deadlines that passed
   both at once    → one tick (deadlines within 1% of the interval, at least 50 ms)
   each due panel: panel:tick, and its count restarts from now; a panel whose interval is
   the top-level one or longer only ever ticks with the others
-dashboard:hidden  only show.refresh_hidden panels tick
-dashboard:shown   what came due ticks now
+panel:state       only panels whose state.fetching is true tick (changed.fetching:
+                  hidden, shown again); one that starts fetching ticks now if it came due
 dashboard:args    every count starts again (and every panel's run)
 ```
 
@@ -146,12 +212,15 @@ dashboard:args    every count starts again (and every panel's run)
 tick while the query runs is skipped, `panel:skipped`) and commit (a new period). A source
 that sends data never waits for ticks.
 
-A hidden dashboard (setup `dashboard.pause_hidden`) spends nothing on what is shown: no
-tick, so a database is not queried (except `show.refresh_hidden` panels), nothing is
-committed and no frame is drawn. A source that sends data cannot be paused without losing
-data: its items are still received and processed (transform, history, thresholds and
-errors notify), and the latest is committed when the dashboard is shown again. User actions (`r`, changed arguments) restart the
-panel's run at once. Each run has a number (`Panel.gen`): ticks and results of an older
+A hidden dashboard (setup `dashboard.pause_hidden`) spends nothing on what is shown: each
+panel sets its state (`dashboard:hidden` / `shown`): `drawing` false, and `fetching`
+false for a database (unless `show.refresh_hidden`), so it gets no tick and is not
+queried; nothing is committed and no frame is drawn. A source that sends data cannot be
+paused without losing data: it keeps `fetching`, its items are still received and
+processed (transform, history, thresholds and errors notify), and the latest is committed
+when the dashboard is shown again.
+
+User actions (`r`, changed arguments) restart the panel's run at once. Each run has a number (`Panel.gen`): ticks and results of an older
 run are dropped.
 
 Failures of a database back off in its loop (`db/driver.lua`): after the n-th in a row the
@@ -166,11 +235,13 @@ on_result → Panel:on_result: queued (setup push.max_queue, unlimited by defaul
           → Panel:consume: one task, in order, one result at a time
               a query's result: query.transform (rendered with the query), rows check
               an item: query.transform rendered for it (or the item as JSON rows)
-          → Panel:settle: the run's record (meta.prev), the result (`panel:result`) or
-              the error (`panel:error`); handle:report(ok) tells the source how it went
-  panel:result / panel:error listeners, in order:
+          → Panel:settle: the run's record, then the state: its result or its error, its
+              run and prev (`panel:state`, changed.result / changed.error);
+              handle:report(ok) tells the source how it went
+  panel:state listeners, in order:
               history (dashboard/history.lua), stat values (track.lua), thresholds
-              (thresholds.lua: `panel:threshold`), commit (commit.lua)
+              (thresholds.lua: `panel:threshold`), view/notifier (errors.notify), commit
+              (commit.lua), the dashboard (its sum)
 ```
 
 A panel's templates (query.sql, query.transform, an item's transform, show.description)
@@ -254,23 +325,24 @@ once, in order); listeners of panel events get the panel first.
 | Event | When | Listeners |
 |---|---|---|
 | `panel:tick` | the clock: a panel's deadline, the top-level one, catching up | the panel (its database's loop), commit |
-| `panel:result` | a result settled | history, track, thresholds, commit |
-| `panel:error` | a result or the source failed | history, commit, view/notifier (`errors.notify`) |
+| `panel:state` | the panel's state changed (`Panel.state`, sent whole; `changed`: which fields): a result, an error, querying, retrying, its source's state, fetching, drawing | the clock, history, track, thresholds, view/notifier, commit, the dashboard (its sum) |
 | `panel:skipped` / `panel:cancelled` | a tick while the query ran / a run cancelled | history |
-| `panel:state` | what the status shows changed (running, listening..., retrying, ended) | commit |
 | `panel:threshold` | a value rose to a step that notifies | view/notifier |
 | `dashboard:args` | the arguments changed | the clock, every panel (restart), commit |
-| `dashboard:hidden` / `shown` | no window shows it / shown again | the clock, sidebar |
+| `dashboard:hidden` / `shown` | no window shows it / shown again | every panel (its state: fetching, drawing), commit (what waited) |
 
 For whoever follows every dashboard, `dashboard/events.lua`:
 
 | Event | When | Listeners |
 |---|---|---|
-| `dashboard:started` / `stopped` | created / stopped | sidebar, notifier (they listen to its `d.events`); the view closes its buffer |
+| `dashboard:started` / `stopped` | created / stopped | notifier (it listens to its `d.events`); the view closes its buffer |
+| `dashboard:state` | what a dashboard sums changed (`Dashboard.state`: running, visible, fetching) | sidebar |
 | `dashboard:error` | a config could not start | view/notifier |
 | `action` | a dashboard key's event reached the document's root | commands (wired in init.lua) |
 
-The view listens to no data event: what it shows comes from the document.
+The view listens to no data event: what it shows comes from the document. Events that
+carry state send it whole (`panel:state`, `dashboard:state`); `panel:tick`,
+`panel:skipped`, `panel:cancelled` and `panel:threshold` tell that something happened.
 
 ## How it compares to a browser
 

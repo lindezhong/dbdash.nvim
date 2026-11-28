@@ -1,5 +1,5 @@
 -- The values of stat panels (the change since the previous refresh, the sparkline), kept
--- from their results.
+-- from their results (each new one their state tells: panel:state).
 local M = {}
 
 ---@param p dbdash.Panel
@@ -25,7 +25,11 @@ end
 ---Keep the values of the stat panels of dashboard `d`.
 ---@param d dbdash.Dashboard
 function M.attach(d)
-  d.events:on("panel:result", track)
+  d.events:on("panel:state", function(p, st, changed)
+    if changed.result then
+      track(p, st.result)
+    end
+  end)
 end
 
 return M

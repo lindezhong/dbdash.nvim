@@ -46,7 +46,7 @@ local function wait(fn, ms)
 end
 
 local function rows(p)
-  return p.rs and p.rs.rows or {}
+  return p.state.result and p.state.result.rows or {}
 end
 
 T["every item is processed in order, one at a time; meta.run.kind is push"] = function()
@@ -75,8 +75,8 @@ show: { type: table, interval: 1s }
   eq(p.store.seen, { "1", "2", "3", "4", "5" })
   eq(rows(p), { { "push", 5, "push" } }) -- (columns by name: kind, n, prev)
   eq({ p.stream.received, p.stream.processed, p.refresh_count }, { 5, 5, 5 })
-  eq(p:push_state(), "ended")
-  eq(p.error, nil)
+  eq(p.state.source, "ended")
+  eq(p.state.error, nil)
 end
 
 T["without query.transform an item must be JSON rows"] = function()
@@ -92,7 +92,7 @@ show: { type: table, interval: 1s }
   wait(function()
     return p.ended
   end)
-  eq({ p.rs.columns[1].name, rows(p) }, { "c", { { 2 } } })
+  eq({ p.state.result.columns[1].name, rows(p) }, { "c", { { 2 } } })
   d = start([[
 database: { url: "luastream://" }
 query: { sql: "print('not json')" }
@@ -102,7 +102,7 @@ show: { type: table, interval: 1s }
   wait(function()
     return p.ended
   end)
-  eq(sched.format_error(p.error):find("add query.transform", 1, true) ~= nil, true)
+  eq(sched.format_error(p.state.error):find("add query.transform", 1, true) ~= nil, true)
 end
 
 T["drawing: at most once per interval, only when something is new"] = function()
@@ -159,7 +159,7 @@ panels:
   eq((other.refresh_count or 0) > count, true) -- the other panel keeps refreshing
   eq(p.next_at, nil) -- no next tick
   d:restart() -- r
-  eq(p:push_state() ~= "ended", true)
+  eq(p.state.source ~= "ended", true)
   wait(function()
     return p.ended
   end)
@@ -184,7 +184,7 @@ show: { type: table, interval: 1s }
     true
   )
   local first = assert(p.stream)
-  require("dbdash.args").set_modified(d.state, "word", "two")
+  require("dbdash.args").set_modified(d.arg_state, "word", "two")
   d:restart()
   eq(
     wait(function()
@@ -293,7 +293,7 @@ show: { type: table, interval: 1s }
   local p = d.panels[1]
   eq(
     wait(function()
-      return p.rs ~= nil
+      return p.state.result ~= nil
     end),
     true
   )
@@ -318,11 +318,11 @@ show: { type: table, interval: 1s }
   local p = d.panels[1]
   eq(
     wait(function()
-      return p:push_state():match("^listening") ~= nil
+      return p.state.source:match("^listening") ~= nil
     end),
     true
   )
-  local port = tonumber(p:push_state():match(":(%d+)$"))
+  local port = tonumber(p.state.source:match(":(%d+)$"))
   local done
   vim.system({
     vim.v.progpath,

@@ -10,14 +10,16 @@ local function message(text, group)
 end
 
 ---The raster of a panel's chart at `width` x `height` (or a placeholder: loading, a
----render error, nothing after a query error).
+---render error, nothing after a query error), from what was committed to its document:
+---the chart's result, the panel's error.
 ---@param fill boolean? the plot fills the height (a fixed or fr grid row)
 ---@return dbdash.render.Output
 function M.raster(p, show, width, height, fill)
-  if p.rs then
+  local rs = p.chart_node.result
+  if rs then
     local ok, out = pcall(
       require("dbdash.render").render,
-      p.rs,
+      rs,
       show,
       { width = width, height = height, history = p.values, fill = fill, node = p.chart_node }
     )
@@ -25,7 +27,7 @@ function M.raster(p, show, width, height, fill)
       return out
     end
     return message("render error: " .. tostring(out), css.scope(p.node):hl("error"))
-  elseif not p.error then
+  elseif not require("dbdash.dom.node").child(p.node, "error").text then
     return message("Loading…", css.scope(p.node):hl("note"))
   end
   return { lines = {}, hl = {} }

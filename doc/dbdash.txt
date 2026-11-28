@@ -208,8 +208,9 @@ database:
     List running dashboards.
 
 :DbDashStatus                                                  *:DbDashStatus*
-    Show the current dashboard's title, config, global refresh (the
-    top-level `interval`) and, for each panel, its database, next refresh
+    Show the current dashboard's title, config, how many of its panels
+    fetch, global refresh (the top-level `interval`) and, for each panel,
+    whether it fetches and is drawn, its database, next refresh
     and last queries (duration, rows, errors, skipped refreshes;
     `defaults.history` of them, 20 by default); for a push source its state
     and items received, processed, queued and dropped (|dbdash-push|).
@@ -217,11 +218,14 @@ database:
 :DbDash                                                              *:DbDash*
     Open the sidebar: the *.yaml / *.yml files of the current directory and
     its subdirectories as a tree (see `sidebar` in |dbdash-setup| for the
-    directory, globs and width). Files show `●` when their dashboard runs,
-    `◐` when it is paused (see |dbdash-pause|) and `○` otherwise;
-    directories show `▸` (collapsed) or `▾` (expanded) and stay expanded
-    when the sidebar is reopened. Hidden directories and names matching
-    `sidebar.exclude` (by default `*.schema.yaml`) are not listed; without
+    directory, globs and width). A file's mark says what its dashboard
+    fetches, the panels' state (|dbdash-pause|): `●` every panel, `◐` some
+    (hidden, with panels that go on: `show.refresh_hidden`, a source that
+    sends data), `○` none (running but paused), `⊘` not running. The legend
+    is at the top, on two lines. Directories show `▸` (collapsed) or `▾`
+    (expanded) and stay expanded when the sidebar is reopened. Hidden
+    directories and names matching `sidebar.exclude` (by default
+    `*.schema.yaml`) are not listed; without
     config files the list says so. The cursor line is your usual
     'cursorline'; `sidebar.cursorline = "name"` marks only the name (when an
     underlined CursorLine would turn partly green under ●), false hides it.
@@ -856,8 +860,8 @@ Elements                                                 *dbdash-css-elements*
                      line-number: the lines' numbers
   note, warning      notes ("… 3 more rows") and warnings
 
-The sidebar is a document of its own: sidebar-dir, sidebar-item (.running,
-.paused, .idle, .cursor).
+The sidebar is a document of its own: sidebar-dir, sidebar-item (.fetching,
+.partly, .paused, .stopped, .cursor).
 
 Properties                                             *dbdash-css-properties*
 
@@ -2244,13 +2248,15 @@ All groups link to standard groups by default:
   (DiagnosticError)                 stat value and its change
 
 Sidebar: `DbDashSidebarDir` (directory names and their ▸/▾, links to
-`Directory`), `DbDashSidebarRunning` (● of running dashboards, links to
-`DiagnosticOk`), `DbDashSidebarPaused` (◐ of paused ones, links to
-`DiagnosticWarn`), `DbDashSidebarIdle` (○, links to `Normal`). With
+`Directory`), the marks `DbDashSidebarFetching` (● every panel fetches,
+links to `DiagnosticOk`), `DbDashSidebarPartly` (◐ some do, links to
+`DiagnosticWarn`), `DbDashSidebarPaused` (○ none does, links to
+`DiagnosticInfo`), `DbDashSidebarStopped` (⊘ not running, links to
+`Comment`). With
 `sidebar.cursorline = "name"` the sidebar window's cursor line uses
 `DbDashSidebarCursorLine` (empty) instead of `CursorLine`, and
 `DbDashSidebarCursor` (underline) marks the name on the cursor line without
-the ●/◐/○ marker: a terminal draws an underline in the text color, so with an
+the ●/◐/○/⊘ mark: a terminal draws an underline in the text color, so with an
 underlined CursorLine the green ● leaves a green piece in the line.
 
 `DbDashTrustFile` (links to `Title`) is the separator line before each

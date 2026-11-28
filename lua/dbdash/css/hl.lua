@@ -45,16 +45,18 @@ M.BASE = {
   DbDashStatValue = { link = "Number" },
   DbDashUp = { link = "DiagnosticOk" },
   DbDashDown = { link = "DiagnosticError" },
-  -- Sidebar: directories (name and arrow), running and idle dashboards.
+  -- Sidebar: directories (name and arrow); the marks of the configs below.
   DbDashSidebarDir = { link = "Directory" },
   DbDashTrustFile = { link = "Title" }, -- file separators in the trust View float
   -- Sidebar cursor line: the window's CursorLine (empty) and the underline of the cursor
   -- line's name, which leaves the ●/◐/○ marker in its own color.
   DbDashSidebarCursorLine = {},
   DbDashSidebarCursor = { underline = true, cterm = { underline = true } },
-  DbDashSidebarRunning = { link = "DiagnosticOk" },
-  DbDashSidebarPaused = { link = "DiagnosticWarn" },
-  DbDashSidebarIdle = { link = "Normal" },
+  -- the marks: every panel fetches, some do, none does (paused), not running
+  DbDashSidebarFetching = { link = "DiagnosticOk" },
+  DbDashSidebarPartly = { link = "DiagnosticWarn" },
+  DbDashSidebarPaused = { link = "DiagnosticInfo" },
+  DbDashSidebarStopped = { link = "Comment" },
   -- Series colors, taken from common syntax groups so they follow the colorscheme.
   DbDashSeries1 = { link = "Function" },
   DbDashSeries2 = { link = "String" },

@@ -31,7 +31,7 @@ local function run(name, text)
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   vim.wait(10000, function()
     for _, p in ipairs(d.panels) do
-      if not (p.rs or p.error) or p.running then
+      if not (p.state.result or p.state.error) or p.running then
         return false
       end
     end

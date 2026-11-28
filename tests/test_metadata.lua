@@ -37,7 +37,7 @@ local function run(name, lines)
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   vim.wait(10000, function()
     for _, p in ipairs(d.panels) do
-      if not (p.rs or p.error) or p.running then
+      if not (p.state.result or p.state.error) or p.running then
         return false
       end
     end
@@ -117,9 +117,12 @@ T["db_*: each panel's own database, else the top-level default"] = function()
     "    query: { sql: 'return { { t = meta.db_type, url = meta.db_url } }' }",
   })
   local p1, p2 = d.panels[1], d.panels[2]
-  eq({ p1.meta.db_type, p1.meta.db_name, p1.rs.rows[1][1] }, { "sqlite", ":memory:", "sqlite" })
+  eq(
+    { p1.meta.db_type, p1.meta.db_name, p1.state.result.rows[1][1] },
+    { "sqlite", ":memory:", "sqlite" }
+  )
   eq({ p2.meta.db_type, p2.meta.db_url, p2.meta.db_host }, { "lua", "lua://", nil })
-  eq(p2.rs.rows[1][1], "lua")
+  eq(p2.state.result.rows[1][1], "lua")
   -- A panel without its own database reports the top-level one.
   local _, d2 = run("shared", {
     "database: { url: 'sqlite:///:memory:' }",
@@ -146,11 +149,11 @@ T["args and meta in query.sql, query.transform, lua:// and imported templates"] 
     "    return { { n = rs.rows[1][1], idx = rs.rows[1][2], cfg = rs.rows[1][3], n2 = rs.rows[1][4],",
     "               lua_n = args.n, lua_cfg = meta.config_name, tpl_n = {{ args.n }} } }",
   })
-  eq(p.error, nil)
-  eq(p.rs.columns[1].name, "cfg")
+  eq(p.state.error, nil)
+  eq(p.state.result.columns[1].name, "cfg")
   local row = {}
-  for i, c in ipairs(p.rs.columns) do
-    row[c.name] = p.rs.rows[1][i]
+  for i, c in ipairs(p.state.result.columns) do
+    row[c.name] = p.state.result.rows[1][i]
   end
   eq(row, { n = 4, idx = 1, cfg = "ctx", n2 = 4, lua_n = 4, lua_cfg = "ctx", tpl_n = 4 })
   local l = run("luactx", {
@@ -161,9 +164,9 @@ T["args and meta in query.sql, query.transform, lua:// and imported templates"] 
     "    return { { a = args.os, b = args.table, os = meta.os, today = os.date('%Y-%m-%d'),",
     "               n = table.concat({ 'p', 'q' }) } }",
   })
-  eq(l.error, nil)
+  eq(l.state.error, nil)
   -- arguments named os / table do not hide Lua's libraries
-  eq(l.rs.rows[1], { "x", "y", "pq", metadata.os_name(), os.date("%Y-%m-%d") })
+  eq(l.state.result.rows[1], { "x", "y", "pq", metadata.os_name(), os.date("%Y-%m-%d") })
 end
 
 T["{% lua %} blocks in query.sql and query.transform see the same args and meta"] = function()
@@ -178,8 +181,8 @@ T["{% lua %} blocks in query.sql and query.transform see the same args and meta"
     "    return { { n = rs.rows[1][1], cfg = rs.rows[1][2],",
     "               t = '{% lua %}return meta.config_name .. args.n{% endlua %}' } }",
   })
-  eq(p.error, nil)
-  eq(p.rs.rows, { { "blocks", 12, "blocks6" } })
+  eq(p.state.error, nil)
+  eq(p.state.result.rows, { { "blocks", 12, "blocks6" } })
   -- an error in a block points at the YAML line
   p = run("blockerr", {
     "database: { url: 'sqlite:///:memory:' }",
@@ -192,7 +195,7 @@ T["{% lua %} blocks in query.sql and query.transform see the same args and meta"
   })
   eq(
     sched
-      .format_error(p.error)
+      .format_error(p.state.error)
       :find("blockerr.yaml:6: attempt to perform arithmetic on a nil value", 1, true) ~= nil,
     true
   )
@@ -203,12 +206,12 @@ T["meta.refresh_count and meta.now change per refresh"] = function()
     "database: { url: 'sqlite:///:memory:' }",
     "query: { sql: 'SELECT {{ meta.refresh_count }} AS c' }",
   })
-  eq(p.rs.rows[1][1], 1)
+  eq(p.state.result.rows[1][1], 1)
   p:emit("panel:tick")
   vim.wait(5000, function()
-    return not p.running and p.rs.rows[1][1] == 2
+    return not p.running and p.state.result.rows[1][1] == 2
   end, 10)
-  eq(p.rs.rows[1][1], 2)
+  eq(p.state.result.rows[1][1], 2)
 end
 
 T["bare argument names, assigning args/meta and writing meta are errors"] = function()
@@ -222,7 +225,7 @@ T["bare argument names, assigning args/meta and writing meta are errors"] = func
   })
   eq(
     sched
-      .format_error(p.error)
+      .format_error(p.state.error)
       :find("bare.yaml:6: 'days' is undefined; arguments are written args.days", 1, true)
       ~= nil,
     true
@@ -232,7 +235,7 @@ T["bare argument names, assigning args/meta and writing meta are errors"] = func
   _, err = template.render("{% for meta in [1] %}{% endfor %}", {})
   eq(assert(err).message, "'meta' is reserved (dashboard metadata) and cannot be assigned")
   local l = run("ro", { "database: { url: 'lua://' }", "query: { sql: 'meta.os = 1; return {}' }" })
-  eq(l.error.message:find("meta is read-only (meta.os)", 1, true) ~= nil, true)
+  eq(l.state.error.message:find("meta is read-only (meta.os)", 1, true) ~= nil, true)
 end
 
 T["iso_now carries the UTC offset"] = function()

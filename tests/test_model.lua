@@ -56,6 +56,21 @@ local function on_fake_clock(text)
     ticks[#ticks + 1] = p.index
   end)
   d.clock:start()
+  -- started sources (a stand-in each): the panels fetch, so they tick
+  for _, p in ipairs(d.panels) do
+    p.feed = {
+      queue = {},
+      received = 0,
+      processed = 0,
+      dropped = 0,
+      state = "running",
+      token = require("dbdash.db.cancel").new(),
+    }
+    p:set(p:status())
+  end
+  vim.wait(20, function()
+    return not d.clock.catching_up
+  end, 1)
   return d, ticks, function(ms)
     now = ms
   end
@@ -126,7 +141,10 @@ panels:
   d.clock:wake()
   eq(ticks, { 2 })
   t(1500)
-  d:resume()
+  d:resume() -- the panels fetch again; what came due ticks once they all said so
+  vim.wait(100, function()
+    return #ticks >= 2
+  end, 1)
   eq(ticks, { 2, 1 })
   eq(d.panels[1].next_at, 2500)
 end
@@ -136,12 +154,10 @@ T["commit: one result per period at once, the next at the tick; a tick commits o
   local p = d.panels[1]
   d:commit()
   local rs = require("dbdash.db.lua_result").normalize({ { x = 1 } }, {})
-  p.rs = rs
-  p:emit("panel:result", rs, {})
+  p:set({ result = rs }) -- as a settled run sets it
   eq({ p.committed, p.pending }, { true, false })
   local version = d.doc.version
-  p.rs = require("dbdash.db.lua_result").normalize({ { x = 2 } }, {})
-  p:emit("panel:result", p.rs, {})
+  p:set({ result = require("dbdash.db.lua_result").normalize({ { x = 2 } }, {}) })
   eq({ p.pending, d.doc.version }, { true, version }) -- waits for the next tick
   p:emit("panel:tick")
   eq(p.pending, false)
@@ -155,8 +171,12 @@ T["subscribers: history records results, errors, skipped ticks and cancels"] = f
   local d = on_fake_clock(GRID)
   local p = d.panels[1]
   local rs = require("dbdash.db.lua_result").normalize({ { x = 1 } }, {})
-  p:emit("panel:result", rs, { elapsed_ms = 3 })
-  p:emit("panel:error", require("dbdash.util.error").new({ phase = "query", message = "no" }), {})
+  -- runs that settled (their state: the run, its result or its error)
+  p:set({ run = { ok = true, data_ms = 3 }, result = rs })
+  p:set({
+    run = { ok = false },
+    error = require("dbdash.util.error").new({ phase = "query", message = "no" }),
+  })
   p:emit("panel:skipped")
   p:emit("panel:cancelled", "why")
   local kinds = vim.tbl_map(function(h)
@@ -175,11 +195,11 @@ show: { type: table, interval: 1h }
   local seen = {}
   local events = require("dbdash.dashboard.events")
   local function on_started(d)
-    for _, e in ipairs({ "panel:state", "panel:result", "panel:error" }) do
-      d.events:on(e, function()
-        seen[#seen + 1] = e
-      end)
-    end
+    d.events:on("panel:state", function(_, _, changed)
+      local keys = vim.tbl_keys(changed)
+      table.sort(keys)
+      seen[#seen + 1] = table.concat(keys, ",")
+    end)
   end
   events:on("dashboard:started", on_started)
   MiniTest.finally(function()
@@ -188,10 +208,11 @@ show: { type: table, interval: 1h }
   local d = sched.create(path, cfg, state)
   local p = d.panels[1]
   vim.wait(3000, function()
-    return p.rs ~= nil
+    return p.state.result ~= nil
   end, 10)
   -- started, its query running, the result, not running any more
-  eq(seen, { "panel:state", "panel:state", "panel:result", "panel:state" })
+  -- started (fetching), its query running, then the result with the run that made it
+  eq(seen, { "next_at", "fetching,stream", "activity", "activity,result,run" })
   eq(p.node.data.running, false)
   eq(p.node.data.next_at, p.next_at)
   local cells = {}
@@ -213,7 +234,7 @@ show: { type: table, interval: 1h }
   local d = sched.create(path, cfg, state)
   local p = d.panels[1]
   vim.wait(3000, function()
-    return p.rs ~= nil
+    return p.state.result ~= nil
   end, 10)
   local old = p.gen
   p:restart()

@@ -25,7 +25,7 @@ local function start(lines)
   local d = assert(sched.get(sched.normalize(f)))
   vim.wait(5000, function()
     for _, p in ipairs(d.panels) do
-      if not (p.rs or p.error) then
+      if not (p.state.result or p.state.error) then
         return false
       end
     end

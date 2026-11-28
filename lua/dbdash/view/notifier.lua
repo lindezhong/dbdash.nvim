@@ -38,10 +38,16 @@ function M.where(path, p)
   return title and (file .. " › " .. title) or file
 end
 
-local function on_error(p, err, o)
+---A panel's error, from its state: "once" when it appears or changes, "always" on every
+---failure (every run that failed, a source that failed).
+local function on_state(p, st, changed)
+  if not st.error then
+    return
+  end
   local mode = require("dbdash.options").current.errors.notify
-  if o.always or mode == "always" or (mode == "once" and o.changed) then
-    M.notify(M.where(p.d.path, p) .. ": " .. format_error(err), vim.log.levels.ERROR)
+  local failed = (changed.run and not st.run.ok) or changed.error
+  if (mode == "always" and failed) or (mode == "once" and changed.error) then
+    M.notify(M.where(p.d.path, p) .. ": " .. format_error(st.error), vim.log.levels.ERROR)
   end
 end
 
@@ -60,7 +66,7 @@ local function on_threshold(p, cur)
 end
 
 events:on("dashboard:started", function(d)
-  d.events:on("panel:error", on_error)
+  d.events:on("panel:state", on_state)
   d.events:on("panel:threshold", on_threshold)
 end)
 

@@ -32,7 +32,7 @@ local T = MiniTest.new_set({
 local function settle(d)
   vim.wait(10000, function()
     for _, p in ipairs(d.panels) do
-      if not (p.rs or p.error) or p.running then
+      if not (p.state.result or p.state.error) or p.running then
         return false
       end
     end
@@ -61,8 +61,8 @@ local function again(p)
 end
 
 local function cell(p, r, c)
-  assert(p.rs, p.error and sched.format_error(p.error) or "no result")
-  return p.rs.rows[r or 1][c or 1]
+  assert(p.state.result, p.state.error and sched.format_error(p.state.error) or "no result")
+  return p.state.result.rows[r or 1][c or 1]
 end
 
 T["store: kept across refreshes, one per panel, shared by all of its Lua"] = function()
@@ -134,10 +134,10 @@ query:
 ]]
   )
   local p = d.panels[1]
-  eq(p.rs.rows[1], { 2, 0, 0, 1, "none" })
+  eq(p.state.result.rows[1], { 2, 0, 0, 1, "none" })
   again(p)
   -- prev_ok.result is the transformed row (doubled = 2), prev_ok.query the query's own (n = 1)
-  eq(p.rs.rows[1], { 4, 2, 1, 1, "n" })
+  eq(p.state.result.rows[1], { 4, 2, 1, 1, "n" })
 end
 
 T["meta.prev.error: the previous refresh's error; meta.prev_ok keeps the last success"] = function()
@@ -154,15 +154,15 @@ query:
 ]]
   )
   local p = d.panels[1]
-  eq(p.rs.rows[1], { "", 1, 0 }) -- columns sorted: err, n, prev
+  eq(p.state.result.rows[1], { "", 1, 0 }) -- columns sorted: err, n, prev
   again(p)
-  eq(p.error ~= nil, true)
+  eq(p.state.error ~= nil, true)
   again(p)
-  local row = p.rs.rows[1]
+  local row = p.state.result.rows[1]
   eq({ row[2], row[3] }, { 3, 1 }) -- the last success was refresh 1
   eq(row[1]:find("boom", 1, true) ~= nil, true)
   again(p)
-  eq(p.rs.rows[1][1], "") -- refresh 3 succeeded: no meta.prev.error
+  eq(p.state.result.rows[1][1], "") -- refresh 3 succeeded: no meta.prev.error
 end
 
 T["show.refresh_hidden: keeps refreshing while the dashboard is paused"] = function()
@@ -238,9 +238,9 @@ query:
 ]]
   )
   local p = d.panels[1]
-  assert(p.rs, p.error and sched.format_error(p.error))
+  assert(p.state.result, p.state.error and sched.format_error(p.state.error))
   -- the refresh: n = 1, depth 0; its callback: n = 10, depth 1; that one's: n = 100, depth 2
-  eq(p.rs.rows[1], { 1, 0, "10:1,100:2,-" })
+  eq(p.state.result.rows[1], { 1, 0, "10:1,100:2,-" })
   eq(p.refresh_count, 1) -- callbacks are not refreshes
 end
 
@@ -270,10 +270,10 @@ panels:
 ]]
   )
   local p1, p2 = d.panels[1], d.panels[2]
-  assert(p1.rs, p1.error and sched.format_error(p1.error))
+  assert(p1.state.result, p1.state.error and sched.format_error(p1.state.error))
   -- columns sorted: v, via_module, via_transform
-  eq(p1.rs.rows[1], { 7, 14, 21 })
-  eq(p2.rs.rows[1][1], 55)
+  eq(p1.state.result.rows[1], { 7, 14, 21 })
+  eq(p2.state.result.rows[1][1], 55)
 end
 
 T["dbdash.run(): the depth and total limits fail the refresh"] = function()
@@ -287,7 +287,7 @@ query: { sql: "dbdash.run(); return {}" }
   local p = d.panels[1]
   eq(
     sched
-      .format_error(p.error)
+      .format_error(p.state.error)
       :find("dbdash.run: callbacks nested deeper than 10 (lua.max_callback_depth)", 1, true)
       ~= nil,
     true
@@ -310,7 +310,7 @@ query: { sql: "if meta.run.depth < 5 then for _ = 1, 3 do dbdash.run() end end; 
   p = d.panels[1]
   eq(
     sched
-      .format_error(p.error)
+      .format_error(p.state.error)
       :find("dbdash.run: more than 50 callbacks in one refresh (lua.max_callbacks)", 1, true)
       ~= nil,
     true
@@ -325,10 +325,10 @@ query: { sql: "if meta.run.depth < 2 then for _ = 1, 3 do dbdash.run() end end; 
 ]]
   )
   p = d.panels[1]
-  eq(p.error, nil)
+  eq(p.state.error, nil)
   again(p)
   again(p)
-  eq({ p.error, p.refresh_count }, { nil, 3 })
+  eq({ p.state.error, p.refresh_count }, { nil, 3 })
 end
 
 T["dbdash.run(): unknown arguments and wrong types are errors"] = function()
@@ -342,8 +342,9 @@ query:
 ]]
   )
   eq(
-    sched.format_error(d.panels[1].error):find("'nope' is not an argument of this panel", 1, true)
-      ~= nil,
+    sched
+      .format_error(d.panels[1].state.error)
+      :find("'nope' is not an argument of this panel", 1, true) ~= nil,
     true
   )
   d = start(
@@ -356,8 +357,9 @@ query:
 ]]
   )
   eq(
-    sched.format_error(d.panels[1].error):find("argument 'n' is an int, got a string", 1, true)
-      ~= nil,
+    sched
+      .format_error(d.panels[1].state.error)
+      :find("argument 'n' is an int, got a string", 1, true) ~= nil,
     true
   )
 end
@@ -375,7 +377,7 @@ query:
     while true do end
 ]]
   )
-  local e = d.panels[1].error
+  local e = d.panels[1].state.error
   eq(e ~= nil and sched.format_error(e):find("did not finish within 1.0s", 1, true) ~= nil, true)
 end
 
@@ -416,7 +418,7 @@ query:
     end, 5)
   end)
   eq({ ok, err }, { true, nil })
-  eq(d.panels[1].error, nil)
+  eq(d.panels[1].state.error, nil)
 end
 
 T["args.x = v in Lua: the rest of the run sees it, and it is kept"] = function()
@@ -446,17 +448,17 @@ query:
 ]]
   )
   local p = d.panels[1]
-  assert(p.rs, p.error and sched.format_error(p.error))
-  eq(p.rs.rows[1], { 1, 11, 11, 22, 22, 22 })
+  assert(p.state.result, p.state.error and sched.format_error(p.state.error))
+  eq(p.state.result.rows[1], { 1, 11, 11, 22, 22, 22 })
   -- kept like an edit: shown, used by the next refresh, reset by R
   local a = require("dbdash.args")
   local function value(name)
-    return a.value(a.find(d.cfg.args, name), d.state)
+    return a.value(a.find(d.cfg.args, name), d.arg_state)
   end
   eq({ value("n"), value("tag") }, { 22, "t22" })
   again(p)
-  eq(p.rs.rows[1][1], 22)
-  a.reset(d.state)
+  eq(p.state.result.rows[1][1], 22)
+  a.reset(d.arg_state)
   eq(value("n"), 1)
 end
 
@@ -483,11 +485,11 @@ query:
 ]]
   )
   local p = d.panels[1]
-  assert(p.rs, p.error and sched.format_error(p.error))
+  assert(p.state.result, p.state.error and sched.format_error(p.state.error))
   -- (1 + 1) * 2 * 2 + 100; the loop's assignments are not loop-local
-  eq(p.rs.rows[1], { 108, 108, 2 })
+  eq(p.state.result.rows[1], { 108, 108, 2 })
   local a = require("dbdash.args")
-  eq(a.value(a.find(d.cfg.args, "n"), d.state), 108)
+  eq(a.value(a.find(d.cfg.args, "n"), d.arg_state), 108)
 end
 
 T["assigning args: a callback keeps its values; the assignment is still kept"] = function()
@@ -507,10 +509,10 @@ query:
 ]]
   )
   local p = d.panels[1]
-  assert(p.rs, p.error and sched.format_error(p.error))
-  eq(p.rs.rows[1], { 50, 1 }) -- columns: inner, n; the refresh's own n is still 1
+  assert(p.state.result, p.state.error and sched.format_error(p.state.error))
+  eq(p.state.result.rows[1], { 50, 1 }) -- columns: inner, n; the refresh's own n is still 1
   local a = require("dbdash.args")
-  eq(a.value(a.find(d.cfg.args, "n"), d.state), 50)
+  eq(a.value(a.find(d.cfg.args, "n"), d.arg_state), 50)
 end
 
 T["assigning args: shared or the panel's own (a local one shadows)"] = function()
@@ -529,17 +531,17 @@ panels:
   )
   local a = require("dbdash.args")
   local function value(key)
-    return a.value(a.find(d.cfg.args, key), d.state)
+    return a.value(a.find(d.cfg.args, key), d.arg_state)
   end
   eq({ value("1.region"), value("region") }, { "CN", "JP" })
   again(d.panels[2])
-  eq(d.panels[2].rs.rows[1][1], "JP")
+  eq(d.panels[2].state.result.rows[1][1], "JP")
 end
 
 T["assigning args: unknown names, wrong types, the whole args or meta are errors"] = function()
   local function err_of(name, text)
     local d = start(name, text)
-    local e = d.panels[1].error
+    local e = d.panels[1].state.error
     return e and sched.format_error(e) or ""
   end
   local db = "database: { url: 'sqlite:///:memory:' }\n"
@@ -637,10 +639,10 @@ query:
 ]]):format(copy_expr)
     )
     local p = d.panels[1]
-    assert(p.rs, p.error and sched.format_error(p.error))
+    assert(p.state.result, p.state.error and sched.format_error(p.state.error))
     local a = require("dbdash.args")
     -- columns sorted: caller, cb_after, cb_start, copy
-    return p.rs.rows[1], a.value(a.find(d.cfg.args, "days"), d.state)
+    return p.state.result.rows[1], a.value(a.find(d.cfg.args, "days"), d.arg_state)
   end
   local row, kept = run_case("deep", "vim.deepcopy(args)")
   eq({ row, kept }, { { 0, 10, 14, 14 }, 10 })
@@ -653,7 +655,7 @@ end
 -- into `store.log`; kept() is the dashboard's value of `days`.
 local function kept(d, name)
   local a = require("dbdash.args")
-  return a.value(a.find(d.cfg.args, name or "days"), d.state)
+  return a.value(a.find(d.cfg.args, name or "days"), d.arg_state)
 end
 
 ---A lua:// panel with argument days (default 0); `body` is its script.
@@ -671,7 +673,7 @@ query:
 ]]):format(body:gsub("\n", "\n    "):gsub("^", "    "))
   )
   local p = d.panels[1]
-  assert(p.rs or p.error, "no result")
+  assert(p.state.result or p.state.error, "no result")
   return d, p, p.store.log
 end
 
@@ -694,9 +696,9 @@ query:
 ]]
   )
   local p = d.panels[1]
-  assert(p.rs, p.error and sched.format_error(p.error))
+  assert(p.state.result, p.state.error and sched.format_error(p.state.error))
   -- columns sorted by name: callback_query, caller, copy
-  eq(p.rs.rows[1], { 10, 0, 14 })
+  eq(p.state.result.rows[1], { 10, 0, 14 })
   eq(kept(d), 10)
 end
 
@@ -721,9 +723,9 @@ query:
 ]]
   )
   local p = d.panels[1]
-  assert(p.rs, p.error and sched.format_error(p.error))
+  assert(p.state.result, p.state.error and sched.format_error(p.state.error))
   -- columns: caller, cb_after, cb_before, cb_used
-  eq(p.rs.rows[1], { 0, 10, 14, 14 })
+  eq(p.state.result.rows[1], { 0, 10, 14, 14 })
   eq(kept(d), 10)
 end
 
@@ -834,7 +836,7 @@ if meta.run.depth > 0 then args.days = 10; return { { ok = 1 } } end
 dbdash.run()
 error("later")]]
   )
-  eq(p.error ~= nil, true)
+  eq(p.state.error ~= nil, true)
   eq(kept(d), 10) -- the callback's script returned before the failure
   d, p = lua_case(
     "cb_fail_within",
@@ -842,7 +844,7 @@ error("later")]]
 if meta.run.depth > 0 then args.days = 10; error("inside") end
 dbdash.run()]]
   )
-  eq(p.error ~= nil, true)
+  eq(p.state.error ~= nil, true)
   eq(kept(d), 0) -- assigned in the code that failed: not applied
 end
 
@@ -854,8 +856,8 @@ if meta.run.depth > 0 then args.days = 14; return { { ok = 1 } } end
 dbdash.run({ days = 14 })
 args.days = 0]]
   )
-  eq(p.error, nil)
-  eq(d.state.modified.days, nil) -- 14 was the callback's value already; 0 the caller's
+  eq(p.state.error, nil)
+  eq(d.arg_state.modified.days, nil) -- 14 was the callback's value already; 0 the caller's
   local d2 = lua_case(
     "cb_reset",
     [[
@@ -863,7 +865,7 @@ if meta.run.depth > 0 then args.days = 10; return { { ok = 1 } } end
 dbdash.run()]]
   )
   eq(kept(d2), 10)
-  require("dbdash.args").reset(d2.state)
+  require("dbdash.args").reset(d2.arg_state)
   eq(kept(d2), 0)
   again(d2.panels[1])
   eq(kept(d2), 10) -- the next refresh's callback assigns it again
@@ -900,7 +902,7 @@ end
 
 T["run records: the refresh and its callback, ids, kinds, parents, times"] = function()
   local _, p = runs_case("rec1")
-  assert(p.rs, p.error and sched.format_error(p.error))
+  assert(p.state.result, p.state.error and sched.format_error(p.state.error))
   local refresh, callback = p.store.seen[1], p.store.seen[2]
   local r, c = refresh.run, callback.run
   eq({ r.kind, r.depth, r.parent_id, r.refresh_id }, { "refresh", 0, nil, r.id })
@@ -953,7 +955,7 @@ end
 T["run records: after a failed refresh, prev is it, prev_ok the last success"] = function()
   local _, p = runs_case("rec3", 2)
   again(p) -- refresh 2 fails after its callback
-  eq(p.error ~= nil, true)
+  eq(p.state.error ~= nil, true)
   again(p) -- refresh 3 sees both
   local first, second, third = p.store.seen[1], p.store.seen[3], p.store.seen[5]
   eq({ third.prev.id, third.prev.ok }, { second.run.id, false })
@@ -1021,11 +1023,11 @@ query:
 ]]
   )
   local p = d.panels[1]
-  assert(p.rs, p.error and sched.format_error(p.error))
-  eq(p.rs.rows[1], { 2, "refresh", "None", "-" })
+  assert(p.state.result, p.state.error and sched.format_error(p.state.error))
+  eq(p.state.result.rows[1], { 2, "refresh", "None", "-" })
   local first = p.prev.id
   again(p)
-  eq(p.rs.rows[1][4], first)
+  eq(p.state.result.rows[1][4], first)
 end
 
 T["run records: showing the SQL or a description is not a run"] = function()
@@ -1053,7 +1055,7 @@ query:
 ]]
   )
   local p = d.panels[1]
-  eq(p.error ~= nil, true)
+  eq(p.state.error ~= nil, true)
   local r = assert(p.prev)
   eq(
     { r.ok, r.query.rows[1][1], r.result, r.error:find("bad transform", 1, true) ~= nil },
@@ -1074,7 +1076,7 @@ query:
                pr = tostring(meta.prev_result), pe = tostring(meta.prev_error) } }
 ]]
   )
-  eq(d.panels[1].rs.rows[1], { "nil", "nil", "nil", "nil" })
+  eq(d.panels[1].state.result.rows[1], { "nil", "nil", "nil", "nil" })
   for i, name in ipairs({ "callback", "prev_query", "prev_result", "prev_error" }) do
     local e = start(
       "gone" .. i,
@@ -1082,7 +1084,7 @@ query:
         name
       )
     )
-    eq({ name, e.panels[1].error ~= nil }, { name, true })
+    eq({ name, e.panels[1].state.error ~= nil }, { name, true })
   end
 end
 
@@ -1109,9 +1111,9 @@ query:
 ]]
   )
   local p = d.panels[1]
-  assert(p.rs, p.error and sched.format_error(p.error))
+  assert(p.state.result, p.state.error and sched.format_error(p.state.error))
   -- columns sorted by name: days, depth
-  eq(p.rs.rows, { { 7, 0 }, { 14, 1 }, { 28, 2 }, { 56, 3 } })
+  eq(p.state.result.rows, { { 7, 0 }, { 14, 1 }, { 28, 2 }, { 56, 3 } })
 end
 
 return T

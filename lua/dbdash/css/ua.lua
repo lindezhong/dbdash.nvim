@@ -58,9 +58,10 @@ local M = {
   ["chart.stat value.danger"] = { color = "DiagnosticError" },
   -- the sidebar
   ["sidebar-dir"] = { color = "DbDashSidebarDir" },
-  ["sidebar-item.running"] = { color = "DbDashSidebarRunning" },
+  ["sidebar-item.fetching"] = { color = "DbDashSidebarFetching" },
+  ["sidebar-item.partly"] = { color = "DbDashSidebarPartly" },
   ["sidebar-item.paused"] = { color = "DbDashSidebarPaused" },
-  ["sidebar-item.idle"] = { color = "DbDashSidebarIdle" },
+  ["sidebar-item.stopped"] = { color = "DbDashSidebarStopped" },
   ["sidebar-item.cursor"] = { color = "DbDashSidebarCursor" },
 }
 

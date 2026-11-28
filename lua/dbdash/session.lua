@@ -11,7 +11,7 @@ function M.state()
   for _, d in ipairs(require("dbdash.dashboard").list()) do
     local values = {}
     for _, spec in ipairs(d.cfg.args) do
-      local v = args.value(spec, d.state)
+      local v = args.value(spec, d.arg_state)
       if v ~= nil and not vim.deep_equal(v, spec.default) then
         values[spec.key or spec.name] = args.format_value(v)
       end

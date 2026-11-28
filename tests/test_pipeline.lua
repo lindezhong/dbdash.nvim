@@ -39,7 +39,9 @@ local function start()
   require("dbdash.view.dashboard").start(f, { no_show = true })
   local d = assert(sched.get(sched.normalize(f)))
   vim.wait(5000, function()
-    return d.panels[1].rs ~= nil and d.panels[2].rs ~= nil and not d.render_pending
+    return d.panels[1].state.result ~= nil
+      and d.panels[2].state.result ~= nil
+      and not d.render_pending
   end, 10)
   require("dbdash.view.dashboard").redraw(d)
   return d
@@ -62,9 +64,11 @@ end
 T["a style query before the frame (a flush) does not lose the frame"] = function()
   local d = start()
   local p = d.panels[2]
-  p.rs = require("dbdash.db.resultset").new({ { name = "m", type = "integer" } }, { { 7 } })
   p.committed = false
-  p:emit("panel:result", p.rs, {}) -- committed: the document asks for a frame
+  -- committed: the document asks for a frame
+  p:set({
+    result = require("dbdash.db.resultset").new({ { name = "m", type = "integer" } }, { { 7 } }),
+  })
   -- what the status line does: read computed styles, which restyles the document early
   require("dbdash.css.style").get(p.node)
   eq(d.doc:needs_update(), false)
@@ -93,9 +97,11 @@ T["a new result of one panel lays out that panel only"] = function()
   local d = start()
   local p = d.panels[2]
   local before = counters(d)
-  p.rs = require("dbdash.db.resultset").new({ { name = "m", type = "integer" } }, { { 3 } })
   p.committed = false -- (a new period: the result is committed at once)
-  p:emit("panel:result", p.rs, {}) -- as the panel's consumer tells it
+  -- as the panel's consumer sets it
+  p:set({
+    result = require("dbdash.db.resultset").new({ { name = "m", type = "integer" } }, { { 3 } }),
+  })
   require("dbdash.view.dashboard").redraw(d)
   local dd = delta(before, counters(d))
   -- panel b: measured twice (min / max-content) and laid out once; panel a: reused

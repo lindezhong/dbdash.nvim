@@ -37,7 +37,7 @@ local function run(name, lines)
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   local p = d.panels[1]
   vim.wait(20000, function()
-    return (p.rs or p.error) ~= nil and not p.running
+    return (p.state.result or p.state.error) ~= nil and not p.running
   end, 10)
   return p
 end
@@ -64,8 +64,11 @@ end
 
 T["sqlite: the transform's rows replace the result"] = function()
   local p = run("sqlite", board("sqlite:///:memory:", "SELECT 'a' AS name, 21 AS n"))
-  eq(p.error, nil)
-  eq({ p.rs.columns[1].name, p.rs.columns[2].name, p.rs.rows }, { "k", "v", { { "a", 42 } } })
+  eq(p.state.error, nil)
+  eq(
+    { p.state.result.columns[1].name, p.state.result.columns[2].name, p.state.result.rows },
+    { "k", "v", { { "a", 42 } } }
+  )
 end
 
 T["template in the transform; errors point at the YAML line"] = function()
@@ -77,7 +80,7 @@ T["template in the transform; errors point at the YAML line"] = function()
     "  transform: |",
     "    return { { n = rs.rows[1][1] * {{ args.f }} } }",
   })
-  eq(p.rs.rows, { { 15 } })
+  eq(p.state.result.rows, { { 15 } })
   eq(notes, {}) -- a successful refresh does not notify
   p = run("bad", {
     "database: { url: 'sqlite:///:memory:' }",
@@ -87,8 +90,8 @@ T["template in the transform; errors point at the YAML line"] = function()
     "    local x = nil",
     "    return x.y",
   })
-  eq(p.error.phase, "transform")
-  eq(p.error.message:find("bad.yaml:6: attempt to index local 'x'", 1, true) ~= nil, true)
+  eq(p.state.error.phase, "transform")
+  eq(p.state.error.message:find("bad.yaml:6: attempt to index local 'x'", 1, true) ~= nil, true)
   eq(#notes, 1)
   eq(notes[1].level, vim.log.levels.ERROR)
   eq(
@@ -106,7 +109,7 @@ T["rs gives names, types and rows with nil for NULL"] = function()
     "  transform: |",
     "    return { { cols = table.concat(rs.columns, ','), t = rs.types[1], b_is_nil = rs.rows[1][2] == nil } }",
   })
-  eq(p.rs.rows, { { true, "a,b", "integer" } })
+  eq(p.state.result.rows, { { true, "a,b", "integer" } })
 end
 
 T["lua:// and http(s):// give the transform their raw value; rows are checked after it"] = function()
@@ -120,8 +123,8 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
     "    for _, n in ipairs(rs.data) do out[#out + 1] = { n = n * 2 } end",
     "    return out",
   })
-  eq(p.error, nil)
-  eq(p.rs.rows, { { 6 }, { 8 } })
+  eq(p.state.error, nil)
+  eq(p.state.result.rows, { { 6 }, { 8 } })
   -- http: rs is the decoded body, response the status/headers/body
   local base = h.http_server(function()
     local body = '{"items":[{"name":"a","count":2}]}'
@@ -141,8 +144,8 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
     "    end",
     "    return { columns = { 'name', 'n', 'page', 'status' }, rows = out }",
   })
-  eq(p.error, nil)
-  eq(p.rs.rows, { { "a", 2, "1", 200 } })
+  eq(p.state.error, nil)
+  eq(p.state.result.rows, { { "a", 2, "1", 200 } })
   -- the transform's value is checked as rows too
   p = run("http_bad", {
     ("database: { url: %q }"):format(base),
@@ -150,8 +153,8 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
     "  sql: curl",
     "  transform: 'return rs.items[1].name'",
   })
-  eq(p.error.phase, "transform")
-  eq(p.error.message, "the result is not rows (got string)")
+  eq(p.state.error.phase, "transform")
+  eq(p.state.error.message, "the result is not rows (got string)")
   eq(notes[#notes].level, vim.log.levels.ERROR)
   eq(
     notes[#notes].msg:match("http_bad%.yaml: (.*)$"),
@@ -159,10 +162,13 @@ T["lua:// and http(s):// give the transform their raw value; rows are checked af
   )
   -- without a transform the response itself is checked, with a hint
   p = run("http_plain", { ("database: { url: %q }"):format(base), "query: { sql: curl }" })
-  eq(p.error.phase, "query")
+  eq(p.state.error.phase, "query")
   eq(
-    p.error.message:find("the result is an object (items), not rows; add query.transform", 1, true)
-      ~= nil,
+    p.state.error.message:find(
+      "the result is an object (items), not rows; add query.transform",
+      1,
+      true
+    ) ~= nil,
     true
   )
   eq(notes[#notes].level, vim.log.levels.ERROR)
@@ -186,8 +192,8 @@ T["http: cookies the server sets reach the next refresh through the -c / -b file
     "  sql: curl -b jar.txt -c jar.txt -b 'token=initial; user=me'",
   }
   local p = run("cookies", lines)
-  eq(p.error, nil)
-  p.rs, p.error = nil, nil
+  eq(p.state.error, nil)
+  p:set({ result = vim.NIL, error = vim.NIL })
   p:emit("panel:tick")
   vim.wait(5000, function()
     return #seen >= 2 and not p.running
@@ -241,9 +247,9 @@ for _, db in ipairs(DATABASES) do
       "  transform: |",
       "    return { { columns = #rs.columns, rows = #rs.rows, first = rs.columns[1] } }",
     })
-    eq(p.error, nil)
-    eq(p.rs.columns[1].name, "columns")
-    eq(p.rs.rows[1][1] >= 1 and p.rs.rows[1][3] >= 1, true)
+    eq(p.state.error, nil)
+    eq(p.state.result.columns[1].name, "columns")
+    eq(p.state.result.rows[1][1] >= 1 and p.state.result.rows[1][3] >= 1, true)
   end
 end
 

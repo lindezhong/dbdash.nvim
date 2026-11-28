@@ -178,7 +178,7 @@ local function cached(p, kind, width, height, fill, exact, build)
   local cache = p.layout_cache
   local key = kind .. "|" .. panel_key(p, width, height, fill, exact)
   local hit = cache.entries[key]
-  if hit and hit.rs == p.rs then
+  if hit and hit.rs == p.chart_node.result then
     M.stats.hits = M.stats.hits + 1
     return hit.frag
   end
@@ -189,7 +189,7 @@ local function cached(p, kind, width, height, fill, exact, build)
   end
   -- keyed on the version after layout: styling parts the first time bumps it
   cache.entries[kind .. "|" .. panel_key(p, width, height, fill, exact)] =
-    { rs = p.rs, frag = frag }
+    { rs = p.chart_node.result, frag = frag }
   cache.n = cache.n + 1
   return frag
 end
@@ -289,9 +289,9 @@ function M.measure(p, width)
     p.node and p.node.layout_version or 0,
   })
   local m = p.measured
-  if not (m and m.rs == p.rs and m.key == key) then
+  if not (m and m.rs == p.chart_node.result and m.key == key) then
     m = {
-      rs = p.rs,
+      rs = p.chart_node.result,
       key = key,
       hmin = #paint.fragment(M.panel(p, width, 0)).lines,
       hmax = #paint.fragment(M.panel(p, width, 100000)).lines,

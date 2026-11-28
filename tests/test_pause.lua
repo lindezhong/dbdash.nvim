@@ -91,7 +91,7 @@ panels:
     show: { type: table, interval: 1h }
 ]],
     function(d)
-      return d.panels[1].rs ~= nil and d.panels[2].rs ~= nil
+      return d.panels[1].state.result ~= nil and d.panels[2].state.result ~= nil
     end
   )
   settle(200)
@@ -120,7 +120,7 @@ query: { sql: "SELEC oops" }
 show: { type: table, interval: 1s }
 ]],
     function(d)
-      return d.panels[1].error ~= nil and not d.panels[1].running
+      return d.panels[1].state.error ~= nil and not d.panels[1].running
     end
   )
   hide(d)
@@ -140,7 +140,7 @@ query: { sql: "SELECT 1 AS a" }
 show: { type: table, interval: 1s }
 ]],
     function(d)
-      return d.panels[1].rs ~= nil
+      return d.panels[1].state.result ~= nil
     end
   )
   vim.cmd("enew")
@@ -199,7 +199,7 @@ show:
   -- nothing committed, nothing drawn
   eq(p.chart_node.content and p.chart_node.content.rs, committed)
   eq(shown_n(), text)
-  local latest = p.rs
+  local latest = p.state.result
   show(d)
   -- the latest result at once (later items wait for the panel's next tick)
   eq(p.chart_node.content.rs, latest)

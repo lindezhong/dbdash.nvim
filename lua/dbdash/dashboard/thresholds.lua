@@ -22,7 +22,11 @@ end
 ---Check the results of the panels of dashboard `d`.
 ---@param d dbdash.Dashboard
 function M.attach(d)
-  d.events:on("panel:result", check)
+  d.events:on("panel:state", function(p, st, changed)
+    if changed.result then
+      check(p, st.result)
+    end
+  end)
 end
 
 return M

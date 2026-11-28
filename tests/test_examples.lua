@@ -47,25 +47,25 @@ for _, f in ipairs(files) do
     ---A webhook panel waits for requests: listening is enough.
     local function waiting(p)
       return p.cfg.database.type == "webhook"
-        and not p.error
-        and (p:push_state() or ""):match("^listening") ~= nil
+        and not p.state.error
+        and (p.state.source or ""):match("^listening") ~= nil
     end
     vim.wait(30000, function()
       for _, p in ipairs(d.panels) do
-        if not waiting(p) and (not (p.rs or p.error) or p.running) then
+        if not waiting(p) and (not (p.state.result or p.state.error) or p.running) then
           return false
         end
       end
       return true
     end, 10)
     for _, p in ipairs(d.panels) do
-      if p.error then
-        error(f .. ": " .. sched.format_error(p.error))
+      if p.state.error then
+        error(f .. ": " .. sched.format_error(p.state.error))
       end
       if waiting(p) then
         goto continue
       end
-      local rs = assert(p.rs, f .. ": no result")
+      local rs = assert(p.state.result, f .. ": no result")
       eq(rs.row_count > 0, true)
       local out = render.render(rs, p.cfg.show, { width = 100, height = 30 })
       for _, hl in ipairs(out.hl) do
@@ -94,7 +94,7 @@ for _, name in ipairs({ "statements", "filters", "tests_functions", "methods", "
     local d = assert(sched.get(sched.normalize(f)))
     vim.wait(10000, function()
       for _, p in ipairs(d.panels) do
-        if not (p.rs or p.error) or p.running then
+        if not (p.state.result or p.state.error) or p.running then
           return false
         end
       end
@@ -105,10 +105,10 @@ for _, name in ipairs({ "statements", "filters", "tests_functions", "methods", "
       tpl.env(require("dbdash.template.dialect").get("sqlite"), false, vim.fn.fnamemodify(f, ":h"))
     local checked = 0
     for _, p in ipairs(d.panels) do
-      eq(p.error, nil)
-      local ti, ri = p.rs:col_index("template"), p.rs:col_index("result")
+      eq(p.state.error, nil)
+      local ti, ri = p.state.result:col_index("template"), p.state.result:col_index("result")
       if ti and ri then
-        for _, row in ipairs(p.rs.rows) do
+        for _, row in ipairs(p.state.result.rows) do
           local out, err = tpl.render(
             row[ti],
             { args = args, meta = map.new() },

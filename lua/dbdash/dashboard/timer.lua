@@ -3,13 +3,16 @@
 -- A wake sends each due panel one tick (panel:tick), however many deadlines it met: a
 -- panel's own deadline and the top-level one at the same moment are one tick. A tick
 -- restarts the panel's own count, so a panel whose interval is the top-level one or longer
--- only ever ticks with the others (cfg.follows_global). Hidden (dashboard:hidden) only
--- show.refresh_hidden panels tick; shown again (dashboard:shown), what came due ticks.
+-- only ever ticks with the others (cfg.follows_global). Only panels whose state says they
+-- fetch tick (Panel.state.fetching: a hidden dashboard's databases do not, unless
+-- show.refresh_hidden); one that fetches again ticks at once if it came due. The panels'
+-- deadlines are theirs (Panel:schedule): the clock asks them to change.
 local M = {}
 
 ---@class dbdash.Clock
 ---@field d dbdash.Dashboard
 ---@field timer uv.uv_timer_t?
+---@field catching_up boolean? a catch-up waits for the end of the event (Clock:catch_up)
 local Clock = {}
 Clock.__index = Clock
 
@@ -28,18 +31,21 @@ end
 ---@return dbdash.Clock
 function M.new(d)
   local clock = setmetatable({ d = d }, Clock)
-  d.events:on("dashboard:hidden", function()
-    clock:pause()
-  end)
-  d.events:on("dashboard:shown", function()
-    clock:resume()
+  d.events:on("panel:state", function(_, st, changed)
+    if changed.fetching then
+      if st.fetching then
+        clock:catch_up()
+      else
+        clock:arm()
+      end
+    end
   end)
   return clock
 end
 
 ---A tick of panel `p`: its count restarts from now.
 local function tick(p, t)
-  p.next_at = t + p.cfg.show.interval
+  p:schedule(t + p.cfg.show.interval)
   p:emit("panel:tick")
 end
 
@@ -48,9 +54,9 @@ local function own(p)
   return not (p.d.cfg.refresh_all and p.cfg.follows_global)
 end
 
----Ticks while the dashboard is paused (hidden): show.refresh_hidden panels.
+---Ticks: it fetches (its state).
 local function active(p)
-  return not p.d.paused or p.cfg.show.refresh_hidden
+  return p.state.fetching
 end
 
 ---Start: every panel's first tick now, the next ones an interval from now.
@@ -61,14 +67,14 @@ function Clock:start()
     d.gnext_at = t + d.cfg.refresh_all
   end
   for _, p in ipairs(d.panels) do
-    p.next_at = t + p.cfg.show.interval
+    p:schedule(t + p.cfg.show.interval)
   end
   self:arm()
 end
 
 ---Restart a panel's count from now (after a tick, or when the user refreshed it).
 function Clock:reset(p, t)
-  p.next_at = (t or now()) + p.cfg.show.interval
+  p:schedule((t or now()) + p.cfg.show.interval)
 end
 
 ---Set the uv timer to the earliest deadline of what ticks now.
@@ -122,7 +128,7 @@ function Clock:wake()
       local mine = own(p) and p.next_at and t + slack(p.cfg.show.interval) >= p.next_at
       if global and p.retry_at and t < p.retry_at then
         -- backing off after failures: the top-level tick leaves it alone
-        p.next_at = p.retry_at
+        p:schedule(p.retry_at)
       elseif global or mine then
         tick(p, t)
       end
@@ -131,12 +137,20 @@ function Clock:wake()
   self:arm()
 end
 
----Hidden: only show.refresh_hidden panels keep ticking.
-function Clock:pause()
-  self:arm()
+---Panels fetch again (shown again): once every panel has said so (after the event that
+---changed them), what came due ticks now, the rest keeps its remaining time.
+function Clock:catch_up()
+  if self.catching_up then
+    return
+  end
+  self.catching_up = true
+  vim.schedule(function()
+    self.catching_up = false
+    self:resume()
+  end)
 end
 
----Shown again: what came due while hidden ticks now, the rest keeps its remaining time.
+---What came due ticks now, the rest keeps its remaining time.
 function Clock:resume()
   if not self.timer then
     return
@@ -147,7 +161,7 @@ function Clock:resume()
     return
   end
   for _, p in ipairs(d.panels) do
-    if not p.ended and own(p) and p.next_at and p.next_at <= t then
+    if not p.ended and active(p) and own(p) and p.next_at and p.next_at <= t then
       tick(p, t)
     end
   end

@@ -1,5 +1,5 @@
--- A panel's history (:DbDashHistory): the last refreshes, newest first, recorded from the
--- panel's events (setup defaults.history entries at most).
+-- A panel's history (:DbDashStatus): the last refreshes, newest first, recorded from the
+-- panel's events and its state (setup defaults.history entries at most).
 local M = {}
 
 ---@class dbdash.HistoryEntry
@@ -24,12 +24,15 @@ end
 ---@param d dbdash.Dashboard
 function M.attach(d)
   local ev = d.events
-  ev:on("panel:result", function(p, rs, o)
-    push(p, { elapsed_ms = o.elapsed_ms, rows = rs.row_count })
-  end)
-  ev:on("panel:error", function(p, err, o)
-    if not o.internal then
-      push(p, { error = require("dbdash.util.error").format(err) })
+  ev:on("panel:state", function(p, st, changed)
+    if changed.run then -- a run settled: its result or its error
+      if st.run.ok then
+        push(p, { elapsed_ms = st.run.data_ms, rows = st.result.row_count })
+      else
+        push(p, { error = require("dbdash.util.error").format(st.error) })
+      end
+    elseif changed.error and st.error then -- the source itself failed
+      push(p, { error = require("dbdash.util.error").format(st.error) })
     end
   end)
   ev:on("panel:skipped", function(p)

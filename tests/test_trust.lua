@@ -183,11 +183,12 @@ T["an included template with Lua that the trust does not cover asks again"] = fu
   require("dbdash.view.dashboard").start(path, { no_show = true })
   local d = sched.get(sched.normalize(path))
   vim.wait(3000, function()
-    return d.panels[1].error ~= nil or d.panels[1].rs ~= nil
+    return d.panels[1].state.error ~= nil or d.panels[1].state.result ~= nil
   end, 10)
   eq(asked, 1)
   eq(
-    d.panels[1].error ~= nil and sched.format_error(d.panels[1].error):find("not trusted") ~= nil,
+    d.panels[1].state.error ~= nil
+      and sched.format_error(d.panels[1].state.error):find("not trusted") ~= nil,
     true
   )
 end
@@ -340,7 +341,7 @@ local function run(path)
   local d = assert(sched.get(sched.normalize(path)), "dashboard did not start")
   local p = d.panels[1]
   vim.wait(5000, function()
-    return (p.rs or p.error) ~= nil and not p.running
+    return (p.state.result or p.state.error) ~= nil and not p.running
   end, 10)
   return p
 end
@@ -363,8 +364,8 @@ T["the same .lua helper works in query.sql and query.transform"] = function()
   })
   answer = "allow"
   local p = run(path)
-  eq(p.error, nil)
-  eq(p.rs.rows, { { 8, "v4", 8, "v4" } })
+  eq(p.state.error, nil)
+  eq(p.state.result.rows, { { 8, "v4", 8, "v4" } })
   eq(asked_files, { "both.yaml:config", "h.lua:lua" })
 end
 
@@ -382,13 +383,16 @@ T["a file loaded through a computed path, or changed while running, asks again"]
   answer = "deny"
   local p = run(path)
   eq(asked_files, { "dyn.yaml:config", "dyn.lua:lua" })
-  eq(sched.format_error(p.error):find("dyn.yaml denied; it will not run", 1, true) ~= nil, true)
+  eq(
+    sched.format_error(p.state.error):find("dyn.yaml denied; it will not run", 1, true) ~= nil,
+    true
+  )
   sched.stop(sched.normalize(path))
   require("dbdash.commands").trust({ "remove", path })
   answer = "allow"
   p = run(path)
-  eq(p.error, nil)
-  eq(p.rs.rows, { { 7 } })
+  eq(p.state.error, nil)
+  eq(p.state.result.rows, { { 7 } })
   eq(asked, 2)
   -- trusted with dyn.lua now: a restart does not ask
   sched.stop(sched.normalize(path))
@@ -403,15 +407,15 @@ T["a file loaded through a computed path, or changed while running, asks again"]
   end, 10)
   eq(asked, 3)
   eq(
-    sched.format_error(p.error):find("dyn.yaml not started (not trusted yet)", 1, true) ~= nil,
+    sched.format_error(p.state.error):find("dyn.yaml not started (not trusted yet)", 1, true) ~= nil,
     true
   )
   answer = "allow"
   p:emit("panel:tick")
   vim.wait(5000, function()
-    return not p.running and p.error == nil
+    return not p.running and p.state.error == nil
   end, 10)
-  eq(p.rs.rows, { { 8 } })
+  eq(p.state.result.rows, { { 8 } })
 end
 
 T["confirm = false and trusted_dirs skip the question"] = function()

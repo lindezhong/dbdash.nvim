@@ -88,29 +88,29 @@ T["tree: files first, then directories; expanded ones show their content indente
   dbdash.setup({ sidebar = { dir = dir } })
   eq(
     (render()),
-    { "○ a.yaml", "○ b.yml", "○ d.dash.yaml", "▸ empty/", "▸ node_modules/", "▸ sub/" }
+    { "⊘ a.yaml", "⊘ b.yml", "⊘ d.dash.yaml", "▸ empty/", "▸ node_modules/", "▸ sub/" }
   )
   sidebar.toggle(dir, dir .. "/sub")
   sidebar.toggle(dir, dir .. "/sub/deeper")
   sidebar.toggle(dir, dir .. "/empty")
   local lines, _, buf = render()
   eq(lines, {
-    "○ a.yaml",
-    "○ b.yml",
-    "○ d.dash.yaml",
+    "⊘ a.yaml",
+    "⊘ b.yml",
+    "⊘ d.dash.yaml",
     "▾ empty/",
     "▸ node_modules/",
     "▾ sub/",
-    "  ○ e.yaml",
+    "  ⊘ e.yaml",
     "  ▾ deeper/",
-    "    ○ f.yaml",
+    "    ⊘ f.yaml",
   })
   -- line -> node mapping
   local nodes = vim.b[buf].dbdash_sidebar_nodes
-  -- name_col: where the name starts (after the indent and the ●/◐/○ marker)
+  -- name_col: where the name starts (after the indent and the ●/◐/○/⊘ mark)
   eq(
     nodes[tostring(sidebar.HEADER_LINES + 7)],
-    { path = dir .. "/sub/e.yaml", name_col = 2 + #"○" + 1 }
+    { path = dir .. "/sub/e.yaml", name_col = 2 + #"⊘" + 1 }
   )
   eq(
     nodes[tostring(sidebar.HEADER_LINES + 8)],
@@ -119,33 +119,40 @@ T["tree: files first, then directories; expanded ones show their content indente
   sidebar.toggle(dir, dir .. "/sub") -- collapse: its children are hidden, state kept
   eq(#render(), 6)
   sidebar.toggle(dir, dir .. "/sub")
-  eq((render())[9], "    ○ f.yaml")
+  eq((render())[9], "    ⊘ f.yaml")
 end
 
-T["highlights: directories with their arrow, running and idle markers"] = function()
+T["highlights: directories with their arrow; the marks and their legend on two lines"] = function()
   dbdash.setup({ sidebar = { dir = dir .. "/sub" } })
-  local _, marks = render()
+  local _, marks, buf = render()
+  eq(vim.api.nvim_buf_get_lines(buf, 3, 5, false), {
+    "● Fetching        ◐ Partly fetching",
+    "○ Paused          ⊘ Not running",
+  })
   eq(marks, {
-    { "DbDashSidebarRunning", "●" }, -- legend
-    { "DbDashSidebarPaused", "◐" },
-    { "DbDashSidebarIdle", "○" },
-    { "DbDashSidebarIdle", "○" },
+    { "DbDashSidebarFetching", "●" }, -- legend
+    { "DbDashSidebarPartly", "◐" },
+    { "DbDashSidebarPaused", "○" },
+    { "DbDashSidebarStopped", "⊘" },
+    { "DbDashSidebarStopped", "⊘" }, -- e.yaml
     { "DbDashSidebarDir", "▸ deeper/" },
   })
   local links = {}
   for _, g in ipairs({
     "DbDashSidebarDir",
-    "DbDashSidebarRunning",
+    "DbDashSidebarFetching",
+    "DbDashSidebarPartly",
     "DbDashSidebarPaused",
-    "DbDashSidebarIdle",
+    "DbDashSidebarStopped",
   }) do
     links[g] = vim.api.nvim_get_hl(0, { name = g }).link
   end
   eq(links, {
     DbDashSidebarDir = "Directory",
-    DbDashSidebarRunning = "DiagnosticOk",
-    DbDashSidebarPaused = "DiagnosticWarn",
-    DbDashSidebarIdle = "Normal",
+    DbDashSidebarFetching = "DiagnosticOk",
+    DbDashSidebarPartly = "DiagnosticWarn",
+    DbDashSidebarPaused = "DiagnosticInfo",
+    DbDashSidebarStopped = "Comment",
   })
 end
 

@@ -229,10 +229,11 @@ T["sidebar lists configs and starts/stops them"] = function()
     "DbDash Sidebar",
     "Directory: " .. child.lua_get("vim.fn.fnamemodify(vim.fn.getcwd(), ':~')"),
     "",
-    "● = Running  ◐ = Paused  ○ = Not running",
+    "● Fetching        ◐ Partly fetching",
+    "○ Paused          ⊘ Not running",
     "",
-    "○ board.yaml",
-    "○ broken.yaml",
+    "⊘ board.yaml",
+    "⊘ broken.yaml",
   })
   eq(
     child.lua_get(
@@ -247,9 +248,9 @@ T["sidebar lists configs and starts/stops them"] = function()
   eq(child.lua_get("vim.bo.filetype"), "dbdash")
   eq(child.lua_get("#vim.api.nvim_tabpage_list_wins(0)"), 2)
   child.cmd("wincmd h")
-  eq(lines()[6], "● board.yaml")
+  eq(lines()[7], "● board.yaml")
   child.type_keys("t")
-  eq(lines()[6], "○ board.yaml")
+  eq(lines()[7], "⊘ board.yaml")
   eq(child.lua_get("#vim.tbl_keys(require('dbdash.dashboard').dashboards)"), 0)
   child.cmd("DbDash") -- already open: jump to it
   eq(child.lua_get("#vim.api.nvim_tabpage_list_wins(0)"), 2)
@@ -261,32 +262,32 @@ T["sidebar directories expand, collapse and open nested dashboards"] = function(
   vim.fn.mkdir(dir .. "/team/daily", "p")
   vim.fn.writefile(vim.split(CFG, "\n"), dir .. "/team/daily/nested.yaml")
   child.cmd("DbDash")
-  eq(lines()[8], "▸ team/")
-  child.api.nvim_win_set_cursor(0, { 8, 0 })
-  child.type_keys("<CR>")
-  eq(
-    { lines()[8], lines()[9], child.api.nvim_win_get_cursor(0)[1] },
-    { "▾ team/", "  ▸ daily/", 8 }
-  )
+  eq(lines()[9], "▸ team/")
   child.api.nvim_win_set_cursor(0, { 9, 0 })
   child.type_keys("<CR>")
-  eq(lines()[10], "    ○ nested.yaml")
+  eq(
+    { lines()[9], lines()[10], child.api.nvim_win_get_cursor(0)[1] },
+    { "▾ team/", "  ▸ daily/", 9 }
+  )
+  child.api.nvim_win_set_cursor(0, { 10, 0 })
+  child.type_keys("<CR>")
+  eq(lines()[11], "    ⊘ nested.yaml")
   child.type_keys("t") -- stop/refresh do nothing on directories
   eq(child.lua_get("#require('dbdash.dashboard').list()"), 0)
-  child.api.nvim_win_set_cursor(0, { 10, 0 })
+  child.api.nvim_win_set_cursor(0, { 11, 0 })
   child.type_keys("<CR>")
   wait_loaded()
   eq(child.fn.expand("%:t"), "nested.yaml")
   child.cmd("wincmd h")
-  eq(lines()[10], "    ● nested.yaml")
+  eq(lines()[11], "    ● nested.yaml")
   -- closing and reopening keeps the tree expanded
   child.type_keys("q")
   child.cmd("DbDash")
-  eq(lines()[10], "    ● nested.yaml")
+  eq(lines()[11], "    ● nested.yaml")
   -- collapse the top directory
-  child.api.nvim_win_set_cursor(0, { 8, 0 })
+  child.api.nvim_win_set_cursor(0, { 9, 0 })
   child.type_keys("<CR>")
-  eq({ #lines(), lines()[8] }, { 8, "▸ team/" })
+  eq({ #lines(), lines()[9] }, { 9, "▸ team/" })
 end
 
 T["sidebar cursorline: the usual CursorLine by default, or none"] = function()
@@ -337,18 +338,18 @@ T["sidebar cursorline = name: underline after the marker, marker keeps its color
     end)()]]):format(lnum - 1, lnum - 1))
   end
   -- start board.yaml, come back: its line is ● and the cursor is on it
-  child.cmd("6")
+  child.cmd("7")
   child.type_keys("<CR>")
   wait_loaded()
   child.cmd("wincmd h")
-  child.cmd("6")
-  eq(lines()[6], "● board.yaml")
-  eq(cursor_mark(), { 6, "board.yaml", "DbDashSidebarCursor" }) -- not the ●
-  eq(marker(6), "DbDashSidebarRunning")
   child.cmd("7")
-  eq(cursor_mark(), { 7, "broken.yaml", "DbDashSidebarCursor" })
-  child.cmd("8") -- a directory: arrow and name share a color, the whole entry is underlined
-  eq(cursor_mark(), { 8, "▸ team/", "DbDashSidebarCursor" })
+  eq(lines()[7], "● board.yaml")
+  eq(cursor_mark(), { 7, "board.yaml", "DbDashSidebarCursor" }) -- not the ●
+  eq(marker(7), "DbDashSidebarFetching")
+  child.cmd("8")
+  eq(cursor_mark(), { 8, "broken.yaml", "DbDashSidebarCursor" })
+  child.cmd("9") -- a directory: arrow and name share a color, the whole entry is underlined
+  eq(cursor_mark(), { 9, "▸ team/", "DbDashSidebarCursor" })
   child.cmd("1")
   eq(cursor_mark(), { 1, "DbDash Sidebar", "DbDashSidebarCursor" })
   child.cmd("3") -- empty line: nothing
@@ -456,7 +457,7 @@ T["sidebar without configs says so and keeps the windows"] = function()
   child.cmd("cd " .. empty)
   child.cmd("edit notes.txt")
   child.cmd("DbDash")
-  eq(lines()[6], "(no config files matching *.yaml, *.yml)")
+  eq(lines()[7], "(no config files matching *.yaml, *.yml)")
   eq(
     child.lua_get("{ vim.bo.filetype, #vim.api.nvim_tabpage_list_wins(0) }"),
     { "dbdash-sidebar", 2 }
@@ -500,7 +501,7 @@ T["sessions without 'blank' in sessionoptions keep dashboard windows"] = functio
   child.cmd("source " .. vim.fn.fnameescape(session))
   child.lua([[_G.wait_for(function()
     local ds = require("dbdash.dashboard").list()
-    return #ds == 2 and ds[1].panels[1].rs ~= nil and ds[2].panels[1].rs ~= nil
+    return #ds == 2 and ds[1].panels[1].state.result ~= nil and ds[2].panels[1].state.result ~= nil
   end)]])
   eq(child.lua_get("#require('dbdash.dashboard').list()"), 2)
   eq(
@@ -630,7 +631,7 @@ local function start_grid()
   child.cmd("DbDashStart grid.yaml")
   child.lua([[_G.wait_for(function()
     local d = require("dbdash.dashboard").list()[1]
-    return d and d.panels[1].rs and d.panels[2].rs
+    return d and d.panels[1].state.result and d.panels[2].state.result
   end)]])
 end
 
@@ -640,21 +641,21 @@ T["grid: each panel shows the arguments it reads; local ones shadow shared ones"
   eq(find_line("hours=24") ~= nil, true) -- panel 2 reads only hours
   eq(find_line("region=EU"), nil) -- the shared region is shadowed where it is read
   local rows = child.lua_get(
-    "vim.tbl_map(function(p) return p.rs.rows[1][1] end, require('dbdash.dashboard').list()[1].panels)"
+    "vim.tbl_map(function(p) return p.state.result.rows[1][1] end, require('dbdash.dashboard').list()[1].panels)"
   )
   eq(rows, { "US", 24 })
   -- region= sets every region; orders.region= only that panel's.
   child.cmd("DbDashUpdateVariable region JP")
   child.lua(
-    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].rs.rows[1][1] == "JP" end)]]
+    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].state.result.rows[1][1] == "JP" end)]]
   )
   child.cmd("DbDashUpdateVariable orders.region CN")
   child.lua(
-    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].rs.rows[1][1] == "CN" end)]]
+    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].state.result.rows[1][1] == "CN" end)]]
   )
   eq(
     child.lua_get(
-      "require('dbdash.args').value(require('dbdash.dashboard').list()[1].cfg.shared_args[1], require('dbdash.dashboard').list()[1].state)"
+      "require('dbdash.args').value(require('dbdash.dashboard').list()[1].cfg.shared_args[1], require('dbdash.dashboard').list()[1].arg_state)"
     ),
     "JP"
   )
@@ -711,16 +712,16 @@ T["changing an argument while a query runs re-runs it with the new value"] = fun
   child.cmd("DbDashStart slow.yaml")
   child.lua([[_G.wait_for = function(fn) return vim.wait(20000, fn, 10) end]])
   child.lua(
-    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].rs ~= nil end)]]
+    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].state.result ~= nil end)]]
   )
   child.cmd("DbDashRestart")
   eq(child.lua_get("require('dbdash.dashboard').list()[1].panels[1].running"), true)
   child.cmd("DbDashUpdateVariable n 5") -- while the query runs
   child.lua([[_G.wait_for(function()
     local p = require("dbdash.dashboard").list()[1].panels[1]
-    return not p.running and p.rs.rows[1][1] == 5
+    return not p.running and p.state.result.rows[1][1] == 5
   end)]])
-  eq(child.lua_get("require('dbdash.dashboard').list()[1].panels[1].rs.rows[1][1]"), 5)
+  eq(child.lua_get("require('dbdash.dashboard').list()[1].panels[1].state.result.rows[1][1]"), 5)
 end
 
 T["hidden dashboards pause; showing them again refreshes what is due"] = function()
@@ -766,10 +767,11 @@ T["closing the last window of a dashboard stops it; hiding it pauses it"] = func
   child.cmd("DbDashStart board.yaml")
   wait_loaded()
   local buf = child.lua_get("vim.api.nvim_get_current_buf()")
-  -- hidden: another buffer in its window -> paused (◐), still running
+  -- hidden: another buffer in its window -> paused, still running; its one panel (a
+  -- database) fetches no more: ○
   child.cmd("enew")
   settle(100)
-  eq({ running(), paused(), sidebar_mark("board.yaml") }, { 1, true, "◐" })
+  eq({ running(), paused(), sidebar_mark("board.yaml") }, { 1, true, "○" })
   child.cmd("buffer " .. buf)
   settle(100)
   eq({ paused(), sidebar_mark("board.yaml") }, { false, "●" })
@@ -778,14 +780,14 @@ T["closing the last window of a dashboard stops it; hiding it pauses it"] = func
   child.cmd("q")
   settle(100)
   eq({ running(), paused() }, { 1, false })
-  -- closing its last window (:q) stops it like :DbDashStop (○), the buffer is gone
+  -- closing its last window (:q) stops it like :DbDashStop (⊘), the buffer is gone
   child.cmd("q")
   settle(100)
   eq({
     running(),
     sidebar_mark("board.yaml"),
     child.lua_get(("vim.api.nvim_buf_is_valid(%d)"):format(buf)),
-  }, { 0, "○", false })
+  }, { 0, "⊘", false })
 end
 
 T["a dashboard only in another tab pauses; closing that tab stops it"] = function()
@@ -871,12 +873,24 @@ T["resuming before the next refresh keeps the remaining time"] = function()
   eq(child.lua_get("require('dbdash.dashboard').list()[1]:remaining() > 3500"), true)
 end
 
-T["the sidebar marks paused dashboards with ◐"] = function()
+T["the sidebar marks what a dashboard fetches: ● all, ◐ some, ○ none (hidden)"] = function()
   fast_board()
-  child.cmd("enew")
-  settle(100)
+  vim.fn.writefile(
+    vim.fn.readfile(ROOT .. "/example/dashboards/hidden.yaml"),
+    dir .. "/hidden.yaml"
+  )
+  child.cmd("DbDashStart hidden.yaml")
   child.cmd("DbDash")
-  eq(vim.tbl_contains(lines(), "◐ fast.yaml"), true)
+  eq(vim.tbl_contains(lines(), "● hidden.yaml"), true) -- shown: every panel fetches
+  child.cmd("wincmd l")
+  child.cmd("enew") -- both hidden
+  settle(100)
+  child.cmd("wincmd h") -- the sidebar
+  -- hidden.yaml: one panel with show.refresh_hidden goes on; fast.yaml: none does
+  eq({ vim.tbl_contains(lines(), "◐ hidden.yaml"), vim.tbl_contains(lines(), "○ fast.yaml") }, {
+    true,
+    true,
+  })
 end
 
 T["pause_hidden = false keeps hidden dashboards refreshing"] = function()
@@ -898,7 +912,7 @@ T["hidden by switching the window: only refresh_hidden panels go on (the example
   child.cmd("DbDashStart hidden.yaml")
   child.lua([[_G.wait_for(function()
     local d = require("dbdash.dashboard").list()[1]
-    return d and d.panels[1].rs and d.panels[2].rs
+    return d and d.panels[1].state.result and d.panels[2].state.result
   end)]])
   local count = [[vim.tbl_map(function(p) return p.refresh_count or 0 end,
     require("dbdash.dashboard").list()[1].panels)]]
@@ -944,7 +958,7 @@ T["export key picks a format; with panels the one under the cursor"] = function(
   child.cmd("DbDashStart " .. ROOT .. "/example/dashboards/multi_panel.yaml")
   child.lua([[_G.wait_for(function()
     local d = require("dbdash.dashboard").list()[1]
-    for _, p in ipairs(d.panels) do if not p.rs then return false end end
+    for _, p in ipairs(d.panels) do if not p.state.result then return false end end
     return true
   end)]])
   child.lua([[vim.ui.select = function(items, _, cb) cb("csv") end]])
@@ -952,7 +966,7 @@ T["export key picks a format; with panels the one under the cursor"] = function(
   child.api.nvim_win_set_cursor(0, { r.row_s + 2, r.x + 1 })
   child.type_keys("e")
   local second = child.lua_get(
-    "require('dbdash.export').format(require('dbdash.dashboard').list()[1].panels[2].rs, 'csv')"
+    "require('dbdash.export').format(require('dbdash.dashboard').list()[1].panels[2].state.result, 'csv')"
   )
   eq(child.fn.getreg('"'), second)
 end
@@ -986,13 +1000,13 @@ T["thresholds notify once when a value rises to a notify step"] = function()
   }, dir .. "/alert.yaml")
   child.cmd("DbDashStart alert.yaml")
   child.lua(
-    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].rs ~= nil end)]]
+    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].state.result ~= nil end)]]
   )
   local function set(v)
     child.cmd("DbDashUpdateVariable v " .. v)
     child.lua(([[_G.wait_for(function()
       local p = require("dbdash.dashboard").list()[1].panels[1]
-      return not p.running and p.rs.rows[1][1] == %d
+      return not p.running and p.state.result.rows[1][1] == %d
     end)]]):format(v))
   end
   local function warnings()
@@ -1050,7 +1064,7 @@ T["backoff: consecutive failures wait 2x, 4x... the interval; success resets"] =
   -- a manual refresh is not delayed; success resets the backoff
   child.cmd("DbDashUpdateVariable v 1")
   child.lua(
-    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].error == nil end)]]
+    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].state.error == nil end)]]
   )
   eq({ panel("failures"), panel("retry_at") }, { 0, vim.NIL })
   eq(child.lua_get("require('dbdash.dashboard').list()[1].panels[1]:remaining() <= 1"), true)
@@ -1139,17 +1153,20 @@ T["lua:// dashboards: template, args, chart; errors point at the YAML line"] = f
   child.lua([[require("dbdash").setup({ lua = { confirm = false } })]]) -- trust: test_trust.lua
   child.cmd("DbDashStart lua.yaml")
   child.lua(
-    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].rs ~= nil end)]]
+    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].state.result ~= nil end)]]
   )
   eq(
-    child.lua_get("require('dbdash.dashboard').list()[1].panels[1].rs.rows"),
+    child.lua_get("require('dbdash.dashboard').list()[1].panels[1].state.result.rows"),
     { { "k1", 3 }, { "k2", 6 }, { "k3", 9 } }
   )
   child.cmd("DbDashUpdateVariable n 2")
   child.lua(
-    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].rs.row_count == 2 end)]]
+    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].state.result.row_count == 2 end)]]
   )
-  eq(child.lua_get("require('dbdash.dashboard').list()[1].panels[1].rs.rows[2]"), { "k2", 4 })
+  eq(
+    child.lua_get("require('dbdash.dashboard').list()[1].panels[1].state.result.rows[2]"),
+    { "k2", 4 }
+  )
   -- a runtime error is reported with the line of the YAML file
   vim.fn.writefile({
     "database: { url: 'lua://' }",
@@ -1161,7 +1178,7 @@ T["lua:// dashboards: template, args, chart; errors point at the YAML line"] = f
   child.cmd("DbDashStart lua_err.yaml")
   child.lua([[_G.wait_for(function()
     for _, d in ipairs(require("dbdash.dashboard").list()) do
-      if d.path:find("lua_err") and d.panels[1].error then return true end
+      if d.path:find("lua_err") and d.panels[1].state.error then return true end
     end
   end)]])
   eq(
@@ -1184,7 +1201,7 @@ T["query.transform: shown by :DbDashShowSQL, exported as transformed"] = functio
   child.lua([[require("dbdash").setup({ lua = { confirm = false } })]]) -- trust: test_trust.lua
   child.cmd("DbDashStart tf.yaml")
   child.lua(
-    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].rs ~= nil end)]]
+    [[_G.wait_for(function() return require("dbdash.dashboard").list()[1].panels[1].state.result ~= nil end)]]
   )
   child.cmd("DbDashExport csv")
   eq(child.fn.getreg('"'), "k,v\na,20\n")

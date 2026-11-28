@@ -104,7 +104,7 @@ end
 function M.new(p, values, parent, kind)
   local run = setmetatable({
     panel = p,
-    values = values or args.resolve_panel(p.cfg, p.d.state),
+    values = values or args.resolve_panel(p.cfg, p.d.arg_state),
     depth = parent and parent.depth + 1 or 0,
     -- The life: callbacks so far, records, and the cancel token of the refresh.
     counter = parent and parent.counter
@@ -210,7 +210,7 @@ function Run:set_arg(name, v)
   for _, m in ipairs(run.maps) do
     require("dbdash.util.map").set(m, name, R.from_lua(v))
   end
-  args.set_modified(run.panel.d.state, spec.key, v == nil and vim.NIL or v)
+  args.set_modified(run.panel.d.arg_state, spec.key, v == nil and vim.NIL or v)
 end
 
 ---The `dbdash` table of a run's Lua code: the shared helpers plus the run's own:
@@ -286,7 +286,7 @@ end
 ---description): the shared arguments, the dashboard's metadata; it changes no argument.
 function M.dashboard_opts(d)
   local cfg = d.cfg
-  local values = args.resolve(cfg.shared_args, d.state)
+  local values = args.resolve(cfg.shared_args, d.arg_state)
   local seen = vim.deepcopy(values)
   local function refuse()
     error("arguments cannot be assigned in a description", 0)

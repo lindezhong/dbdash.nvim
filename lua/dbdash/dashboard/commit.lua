@@ -4,8 +4,9 @@
 --
 -- A panel's results are committed at most once per period (its ticks): the first result
 -- of a period at once (a database's query of the tick), later ones at the next tick (a
--- source that sends data faster than its interval). A hidden dashboard (dashboard:hidden)
--- commits nothing: its results wait, and are committed at once when it is shown again.
+-- source that sends data faster than its interval). It reads the panels' states it is
+-- given (panel:state): a panel that is not drawing (its dashboard hidden) commits nothing,
+-- its results wait and are committed at once when it draws again.
 -- Committing is idempotent: a tick with nothing pending writes nothing new. The status
 -- (running, listening..., the next tick) is element data (Node:set_data), written when it
 -- changes.
@@ -37,7 +38,7 @@ function M.header_status(d)
   if d.refreshing_all then
     local running = false
     for _, p in ipairs(d.panels) do
-      running = running or p.running
+      running = running or p.state.activity == "querying"
     end
     d.refreshing_all = running or nil
   end
@@ -53,7 +54,7 @@ function M.args(d)
     local node = child(p.node, "args")
     local items = {}
     for _, spec in ipairs(p.cfg.shown_args) do
-      local value = args.format_value(args.value(spec, d.state))
+      local value = args.format_value(args.value(spec, d.arg_state))
       items[#items + 1] = { name = spec.name, value = value, ["local"] = spec.panel ~= nil }
     end
     if not vim.deep_equal(items, node.items) then
@@ -81,8 +82,11 @@ function M.panel(p)
   -- the chart's content (render/content): built from the result here, before styles are
   -- computed, as a script builds elements before the browser styles them; a result the
   -- data cannot show (a missing column) is reported by the renderer instead
-  if p.rs and not p.error then
-    pcall(require("dbdash.render.content").build, p.chart_node, p.rs, show)
+  local st = p.state
+  -- the result shown (layout draws it): what is committed, not what came since
+  p.chart_node.result = st.result
+  if st.result and not st.error then
+    pcall(require("dbdash.render.content").build, p.chart_node, st.result, show)
   end
   local title = child(p.node, "panel-title")
   title:set_text(style.get(title).display ~= "none" and p:shown_title() or nil)
@@ -91,14 +95,15 @@ function M.panel(p)
   child(p.node, "subtitle"):set_text(sub ~= nil and sub ~= vim.NIL and sub or nil)
 end
 
----A panel's status: its error, and data of its element: running, its source's state
----(push panels), the next tick (none once it ended).
+---A panel's status from its state: its error, and data of its element: querying, its
+---source's state (a source that sends data), the next tick (none once it ended).
 ---@param p dbdash.Panel
 function M.status(p)
-  child(p.node, "error"):set_text(p.error and format_error(p.error) or nil)
-  p.node:set_data("running", p.running == true)
-  p.node:set_data("state", p:push_state())
-  p.node:set_data("next_at", p.next_at)
+  local st = p.state
+  child(p.node, "error"):set_text(st.error and format_error(st.error) or nil)
+  p.node:set_data("running", st.activity == "querying")
+  p.node:set_data("state", st.source)
+  p.node:set_data("next_at", st.next_at)
   M.header_status(p.d)
 end
 
@@ -106,7 +111,7 @@ end
 ---next tick. The chart is laid out again (its values may change with the same result).
 ---@param p dbdash.Panel
 function M.result(p)
-  if p.committed or p.d.paused then
+  if p.committed or not p.state.drawing then
     p.pending = true
     return
   end
@@ -139,30 +144,19 @@ function M.attach(d)
     end
     M.status(p)
   end)
-  ev:on("panel:result", M.result)
-  ev:on("panel:error", function(p, _, o)
-    if not o.internal then
-      M.result(p)
+  ev:on("panel:state", function(p, st, changed)
+    if changed.run or changed.result or changed.error then
+      M.result(p) -- a result settled, or failed
     end
-  end)
-  ev:on("panel:state", function(p)
-    if p.ended and p.pending then
-      p.committed = false -- the last result, now
+    if p.pending and ((changed.drawing and st.drawing) or (changed.source and p.ended)) then
+      -- drawing again (shown): what waited, at once; a source that ended: its last result
+      p.committed = false
       M.result(p)
     end
     M.status(p)
   end)
   ev:on("dashboard:args", function()
     M.args(d)
-  end)
-  -- shown again: what came while hidden, at once (after the clock's ticks that came due)
-  ev:on("dashboard:shown", function()
-    for _, p in ipairs(d.panels) do
-      if p.pending then
-        p.committed = false
-        M.result(p)
-      end
-    end
   end)
 end
 

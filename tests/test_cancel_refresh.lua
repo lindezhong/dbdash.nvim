@@ -96,22 +96,22 @@ T["a requested refresh cancels the running one and starts at once"] = function()
     { first.record.id, false, "query cancelled: replaced by a new refresh" }
   )
   eq(p.history[1].cancelled, "replaced by a new refresh")
-  eq(p.error, nil)
+  eq(p.state.error, nil)
 end
 
 T["changing an argument cancels the running refresh; only the new result shows"] = function()
   local d = start(SLOW)
   local p = d.panels[1]
   wait_running(p)
-  require("dbdash.args").set_modified(d.state, "q", "fast")
+  require("dbdash.args").set_modified(d.arg_state, "q", "fast")
   d:restart()
   vim.wait(1000, function()
-    return p.rs ~= nil
+    return p.state.result ~= nil
   end, 5)
-  eq(p.rs.rows[1][1], "fast")
+  eq(p.state.result.rows[1][1], "fast")
   vim.wait(2500) -- the slow query's late result is dropped
-  eq(p.rs.rows[1][1], "fast")
-  eq({ p.error, p.refresh_count }, { nil, 2 })
+  eq(p.state.result.rows[1][1], "fast")
+  eq({ p.state.error, p.refresh_count }, { nil, 2 })
 end
 
 T["a timer tick while a refresh runs is skipped, not a cancel"] = function()
@@ -121,9 +121,9 @@ T["a timer tick while a refresh runs is skipped, not a cancel"] = function()
   p:emit("panel:tick") -- a timer tick
   eq(p.history[1].skipped, true)
   vim.wait(2500, function()
-    return p.rs ~= nil
+    return p.state.result ~= nil
   end, 5)
-  eq({ has("cancel"), p.rs.rows[1][1], p.refresh_count }, { false, "slow", 1 })
+  eq({ has("cancel"), p.state.result.rows[1][1], p.refresh_count }, { false, "slow", 1 })
 end
 
 T["stopping the dashboard cancels its queries"] = function()
