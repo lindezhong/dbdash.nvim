@@ -178,8 +178,8 @@ the header's `title` and `description`. The top-level `database`, `query` and `s
 defaults each panel can override (a panel's own `database`, `show.interval`, ...); fields
 of one chart (`query.sql`, `show.type`, ...) belong in each panel. A panel's `query.args`
 are its own. A config is checked when it loads (fields, arguments, the database URL and
-the driver's options, chart types, style sheets, the grid), each problem with its line and
-column. See `:help dbdash-config`.
+the driver's options, chart types, style sheets, the grid), each problem with its line,
+column and the check that found it (`board.yaml:7:9: [chart] unknown chart type 'radar'`). See `:help dbdash-config`.
 
 Style sheets map selectors to CSS properties, at the top level (the dashboard's), in a
 panel (only its own elements) and in `setup()` (every dashboard):
@@ -229,6 +229,7 @@ Examples are in [`example/`](example), one directory per topic (`:help dbdash-ex
 | [`push/`](example/push) | push sources: [`luastream.yaml`](example/push/luastream.yaml) (with `dbdash.run()` on an item), [`exec.yaml`](example/push/exec.yaml), [`webhook.yaml`](example/push/webhook.yaml) (OpenAPI: a GET without a token, a POST with one) |
 | [`databases/`](example/databases) | a SQLite file ([`sqlite_file.yaml`](example/databases/sqlite_file.yaml)); after `make it-up` (the test services in docker): [`postgres.yaml`](example/databases/postgres.yaml), [`mysql.yaml`](example/databases/mysql.yaml), [`redis.yaml`](example/databases/redis.yaml), [`mongodb.yaml`](example/databases/mongodb.yaml), [`cassandra.yaml`](example/databases/cassandra.yaml), [`mssql.yaml`](example/databases/mssql.yaml), [`http.yaml`](example/databases/http.yaml) |
 | [`connections/`](example/connections) | after `make it-up`: TLS modes ([`tls.yaml`](example/connections/tls.yaml)), passwords outside the config ([`passwords.yaml`](example/connections/passwords.yaml)), cancelling a slow query ([`cancel.yaml`](example/connections/cancel.yaml)); an HTTPS API ([`github.yaml`](example/connections/github.yaml), needs network) |
+| [`extend/`](example/extend) | a driver ([`numbers://`](example/extend/lua/dbdash/db/drivers/numbers)) and a chart type ([`progress`](example/extend/lua/dbdash/render/charts/progress)) of your own, each a directory with its checks ([`extend.yaml`](example/extend/extend.yaml)) |
 
 ### Connection URLs
 
@@ -400,7 +401,11 @@ Origin checks, limits on bodies and connections. Examples are in
 ## Development
 
 How the code is put together (layers, data sources, scheduling, drawing, events) is in
-[ARCHITECTURE.md](ARCHITECTURE.md).
+[ARCHITECTURE.md](ARCHITECTURE.md). A chart type is a directory `render/charts/<type>/`
+and a driver a directory `db/drivers/<name>/`, each with its own checks (`validate.lua`),
+found on the runtimepath: adding one is adding the directory, then its schema, help,
+example and tests (ARCHITECTURE.md#extending). Yours can live in your own config
+directory the same way (`:help dbdash-extend`).
 
 ```sh
 make test                  # lint, then unit, golden and UI tests

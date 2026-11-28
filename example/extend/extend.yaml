@@ -8,7 +8,7 @@
 #   :set runtimepath+=example/extend   (from the plugin's directory)
 #   :DbDashStart example/extend/extend.yaml
 # A config error names the validator that found it, e.g. with step: 0
-#   extend.yaml:20:24: [db numbers] step must be positive, not 0
+#   extend.yaml:21:12: [db numbers] step must be positive, not 0
 # No $schema line here: the schema describes the built-in types and drivers only.
 
 title: "Extending dbdash"

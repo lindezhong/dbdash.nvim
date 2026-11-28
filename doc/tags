@@ -36,6 +36,7 @@ dbdash-description	dbdash.txt	/*dbdash-description*
 dbdash-errors	dbdash.txt	/*dbdash-errors*
 dbdash-examples	dbdash.txt	/*dbdash-examples*
 dbdash-exec	dbdash.txt	/*dbdash-exec*
+dbdash-extend	dbdash.txt	/*dbdash-extend*
 dbdash-header	dbdash.txt	/*dbdash-header*
 dbdash-health	dbdash.txt	/*dbdash-health*
 dbdash-highlights	dbdash.txt	/*dbdash-highlights*

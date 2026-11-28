@@ -45,7 +45,8 @@ defaults: >lua
     style = {},            -- your style sheet for every dashboard:
                            -- selector -> properties, |dbdash-css|
     ticks = "nice",        -- axis ticks: "nice" or "linear"
-    register = {},         -- custom chart styles and canvases
+    register = {},         -- renderers of a chart type, canvases, ticks,
+                           -- palettes (types and drivers: |dbdash-extend|)
     sidebar = {
       width = 30,          -- columns, or "30%" of the editor width
       position = "left",   -- "left" | "right"
@@ -131,8 +132,10 @@ then: the YAML, the fields and their types, the arguments, the database
 driver's `database.options`: an unknown option is an error), the chart
 types, the style sheets (properties, renderer, canvas and palette names),
 the thresholds and the grid. A problem is reported with its line and
-column, and the dashboard does not start: >
-  config error: board.yaml:7:9: unknown chart type 'radar'
+column and the check that found it (a validator: [css], [db], [args],
+[dashboard], [chart], [grid], a driver's own such as [db postgres], a chart
+type's such as [chart progress]), and the dashboard does not start: >
+  config error: board.yaml:7:9: [chart] unknown chart type 'radar'
 <
 What depends on templates is checked when it runs (the rendered SQL, curl
 command or OpenAPI document). Every error reads the same way: the driver,
@@ -536,6 +539,7 @@ topic (the sidebar shows them as a tree):
   lua/          a lua:// source, query.transform, store, callbacks, run
                 records
   push/         luastream://, exec:// and webhook:// (|dbdash-push|)
+  extend/       a driver and a chart type of your own (|dbdash-extend|)
   databases/    a SQLite file; after `make it-up` (the test services in
                 docker): postgres, mysql, redis, mongodb, cassandra, mssql
                 and http
@@ -987,7 +991,8 @@ A canvas has `new` and `px_per_char`, ticks `ticks` and `limits`, a palette
 `color`, a frame `render`, `plot_size` and `apply_style`: one missing is an
 error when it is registered. The interfaces are in
 lua/dbdash/render/types.lua. Names in style sheets (`renderer`, `canvas`,
-`palette`) are checked when a config loads.
+`palette`) are checked when a config loads. A chart type of your own (its
+renderers, its parts, its checks) is a directory: |dbdash-extend|.
 
 The YAML parser supports a subset: block and flow collections, quoted and
 plain scalars, block scalars, comments. Anchors, tags and multiple documents
@@ -2284,26 +2289,6 @@ require("dbdash").query({url}, {query}, {opts}, {callback})
     once, on the main loop. Returns a handle: `handle:cancel(reason)` stops
     the query (|dbdash-cancel|). Push sources (|dbdash-push|) cannot be
     queried this way: they run as a panel's stream.
-require("dbdash.db").register({driver})        add a data source
-    {driver} has a `name`, `schemes` (default { name }) and one of:
-    - `connect(info)`: a database. It returns a connection with
-      `execute(query, opts)` (a result set), `close()` and optionally
-      `server_version()`; dbdash queries it once per period, with timeouts
-      and backing off after failures. Optionally `cancel(conn, info)` stops
-      the running query on the server (|dbdash-cancel|).
-    - `produce(info, query, ctx)`: a source that sends data. `ctx.emit(value)`
-      passes one item, `ctx.writer(delimiter)` returns a function whose text
-      is cut into items, `ctx.set_status(text)` and `ctx.on_stop(fn)`; it
-      runs until it returns.
-    Optionally `options`: the `database.options` it reads, by name, each a
-    type name ("string", "integer", "boolean", "map", "list") or a function
-    returning an error message; a config with another option is an error.
-    Also `dialect` (how template values are written,
-    |dbdash-template-dialects|),
-    `parse_url(info)` and `query_optional` (a config may leave `query.sql`
-    out). A driver without `name`, or with both or neither of `connect` and
-    `produce`, is an error. The types are in lua/dbdash/db/types.lua.
-
                                                         *dbdash-session-state*
 require("dbdash").mksession({file})
     Write the argument values of running dashboards that differ from their
@@ -2323,5 +2308,60 @@ file: >lua
   -- after :source {file}
   require("dbdash").load_session(file .. ".dbdash")
 <
+
+Drivers and chart types of your own                           *dbdash-extend*
+
+A driver and a chart type are directories under lua/dbdash/ on the
+'runtimepath', found as the built-in ones are: nothing to register. Put them
+in your config directory (~/.config/nvim/lua/dbdash/...), or in a plugin of
+your own. `example/extend/` has one of each (numbers:// and the progress
+chart) with extend.yaml: `:set runtimepath+=example/extend` from the
+plugin's directory, then `:DbDashStart example/extend/extend.yaml`.
+
+A driver: lua/dbdash/db/drivers/{name}/ >
+  init.lua       the driver (required)
+  validate.lua   its checks (required)
+  ...            its own files
+<
+init.lua returns a table with a `name`, `schemes` (default { name }) and
+one of:
+- `connect(info)`: a database. It returns a connection with
+  `execute(query, opts)` (a result set), `close()` and optionally
+  `server_version()`; dbdash queries it once per period, with timeouts and
+  backing off after failures. Optionally `cancel(conn, info)` stops the
+  running query on the server (|dbdash-cancel|).
+- `produce(info, query, ctx)`: a source that sends data. `ctx.emit(value)`
+  passes one item, `ctx.writer(delimiter)` returns a function whose text is
+  cut into items, `ctx.set_status(text)` and `ctx.on_stop(fn)`; it runs
+  until it returns.
+Optionally `options`: the `database.options` it reads, by name, each a type
+name ("string", "integer", "boolean", "map", "list") or a function
+returning an error message; `dialect`, how template values are written
+(|dbdash-template-dialects|; `require("dbdash.db.dialect").make(name,
+rules)`, standard SQL without one); `parse_url(info)`; `query_optional` (a
+config may leave `query.sql` out). The types are in lua/dbdash/db/types.lua.
+
+A chart type: lua/dbdash/render/charts/{type}/ >
+  init.lua       the type (required)
+  {renderer}.lua its renderers (one at least)
+  validate.lua   its checks (optional)
+<
+init.lua returns a table with `renderers` (names of the files next to it,
+the first the default; `canvas`: the default canvas of a canvas chart),
+`parts` (its content as elements, styled by sheets:
+`require("dbdash.render.content.chart").parts(model)` where `model(rs,
+show)` gives its series, bars, legend items ...) and `style` (the default
+style of its parts, |dbdash-css-elements|). A renderer is `{ render = fn }`
+(|dbdash-styles|). The types are in lua/dbdash/render/registry.lua.
+
+validate.lua is a validator: a table with `name` (in its errors: "db
+numbers", "chart progress"), `checks` (what it checks), `after` (the
+validators that run before it: { "db" } for a driver, { "chart" } for a
+chart type) and `validate(cfg, ctx)`. It gets the whole config and checks
+its part: the databases of its driver (`require("dbdash.db.checks")`:
+`databases(cfg, name)`, `url`, `options`, or `validator(name)` for just
+those), the panels of its chart type (`cfg.panels[i].show`). `ctx:fail(path,
+msg, ...)` reports a problem at the line of `path`, `ctx:expect(path,
+value, kind, optional)` checks a type.
 
  vim:tw=78:ts=8:ft=help:norl:
