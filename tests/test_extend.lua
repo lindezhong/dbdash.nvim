@@ -55,7 +55,7 @@ T["a dashboard of them runs and draws"] = function()
       end, 10),
       true
     )
-    local rs = d.panels[1].state.result
+    local rs = assert(d.panels[1].state.result)
     eq({ rs.row_count, rs.rows[2][2] }, { 8, 14 }) -- n2 x step 7
     require("dbdash.view.dashboard").redraw(d)
     local text = table.concat(vim.api.nvim_buf_get_lines(d.buf, 0, -1, false), "\n")

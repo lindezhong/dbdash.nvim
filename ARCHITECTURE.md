@@ -66,17 +66,28 @@ Rules that keep it so:
       ├ dashboard.prepare(path, tokens)          dashboard/init.lua
       │   ├ config.load                          the only reader of config files
       │   │   ├ yaml.parse_file                  every value knows its line
-      │   │   ├ structure and types              (config.lua: fields, defaults, panels)
-      │   │   └ validators                       the rules of the modules (config/validators.lua)
-      │   │       css                style: the sheet parses (gives its rules)
-      │   │       args               arg, args: names, types, each name once
-      │   │       db                 database: the driver (type or URL), the URL's
-      │   │                          variables and parameters, password_cmd, the options
-      │   │       render.registry    show: the chart type; style: renderer, canvas, palette
-      │   │       render.thresholds  show: thresholds
-      │   │       layout.grid        dashboard: the panels can be placed
-      │   │       dashboard.timer    show, panel, dashboard: intervals, refresh_hidden
-      │   │       → ctx:fail(path, msg) reports the line
+      │   │   ├ the structure                    config.lua: the panels (a config without
+      │   │   │                                  `panels:` is its only one), the top-level
+      │   │   │                                  defaults merged into each
+      │   │   └ the validators                   found, not listed: every
+      │   │                                      lua/dbdash/**/validate.lua on the
+      │   │                                      runtimepath, ordered by their `after`;
+      │   │                                      each gets the whole config
+      │   │       [css]        css/validate.lua        style sheets parse (their rules)
+      │   │       [db]         db/validate.lua         database: which driver (type or the URL's
+      │   │                                            scheme), ${NAME} in the URL, password_cmd
+      │   │       [args]       args/validate.lua       arguments: names, types, each name once
+      │   │       [dashboard]  dashboard/validate.lua  the top-level fields, the query and show
+      │   │                                            fields every panel has, intervals,
+      │   │                                            refresh_hidden (after db)
+      │   │       [chart]      render/validate.lua     show.type, renderer, canvas, palette names,
+      │   │                                            thresholds (after css)
+      │   │       [grid]       layout/validate.lua     the panels can be placed (after css)
+      │   │       [db <name>]  db/drivers/<name>/validate.lua    its panels: the URL's form,
+      │   │                                            database.options, the query (after db)
+      │   │       [chart <type>]  render/charts/<type>/validate.lua   its panels' show
+      │   │                                            (after chart)
+      │   │       → ctx:fail(path, msg): the error says the validator, the file and the line
       │   ├ trust.check                          Lua code and curl -c: ask first
       │   │                                      (unless trust.required says no)
       │   └ the command line's arguments
@@ -91,14 +102,21 @@ Rules that keep it so:
 A config without `panels:` is a dashboard of one panel: once loaded, a config is always
 its list of panels (`cfg.panels`), and nothing after loading asks how it was written.
 
+config.lua knows the structure only (where the panels are, the defaults they take): it
+knows no field's meaning and no validator. A validator is a module's own: it has a name
+(in its errors: `board.yaml:12: [db] panels[2].database.url: ...`), what it checks, the
+validators that run before it (`after`: one fills in what another reads, as [db] fills
+in database.type), and validate(cfg, ctx): the whole config, of which it checks, and may
+complete, its own part. Fields no validator reads are left alone.
+
 Only what depends on templates is checked when it runs: the rendered curl command,
 OpenAPI document or SQL.
 
 ## Data sources
 
-Every data source is a driver (`db/types.lua`): it has `connect` (a database, queried) or
-`produce` (a source that sends data), the options it reads (`options`, checked by
-`db/options.lua`) and the name of its template dialect (`template/dialect.lua`). A
+Every data source is a driver (`db/drivers/<name>/`, see Extending): it has `connect` (a
+database, queried) or `produce` (a source that sends data), its URL schemes, the options
+it reads, its template dialect, and its checks (its validate.lua). A
 database's producer is the same for all of them (`db/driver.lua`).
 
 ```
@@ -357,15 +375,55 @@ carry state send it whole (`panel:state`, `dashboard:state`); `panel:tick`,
 | update the rendering (only what is dirty) | the view's frame |
 | hidden tab: no rendering, slower timers | hidden dashboard: no frames, no commits, only refresh_hidden ticks; push sources keep receiving |
 
+## Extending
+
+A chart type and a driver are each a directory that says all there is about it; the
+modules that use them find them, nothing lists or registers them. Built-ins and the
+user's are found the same way, by their path on the runtimepath: a user's
+`~/.config/nvim/lua/dbdash/db/drivers/foo/init.lua` is found as a built-in driver is.
+
+```
+render/charts/<type>/          a chart type
+  init.lua      renderers (the first: the default; a canvas chart's default canvas),
+                parts: fun(chart, rs, show), its content as DOM (render/content builds it
+                with it), style: the default style of its parts (merged into the user
+                agent sheet)
+  validate.lua  optional: [chart <type>], the show of the panels of this type (after chart)
+  <name>.lua    its renderers
+    used by     render/registry (types, renderers), render/content (parts), css/ua (style)
+
+db/drivers/<name>/             a driver
+  init.lua      name, schemes, capabilities, dialect (how values are written in its
+                queries), options (what database.options it reads), connect | produce,
+                cancel (db/types.lua)
+  validate.lua  optional: [db <name>], the panels that use it: the URL's form,
+                database.options, the query (after db)
+  ...           its own files (a protocol, a worker thread)
+    used by     db (schemes → driver), template (the dialect)
+```
+
+A validate.lua is a validator like any other (found the same way, given the whole
+config): it checks the panels that use its driver or chart type. `register` in setup()
+stays for renderers, canvases, ticks and palettes.
+
+`:checkhealth dbdash.<database>` stays at `lua/dbdash/<database>/health.lua` (Neovim finds
+health checks by that path).
+
+Adding one: the directory, then what tests check against it: the schema
+(`example/dbdash.schema.yaml`: show.type and the type's fields; the URL schemes), the help
+(`doc/dbdash.txt`: the type and its parts; the scheme), an example
+(`example/charts/<type>.yaml`, `example/databases/<name>.yaml`) and its tests.
+
 ## Interfaces
 
 | Interface | Defined in | Implemented by |
 |---|---|---|
-| `dbdash.db.Driver`, `Connection`, `StreamCtx` | `db/types.lua` (base: `db/driver.lua`) | `db/drivers/*` |
-| a config part's rules (`M.validators`) | `config/types.lua` (listed in `config/validators.lua`) | `css`, `args`, `db`, `render/registry`, `render/thresholds`, `layout/grid`, `dashboard/timer` |
-| chart renderers, canvases, ticks, palettes, frames | `render/types.lua` (checked by `render/registry.lua`) | `render/charts/*`, `render/{canvas,ticks,palette,frame}/*` |
+| a driver (`dbdash.db.Driver`), `Connection`, `StreamCtx` | `db/types.lua` (base: `db/driver.lua`) | `db/drivers/<name>/init.lua`, found on the runtimepath |
+| a validator (name, checks, after, validate(cfg, ctx)) | `config/types.lua` | every `validate.lua` on the runtimepath: css, db, args, dashboard, render, layout, each driver, each chart type |
+| a chart type (renderers, parts, style) | `render/types.lua` (collected by `render/registry.lua`) | `render/charts/<type>/init.lua`, found on the runtimepath |
+| chart renderers, canvases, ticks, palettes, frames | `render/types.lua` (checked by `render/registry.lua`) | `render/charts/<type>/*`, `render/{canvas,ticks,palette,frame}/*` |
 | `dbdash.render.Output` (lines and highlights): the chart only, never its title | `render/types.lua` | every renderer |
-| a chart's content (DOM) | `render/content` (`build` by commit, `root` for renderers) | `render/content/*`; read by table and text renderers |
+| a chart's content (DOM) | `render/content` (`build` by commit with the type's `parts`, `root` for renderers) | each chart type's `parts`; read by table and text renderers |
 | `dbdash.Error` | `util/error.lua` | every error shown to the user |
 | a run of `db.run` (`dbdash.db.RunHandle`) | `db/init.lua` | used by `dashboard/panel.lua` |
 
@@ -379,15 +437,18 @@ lua/dbdash/
   dashboard/               the model: the running dashboards (init), Dashboard, Panel, Run,
                            clock (timer), document, commit, history, track, thresholds,
                            events
-  config.lua, config/      loading configs; the validator list and its interface
+  config.lua, config/      loading configs (the structure); finding and running the
+                           validators, their interface
   options.lua, session.lua setup's options; argument values in sessions
   trust.lua, metadata.lua  trust records; meta for templates and Lua
   layout/, paint/          grid and panels; display lists and boxes (borders, padding)
-  render/, compositor/     charts, their content and parts, the registry, the interfaces;
-                           layers into lines
+  render/, compositor/     chart types (charts/<type>/: the type, its checks, its
+                           renderers), their content, the registry, the interfaces; layers
+                           into lines
   css/, dom/               style system; documents and nodes
-  db/                      db.run, the drivers' interface and base (types, driver), drivers,
-                           results, the Lua of queries (lua_env)
+  db/                      db.run, the drivers' interface and base (types, driver), drivers
+                           (drivers/<name>/: the driver, its checks, its files), results,
+                           the Lua of queries (lua_env)
   template/                the Jinja2 engine and SQL dialects
   net/, crypto/, yaml/     sockets, TLS, HTTP, OpenAPI; cryptography; YAML
   util/                    errors, JSON, UTF-8, numbers, time, shell, URLs, events, the Lua
